@@ -1,0 +1,22 @@
+# Database
+
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.qwen/
+.vscode/
+*~
+
+# Docker
+.dockerignore
+
+# Logs
+*.log
+
+# cache
+target/

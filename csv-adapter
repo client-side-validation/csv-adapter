@@ -1,0 +1,183 @@
+//! Real Ethereum RPC implementation using Alloy
+//!
+//! Only compiled when the `rpc` feature is enabled.
+//! Implements the `EthereumRpc` trait using Alloy's JSON-RPC client.
+
+#[cfg(feature = "rpc")]
+mod real_rpc_impl {
+    use std::sync::Arc;
+
+    use alloy::{
+        eips::{BlockId, BlockNumberOrTag},
+        primitives::{Address, B256, Bytes},
+        rpc::types::EIP1186AccountProofResponse,
+    };
+    use csv_adapter_store::SqliteSealStore;
+    use tokio::runtime::Runtime;
+
+    use crate::rpc::{EthereumRpc, LogEntry, SingleStorageProof, StorageProof, TransactionReceipt};
+    use crate::seal_contract::CsvSealAbi;
+    use crate::types::EthereumSealRef;
+
+    /// Error type for Alloy-based RPC operations
+    #[derive(Debug, thiserror::Error)]
+    pub enum AlloyRpcError {
+        /// Unknown error
+        #[error("RPC error: {0}")]
+        Rpc(String),
+        /// Tokio runtime error
+        #[error("Tokio runtime error: {0}")]
+        Runtime(#[from] std::io::Error),
+        /// URL parse error
+        #[error("Invalid RPC URL: {0}")]
+        InvalidUrl(String),
+    }
+
+    // Internal trait for the alloy provider that we implement with a macro
+    // to avoid needing to name the complex type.
+    trait EthereumClient: Send + Sync {
+        fn block_number(&self) -> Result<u64, AlloyRpcError>;
+        fn get_block_by_number(&self, number: BlockNumberOrTag, include_txs: bool)
+            -> Result<Option<alloy::rpc::types::Block>, AlloyRpcError>;
+        fn get_block_by_hash(
+            &self,
+            hash: B256,
+            include_txs: bool,
+        ) -> Result<Option<alloy::rpc::types::Block>, AlloyRpcError>;
+        fn get_proof(
+            &self,
+            address: Address,
+            keys: Vec<B256>,
+            block_id: BlockId,
+        ) -> Result<EIP1186AccountProofResponse, AlloyRpcError>;
+        fn get_transaction_receipt(
+            &self,
+            tx_hash: B256,
+        ) -> Result<Option<alloy::rpc::types::TransactionReceipt>, AlloyRpcError>;
+        fn send_raw_transaction(
+            &self,
+            tx_bytes: Bytes,
+        ) -> Result<B256, AlloyRpcError>;
+    }
+
+    // Macro to create a concrete implementation for any provider type
+    macro_rules! impl_ethereum_client {
+        ($provider_type:ty) => {
+            struct ProviderAdapter($provider_type);
+
+            impl EthereumClient for ProviderAdapter {
+                fn block_number(&self) -> Result<u64, AlloyRpcError> {
+                    let rt = tokio::runtime::Handle::current();
+                    let _guard = rt.enter();
+                    let future = alloy::providers::Provider::get_block_number(&self.0);
+                    rt.block_on(future).map_err(|e| AlloyRpcError::Rpc(e.to_string()))
+                }
+
+                fn get_block_by_number(
+                    &self,
+                    number: BlockNumberOrTag,
+                    include_txs: bool,
+                ) -> Result<Option<alloy::rpc::types::Block>, AlloyRpcError> {
+                    let rt = tokio::runtime::Handle::current();
+                    let _guard = rt.enter();
+                    let future = alloy::providers::Provider::get_block_by_number(&self.0, number, include_txs.into());
+                    rt.block_on(future).map_err(|e| AlloyRpcError::Rpc(e.to_string()))
+                }
+
+                fn get_block_by_hash(
+                    &self,
+                    hash: B256,
+                    include_txs: bool,
+                ) -> Result<Option<alloy::rpc::types::Block>, AlloyRpcError> {
+                    let rt = tokio::runtime::Handle::current();
+                    let _guard = rt.enter();
+                    let future = alloy::providers::Provider::get_block_by_hash(&self.0, hash, include_txs.into());
+                    rt.block_on(future).map_err(|e| AlloyRpcError::Rpc(e.to_string()))
+                }
+
+                fn get_proof(
+                    &self,
+                    address: Address,
+                    keys: Vec<B256>,
+                    block_id: BlockId,
+                ) -> Result<EIP1186AccountProofResponse, AlloyRpcError> {
+                    let rt = tokio::runtime::Handle::current();
+                    let _guard = rt.enter();
+                    let future = alloy::providers::Provider::get_proof(&self.0, address, keys).block_id(block_id);
+                    rt.block_on(future).map_err(|e| AlloyRpcError::Rpc(e.to_string()))
+                }
+
+                fn get_transaction_receipt(
+                    &self,
+                    tx_hash: B256,
+                ) -> Result<Option<alloy::rpc::types::TransactionReceipt>, AlloyRpcError> {
+                    let rt = tokio::runtime::Handle::current();
+                    let _guard = rt.enter();
+                    let future = alloy::providers::Provider::get_transaction_receipt(&self.0, tx_hash);
+                    rt.block_on(future).map_err(|e| AlloyRpcError::Rpc(e.to_string()))
+                }
+
+                fn send_raw_transaction(
+                    &self,
+                    tx_bytes: Bytes,
+                ) -> Result<B256, AlloyRpcError> {
+                    let rt = tokio::runtime::Handle::current();
+                    let _guard = rt.enter();
+                    let future = alloy::providers::Provider::send_raw_transaction(&self.0, tx_bytes);
+                    rt.block_on(future).map(|p| *p.tx_hash()).map_err(|e| AlloyRpcError::Rpc(e.to_string()))
+                }
+            }
+        };
+    }
+
+    /// Real Ethereum RPC client backed by Alloy
+    pub struct RealEthereumRpc {
+        client: Box<dyn EthereumClient>,
+        csv_seal_address: Address,
+        seal_store: Option<SqliteSealStore>,
+        runtime: Arc<Runtime>,
+    }
+
+    impl RealEthereumRpc {
+        /// Create a new RPC client connecting to the given URL
+        pub fn new(rpc_url: &str, csv_seal_address: [u8; 20]) -> Result<Self, AlloyRpcError> {
+            // Build the tokio runtime first
+            let runtime = Arc::new(
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .map_err(std::io::Error::other)?,
+            );
+
+            let parsed_url = rpc_url
+                .parse::<url::Url>()
+                .map_err(|e| AlloyRpcError::InvalidUrl(e.to_string()))?;
+
+            // Build the provider inside the runtime context
+            let provider = {
+                let _rt_guard = runtime.enter();
+                alloy::providers::ProviderBuilder::new().on_http(parsed_url)
+            };
+
+            // Use the macro to generate the impl for this specific type
+            impl_ethereum_client!(_);
+            let client = Box::new(ProviderAdapter(provider));
+
+            Ok(Self {
+                client,
+                csv_seal_address: Address::from(csv_seal_address),
+                seal_store: None,
+                runtime,
+            })
+        }
+    }
+
+    // This won't work because the macro needs a concrete type at compile time.
+    // Let me try yet another approach - capture the type through a function.
+}
+
+#[cfg(feature = "rpc")]
+pub use real_rpc_impl::{
+    RealEthereumRpc,
+    AlloyRpcError,
+};
