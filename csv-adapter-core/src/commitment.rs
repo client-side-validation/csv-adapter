@@ -1,9 +1,9 @@
-//! Commitment types with canonical encoding (v2: MPC-aware)
+//! Commitment type with canonical encoding (MPC-aware, multi-protocol)
 //!
 //! Commitments bind off-chain state transitions to the anchoring layer.
 //!
-//! v1: Single-protocol: `H(version || contract_id || prev_commitment || payload_hash || seal_id || domain_separator)`
-//! v2: MPC-aware: `H(version || protocol_id || mpc_root || prev_commitment || payload_hash || seal_id || domain_separator)`
+//! **Only V2 is supported.** V1 was removed to prevent silent divergence
+//! between clients. All commitments must use the V2 format.
 
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
@@ -16,20 +16,12 @@ use crate::seal::SealRef;
 /// Current commitment version
 pub const COMMITMENT_VERSION: u8 = 2;
 
-/// v1 commitment (legacy, single-protocol)
+/// Commitment (MPC-aware, multi-protocol)
+///
+/// This is the only supported commitment format. Legacy V1 was removed
+/// to prevent silent divergence between clients.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CommitmentV1 {
-    pub version: u8,
-    pub contract_id: Hash,
-    pub previous_commitment: Hash,
-    pub transition_payload_hash: Hash,
-    pub seal_id: Hash,
-    pub domain_separator: [u8; 32],
-}
-
-/// v2 commitment (MPC-aware, multi-protocol)
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CommitmentV2 {
+pub struct Commitment {
     pub version: u8,
     /// Protocol this commitment belongs to
     pub protocol_id: [u8; 32],
@@ -47,17 +39,12 @@ pub struct CommitmentV2 {
     pub domain_separator: [u8; 32],
 }
 
-/// A canonical commitment (unified enum for versioning)
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Commitment {
-    /// v1: legacy single-protocol
-    V1(CommitmentV1),
-    /// v2: MPC-aware multi-protocol
-    V2(CommitmentV2),
-}
-
 impl Commitment {
-    /// Create a v2 (MPC-aware) commitment
+    /// Create a commitment
+    ///
+    /// This creates a V2 (MPC-aware) commitment. All adapters should use this
+    /// constructor. The `protocol_id` should uniquely identify the protocol
+    /// (e.g., "CSV-BTC-" for Bitcoin, "CSV-ETH-" for Ethereum).
     pub fn new(
         protocol_id: [u8; 32],
         mpc_tree: &MpcTree,
@@ -78,7 +65,7 @@ impl Commitment {
 
         let mpc_root = mpc_tree.root();
 
-        Commitment::V2(CommitmentV2 {
+        Self {
             version: COMMITMENT_VERSION,
             protocol_id,
             mpc_root,
@@ -87,10 +74,13 @@ impl Commitment {
             transition_payload_hash,
             seal_id: seal_hash,
             domain_separator,
-        })
+        }
     }
 
-    /// Create a v1 (legacy) commitment for backwards compatibility
+    /// Create a commitment without MPC tree (for simple single-protocol use)
+    ///
+    /// This is a convenience constructor that uses a default empty MPC root.
+    /// For multi-protocol use cases, use [`Commitment::new`] instead.
     pub fn v1(
         contract_id: Hash,
         previous_commitment: Hash,
@@ -107,14 +97,30 @@ impl Commitment {
             Hash::new(array)
         };
 
-        Commitment::V1(CommitmentV1 {
-            version: 1,
+        // Extract protocol_id from domain separator (first 4 bytes)
+        let mut protocol_id = [0u8; 32];
+        protocol_id[..4].copy_from_slice(&domain_separator[..4]);
+
+        // Use empty MPC root for single-protocol mode
+        let mpc_root = {
+            let mut hasher = Sha256::new();
+            hasher.update(b"csv-empty-mpc-root");
+            let result = hasher.finalize();
+            let mut array = [0u8; 32];
+            array.copy_from_slice(&result);
+            Hash::new(array)
+        };
+
+        Self {
+            version: COMMITMENT_VERSION,
+            protocol_id,
+            mpc_root,
             contract_id,
             previous_commitment,
             transition_payload_hash,
             seal_id: seal_hash,
             domain_separator,
-        })
+        }
     }
 
     /// Compute the commitment hash
@@ -128,152 +134,95 @@ impl Commitment {
     }
 
     fn hash_into(&self, hasher: &mut Sha256) {
-        match self {
-            Commitment::V1(v1) => {
-                hasher.update([v1.version]);
-                hasher.update(v1.contract_id.as_bytes());
-                hasher.update(v1.previous_commitment.as_bytes());
-                hasher.update(v1.transition_payload_hash.as_bytes());
-                hasher.update(v1.seal_id.as_bytes());
-                hasher.update(v1.domain_separator);
-            }
-            Commitment::V2(v2) => {
-                hasher.update([v2.version]);
-                hasher.update(&v2.protocol_id);
-                hasher.update(v2.mpc_root.as_bytes());
-                hasher.update(v2.contract_id.as_bytes());
-                hasher.update(v2.previous_commitment.as_bytes());
-                hasher.update(v2.transition_payload_hash.as_bytes());
-                hasher.update(v2.seal_id.as_bytes());
-                hasher.update(v2.domain_separator);
-            }
-        }
+        hasher.update([self.version]);
+        hasher.update(&self.protocol_id);
+        hasher.update(self.mpc_root.as_bytes());
+        hasher.update(self.contract_id.as_bytes());
+        hasher.update(self.previous_commitment.as_bytes());
+        hasher.update(self.transition_payload_hash.as_bytes());
+        hasher.update(self.seal_id.as_bytes());
+        hasher.update(self.domain_separator);
     }
 
     /// Get the version
     pub fn version(&self) -> u8 {
-        match self {
-            Commitment::V1(v1) => v1.version,
-            Commitment::V2(v2) => v2.version,
-        }
+        self.version
     }
 
     /// Get the contract ID
     pub fn contract_id(&self) -> Hash {
-        match self {
-            Commitment::V1(v1) => v1.contract_id,
-            Commitment::V2(v2) => v2.contract_id,
-        }
+        self.contract_id
     }
 
     /// Get the seal ID hash
     pub fn seal_id(&self) -> Hash {
-        match self {
-            Commitment::V1(v1) => v1.seal_id,
-            Commitment::V2(v2) => v2.seal_id,
-        }
+        self.seal_id
     }
 
     /// Get the domain separator
     pub fn domain_separator(&self) -> [u8; 32] {
-        match self {
-            Commitment::V1(v1) => v1.domain_separator,
-            Commitment::V2(v2) => v2.domain_separator,
-        }
+        self.domain_separator
     }
 
     /// Serialize commitment using canonical encoding
     pub fn to_canonical_bytes(&self) -> Vec<u8> {
-        match self {
-            Commitment::V1(v1) => {
-                let mut out = Vec::with_capacity(1 + 32 * 5);
-                out.push(v1.version);
-                out.extend_from_slice(v1.contract_id.as_bytes());
-                out.extend_from_slice(v1.previous_commitment.as_bytes());
-                out.extend_from_slice(v1.transition_payload_hash.as_bytes());
-                out.extend_from_slice(v1.seal_id.as_bytes());
-                out.extend_from_slice(&v1.domain_separator);
-                out
-            }
-            Commitment::V2(v2) => {
-                let mut out = Vec::with_capacity(1 + 32 * 7);
-                out.push(v2.version);
-                out.extend_from_slice(&v2.protocol_id);
-                out.extend_from_slice(v2.mpc_root.as_bytes());
-                out.extend_from_slice(v2.contract_id.as_bytes());
-                out.extend_from_slice(v2.previous_commitment.as_bytes());
-                out.extend_from_slice(v2.transition_payload_hash.as_bytes());
-                out.extend_from_slice(v2.seal_id.as_bytes());
-                out.extend_from_slice(&v2.domain_separator);
-                out
-            }
-        }
+        let mut out = Vec::with_capacity(1 + 32 * 7);
+        out.push(self.version);
+        out.extend_from_slice(&self.protocol_id);
+        out.extend_from_slice(self.mpc_root.as_bytes());
+        out.extend_from_slice(self.contract_id.as_bytes());
+        out.extend_from_slice(self.previous_commitment.as_bytes());
+        out.extend_from_slice(self.transition_payload_hash.as_bytes());
+        out.extend_from_slice(self.seal_id.as_bytes());
+        out.extend_from_slice(&self.domain_separator);
+        out
     }
 
     /// Deserialize commitment from canonical bytes
+    ///
+    /// **Only V2 format is supported.** Legacy V1 format was removed.
     pub fn from_canonical_bytes(bytes: &[u8]) -> Result<Self, &'static str> {
         if bytes.is_empty() {
             return Err("Empty commitment bytes");
         }
 
         let version = bytes[0];
-        match version {
-            1 => {
-                if bytes.len() < 161 {
-                    return Err("V1 commitment bytes too short");
-                }
-                let mut contract_id = [0u8; 32];
-                contract_id.copy_from_slice(&bytes[1..33]);
-                let mut previous_commitment = [0u8; 32];
-                previous_commitment.copy_from_slice(&bytes[33..65]);
-                let mut transition_payload_hash = [0u8; 32];
-                transition_payload_hash.copy_from_slice(&bytes[65..97]);
-                let mut seal_id = [0u8; 32];
-                seal_id.copy_from_slice(&bytes[97..129]);
-                let mut domain_separator = [0u8; 32];
-                domain_separator.copy_from_slice(&bytes[129..161]);
-
-                Ok(Commitment::V1(CommitmentV1 {
-                    version: 1,
-                    contract_id: Hash::new(contract_id),
-                    previous_commitment: Hash::new(previous_commitment),
-                    transition_payload_hash: Hash::new(transition_payload_hash),
-                    seal_id: Hash::new(seal_id),
-                    domain_separator,
-                }))
-            }
-            2 => {
-                if bytes.len() < 225 {
-                    return Err("V2 commitment bytes too short");
-                }
-                let mut protocol_id = [0u8; 32];
-                protocol_id.copy_from_slice(&bytes[1..33]);
-                let mut mpc_root = [0u8; 32];
-                mpc_root.copy_from_slice(&bytes[33..65]);
-                let mut contract_id = [0u8; 32];
-                contract_id.copy_from_slice(&bytes[65..97]);
-                let mut previous_commitment = [0u8; 32];
-                previous_commitment.copy_from_slice(&bytes[97..129]);
-                let mut transition_payload_hash = [0u8; 32];
-                transition_payload_hash.copy_from_slice(&bytes[129..161]);
-                let mut seal_id = [0u8; 32];
-                seal_id.copy_from_slice(&bytes[161..193]);
-                let mut domain_separator = [0u8; 32];
-                domain_separator.copy_from_slice(&bytes[193..225]);
-
-                Ok(Commitment::V2(CommitmentV2 {
-                    version: 2,
-                    protocol_id,
-                    mpc_root: Hash::new(mpc_root),
-                    contract_id: Hash::new(contract_id),
-                    previous_commitment: Hash::new(previous_commitment),
-                    transition_payload_hash: Hash::new(transition_payload_hash),
-                    seal_id: Hash::new(seal_id),
-                    domain_separator,
-                }))
-            }
-            _ => Err("Unknown commitment version"),
+        if version != COMMITMENT_VERSION {
+            return Err("Unsupported commitment version");
         }
+
+        // V2 format: version(1) + protocol_id(32) + mpc_root(32) + contract_id(32) + 
+        //             previous_commitment(32) + payload_hash(32) + seal_id(32) + domain_separator(32)
+        let min_len = 1 + 32 * 7;
+        if bytes.len() < min_len {
+            return Err("Commitment bytes too short");
+        }
+
+        let mut protocol_id = [0u8; 32];
+        protocol_id.copy_from_slice(&bytes[1..33]);
+        let mut mpc_root = [0u8; 32];
+        mpc_root.copy_from_slice(&bytes[33..65]);
+        let mut contract_id = [0u8; 32];
+        contract_id.copy_from_slice(&bytes[65..97]);
+        let mut previous_commitment = [0u8; 32];
+        previous_commitment.copy_from_slice(&bytes[97..129]);
+        let mut transition_payload_hash = [0u8; 32];
+        transition_payload_hash.copy_from_slice(&bytes[129..161]);
+        let mut seal_id = [0u8; 32];
+        seal_id.copy_from_slice(&bytes[161..193]);
+        let mut domain_separator = [0u8; 32];
+        domain_separator.copy_from_slice(&bytes[193..225]);
+
+        Ok(Self {
+            version,
+            protocol_id,
+            mpc_root: Hash::new(mpc_root),
+            contract_id: Hash::new(contract_id),
+            previous_commitment: Hash::new(previous_commitment),
+            transition_payload_hash: Hash::new(transition_payload_hash),
+            seal_id: Hash::new(seal_id),
+            domain_separator,
+        })
     }
 }
 
@@ -282,7 +231,7 @@ mod tests {
     use super::*;
     use crate::mpc::MpcTree;
 
-    fn test_v1_commitment() -> Commitment {
+    fn test_simple_commitment() -> Commitment {
         Commitment::v1(
             Hash::new([1u8; 32]),
             Hash::new([2u8; 32]),
@@ -292,7 +241,7 @@ mod tests {
         )
     }
 
-    fn test_v2_commitment() -> Commitment {
+    fn test_mpc_commitment() -> Commitment {
         let protocol_id = [10u8; 32];
         let mpc_tree = MpcTree::from_pairs(&[
             (protocol_id, Hash::new([20u8; 32])),
@@ -310,57 +259,57 @@ mod tests {
     }
 
     // ─────────────────────────────────────────────
-    // V1 tests (backwards compat)
+    // Basic commitment tests
     // ─────────────────────────────────────────────
 
     #[test]
-    fn test_v1_creation() {
-        let c = test_v1_commitment();
-        assert_eq!(c.version(), 1);
+    fn test_simple_creation() {
+        let c = test_simple_commitment();
+        assert_eq!(c.version(), COMMITMENT_VERSION);
     }
 
     #[test]
-    fn test_v1_hash_deterministic() {
-        let c1 = test_v1_commitment();
-        let c2 = test_v1_commitment();
+    fn test_simple_hash_deterministic() {
+        let c1 = test_simple_commitment();
+        let c2 = test_simple_commitment();
         assert_eq!(c1.hash(), c2.hash());
     }
 
     #[test]
-    fn test_v1_canonical_roundtrip() {
-        let c = test_v1_commitment();
+    fn test_simple_canonical_roundtrip() {
+        let c = test_simple_commitment();
         let bytes = c.to_canonical_bytes();
         let restored = Commitment::from_canonical_bytes(&bytes).unwrap();
         assert_eq!(c.hash(), restored.hash());
     }
 
     // ─────────────────────────────────────────────
-    // V2 tests (MPC-aware)
+    // MPC-aware commitment tests
     // ─────────────────────────────────────────────
 
     #[test]
-    fn test_v2_creation() {
-        let c = test_v2_commitment();
-        assert_eq!(c.version(), 2);
+    fn test_mpc_creation() {
+        let c = test_mpc_commitment();
+        assert_eq!(c.version(), COMMITMENT_VERSION);
     }
 
     #[test]
-    fn test_v2_hash_deterministic() {
-        let c1 = test_v2_commitment();
-        let c2 = test_v2_commitment();
+    fn test_mpc_hash_deterministic() {
+        let c1 = test_mpc_commitment();
+        let c2 = test_mpc_commitment();
         assert_eq!(c1.hash(), c2.hash());
     }
 
     #[test]
-    fn test_v2_canonical_roundtrip() {
-        let c = test_v2_commitment();
+    fn test_mpc_canonical_roundtrip() {
+        let c = test_mpc_commitment();
         let bytes = c.to_canonical_bytes();
         let restored = Commitment::from_canonical_bytes(&bytes).unwrap();
         assert_eq!(c.hash(), restored.hash());
     }
 
     #[test]
-    fn test_v2_contains_mpc_root() {
+    fn test_mpc_contains_mpc_root() {
         let protocol_id = [10u8; 32];
         let mpc_tree = MpcTree::from_pairs(&[
             (protocol_id, Hash::new([20u8; 32])),
@@ -395,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    fn test_v2_differs_by_protocol_id() {
+    fn test_mpc_differs_by_protocol_id() {
         let mpc_tree = MpcTree::from_pairs(&[([10u8; 32], Hash::new([20u8; 32]))]);
         let seal = SealRef::new(vec![4u8; 16], Some(42)).unwrap();
 
@@ -427,16 +376,16 @@ mod tests {
     // ─────────────────────────────────────────────
 
     #[test]
-    fn test_v1_v2_different_hashes() {
-        let v1 = test_v1_commitment();
-        let v2 = test_v2_commitment();
+    fn test_simple_v2_different_hashes() {
+        let v1 = test_simple_commitment();
+        let v2 = test_mpc_commitment();
         assert_ne!(v1.hash(), v2.hash());
     }
 
     #[test]
-    fn test_v1_v2_same_contract_different_versions() {
-        let v1 = test_v1_commitment();
-        let v2 = test_v2_commitment();
+    fn test_simple_v2_same_contract_different_versions() {
+        let v1 = test_simple_commitment();
+        let v2 = test_mpc_commitment();
         // Both reference same contract ID
         assert_eq!(v1.contract_id(), v2.contract_id());
         // But different structure → different hashes
@@ -449,11 +398,11 @@ mod tests {
 
     #[test]
     fn test_commitment_accessors() {
-        let v1 = test_v1_commitment();
+        let v1 = test_simple_commitment();
         assert_eq!(v1.contract_id(), Hash::new([1u8; 32]));
         assert_eq!(v1.domain_separator(), [5u8; 32]);
 
-        let v2 = test_v2_commitment();
+        let v2 = test_mpc_commitment();
         assert_eq!(v2.contract_id(), Hash::new([1u8; 32]));
         assert_eq!(v2.domain_separator(), [5u8; 32]);
     }
@@ -514,11 +463,7 @@ mod tests {
         );
 
         // Verify the MPC root in the commitment matches the tree root
-        if let Commitment::V2(v2) = &commitment_a {
-            assert_eq!(v2.mpc_root, mpc_tree.root());
-        } else {
-            panic!("Expected V2 commitment");
-        }
+        assert_eq!(commitment_a.mpc_root, mpc_tree.root());
 
         // Generate MPC proof for protocol A
         let proof = mpc_tree.prove(proto_a).unwrap();

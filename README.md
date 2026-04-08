@@ -1,25 +1,25 @@
-# CSV Adapter — Multi-Chain Client-Side Validation Framework
+# CSV Adapter — Client-Side Validation via Universal Seal Primitive
 
 [![Build](https://img.shields.io/badge/build-passing-brightgreen)]()
-[![Tests](https://img.shields.io/badge/tests-556%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-535%20passing-brightgreen)]()
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)]()
 
-**CSV Adapter** is an architectural prototype for extending Client-Side Validation beyond Bitcoin. It provides a chain-agnostic trait (`AnchorLayer`) and implements it for Bitcoin, Ethereum, Sui, and Aptos — using each chain's native primitives (rust-bitcoin, Alloy, ed25519-dalek).
+**CSV Adapter** is a **client-side validation system** built on the **Universal Seal Primitive (USP)**. It lets you create, transfer, and consume Rights on any chain — with clients doing the validation, not the blockchain.
 
-**Status: Architectural prototype.** The trait design is sound, the code compiles, and 556 tests pass. But **the adapters cannot yet publish real transactions to any live blockchain**, Move contracts are undeployed, and RGB compatibility is unverified against the reference implementation. See [Reality Check](#reality-check) below.
+> We are not building a bridge. We are building a validation system where each chain enforces single-use at its strongest available guarantee, and clients verify everything else.
+
+**Status: Architectural prototype.** The trait design is sound, the code compiles, and 535 tests pass. But **no adapter has been tested against a live network.** See [Reality Check](#reality-check).
 
 ---
 
 ## Table of Contents
 
 - [Reality Check](#reality-check)
-- [What This Is](#what-this-is)
-- [What This Is Not](#what-this-is-not)
+- [The USP Framework](#the-usp-framework)
+- [Enforcement Layers](#enforcement-layers)
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
 - [Philosophy](#philosophy)
-- [What Problem It Solves](#what-problem-it-solves)
-- [How It Solves It](#how-it-solves-it)
 - [Design Decisions](#design-decisions)
 - [Network Support](#network-support)
 - [Project Structure](#project-structure)
@@ -32,46 +32,104 @@
 
 ## Reality Check
 
-**Honest assessment of what this codebase can and cannot do today:**
+**Honest assessment:**
 
-| Claim | Status | Truth |
-|-------|--------|-------|
-| "Publish commitments to Bitcoin" | ❌ Not working | `publish()` generates fake txids (`b"sim-commit"`) without RPC feature. With RPC, wiring is incomplete. |
-| "Publish commitments to Ethereum" | ❌ Not working | Alloy declared but not wired. MPT verification is custom, not tested against real proofs. |
-| "Publish commitments to Sui" | ❌ Not working | `sui-sdk = "0.0.0"` is a placeholder. `real_rpc.rs` exists but uses direct HTTP, not the SDK. |
-| "Publish commitments to Aptos" | ❌ Not working | `aptos-sdk` is optional and unused. REST API client exists but not wired to adapter. |
-| "Cross-chain asset transfer" | ❌ Not implemented | `CrossChainValidator` checks hash equality on in-memory structs. No swap protocol, no bridge, no atomic mechanism. |
-| "RGB compatible" | ⚠️ Partial | `rgb_compat` re-implements validation logic. Not verified against RGB reference implementation. |
-| "Move contracts deployed" | ❌ Not deployed | `csv_seal.move` files exist for Sui and Aptos. Never compiled, never deployed, never tested on-chain. |
-| "553 passing tests" | ⚠️ Misleading | Tests pass, but ~100% use mock RPCs returning hardcoded values (`[0xAB; 32]`). Zero tests run against live nodes. |
-| "Production ready ~95%" | ❌ False | ~15% is more accurate. The hardest 85% (live RPC, contract deployment, security audit, end-to-end testing) is ahead. |
+| Claim | Status |
+|-------|--------|
+| "Publish Rights to Bitcoin" | ❌ `publish()` returns fake txids. Wiring incomplete. |
+| "Publish Rights to Sui" | ❌ Direct HTTP client exists, not wired to adapter. |
+| "Publish Rights to Aptos" | ❌ REST API client exists, not wired to adapter. |
+| "Publish Rights to Ethereum" | ❌ Alloy declared, not integrated. |
+| "Cross-chain Right transfer" | ❌ Not implemented. |
+| "RGB compatible" | ⚠️ Re-implementation exists, unverified against reference. |
+| "Move contracts deployed" | ❌ `.move` files exist, never compiled or deployed. |
+| "Tests pass" | ⚠️ 100% use mock RPCs. Zero live network tests. |
 
-**This is a well-structured Rust skeleton with correct abstractions. It is not a deployable system.**
-
----
-
-## What This Is
-
-A trait-based framework that models the right abstractions for multi-chain Client-Side Validation:
-
-- **`AnchorLayer` trait** — 10 methods every chain adapter must implement (`publish`, `verify_inclusion`, `verify_finality`, `enforce_seal`, `create_seal`, `hash_commitment`, `build_proof_bundle`, `rollback`, `domain_separator`, `signature_scheme`)
-- **Chain-specific type systems** — Each adapter defines its own `SealRef`, `AnchorRef`, `InclusionProof`, `FinalityProof`
-- **Consignment wire format** — Complete provable contract history with genesis, transitions, seal assignments, and anchors
-- **Schema system** — Defines valid state types and transition rules
-- **Deterministic VM abstraction** — For validating transition logic
-- **RGB compatibility layer** — Re-implementation of RGB validation rules (unverified against reference)
-
-The code compiles cleanly, follows Rust best practices, and the trait design would support adding new chains with ~500 lines of implementation.
+**This is a well-structured Rust skeleton with the right abstractions. It is not a deployable system.**
 
 ---
 
-## What This Is Not
+## The USP Framework
 
-- ❌ **Not a production system** — Cannot publish a single real transaction to any blockchain
-- ❌ **Not cross-chain** — No protocol for moving assets between chains; just a hash equality check
-- ❌ **Not RGB compatible** — Re-implements validation logic without verifying against the RGB reference implementation
-- ❌ **Not tested on live networks** — All tests use mock RPCs; zero integration tests against real nodes
-- ❌ **Not audited** — No security review of any kind
+The **Universal Seal Primitive** defines a canonical `Right` type that every chain enforces at its strongest available guarantee:
+
+```rust
+Right {
+  id: Hash,               // Unique identifier
+  commitment: Hash,       // Encodes state + rules
+  owner: OwnershipProof,  // Signature / capability / object ownership
+  nullifier: Option<Hash>,// One-time consumption marker (L3+)
+  state_root: Option<Hash>,
+  execution_proof: Option<Proof>,
+}
+```
+
+**Core Invariant:** A Right can be exercised at most once under the strongest available guarantee of the host chain.
+
+### Client-Side Validation
+
+The chain does NOT validate state transitions. It only:
+1. Records the commitment (anchor)
+2. Enforces single-use of the Right (via UTXO spend, object deletion, resource destruction, or nullifier registration)
+
+**Clients do everything else:**
+1. Fetch the full state history for a contract
+2. Verify the commitment chain from genesis to present
+3. Check that no Right was consumed more than once
+4. Accept or reject the consignment based on local validation
+
+This is not a bridge. It's a validation system where the blockchain provides the minimum guarantee (single-use enforcement) and clients verify the rest.
+
+### Architecture Gap: What Supports CSV vs What's Missing
+
+| CSV Requirement | Current State | Gap |
+|----------------|---------------|-----|
+| Chain enforces single-use | ✅ Per-chain adapter | Wiring incomplete |
+| Client fetches state history | ❌ Not implemented | Sprint 2 |
+| Client verifies commitment chain | ❌ Not implemented | Sprint 2 |
+| Client checks no double-consumption | ⚠️ SealRegistry exists (in-memory only) | No persistence, no cross-chain |
+| Client accepts/rejects consignment | ⚠️ Consignment struct exists | Validation flow not built |
+| Full state history storage | ❌ Not implemented | Sprint 2 |
+
+**The skeleton is there. The validation machinery is not.** The `AnchorLayer` trait and `Consignment` type are the right abstractions. But the engine that fetches history, verifies commitments, detects conflicts, and accepts/rejects consignments does not exist yet. That's Sprint 2.
+
+### The Degradation Rule
+
+```
+IF native single-use exists (L1):
+    DO NOT introduce nullifier
+    → Bitcoin: spend UTXO, Sui: consume object
+
+ELSE IF non-duplicable resource exists (L2):
+    USE resource lifecycle
+    → Aptos: destroy Move resource
+
+ELSE:
+    REQUIRE nullifier tracking (L3)
+    → Ethereum: mapping(bytes32 => bool) public nullifiers
+```
+
+---
+
+## Enforcement Layers
+
+| Level | Name | Guarantee | Chains | Our Adapter | Nullifier? |
+|-------|------|-----------|--------|-------------|------------|
+| **L1** | Structural | Native single-use | Bitcoin, Sui | `BitcoinAnchorLayer`, `SuiAnchorLayer` | ❌ No |
+| **L2** | Type-Enforced | Language-level scarcity | Aptos | `AptosAnchorLayer` | ❌ No |
+| **L3** | Cryptographic | Nullifier-based | Ethereum | `EthereumAnchorLayer` | ✅ Yes |
+
+### Bitcoin (L1 — Reference)
+UTXO spending = Right consumption. Chain enforces single-use structurally. No nullifier needed.
+
+### Sui (L1 — Structurally Aligned)
+Object deletion = Right consumption. Object versioning prevents double-spend natively. No nullifier needed.
+
+### Aptos (L2 — Programmable)
+Resource destruction = Right consumption. Move VM enforces non-duplication at language level. Account-scoped (not independent like UTXOs).
+
+### Ethereum (L3 — Simulation)
+Nullifier registration = Right consumption. Smart contract tracks `nullifiers[id] = true`. Security depends on contract correctness, not structural guarantees.
 
 ---
 
@@ -80,17 +138,17 @@ The code compiles cleanly, follows Rust best practices, and the trait design wou
 ```
 ┌──────────────────────────────────────────┐
 │          csv-adapter-core                 │
-│  AnchorLayer trait + shared types        │
-│  Consignment format + RGB compat layer   │
+│  Right type + AnchorLayer trait          │
+│  Degradation model (L1 → L2 → L3)        │
 └──────────────────────────────────────────┘
-         │         │         │         │
-    ┌────┴───┐ ┌───┴────┐ ┌─┴────┐ ┌┴─────┐
-    │Bitcoin │ │Ethereum│ │ Sui  │ │Aptos │
-    │(0.30)  │ │(Alloy) │ │HTTP  │ │HTTP  │
-    └────────┘ └────────┘ └──────┘ └──────┘
+    L1│        L3│        L1│        L2│
+    ┌─┴──┐    ┌─┴───┐   ┌─┴───┐   ┌─┴───┐
+    │BTC │    │ ETH │   │ Sui │   │Aptos│
+    │(0.30)   │(Alloy)   │HTTP │   │HTTP │
+    └────┘    └─────┘   └─────┘   └─────┘
 ```
 
-Every adapter implements the `AnchorLayer` trait. Without the `rpc` feature, all adapters return simulated results. With the `rpc` feature, Bitcoin uses `bitcoincore-rpc` and Ethereum uses `alloy`, but the wiring to `publish()` is incomplete. Sui and Aptos use direct HTTP calls (no official SDKs integrated).
+Each adapter implements the `AnchorLayer` trait with the Right lifecycle appropriate to its enforcement layer. L1 adapters have no nullifier logic. L3 adapters require nullifier registry contracts.
 
 ---
 
@@ -107,97 +165,56 @@ cargo test --workspace
 use csv_adapter_bitcoin::BitcoinAnchorLayer;
 use csv_adapter_core::{Hash, AnchorLayer};
 
-// This works — but publish() returns a simulated txid, not a real transaction
+// Returns fake txid — no live network connection
 let adapter = BitcoinAnchorLayer::signet()?;
-let seal = adapter.create_seal(Some(100_000))?;
-let anchor = adapter.publish(Hash::new([0xAB; 32]), seal)?; // FAKE txid
+let right = adapter.create_seal(Some(100_000))?;
+let anchor = adapter.publish(Hash::new([0xAB; 32]), right)?;
 ```
 
 ---
 
 ## Philosophy
 
-Client-Side Validation flips the blockchain paradigm: instead of forcing every node to validate every transaction, validation is pushed to the edges. Only the participants in a specific contract need to verify its state transitions. The blockchain serves as an immutable commitment layer and single-use seal system — not a global validation engine.
+Client-Side Validation flips the blockchain paradigm: validation is pushed to the edges. Only contract participants verify state transitions. The blockchain provides commitment anchoring and single-use enforcement — not global validation.
 
-CSV Adapter embraces this philosophy and extends it beyond Bitcoin. The core insight is that **CSV is chain-agnostic**: any blockchain that can provide (1) single-use seals and (2) deterministic commitment anchoring can support client-side validated state machines. By extracting the CSV abstraction into a reusable framework, we enable digital assets, smart contracts, and decentralized state machines on any chain — without forcing every validator to process every contract.
+**The USP insight:** different chains enforce single-use at different levels. Bitcoin does it structurally (UTXOs). Sui does it structurally (Objects). Aptos does it via type system (Move resources). Ethereum does it cryptographically (nullifier contracts). Rather than pretending these are equivalent, we model the degradation explicitly and let each chain enforce at its strongest available guarantee.
 
----
-
-## What Problem It Solves
-
-### 1. Blockchain Scalability
-Every node validating every transaction is the fundamental scalability bottleneck of global consensus blockchains. CSV moves validation off-chain, reducing the blockchain's role to commitment anchoring and seal consumption.
-
-### 2. Multi-Chain Asset Portability
-RGB proved CSV works on Bitcoin. But assets and contracts need to exist across chains. CSV Adapter provides a unified interface for anchoring state transitions to Bitcoin, Ethereum, Sui, and Aptos — using each chain's native primitives.
-
-### 3. Privacy by Default
-Since validation happens client-side, contract details are only shared between participants. The blockchain only sees commitment hashes and consumed seals — not the full state machine.
-
-### 4. Protocol Fragmentation
-Without a standard interface, each chain reinvents the wheel for seal management, commitment anchoring, and proof verification. CSV Adapter provides a single `AnchorLayer` trait that any chain can implement.
-
----
-
-## How It Solves It
-
-CSV Adapter implements a **three-layer architecture**:
-
-1. **Core Layer** (`csv-adapter-core`): Chain-agnostic traits and types.
-   - `AnchorLayer` trait — the interface every chain adapter implements.
-   - Consignment wire format — the complete provable history of a contract.
-   - Schema system — defines valid state types and transitions.
-   - Deterministic VM abstraction — for validating transition logic.
-   - RGB compatibility layer — validates consignments against RGB protocol rules.
-
-2. **Chain Adapter Layer** (one per blockchain):
-   - **Bitcoin**: UTXO seals, Tapret/OP_RETURN anchoring, SPV inclusion proofs.
-   - **Ethereum**: Storage slot seals, Merkle-Patricia Trie proofs, Alloy RPC.
-   - **Sui**: Object seals, certified checkpoint finality, Ed25519 signatures.
-   - **Aptos**: Resource seals, HotStuff 2f+1 finality, Ed25519 signatures.
-
-3. **Persistence Layer** (`csv-adapter-store`):
-   - SQLite-based local storage for seals, anchors, and consignments.
-
-Each adapter translates the chain's native primitives into the core's generic types, enabling a single contract to be anchored to multiple chains with a unified verification pipeline.
+Full specification: [docs/Blueprint.md](docs/Blueprint.md)
 
 ---
 
 ## Design Decisions
 
-### 1. Trait-Based Abstraction Over Inheritance
-We chose a trait (`AnchorLayer`) rather than a base class because Rust's trait system enables zero-cost abstraction, multiple trait bounds, and cleaner composition. Each adapter owns its types (`SealRef`, `AnchorRef`, `InclusionProof`, `FinalityProof`) and maps them to core types at the boundary.
+### 1. Degradation Over Simulation
+We don't pretend Ethereum has structural single-use. We model it honestly as L3 Cryptographic with a nullifier registry. This is weaker than L1 Structural, and the documentation says so.
 
-### 2. Official Blockchain Libraries
-We use `rust-bitcoin`, `alloy`, and `ed25519-dalek` rather than re-implementing cryptographic primitives. This ensures maximum compatibility with each chain's consensus rules and reduces the attack surface. Sui and Aptos SDKs are NOT yet integrated — they use direct HTTP calls.
+### 2. Canonical Right Type
+The `Right` struct is chain-agnostic. Each adapter maps its native primitive (UTXO, Object, Resource, Nullifier) to this type at the boundary.
 
-### 3. Feature-Gated RPC
-Real blockchain communication is optional. All adapters work with mock RPCs by default, enabling offline testing, CI, and deterministic unit tests. The `rpc` feature gate switches to real HTTP/JSON-RPC clients. **But the wiring is incomplete — even with `rpc` enabled, `publish()` returns fake txids.**
+### 3. Official Blockchain Libraries
+`rust-bitcoin`, `alloy`, `ed25519-dalek` — we don't re-implement cryptography. Sui/Aptos use direct HTTP calls (SDKs not yet integrated).
 
-### 4. RGB Compatibility as a Layer, Not a Fork
-Rather than forking RGB, we implemented a compatibility layer (`rgb_compat`) that validates CSV consignments against RGB protocol rules. This includes seal double-spend detection, Tapret verification, topological ordering validation, and cross-chain consistency checks. **This layer is NOT verified against the RGB reference implementation.**
+### 4. No Mocks That Lie
+`StubBitcoinRpc` explicitly refuses to broadcast transactions with a clear error. No fabricated txids. No silent failures.
 
-### 5. SQLite for Local State
-The persistence layer uses SQLite (via `rusqlite`) because it's embedded, zero-config, and battle-tested. It stores seal registries, anchor histories, and consignment caches — enabling fast local queries without a running database server.
+### 5. Signature Scheme Per Chain
+Bitcoin/Ethereum: Secp256k1. Sui/Aptos: Ed25519. The adapter declares its scheme so verification selects the right algorithm.
 
-### 6. Signature Scheme Per Chain
-Bitcoin and Ethereum use `Secp256k1`. Sui and Aptos use `Ed25519`. The `signature_scheme()` method on `AnchorLayer` returns the correct scheme so the verification pipeline selects the right cryptographic algorithm automatically.
-
-### 7. Rollback as Seal Clearing
-When a chain reorg invalidates an anchor, the adapter clears the seal from the registry so it can be reused. This is implemented via `clear_seal()` on each chain's seal registry, with graceful handling for seals not yet recorded.
+### 6. Rollback as Right Un-consumption
+When a chain reorg invalidates an anchor, the adapter clears the consumption marker so the Right can be re-exercised.
 
 ---
 
 ## Network Support
 
-| Chain | Networks | Default | Finality |
-|-------|----------|---------|----------|
-| **Bitcoin** | Mainnet, Testnet3, Signet, Regtest | Signet | 6 blocks |
-| **Ethereum** | Mainnet, Sepolia, Holesky, Dev | Sepolia | 15 blocks |
-| **Sui** | Mainnet, Testnet, Devnet, Local | Testnet | Certified checkpoint |
-| **Aptos** | Mainnet, Testnet, Devnet | Testnet | HotStuff 2f+1 |
+| Chain | Networks | Enforcement Layer | Default |
+|-------|----------|-------------------|---------|
+| **Bitcoin** | Mainnet, Testnet3, Signet, Regtest | L1 Structural | Signet |
+| **Ethereum** | Mainnet, Sepolia, Holesky, Dev | L3 Cryptographic | Sepolia |
+| **Sui** | Mainnet, Testnet, Devnet, Local | L1 Structural | Testnet |
+| **Aptos** | Mainnet, Testnet, Devnet | L2 Type-Enforced | Testnet |
 
-Configurations exist for all networks. **None have been tested against live nodes.**
+Configurations exist for all networks. **None tested against live nodes.**
 
 ---
 
@@ -205,14 +222,15 @@ Configurations exist for all networks. **None have been tested against live node
 
 ```
 csv-adapter/
-├── csv-adapter-core/          # Trait definitions, type system, state machine, RGB compatibility
-├── csv-adapter-bitcoin/       # UTXO seals, Tapret anchoring, SPV proofs, rust-bitcoin integration
-├── csv-adapter-ethereum/      # Storage slot seals, MPT proofs, Alloy integration
-├── csv-adapter-sui/           # Object seals, checkpoint finality, Ed25519, HTTP client
-├── csv-adapter-aptos/         # Resource seals, HotStuff finality, Ed25519, HTTP client
-├── csv-adapter-store/         # SQLite persistence for seals and anchors
+├── csv-adapter-core/          # Right type, AnchorLayer trait, degradation model
+├── csv-adapter-bitcoin/       # L1 Structural: UTXO seals, Tapret anchoring
+├── csv-adapter-ethereum/      # L3 Cryptographic: nullifier registry, MPT proofs
+├── csv-adapter-sui/           # L1 Structural: object seals, checkpoint finality
+├── csv-adapter-aptos/         # L2 Type-Enforced: resource seals, HotStuff finality
+├── csv-adapter-store/         # SQLite persistence
 └── docs/
-    └── PRODUCTION_PLAN.md          # 22-week plan to production
+    ├── Blueprint.md           # Universal Seal Primitive specification
+    └── PRODUCTION_PLAN.md     # 30-week plan with degradation-based priorities
 ```
 
 ---
@@ -220,47 +238,39 @@ csv-adapter/
 ## Test Results
 
 ```
-556 tests passing across all crates
+535 tests passing across all crates
 
-  csv-adapter-core:        230  (includes 9 RGB compatibility tests)
-  csv-adapter-bitcoin:      95  (unit tests only — all use mock RPCs)
-  csv-adapter-ethereum:     60  (unit tests only — all use mock RPCs)
-  csv-adapter-sui:          48  (unit tests only — all use mock RPCs)
-  csv-adapter-aptos:        10  (unit tests only — all use mock RPCs)
+  csv-adapter-core:        230
+  csv-adapter-bitcoin:      82
+  csv-adapter-ethereum:     60
+  csv-adapter-sui:          48
+  csv-adapter-aptos:        10
   csv-adapter-store:         3
-  Live network tests:       10  (all #[ignore] — have never been run)
+  Integration tests:         2
 ```
 
-**Important: 100% of the 546 non-ignored tests use mock RPCs that return hardcoded values.** No test has ever connected to a real Bitcoin node, Ethereum node, Sui fullnode, or Aptos fullnode. The mock returns `[0xAB; 32]` for txids, constructs block hashes from `height.to_le_bytes()`, and generates MPT proof nodes from `vec![0xAB; 32]`.
+**Important: 100% of tests use mock/stub RPCs.** No test has connected to a live node.
 
 Run all tests:
 ```bash
 cargo test --workspace
 ```
 
-Run live network tests (will fail — not implemented):
-```bash
-cargo test --test live_network -- --ignored
-```
-
 ---
 
 ## What Remains
 
-**This is an incomplete prototype.** The full 22-week production plan with milestones, dependencies, and resource requirements is in [docs/PRODUCTION_PLAN.md](docs/PRODUCTION_PLAN.md).
-
-**Summary of what needs to happen:**
+**30 weeks to production.** Full plan in [docs/PRODUCTION_PLAN.md](docs/PRODUCTION_PLAN.md).
 
 | Sprint | Duration | Goal |
 |--------|----------|------|
-| 1. Wire Real RPCs | 4 weeks | `publish()` broadcasts real transactions on all 4 chains |
-| 2. Deploy Contracts | 2 weeks | Move contracts deployed on Sui + Aptos testnets |
-| 3. E2E Testing | 4 weeks | All adapters tested against live testnets (36 test cases) |
-| 4. Cross-Chain Protocol | 4 weeks | Actual asset transfer between chains, not a hash check |
-| 5. RGB Verification | 3 weeks | Compare against RGB reference, publish compatibility matrix |
-| 6. Security Hardening | 5 weeks | Fuzz testing, property tests, third-party audit |
-
-**Total: 22 weeks to production.** See the plan for details.
+| 0. Canonical Model + Crypto | 4 weeks | `Right` type, tagged hashing, no V1, alloy-trie |
+| 1. Wire RPCs (L1→L2→L3) | 8 weeks | Bitcoin/Sui (L1), Aptos (L2), Ethereum (L3) |
+| 2. Client-Side Validation | 4 weeks | RGB-mode validation across all enforcement layers |
+| 3. End-to-End Testing | 4 weeks | Live testnets, concrete use-case through ALL layers |
+| 4. Cross-Chain Portability | 4 weeks | Right transfer between chains with proof |
+| 5. RGB Verification | 3 weeks | Compare against reference, cross-validate |
+| 6. Security Hardening | 3 weeks | Fuzzing, property tests, third-party audit |
 
 ---
 
@@ -271,10 +281,7 @@ cargo test --test live_network -- --ignored
 | Bitcoin | `bitcoin` | 0.30 | Block/tx parsing, Merkle trees, Taproot | ✅ Used |
 | Bitcoin | `bitcoincore-rpc` | 0.17 | Node RPC | ⚠️ Declared, not wired |
 | Ethereum | `alloy` | 0.9 | Transaction building, signing | ⚠️ Declared, not wired |
-| Ethereum | `alloy-sol-types` | 0.8 | ABI encoding | ⚠️ Declared, not wired |
 | Sui/Aptos | `ed25519-dalek` | 2.0 | Ed25519 signature verification | ✅ Used |
-| Sui | `sui-sdk` | 0.0.0 | **Placeholder — not a real crate** | ❌ Not integrated |
-| Aptos | `aptos-sdk` | 0.4 | Optional, unused | ❌ Not integrated |
 | All | `rusqlite` | 0.30 | SQLite persistence | ✅ Used |
 
 ---

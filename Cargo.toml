@@ -5,7 +5,7 @@ members = [
     "csv-adapter-ethereum",
     "csv-adapter-sui",
     "csv-adapter-aptos",
-    "csv-adapter-celestia", "csv-adapter-store",
+    "csv-adapter-store",
 ]
 resolver = "2"
 

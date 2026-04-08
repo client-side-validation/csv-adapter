@@ -29,7 +29,7 @@ pub mod real_rpc;
 pub use adapter::BitcoinAnchorLayer;
 pub use config::BitcoinConfig;
 pub use types::{BitcoinSealRef, BitcoinAnchorRef, BitcoinInclusionProof, BitcoinFinalityProof};
-pub use rpc::{BitcoinRpc, MockBitcoinRpc};
+pub use rpc::BitcoinRpc;
 pub use tapret::{TapretCommitment, TapretError, OpretCommitment, mine_tapret_nonce, TAPRET_SCRIPT_SIZE};
 pub use tx_builder::{CommitmentTxBuilder, CommitmentData, TxBuilderError};
 pub use wallet::{SealWallet, Bip86Path, DerivedTaprootKey, WalletUtxo, WalletError};

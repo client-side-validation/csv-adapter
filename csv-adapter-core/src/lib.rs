@@ -13,6 +13,7 @@ extern crate alloc;
 // Core types
 pub mod commitment;
 pub mod hash;
+pub mod right;
 pub mod seal;
 
 // Production hardening
@@ -45,11 +46,16 @@ pub mod traits;
 pub mod monitor;
 pub mod store;
 
-// RGB protocol compatibility
+// Client-side validation (Sprint 2)
+pub mod client;
+pub mod validator;
+
+// RGB protocol compatibility (Sprint 5)
 pub mod rgb_compat;
 
 // Re-exports: core
 pub use commitment::Commitment;
+pub use right::{Right, RightId, RightError, OwnershipProof};
 pub use hardening::{
     BoundedQueue, CircuitBreaker, CircuitState, MemoryLimits, TimeoutConfig,
     DEFAULT_CIRCUIT_MAX_FAILURES, DEFAULT_CIRCUIT_RESET_TIMEOUT, DEFAULT_HEALTH_CHECK_TIMEOUT,

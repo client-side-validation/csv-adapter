@@ -1747,19 +1747,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "csv-adapter-celestia"
-version = "0.1.0"
-dependencies = [
- "csv-adapter-core",
- "hex",
- "rand 0.8.5",
- "secp256k1 0.27.0",
- "serde",
- "sha2",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "csv-adapter-core"
 version = "0.1.0"
 dependencies = [
