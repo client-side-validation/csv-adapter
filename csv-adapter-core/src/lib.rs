@@ -54,6 +54,10 @@ pub mod validator;
 // RGB protocol compatibility (Sprint 5)
 pub mod rgb_compat;
 
+// Tapret verification (Sprint 0.5) - requires bitcoin dependency
+#[cfg(feature = "tapret")]
+pub mod tapret_verify;
+
 // Re-exports: core
 pub use commitment::Commitment;
 pub use right::{Right, RightId, RightError, OwnershipProof};

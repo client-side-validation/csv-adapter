@@ -16,6 +16,9 @@ sha3 = "0.10"
 tiny-keccak = { version = "2.0", features = ["keccak"] }
 secp256k1 = { version = "0.28", features = ["global-context", "rand-std"] }
 log = "0.4"
+alloy-primitives = "0.8"
+alloy-rlp = "0.3"
+alloy-trie = "0.7"
 
 # Official Ethereum implementations for maximum compatibility
 alloy = { version = "0.9", features = ["full"], optional = true }

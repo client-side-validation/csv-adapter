@@ -29,6 +29,5 @@ pub use adapter::EthereumAnchorLayer;
 pub use config::EthereumConfig;
 pub use types::{EthereumSealRef, EthereumAnchorRef, EthereumFinalityProof, EthereumInclusionProof};
 pub use rpc::{EthereumRpc, MockEthereumRpc};
-pub use mpt::MptVerifier;
 pub use finality::{FinalityChecker, FinalityConfig};
 pub use seal_contract::CsvSealAbi;

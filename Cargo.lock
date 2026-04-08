@@ -1751,6 +1751,7 @@ name = "csv-adapter-core"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "bitcoin",
  "ed25519-dalek",
  "hex",
  "rand 0.8.5",
@@ -1766,7 +1767,10 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "alloy-contract 0.5.4",
+ "alloy-primitives",
+ "alloy-rlp",
  "alloy-sol-types",
+ "alloy-trie",
  "csv-adapter-core",
  "csv-adapter-store",
  "hex",
