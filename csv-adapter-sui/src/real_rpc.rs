@@ -6,6 +6,7 @@
 use reqwest::blocking::Client;
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
+use base64::Engine;
 
 use crate::rpc::{
     SuiRpc, SuiObject, SuiTransactionBlock, SuiEvent, SuiCheckpoint, SuiLedgerInfo,
@@ -193,19 +194,75 @@ impl SuiRpc for SuiRpcClient {
         Ok(result.as_str().unwrap_or("0").parse()?)
     }
 
-    fn execute_transaction(
+    fn sender_address(&self) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
+        // In production, this would be the address derived from the signer's public key
+        // For now, return a placeholder
+        Err("sender_address not implemented for SuiRpcClient".into())
+    }
+
+    fn get_gas_objects(
+        &self,
+        owner: [u8; 32],
+    ) -> Result<Vec<SuiObject>, Box<dyn std::error::Error + Send + Sync>> {
+        let owner_hex = format!("0x{}", hex::encode(owner));
+        let result = self.rpc_call("suix_getCoins", json!([
+            owner_hex,
+            null, // coin type (all coins)
+            null, // cursor
+            null  // limit
+        ]))?;
+
+        if let Some(data) = result.get("data") {
+            if let Some(coins) = data.as_array() {
+                return Ok(coins.iter()
+                    .filter_map(|coin| {
+                        let coin_obj = coin.get("coinObjectId")?;
+                        let id_str = coin_obj.as_str()?;
+                        let object_id = Self::parse_object_id_static(id_str.trim_start_matches("0x")).ok()?;
+                        let version = coin.get("version")?.as_str()?.parse().ok()?;
+                        Some(SuiObject {
+                            object_id,
+                            version,
+                            owner: owner.to_vec(),
+                            object_type: "0x2::coin::Coin<0x2::sui::SUI>".to_string(),
+                            has_public_transfer: true,
+                        })
+                    })
+                    .collect());
+            }
+        }
+        Ok(Vec::new())
+    }
+
+    fn execute_signed_transaction(
         &self,
         tx_bytes: Vec<u8>,
+        signature: Vec<u8>,
+        public_key: Vec<u8>,
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
-        // In production, this requires signed transaction bytes
-        // For now, return a deterministic placeholder
-        let mut digest = [0u8; 32];
-        digest[..10].copy_from_slice(b"sui-execute");
-        digest[10..].copy_from_slice(&tx_bytes[..22.min(tx_bytes.len())]);
-        if tx_bytes.len() < 22 {
-            digest[10 + tx_bytes.len()..].fill(0);
+        // Call sui_executeTransactionBlock with signed transaction
+        // https://docs.sui.io/sui-jsonrpc#suix_executeTransactionBlock
+        let tx_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &tx_bytes);
+        let sig_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &signature);
+        let pk_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &public_key);
+
+        let result = self.rpc_call("sui_executeTransactionBlock", json!([
+            tx_b64,
+            [sig_b64],
+            [pk_b64],
+            {
+                "showInput": true,
+                "showEffects": true,
+                "showEvents": true
+            }
+        ]))?;
+
+        // Parse the response to get the transaction digest
+        if let Some(digest) = result.get("digest").and_then(|d| d.as_str()) {
+            Self::parse_digest_static(digest.trim_start_matches("0x"))
+        } else {
+            Err(format!("Failed to execute transaction: {:?}", result.get("error")).into())
         }
-        Ok(digest)
     }
 
     fn wait_for_transaction(

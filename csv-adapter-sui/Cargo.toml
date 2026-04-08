@@ -21,11 +21,12 @@ ed25519-dalek = { version = "2.0", features = ["rand_core"] }
 # Note: Uses direct JSON-RPC over HTTP, not sui-sdk
 reqwest = { version = "0.11", features = ["json", "blocking"], optional = true }
 tokio = { version = "1", features = ["rt", "time"], optional = true }
+base64 = { version = "0.22", optional = true }
 
 [features]
 default = []
 # Enables real RPC client (real JSON-RPC calls over HTTP)
-rpc = ["reqwest", "tokio"]
+rpc = ["reqwest", "tokio", "base64"]
 
 [dev-dependencies]
 rand = "0.8"

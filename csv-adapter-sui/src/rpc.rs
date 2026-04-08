@@ -34,10 +34,26 @@ pub trait SuiRpc: Send + Sync {
         &self,
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>>;
 
-    /// Execute a transaction
-    fn execute_transaction(
+    /// Get the sender's address
+    fn sender_address(&self) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>>;
+
+    /// Get gas objects owned by the sender
+    fn get_gas_objects(
+        &self,
+        owner: [u8; 32],
+    ) -> Result<Vec<SuiObject>, Box<dyn std::error::Error + Send + Sync>>;
+
+    /// Execute a signed MoveCall transaction and return the transaction digest
+    ///
+    /// # Arguments
+    /// * `tx_bytes` - BCS-serialized TransactionData
+    /// * `signature` - Ed25519 signature (64 bytes)
+    /// * `public_key` - Signer's public key (32 bytes)
+    fn execute_signed_transaction(
         &self,
         tx_bytes: Vec<u8>,
+        signature: Vec<u8>,
+        public_key: Vec<u8>,
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>>;
 
     /// Wait for transaction confirmation
@@ -133,6 +149,8 @@ pub struct MockSuiRpc {
     transactions: Mutex<HashMap<[u8; 32], SuiTransactionBlock>>,
     checkpoints: Mutex<HashMap<u64, SuiCheckpoint>>,
     latest_checkpoint: u64,
+    mock_address: [u8; 32],
+    tx_counter: std::sync::atomic::AtomicU64,
 }
 
 #[cfg(debug_assertions)]
@@ -143,6 +161,19 @@ impl MockSuiRpc {
             transactions: Mutex::new(HashMap::new()),
             checkpoints: Mutex::new(HashMap::new()),
             latest_checkpoint,
+            mock_address: [0x42; 32],
+            tx_counter: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+
+    pub fn new_with_address(latest_checkpoint: u64, address: [u8; 32]) -> Self {
+        Self {
+            objects: Mutex::new(HashMap::new()),
+            transactions: Mutex::new(HashMap::new()),
+            checkpoints: Mutex::new(HashMap::new()),
+            latest_checkpoint,
+            mock_address: address,
+            tx_counter: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -206,11 +237,36 @@ impl SuiRpc for MockSuiRpc {
         Ok(self.latest_checkpoint)
     }
 
-    fn execute_transaction(
+    fn sender_address(&self) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
+        Ok(self.mock_address)
+    }
+
+    fn get_gas_objects(
+        &self,
+        _owner: [u8; 32],
+    ) -> Result<Vec<SuiObject>, Box<dyn std::error::Error + Send + Sync>> {
+        // Return mock gas objects
+        Ok(vec![SuiObject {
+            object_id: [0x01; 32],
+            version: 1,
+            owner: self.mock_address.to_vec(),
+            object_type: "0x2::coin::Coin<0x2::sui::SUI>".to_string(),
+            has_public_transfer: true,
+        }])
+    }
+
+    fn execute_signed_transaction(
         &self,
         _tx_bytes: Vec<u8>,
+        _signature: Vec<u8>,
+        _public_key: Vec<u8>,
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
-        Ok([0xAB; 32])
+        // Mock: return a deterministic digest with incrementing counter
+        let counter = self.tx_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let mut digest = [0u8; 32];
+        digest[..4].copy_from_slice(b"mock");
+        digest[4..12].copy_from_slice(&counter.to_le_bytes());
+        Ok(digest)
     }
 
     fn wait_for_transaction(

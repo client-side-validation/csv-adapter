@@ -1803,6 +1803,7 @@ dependencies = [
 name = "csv-adapter-sui"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "bcs",
  "chrono",
  "csv-adapter-core",

@@ -41,6 +41,9 @@ pub struct SuiAnchorLayer {
     checkpoint_verifier: CheckpointVerifier,
     /// Event builder for creating and parsing anchor events
     event_builder: CommitmentEventBuilder,
+    /// Ed25519 signing key for transaction signing (RPC mode only)
+    #[cfg(feature = "rpc")]
+    signing_key: Option<ed25519_dalek::SigningKey>,
 }
 
 /// Format an object ID as hex for display.
@@ -104,6 +107,8 @@ impl SuiAnchorLayer {
             rpc,
             checkpoint_verifier,
             event_builder,
+            #[cfg(feature = "rpc")]
+            signing_key: None,
         })
     }
 
@@ -114,21 +119,32 @@ impl SuiAnchorLayer {
         Self::from_config(config, rpc)
     }
 
+    /// Attach an Ed25519 signing key for transaction signing (RPC mode only).
+    #[cfg(feature = "rpc")]
+    pub fn with_signing_key(mut self, signing_key: ed25519_dalek::SigningKey) -> Self {
+        self.signing_key = Some(signing_key);
+        self
+    }
+
     /// Create a new adapter with real RPC (requires `rpc` feature).
     ///
     /// # Arguments
     /// * `config` - Adapter configuration
     /// * `csv_seal_package_id` - Package ID where CSVSeal module is deployed
+    /// * `signing_key` - Ed25519 signing key for transaction signing
     #[cfg(feature = "rpc")]
     pub fn with_real_rpc(
         config: SuiConfig,
         _csv_seal_package_id: [u8; 32],
+        signing_key: ed25519_dalek::SigningKey,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         use crate::real_rpc::SuiRpcClient;
 
         let rpc: Box<dyn SuiRpc> = Box::new(SuiRpcClient::new(&config.rpc_url));
-        Self::from_config(config, rpc)
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+        let mut adapter = Self::from_config(config, rpc)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        adapter.signing_key = Some(signing_key);
+        Ok(adapter)
     }
 
     #[cfg(not(feature = "rpc"))]
@@ -160,6 +176,70 @@ impl SuiAnchorLayer {
         }
 
         Ok(())
+    }
+
+    /// Build a MoveCall transaction for csv_seal::consume_seal() and sign it.
+    ///
+    /// Returns (transaction_bytes, signature, public_key) ready for execution.
+    ///
+    /// # Transaction Structure
+    ///
+    /// ```text
+    /// MoveCall {
+    ///   package: <csv_seal_package_id>,
+    ///   module: "csv_seal",
+    ///   function: "consume_seal",
+    ///   type_arguments: [],
+    ///   arguments: [seal_object_id, commitment_hash],
+    /// }
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// Actual BCS serialization of Sui's TransactionData requires the sui-sdk crate.
+    /// This method provides the structural path and signing logic. For production,
+    /// replace the tx_bytes construction with sui-sdk's TransactionData::move_call().
+    #[cfg(feature = "rpc")]
+    fn build_and_sign_move_call(
+        &self,
+        seal: &SuiSealRef,
+        commitment: [u8; 32],
+    ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), Box<dyn std::error::Error + Send + Sync>> {
+        use ed25519_dalek::Signer;
+
+        let signing_key = self.signing_key.as_ref()
+            .ok_or("No signing key configured")?;
+
+        // Build the MoveCall arguments
+        // In production, this should use sui-sdk's TransactionData::move_call()
+        // For now, serialize the call data for documentation purposes
+        let package_id = self.config.seal_contract.package_id.clone();
+        let module_name = self.config.seal_contract.module_name.clone();
+        let function_name = "consume_seal".to_string();
+
+        log::debug!(
+            "Building MoveCall: {}::{}::{}(seal={}, commitment={})",
+            package_id, module_name, function_name,
+            format_object_id(seal.object_id),
+            hex::encode(commitment),
+        );
+
+        // Transaction bytes placeholder - in production, use:
+        // let tx_data = TransactionData::move_call(...);
+        // let tx_bytes = bcs::to_bytes(&tx_data)?;
+        let tx_bytes = bcs::to_bytes(&(
+            &package_id,
+            &module_name,
+            &function_name,
+            seal.object_id,
+            commitment,
+        )).unwrap_or_default();
+
+        // Sign with Ed25519
+        let signature = signing_key.sign(&tx_bytes);
+        let public_key = signing_key.verifying_key().to_bytes().to_vec();
+
+        Ok((tx_bytes, signature.to_bytes().to_vec(), public_key))
     }
 
     /// Verify the event in a published anchor matches the expected commitment.
@@ -214,16 +294,27 @@ impl AnchorLayer for SuiAnchorLayer {
                 seal.object_id,
             );
 
-            // Build transaction bytes for csv_seal::consume_seal()
-            // In production with sui-sdk: construct a Move transaction calling
-            // csv_seal::consume_seal(seal_id, commitment_hash, event_data)
-            let tx_bytes: Vec<u8> = event_data.clone();
+            // Build a MoveCall transaction for csv_seal::consume_seal()
+            // The transaction construction requires BCS serialization of:
+            // - TransactionData with MoveCall payload
+            // - Package ID, module name, function name
+            // - Type arguments and call arguments (seal_id, commitment)
+            // For production: use sui-sdk's transaction builder
+            let (tx_bytes, signature, public_key) = self.build_and_sign_move_call(
+                &seal,
+                *commitment.as_bytes(),
+            ).map_err(|e| AdapterError::PublishFailed(
+                format!("Failed to build and sign transaction: {}", e),
+            ))?;
 
-            // Submit transaction via RPC
-            let tx_digest = self.rpc.execute_transaction(tx_bytes)
-                .map_err(|e| AdapterError::PublishFailed(
-                    format!("Failed to execute transaction: {}", e),
-                ))?;
+            // Submit signed transaction via RPC
+            let tx_digest = self.rpc.execute_signed_transaction(
+                tx_bytes,
+                signature,
+                public_key,
+            ).map_err(|e| AdapterError::PublishFailed(
+                format!("Failed to execute transaction: {}", e),
+            ))?;
 
             // Wait for confirmation
             let block = self.rpc.wait_for_transaction(tx_digest, 30_000)
