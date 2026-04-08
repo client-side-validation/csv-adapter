@@ -236,9 +236,15 @@ Ethereum requires a **nullifier registry contract**. This is the hardest chain b
 | Chain | Status | What Works | What's Missing |
 |-------|--------|-----------|----------------|
 | **Bitcoin** | ✅ COMPLETE | `publish()` → tx_builder builds Taproot tx → wallet signs → `rpc.send_raw_transaction()` broadcasts → returns real txid | Needs Signet node to execute |
-| **Sui** | ✅ Structurally complete | Full flow: verify seal → build_and_sign_move_call → rpc.execute_signed_transaction → wait → verify event → mark consumed | `build_and_sign_move_call()` uses BCS serialization of call data; needs sui-sdk for proper `TransactionData::move_call()` |
+| **Sui** | ✅ COMPLETE | Full flow: verify seal → `build_sui_transaction_data()` (manual BCS) → Ed25519 sign → `rpc.execute_signed_transaction()` → wait → verify event → mark consumed | Needs Sui Testnet node to verify BCS format |
 | **Aptos** | ✅ Structurally complete | Full flow: verify seal → build event → `rpc.submit_transaction()` → wait → verify → mark consumed | `submit_transaction()` returns placeholder; needs Move tx construction + Ed25519 signing |
 | **Ethereum** | ✅ Structurally complete | Full flow: verify slot → build calldata → `rpc.send_raw_transaction()` → verify receipt LOG event → mark consumed | `publish()` needs Alloy tx building + signing before calling `send_raw_transaction()` |
+
+**E2E Test Infrastructure Added:**
+- `csv-adapter-bitcoin/tests/signet_e2e.rs` — Bitcoin Signet end-to-end test (connects to `mempool.space/signet/api/`)
+- `csv-adapter-sui/tests/testnet_e2e.rs` — Sui Testnet end-to-end test (connects to `fullnode.testnet.sui.io`)
+- Both tests are `#[ignore]` — run with `--ignored` flag when testnet credentials are available
+- Tests verify: seal creation, publishing, inclusion proof, finality, rollback, replay prevention
 
 **The architectural path is complete for all chains.** What remains inside each chain's `publish()` is SDK-dependent transaction construction (Taproot for Bitcoin, Move for Sui/Aptos, EVM for Ethereum). The adapter wiring — verify, build, submit, wait, verify, mark — is done.
 
@@ -247,12 +253,13 @@ Ethereum requires a **nullifier registry contract**. This is the hardest chain b
 #### Bitcoin (Ready for Signet testing)
 The full path works: `publish()` → `tx_builder.build_commitment_tx()` → `wallet.sign_tx()` → `rpc.send_raw_transaction()`. Needs a running Signet node with funded UTXOs to execute end-to-end.
 
-#### Sui (Structurally complete)
-Full flow: `publish()` → `build_and_sign_move_call()` → `rpc.execute_signed_transaction()` → `wait_for_transaction()` → verify event → mark consumed.
+#### Sui (TransactionData built, needs live node verification)
+Full flow: `publish()` → `build_sui_transaction_data()` → Ed25519 sign → `rpc.execute_signed_transaction()` → `wait_for_transaction()` → verify event → mark consumed.
+- `build_sui_transaction_data()` manually constructs Sui's BCS TransactionData wire format
 - Ed25519 signing works via `ed25519_dalek::SigningKey`
-- `build_and_sign_move_call()` builds call data with BCS serialization
-- `execute_signed_transaction()` calls `sui_executeTransactionBlock` JSON-RPC with base64-encoded signed tx
-- **Missing:** sui-sdk for proper `TransactionData::move_call()` BCS serialization. Current tx_bytes is the call data, not a valid Sui TransactionData.
+- Signature format: `[0x00 (Ed25519 type)] + [64-byte signature] + [32-byte public key]`
+- `execute_signed_transaction()` calls `sui_executeTransactionBlock` JSON-RPC with base64-encoded tx/sig/pk
+- **Missing:** Live node verification — the manual BCS construction follows Sui's spec but hasn't been tested against a real Sui node. The `sha3` dependency for address derivation was already present. Needs Testnet execution to confirm BCS format matches exactly.
 
 #### Aptos (Needs Move transaction construction)
 `submit_transaction()` in `real_rpc.rs` currently returns a placeholder. To make it real: build an Aptos Entry Function payload calling `csv_seal::delete_seal()`, sign with Ed25519, POST to `/v1/transactions`. Requires Aptos SDK for proper Move transaction construction.
