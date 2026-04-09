@@ -643,13 +643,21 @@ mod tests {
 
         #[test]
         fn test_dag_in_verify_proof_pipeline() {
-            // Create valid signature format: [pk_len (4)] [pk (33)] [sig (64)]
-            let mut signature = vec![0u8; 101];
-            signature[0..4].copy_from_slice(&33u32.to_le_bytes());
-            signature[4] = 0x02;
-            signature[5..37].copy_from_slice(&[0xAB; 32]);
-            signature[37..69].copy_from_slice(&[0x01; 32]);
-            signature[69..101].copy_from_slice(&[0x01; 32]);
+            use secp256k1::{Secp256k1, SecretKey, Message};
+            // The message signed is the DAG root commitment
+            let root_commitment = Hash::new([99u8; 32]);
+            let message: [u8; 32] = *root_commitment.as_bytes();
+            let secp = Secp256k1::new();
+            let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
+            let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
+            let msg = Message::from_digest_slice(&message).unwrap();
+            let signature_ecdsa = secp.sign_ecdsa(&msg, &secret_key);
+            let sig_bytes = signature_ecdsa.serialize_compact();
+            let pubkey_bytes = public_key.serialize();
+            let mut signature = Vec::with_capacity(4 + pubkey_bytes.len() + sig_bytes.len());
+            signature.extend_from_slice(&(pubkey_bytes.len() as u32).to_le_bytes());
+            signature.extend_from_slice(&pubkey_bytes);
+            signature.extend_from_slice(&sig_bytes);
 
             let node = DAGNode::new(
                 Hash::new([1u8; 32]),
@@ -683,13 +691,20 @@ mod tests {
 
         #[test]
         fn test_dag_with_invalid_parent_fails_in_proof_bundle() {
-            // Create valid signature format
-            let mut signature = vec![0u8; 101];
-            signature[0..4].copy_from_slice(&33u32.to_le_bytes());
-            signature[4] = 0x02;
-            signature[5..37].copy_from_slice(&[0xAB; 32]);
-            signature[37..69].copy_from_slice(&[0x01; 32]);
-            signature[69..101].copy_from_slice(&[0x01; 32]);
+            use secp256k1::{Secp256k1, SecretKey, Message};
+            let root_commitment = Hash::zero();
+            let message: [u8; 32] = *root_commitment.as_bytes();
+            let secp = Secp256k1::new();
+            let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
+            let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
+            let msg = Message::from_digest_slice(&message).unwrap();
+            let signature_ecdsa = secp.sign_ecdsa(&msg, &secret_key);
+            let sig_bytes = signature_ecdsa.serialize_compact();
+            let pubkey_bytes = public_key.serialize();
+            let mut signature = Vec::with_capacity(4 + pubkey_bytes.len() + sig_bytes.len());
+            signature.extend_from_slice(&(pubkey_bytes.len() as u32).to_le_bytes());
+            signature.extend_from_slice(&pubkey_bytes);
+            signature.extend_from_slice(&sig_bytes);
 
             let node = DAGNode::new(
                 Hash::new([1u8; 32]),

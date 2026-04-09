@@ -462,6 +462,7 @@ mod tests {
     use super::*;
     use crate::consignment::Consignment;
     use crate::genesis::Genesis;
+    use crate::OwnershipProof;
 
     fn make_test_genesis() -> Genesis {
         Genesis::new(

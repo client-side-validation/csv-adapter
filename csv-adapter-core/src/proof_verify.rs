@@ -124,19 +124,40 @@ mod tests {
     use crate::seal::{AnchorRef, SealRef};
     use crate::signature::SignatureScheme;
 
+    fn make_secp256k1_signature_bytes(message: &[u8; 32]) -> Vec<u8> {
+        use secp256k1::{Secp256k1, SecretKey, Message};
+        let secp = Secp256k1::new();
+        let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
+        let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
+        let msg = Message::from_digest_slice(message).unwrap();
+        let signature = secp.sign_ecdsa(&msg, &secret_key);
+        let sig_bytes = signature.serialize_compact();
+        let pubkey_bytes = public_key.serialize();
+        // Format: [pk_len (4 bytes LE)] [public_key] [signature]
+        let mut encoded = Vec::with_capacity(4 + pubkey_bytes.len() + sig_bytes.len());
+        encoded.extend_from_slice(&(pubkey_bytes.len() as u32).to_le_bytes());
+        encoded.extend_from_slice(&pubkey_bytes);
+        encoded.extend_from_slice(&sig_bytes);
+        encoded
+    }
+
+    fn make_ed25519_signature_bytes(message: &[u8]) -> Vec<u8> {
+        use ed25519_dalek::{SigningKey, Signer};
+        let signing_key = SigningKey::generate(&mut rand::rngs::OsRng);
+        let verifying_key = signing_key.verifying_key();
+        let signature = signing_key.sign(message);
+        // Format: [pk_len (4 bytes LE)] [public_key] [signature]
+        let mut encoded = Vec::with_capacity(4 + 32 + 64);
+        encoded.extend_from_slice(&32u32.to_le_bytes());
+        encoded.extend_from_slice(&verifying_key.to_bytes());
+        encoded.extend_from_slice(&signature.to_bytes());
+        encoded
+    }
+
     fn test_bundle_with_signatures() -> Result<ProofBundle> {
-        // Create valid secp256k1 signatures
-        // Format: [pk_len (4 bytes)] [public_key (33 bytes)] [signature (64 bytes)]
-        // Total: 101 bytes
-        let mut signature = vec![0u8; 101];
-        signature[0..4].copy_from_slice(&33u32.to_le_bytes()); // public key length
-        signature[4] = 0x02; // compressed public key prefix (index 4)
-        signature[5..37].copy_from_slice(&[0xAB; 32]); // public key remainder (indices 5-36, 32 bytes)
-                                                       // Combined: index 4 is prefix + indices 5-36 = 33 bytes total public key
-                                                       // r value (32 bytes, indices 37-68)
-        signature[37..69].copy_from_slice(&[0x01; 32]);
-        // s value (32 bytes, indices 69-100, low-s to avoid malleability)
-        signature[69..101].copy_from_slice(&[0x01; 32]);
+        // The message signed is the DAG root commitment (Hash::zero() = 32 zero bytes)
+        let message = [0u8; 32];
+        let signature = make_secp256k1_signature_bytes(&message);
 
         let bundle = ProofBundle::new(
             DAGSegment::new(
@@ -204,13 +225,9 @@ mod tests {
 
     #[test]
     fn test_verify_proof_ed25519_valid_format() {
-        // Create valid Ed25519 signature format
-        // Format: [pk_len (4 bytes)] [public_key (32 bytes)] [signature (64 bytes)]
-        let mut signature = vec![0u8; 4 + 32 + 64];
-        signature[0..4].copy_from_slice(&32u32.to_le_bytes()); // public key length
-        signature[4..36].copy_from_slice(&[0xAB; 32]); // Ed25519 public key
-        signature[36..68].copy_from_slice(&[0x01; 32]); // R
-        signature[68..100].copy_from_slice(&[0x01; 32]); // S (valid, < L)
+        // The message signed is the DAG root commitment (Hash::zero() = 32 zero bytes)
+        let message = [0u8; 32];
+        let signature = make_ed25519_signature_bytes(&message);
 
         let mut bundle = test_bundle_with_signatures().unwrap();
         bundle.signatures = vec![signature];

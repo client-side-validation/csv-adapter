@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn test_secp256k1_valid_signature() {
         use secp256k1::{Secp256k1, SecretKey, Message};
-        use secp256k1::ecdsa::Signature;
+        use secp256k1::ecdsa::Signature as SecpSignature;
 
         let secp = Secp256k1::new();
         let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());

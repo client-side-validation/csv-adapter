@@ -263,6 +263,7 @@ mod tests {
     use super::*;
     use crate::consignment::Consignment;
     use crate::genesis::Genesis;
+    use crate::state_store::StateHistoryStore;
 
     fn make_test_consignment() -> Consignment {
         let genesis = Genesis::new(
