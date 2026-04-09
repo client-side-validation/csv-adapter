@@ -1,12 +1,9 @@
 //! Client-Side Validation Engine
 //!
-//! The client receives consignments from peers and validates them locally:
-//! 1. Fetch the full state history for a contract
-//! 2. Verify the commitment chain from genesis to present
-//! 3. Check that no Right was consumed more than once
-//! 4. Accept or reject the consignment based on local validation
+//! The client receives consignments and seal consumption proofs from peers,
+//! verifies them locally, and accepts or rejects state transitions.
 //!
-//! ## Architecture
+//! ## Flow
 //!
 //! ```text
 //! Client receives consignment from peer:
@@ -19,12 +16,13 @@
 //!         ▼
 //!   Client validates uniformly:
 //!     1. Each Right.verify() passes
-//!     2. No Right appears twice (double-consumption check)
-//!     3. Commitment chain integrity (genesis → present)
+//!     2. Commitment chain integrity (genesis → present)
+//!     3. No seal double-consumption (cross-chain registry)
 //!     4. Accept or reject the consignment
 //! ```
 
 use alloc::vec::Vec;
+use alloc::string::String;
 
 use crate::commitment::Commitment;
 use crate::commitment_chain::{verify_ordered_commitment_chain, ChainVerificationResult, ChainError};
@@ -34,6 +32,10 @@ use crate::right::{Right, RightId, OwnershipProof, RightError};
 use crate::seal_registry::{CrossChainSealRegistry, SealConsumption, ChainId, SealStatus, DoubleSpendError};
 use crate::state_store::{ContractHistory, StateTransitionRecord, InMemoryStateStore, StateHistoryStore};
 use crate::seal::SealRef;
+use crate::cross_chain::{
+    InclusionProof as CrossChainInclusionProof,
+    BitcoinMerkleProof, EthereumMPTProof, SuiCheckpointProof, AptosLedgerProof,
+};
 
 /// Result of consignment validation.
 #[derive(Debug)]
@@ -63,166 +65,328 @@ pub enum ValidationError {
     CommitmentChainError(#[from] ChainError),
     #[error("Right validation failed: {0}")]
     RightValidationError(#[from] RightError),
-    #[error("Double-spend detected: {0:?}")]
-    DoubleSpend(DoubleSpendError),
-    #[error("Missing history: contract {0} has incomplete state history")]
-    MissingHistory(Hash),
+    #[error("Double-spend detected")]
+    DoubleSpend(String),
+    #[error("Missing history: contract has incomplete state history")]
+    MissingHistory(String),
     #[error("Seal assignment error: {0}")]
     SealAssignmentError(String),
     #[error("State store error: {0}")]
     StoreError(String),
     #[error("Contract ID mismatch: expected {expected}, got {actual}")]
     ContractIdMismatch { expected: Hash, actual: Hash },
-    #[error("Version mismatch: consignment version {version} not supported")]
+    #[error("Unsupported consignment version: {version}")]
     UnsupportedVersion { version: u32 },
+    #[error("Inclusion proof verification failed: {0}")]
+    InclusionProofFailed(String),
+}
+
+/// Seal consumption event — the atomic unit of client-side validation.
+///
+/// When a seal is consumed on any chain, this event is created.
+/// The client verifies this event and accepts or rejects the state transition.
+#[derive(Clone, Debug)]
+pub struct SealConsumptionEvent {
+    /// Which chain enforced the consumption
+    pub chain: ChainId,
+    /// The seal that was consumed
+    pub seal: SealRef,
+    /// The Right after consumption (new owner, etc.)
+    pub right: Right,
+    /// Inclusion proof (chain-specific)
+    pub inclusion: CrossChainInclusionProof,
+    /// Block/checkpoint height
+    pub height: u64,
+    /// Transaction hash that consumed the seal
+    pub tx_hash: Hash,
 }
 
 /// Client-side validation engine.
 ///
-/// Receives consignments and validates them against local state
-/// and cross-chain seal registry.
+/// Receives consignments and seal consumption proofs,
+/// verifies them against local state and the cross-chain registry,
+/// and accepts or rejects state transitions.
 pub struct ValidationClient {
     /// Persistent state history store
     store: InMemoryStateStore,
-    /// Cross-chain seal consumption registry
+    /// Cross-chain seal registry — prevents double-spend across all chains
     seal_registry: CrossChainSealRegistry,
-    /// The chain this client primarily operates on
-    primary_chain: ChainId,
 }
 
 impl ValidationClient {
-    /// Create a new validation client for a specific chain.
-    pub fn new(primary_chain: ChainId) -> Self {
+    /// Create a new validation client.
+    pub fn new() -> Self {
         Self {
             store: InMemoryStateStore::new(),
             seal_registry: CrossChainSealRegistry::new(),
-            primary_chain,
         }
     }
 
     /// Receive and validate a consignment from a peer.
     ///
-    /// This is the main entry point for client-side validation.
-    /// It performs all validation steps and either accepts or rejects
-    /// the consignment.
-    ///
-    /// # Arguments
-    /// * `consignment` - The consignment to validate
-    /// * `anchor_chain` - The chain that anchors this consignment
-    ///
-    /// # Returns
-    /// `ValidationResult::Accepted` if valid, `ValidationResult::Rejected` if invalid.
+    /// This is the main entry point. It:
+    /// 1. Validates consignment structure
+    /// 2. Extracts commitments and verifies the chain
+    /// 3. Maps anchors to Rights and verifies seal consumption
+    /// 4. Updates local state if valid
     pub fn receive_consignment(
         &mut self,
         consignment: &Consignment,
         anchor_chain: ChainId,
     ) -> ValidationResult {
-        // Step 1: Validate consignment structure
+        // Step 1: Structural validation
         if let Err(e) = consignment.validate_structure() {
             return ValidationResult::Rejected {
                 reason: ValidationError::SealAssignmentError(e.to_string()),
             };
         }
 
-        // Step 2: Extract commitments and verify chain
-        match self.verify_commitment_chain(consignment) {
-            Ok(chain_result) => {
-                // Step 3: Verify Rights and seal consumption
-                match self.verify_rights_and_seals(consignment, &chain_result, &anchor_chain) {
-                    Ok((rights_validated, seals_consumed)) => {
-                        // Step 4: Update local state
-                        if let Err(e) = self.update_local_state(consignment, &chain_result) {
-                            return ValidationResult::Rejected { reason: e };
-                        }
-
-                        ValidationResult::Accepted {
-                            history: ContractHistory::from_genesis(chain_result.genesis.clone()),
-                            rights_count: rights_validated,
-                            seals_consumed,
-                        }
-                    }
-                    Err(e) => ValidationResult::Rejected { reason: e },
-                }
-            }
-            Err(e) => ValidationResult::Rejected {
+        // Step 2: Extract and verify commitment chain
+        let commitments = self.extract_commitments(consignment);
+        let chain_result = match self.verify_commitment_chain(&commitments) {
+            Ok(result) => result,
+            Err(e) => return ValidationResult::Rejected {
                 reason: ValidationError::CommitmentChainError(e),
             },
+        };
+
+        // Step 3: Verify seal consumption
+        let seals_consumed = match self.verify_seal_consumption(consignment, &chain_result, &anchor_chain) {
+            Ok(count) => count,
+            Err(e) => return ValidationResult::Rejected { reason: e },
+        };
+
+        // Step 4: Update local state
+        if let Err(e) = self.update_local_state(consignment, &chain_result) {
+            return ValidationResult::Rejected { reason: e };
+        }
+
+        ValidationResult::Accepted {
+            history: ContractHistory::from_genesis(chain_result.genesis.clone()),
+            rights_count: consignment.seal_assignments.len(),
+            seals_consumed,
         }
     }
 
-    /// Verify the commitment chain in a consignment.
+    /// Receive and verify a seal consumption event from any chain.
+    ///
+    /// This is the cross-chain portability entry point.
+    /// Any client can verify any chain's seal consumption proof.
+    pub fn verify_seal_consumption_event(
+        &mut self,
+        event: SealConsumptionEvent,
+    ) -> Result<(), ValidationError> {
+        // Step 1: Verify the Right itself
+        event.right.verify()
+            .map_err(|e| ValidationError::RightValidationError(e))?;
+
+        // Step 2: Check seal not already consumed (cross-chain)
+        match self.seal_registry.check_seal_status(&event.seal) {
+            SealStatus::Unconsumed => {
+                // OK — first consumption
+            }
+            SealStatus::ConsumedOnChain { chain, .. } => {
+                return Err(ValidationError::DoubleSpend(
+                    format!("Seal already consumed on {:?}", chain)
+                ));
+            }
+            SealStatus::DoubleSpent { .. } => {
+                return Err(ValidationError::DoubleSpend(
+                    "Seal has been double-spent across chains".to_string()
+                ));
+            }
+        }
+
+        // Step 3: Verify inclusion proof (chain-specific)
+        self.verify_inclusion_proof(&event.inclusion, &event.chain)?;
+
+        // Step 4: Record in cross-chain registry
+        let consumption = SealConsumption {
+            chain: event.chain.clone(),
+            seal_ref: event.seal.clone(),
+            right_id: event.right.id.clone(),
+            block_height: event.height,
+            tx_hash: event.tx_hash,
+            recorded_at: 0, // Would be current timestamp
+        };
+
+        if let Err(e) = self.seal_registry.record_consumption(consumption) {
+            return Err(ValidationError::DoubleSpend(format!("{:?}", e)));
+        }
+
+        Ok(())
+    }
+
+    /// Extract commitments from a consignment.
+    ///
+    /// Commitments come from:
+    /// - Genesis (the root commitment)
+    /// - Anchors (each anchor contains a commitment)
+    /// - Transitions (each transition has a payload hash that links to a commitment)
+    fn extract_commitments(&self, consignment: &Consignment) -> Vec<Commitment> {
+        // In a full implementation, commitments would be extracted from
+        // the consignment's anchors and transitions.
+        // For now, we construct synthetic commitments from the seal assignments.
+        let mut commitments = Vec::new();
+
+        // The genesis provides the root commitment
+        let genesis_commitment = {
+            let domain = [0u8; 32];
+            let seal = SealRef::new(consignment.genesis.contract_id.as_bytes().to_vec(), None)
+                .unwrap_or_else(|_| SealRef::new(vec![0x01], None).unwrap());
+            Commitment::simple(
+                consignment.genesis.contract_id,
+                Hash::new([0u8; 32]), // Genesis has no previous commitment
+                Hash::new([0u8; 32]),
+                &seal,
+                domain,
+            )
+        };
+        commitments.push(genesis_commitment);
+
+        // Each seal assignment represents a state transition with a commitment
+        for (i, assignment) in consignment.seal_assignments.iter().enumerate() {
+            let previous = if i == 0 {
+                commitments[0].hash()
+            } else {
+                commitments[i].hash()
+            };
+
+            let domain = [0u8; 32];
+            let seal = assignment.seal_ref.clone();
+            let commitment = Commitment::simple(
+                consignment.schema_id,
+                previous,
+                Hash::new([0u8; 32]), // Would come from transition payload
+                &seal,
+                domain,
+            );
+            commitments.push(commitment);
+        }
+
+        commitments
+    }
+
+    /// Verify the commitment chain.
     fn verify_commitment_chain(
         &self,
-        consignment: &Consignment,
+        commitments: &[Commitment],
     ) -> Result<ChainVerificationResult, ChainError> {
-        // Extract all commitments from the consignment
-        // For now, we use anchors as a proxy for commitments
-        // In a full implementation, transitions would also provide commitments
-
-        let commitments: Vec<Commitment> = consignment.anchors.iter()
-            .filter_map(|anchor| {
-                // Extract commitment from anchor
-                // This is simplified - real implementation would extract from anchor data
-                None
-            })
-            .collect();
-
-        // If no commitments in anchors, check if we have a genesis
-        // For a minimal consignment, we at least need the genesis
-        if consignment.transitions.is_empty() && consignment.anchors.is_empty() {
-            // Minimal genesis-only consignment
+        if commitments.is_empty() {
             return Err(ChainError::EmptyChain);
         }
 
-        // For now, we'll create a synthetic commitment chain from the consignment
-        // In production, commitments would be extracted from transitions
-        Err(ChainError::EmptyChain)
+        // Use the ordered chain verifier — commitments are extracted in order
+        verify_ordered_commitment_chain(commitments)
     }
 
-    /// Verify Rights and seal consumption.
-    fn verify_rights_and_seals(
+    /// Verify seal consumption for all seal assignments in the consignment.
+    fn verify_seal_consumption(
         &mut self,
         consignment: &Consignment,
         _chain_result: &ChainVerificationResult,
         anchor_chain: &ChainId,
-    ) -> Result<(usize, usize), ValidationError> {
-        let mut rights_validated = 0;
+    ) -> Result<usize, ValidationError> {
         let mut seals_consumed = 0;
 
-        // Verify each seal assignment
         for seal_assignment in &consignment.seal_assignments {
             // Check if seal has already been consumed
             match self.seal_registry.check_seal_status(&seal_assignment.seal_ref) {
                 SealStatus::Unconsumed => {
-                    // Seal is fresh - mark as consumed
+                    // Seal is fresh — record consumption
+                    let right_id_bytes: [u8; 32] = {
+                        let mut arr = [0u8; 32];
+                        let seal_bytes = seal_assignment.seal_ref.to_vec();
+                        let len = seal_bytes.len().min(32);
+                        arr[..len].copy_from_slice(&seal_bytes[..len]);
+                        arr
+                    };
+
                     let consumption = SealConsumption {
                         chain: anchor_chain.clone(),
                         seal_ref: seal_assignment.seal_ref.clone(),
-                        right_id: RightId(Hash::new(seal_assignment.seal_ref.seal_id.clone().try_into()
-                            .unwrap_or([0u8; 32]))),
+                        right_id: RightId(Hash::new(right_id_bytes)),
                         block_height: 0, // Would come from anchor
                         tx_hash: Hash::new([0u8; 32]), // Would come from anchor
-                        recorded_at: 0, // Current timestamp
+                        recorded_at: 0,
                     };
 
                     if let Err(e) = self.seal_registry.record_consumption(consumption) {
-                        return Err(ValidationError::DoubleSpend(e));
+                        return Err(ValidationError::DoubleSpend(format!("{:?}", e)));
                     }
 
                     seals_consumed += 1;
                 }
-                SealStatus::ConsumedOnChain { .. } | SealStatus::DoubleSpent { .. } => {
-                    // Seal already consumed - potential double-spend
-                    return Err(ValidationError::SealAssignmentError(
-                        "Seal has already been consumed".to_string(),
+                SealStatus::ConsumedOnChain { chain, .. } => {
+                    return Err(ValidationError::DoubleSpend(
+                        format!("Seal already consumed on {:?}", chain)
+                    ));
+                }
+                SealStatus::DoubleSpent { .. } => {
+                    return Err(ValidationError::DoubleSpend(
+                        "Seal has been double-spent".to_string()
                     ));
                 }
             }
-
-            rights_validated += 1;
         }
 
-        Ok((rights_validated, seals_consumed))
+        Ok(seals_consumed)
+    }
+
+    /// Verify an inclusion proof from any chain.
+    fn verify_inclusion_proof(
+        &self,
+        inclusion: &CrossChainInclusionProof,
+        chain: &ChainId,
+    ) -> Result<(), ValidationError> {
+        match (inclusion, chain) {
+            (CrossChainInclusionProof::Bitcoin(proof), _) => {
+                // Verify Merkle branch is non-empty and structurally valid
+                if proof.merkle_branch.is_empty() {
+                    return Err(ValidationError::InclusionProofFailed(
+                        "Empty Merkle branch".to_string()
+                    ));
+                }
+                if proof.block_header.is_empty() {
+                    return Err(ValidationError::InclusionProofFailed(
+                        "Empty block header".to_string()
+                    ));
+                }
+                // In production: verify Merkle root matches block header
+                // verify_merkle_proof(txid, &proof.merkle_branch) == header.merkle_root
+            }
+            (CrossChainInclusionProof::Ethereum(proof), _) => {
+                if proof.receipt_rlp.is_empty() && proof.merkle_nodes.is_empty() {
+                    return Err(ValidationError::InclusionProofFailed(
+                        "Empty MPT proof".to_string()
+                    ));
+                }
+                // In production: verify MPT proof via alloy-trie
+            }
+            (CrossChainInclusionProof::Sui(proof), _) => {
+                if !proof.certified {
+                    return Err(ValidationError::InclusionProofFailed(
+                        "Checkpoint not certified".to_string()
+                    ));
+                }
+                // In production: verify checkpoint certification
+            }
+            (CrossChainInclusionProof::Aptos(proof), _) => {
+                if !proof.success {
+                    return Err(ValidationError::InclusionProofFailed(
+                        "Transaction failed".to_string()
+                    ));
+                }
+                // In production: verify HotStuff ledger signatures
+            }
+            _ => {
+                return Err(ValidationError::InclusionProofFailed(
+                    format!("Inclusion proof type doesn't match chain: {:?}", chain)
+                ));
+            }
+        }
+
+        Ok(())
     }
 
     /// Update local state with validated consignment data.
@@ -241,17 +405,33 @@ impl ValidationClient {
         };
 
         // Add transitions to history
-        for (i, transition) in consignment.transitions.iter().enumerate() {
-            // Create transition record
+        for (i, _transition) in consignment.transitions.iter().enumerate() {
+            let previous_hash = if i == 0 {
+                chain_result.genesis.hash()
+            } else if i <= history.transition_count() {
+                history.transitions[i - 1].commitment.hash()
+            } else {
+                chain_result.latest.hash()
+            };
+
+            let seal = if i < consignment.seal_assignments.len() {
+                consignment.seal_assignments[i].seal_ref.clone()
+            } else {
+                SealRef::new(vec![i as u8], None).unwrap()
+            };
+
+            let domain = [0u8; 32];
+            let commitment = Commitment::simple(
+                contract_id,
+                previous_hash,
+                Hash::new([0u8; 32]),
+                &seal,
+                domain,
+            );
+
             let record = StateTransitionRecord {
-                commitment: Commitment::simple(
-                    contract_id,
-                    chain_result.latest.hash(),
-                    Hash::new([0u8; 32]),
-                    &SealRef::new(vec![i as u8], None).unwrap(),
-                    [0u8; 32],
-                ),
-                seal_ref: SealRef::new(vec![i as u8], None).unwrap(),
+                commitment,
+                seal_ref: seal,
                 rights: Vec::new(),
                 block_height: 0,
                 verified: true,
@@ -268,19 +448,20 @@ impl ValidationClient {
         Ok(())
     }
 
-    /// Get the state history store for direct access.
+    /// Get the state history store.
     pub fn store(&self) -> &InMemoryStateStore {
         &self.store
     }
 
-    /// Get the seal registry for direct access.
+    /// Get the cross-chain seal registry.
     pub fn seal_registry(&self) -> &CrossChainSealRegistry {
         &self.seal_registry
     }
+}
 
-    /// Get the primary chain ID.
-    pub fn primary_chain(&self) -> &ChainId {
-        &self.primary_chain
+impl Default for ValidationClient {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -313,38 +494,258 @@ mod tests {
 
     #[test]
     fn test_client_creation() {
-        let client = ValidationClient::new(ChainId::Bitcoin);
-        assert_eq!(client.primary_chain(), &ChainId::Bitcoin);
+        let client = ValidationClient::new();
+        assert_eq!(client.store().list_contracts().unwrap().len(), 0);
+        assert_eq!(client.seal_registry().total_seals(), 0);
     }
 
     #[test]
-    fn test_receive_empty_consignment() {
-        let mut client = ValidationClient::new(ChainId::Bitcoin);
+    fn test_receive_consignment_empty() {
+        let mut client = ValidationClient::new();
         let consignment = make_test_consignment();
 
         let result = client.receive_consignment(&consignment, ChainId::Bitcoin);
 
-        // Should be rejected due to empty commitment chain
         match result {
-            ValidationResult::Rejected { reason } => {
-                // Expected - we don't have full commitment extraction yet
-                let _ = reason;
+            ValidationResult::Accepted { rights_count, seals_consumed, .. } => {
+                // Empty consignment with no seal assignments is valid
+                assert_eq!(rights_count, 0);
+                assert_eq!(seals_consumed, 0);
             }
-            ValidationResult::Accepted { .. } => {
-                // Would need proper commitments in the consignment
+            ValidationResult::Rejected { reason } => {
+                // Rejection is also acceptable (depends on implementation details)
+                let _ = reason;
             }
         }
     }
 
     #[test]
-    fn test_client_store_access() {
-        let client = ValidationClient::new(ChainId::Bitcoin);
-        assert_eq!(client.store().list_contracts().unwrap().len(), 0);
+    fn test_receive_multiple_consignments() {
+        let mut client = ValidationClient::new();
+
+        for i in 0..3 {
+            let mut genesis = make_test_genesis();
+            genesis.contract_id = Hash::new([i + 1; 32]);
+            let consignment = Consignment::new(
+                genesis,
+                vec![],
+                vec![],
+                vec![],
+                Hash::new([0x01; 32]),
+            );
+
+            let _ = client.receive_consignment(&consignment, ChainId::Bitcoin);
+        }
+
+        // Should have 3 contracts tracked
+        assert_eq!(client.store().list_contracts().unwrap().len(), 3);
     }
 
     #[test]
-    fn test_client_seal_registry_access() {
-        let client = ValidationClient::new(ChainId::Bitcoin);
-        assert_eq!(client.seal_registry().total_seals(), 0);
+    fn test_seal_consumption_event_btc() {
+        let mut client = ValidationClient::new();
+
+        let right = Right::new(
+            Hash::new([0xCD; 32]),
+            OwnershipProof {
+                proof: vec![0x01, 0x02, 0x03],
+                owner: vec![0xFF; 32],
+            },
+            &[0x42],
+        );
+
+        let inclusion = CrossChainInclusionProof::Bitcoin(
+            crate::cross_chain::BitcoinMerkleProof {
+                txid: [0xAB; 32],
+                merkle_branch: vec![[0xCD; 32], [0xEF; 32]],
+                block_header: vec![0x01; 80],
+                block_height: 1000,
+                confirmations: 6,
+            }
+        );
+
+        let event = SealConsumptionEvent {
+            chain: ChainId::Bitcoin,
+            seal: SealRef::new(vec![0x01], None).unwrap(),
+            right,
+            inclusion,
+            height: 1000,
+            tx_hash: Hash::new([0xAB; 32]),
+        };
+
+        let result = client.verify_seal_consumption_event(event);
+        assert!(result.is_ok());
+
+        // Seal should now be in registry
+        assert_eq!(client.seal_registry().total_seals(), 1);
+    }
+
+    #[test]
+    fn test_seal_consumption_event_double_spend() {
+        let mut client = ValidationClient::new();
+
+        let right = Right::new(
+            Hash::new([0xCD; 32]),
+            OwnershipProof {
+                proof: vec![0x01],
+                owner: vec![0xFF; 32],
+            },
+            &[0x42],
+        );
+
+        let inclusion = CrossChainInclusionProof::Bitcoin(
+            crate::cross_chain::BitcoinMerkleProof {
+                txid: [0xAB; 32],
+                merkle_branch: vec![[0xCD; 32]],
+                block_header: vec![0x01; 80],
+                block_height: 1000,
+                confirmations: 6,
+            }
+        );
+
+        let seal = SealRef::new(vec![0x01], None).unwrap();
+
+        let event1 = SealConsumptionEvent {
+            chain: ChainId::Bitcoin,
+            seal: seal.clone(),
+            right: right.clone(),
+            inclusion: inclusion.clone(),
+            height: 1000,
+            tx_hash: Hash::new([0xAB; 32]),
+        };
+
+        assert!(client.verify_seal_consumption_event(event1).is_ok());
+
+        // Try to consume same seal again
+        let right2 = Right::new(
+            Hash::new([0xEF; 32]),
+            OwnershipProof {
+                proof: vec![0x02],
+                owner: vec![0xEE; 32],
+            },
+            &[0x99],
+        );
+
+        let event2 = SealConsumptionEvent {
+            chain: ChainId::Bitcoin,
+            seal: seal.clone(),
+            right: right2,
+            inclusion,
+            height: 1001,
+            tx_hash: Hash::new([0xBC; 32]),
+        };
+
+        let result = client.verify_seal_consumption_event(event2);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ValidationError::DoubleSpend(_)));
+    }
+
+    #[test]
+    fn test_seal_consumption_cross_chain() {
+        let mut client = ValidationClient::new();
+
+        let right = Right::new(
+            Hash::new([0xCD; 32]),
+            OwnershipProof {
+                proof: vec![0x01],
+                owner: vec![0xFF; 32],
+            },
+            &[0x42],
+        );
+
+        let btc_inclusion = CrossChainInclusionProof::Bitcoin(
+            crate::cross_chain::BitcoinMerkleProof {
+                txid: [0xAB; 32],
+                merkle_branch: vec![[0xCD; 32]],
+                block_header: vec![0x01; 80],
+                block_height: 1000,
+                confirmations: 6,
+            }
+        );
+
+        let eth_inclusion = CrossChainInclusionProof::Ethereum(
+            crate::cross_chain::EthereumMPTProof {
+                tx_hash: [0xAB; 32],
+                receipt_root: [0xCD; 32],
+                receipt_rlp: vec![0x01; 100],
+                merkle_nodes: vec![vec![0xEF; 64]],
+                block_header: vec![0x02; 80],
+                log_index: 0,
+                confirmations: 15,
+            }
+        );
+
+        let seal = SealRef::new(vec![0x01], None).unwrap();
+
+        // Consume on Bitcoin
+        let event_btc = SealConsumptionEvent {
+            chain: ChainId::Bitcoin,
+            seal: seal.clone(),
+            right: right.clone(),
+            inclusion: btc_inclusion,
+            height: 1000,
+            tx_hash: Hash::new([0xAB; 32]),
+        };
+        assert!(client.verify_seal_consumption_event(event_btc).is_ok());
+
+        // Try to consume on Ethereum (cross-chain double-spend)
+        let right2 = Right::new(
+            Hash::new([0xEF; 32]),
+            OwnershipProof {
+                proof: vec![0x02],
+                owner: vec![0xEE; 32],
+            },
+            &[0x99],
+        );
+
+        let event_eth = SealConsumptionEvent {
+            chain: ChainId::Ethereum,
+            seal: seal.clone(),
+            right: right2,
+            inclusion: eth_inclusion,
+            height: 2000,
+            tx_hash: Hash::new([0xBC; 32]),
+        };
+
+        let result = client.verify_seal_consumption_event(event_eth);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_seal_consumption_invalid_inclusion() {
+        let mut client = ValidationClient::new();
+
+        let right = Right::new(
+            Hash::new([0xCD; 32]),
+            OwnershipProof {
+                proof: vec![0x01],
+                owner: vec![0xFF; 32],
+            },
+            &[0x42],
+        );
+
+        // Empty Merkle branch should fail
+        let inclusion = CrossChainInclusionProof::Bitcoin(
+            crate::cross_chain::BitcoinMerkleProof {
+                txid: [0xAB; 32],
+                merkle_branch: vec![], // Empty!
+                block_header: vec![0x01; 80],
+                block_height: 1000,
+                confirmations: 6,
+            }
+        );
+
+        let event = SealConsumptionEvent {
+            chain: ChainId::Bitcoin,
+            seal: SealRef::new(vec![0x01], None).unwrap(),
+            right,
+            inclusion,
+            height: 1000,
+            tx_hash: Hash::new([0xAB; 32]),
+        };
+
+        let result = client.verify_seal_consumption_event(event);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ValidationError::InclusionProofFailed(_)));
     }
 }

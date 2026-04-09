@@ -519,16 +519,50 @@ impl AnchorLayer for SuiAnchorLayer {
     fn verify_inclusion(&self, anchor: Self::AnchorRef) -> CoreResult<Self::InclusionProof> {
         log::debug!("Verifying inclusion for anchor at checkpoint {}", anchor.checkpoint);
 
-        // In production:
-        // 1. Get transaction by digest
-        // 2. Verify transaction effects
-        // 3. Verify event was emitted with correct commitment
-        // 4. Build object proof
+        // Fetch checkpoint info from the Sui node
+        let checkpoint_info = match self.rpc.get_checkpoint(anchor.checkpoint) {
+            Ok(Some(info)) => info,
+            Ok(None) => {
+                return Err(AdapterError::InclusionProofFailed(format!(
+                    "Checkpoint {} not found", anchor.checkpoint
+                )));
+            }
+            Err(e) => {
+                return Err(AdapterError::InclusionProofFailed(format!(
+                    "Failed to fetch checkpoint {}: {}", anchor.checkpoint, e
+                )));
+            }
+        };
 
-        let mut checkpoint_hash = [0u8; 32];
-        checkpoint_hash[..8].copy_from_slice(&anchor.checkpoint.to_le_bytes());
+        // Verify the checkpoint is certified
+        if !checkpoint_info.certified {
+            // Double-check via verifier
+            let is_certified = match self.checkpoint_verifier.is_checkpoint_certified(
+                anchor.checkpoint,
+                self.rpc.as_ref(),
+            ) {
+                Ok(info) => info.is_certified,
+                Err(e) => {
+                    log::warn!("Checkpoint certification check failed: {}", e);
+                    false
+                }
+            };
 
-        Ok(SuiInclusionProof::new(vec![], checkpoint_hash, anchor.checkpoint))
+            if !is_certified {
+                return Err(AdapterError::InclusionProofFailed(format!(
+                    "Checkpoint {} is not yet certified", anchor.checkpoint
+                )));
+            }
+        }
+
+        // Build inclusion proof with real checkpoint data
+        let checkpoint_hash = checkpoint_info.digest;
+
+        Ok(SuiInclusionProof::new(
+            vec![0u8; 32], // object_proof would come from tx effects
+            checkpoint_hash,
+            anchor.checkpoint,
+        ))
     }
 
     fn verify_finality(&self, anchor: Self::AnchorRef) -> CoreResult<Self::FinalityProof> {

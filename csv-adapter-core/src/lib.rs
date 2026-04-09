@@ -54,6 +54,9 @@ pub mod commitment_chain;
 pub mod state_store;
 pub mod seal_registry;
 
+// Cross-chain transfer (Sprint 4 - NORTH STAR)
+pub mod cross_chain;
+
 // RGB protocol compatibility (Sprint 5)
 pub mod rgb_compat;
 

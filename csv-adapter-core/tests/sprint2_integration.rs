@@ -56,7 +56,7 @@ fn make_test_commitment(previous: Hash, seal_id: u8) -> Commitment {
 /// Test 1: Full ValidationClient flow
 #[test]
 fn test_validation_client_receives_consignment() {
-    let mut client = ValidationClient::new(ChainId::Bitcoin);
+    let mut client = ValidationClient::new();
     let contract_id = Hash::new([0xAB; 32]);
     let genesis = make_genesis(contract_id);
     let consignment = make_consignment(genesis, Hash::new([0x01; 32]));
@@ -333,7 +333,7 @@ fn test_seal_registry_statistics() {
 /// Test 9: ValidationClient tracks validated consignments
 #[test]
 fn test_client_tracks_validated_consignments() {
-    let mut client = ValidationClient::new(ChainId::Bitcoin);
+    let mut client = ValidationClient::new();
     let contract_id = Hash::new([0xCC; 32]);
     let genesis = make_genesis(contract_id);
     let consignment = make_consignment(genesis, Hash::new([0x03; 32]));
