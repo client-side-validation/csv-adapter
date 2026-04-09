@@ -121,18 +121,19 @@ impl ConsignmentValidator {
     /// Step 1: Validate consignment structure.
     fn validate_structure(&mut self, consignment: &Consignment) {
         let result = consignment.validate_structure();
+        let passed = result.is_ok();
 
         self.report.steps.push(ValidationStep {
             name: "Structural Validation".to_string(),
-            passed: result.is_ok(),
-            details: if result.is_ok() {
+            passed,
+            details: if passed {
                 "All structural checks passed".to_string()
             } else {
                 format!("Structural validation failed: {}", result.unwrap_err())
             },
         });
 
-        if result.is_err() {
+        if !passed {
             self.report.passed = false;
         }
     }
@@ -270,11 +271,12 @@ mod tests {
     fn make_test_consignment() -> Consignment {
         let genesis = Genesis::new(
             Hash::new([0xAB; 32]),
-            vec![0x01, 0x02, 0x03],
+            Hash::new([0x01; 32]),
+            vec![],
+            vec![],
             vec![],
         );
         Consignment::new(
-            1,
             genesis,
             vec![],
             vec![],

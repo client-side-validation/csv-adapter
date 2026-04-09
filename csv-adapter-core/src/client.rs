@@ -181,7 +181,7 @@ impl ValidationClient {
 
     /// Verify Rights and seal consumption.
     fn verify_rights_and_seals(
-        &self,
+        &mut self,
         consignment: &Consignment,
         _chain_result: &ChainVerificationResult,
         anchor_chain: &ChainId,
@@ -287,14 +287,15 @@ impl ValidationClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consignment::Anchor;
+    use crate::consignment::Consignment;
     use crate::genesis::Genesis;
-    use crate::schema::Schema;
 
     fn make_test_genesis() -> Genesis {
         Genesis::new(
             Hash::new([0xAB; 32]),
-            vec![0x01, 0x02, 0x03],
+            Hash::new([0x01; 32]),
+            vec![],
+            vec![],
             vec![],
         )
     }
@@ -302,7 +303,6 @@ mod tests {
     fn make_test_consignment() -> Consignment {
         let genesis = make_test_genesis();
         Consignment::new(
-            1,
             genesis,
             vec![],
             vec![],
