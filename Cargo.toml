@@ -6,6 +6,7 @@ members = [
     "csv-adapter-sui",
     "csv-adapter-aptos",
     "csv-adapter-store",
+    "csv-cli",
 ]
 resolver = "2"
 
