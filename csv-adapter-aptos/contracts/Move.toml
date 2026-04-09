@@ -1,0 +1,10 @@
+[package]
+name = "csv-seal"
+version = "0.0.1"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "testnet" }
+
+[addresses]
+csv_seal = "0x0"
+aptos_framework = "0x1"

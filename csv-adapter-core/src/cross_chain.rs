@@ -215,11 +215,20 @@ pub enum CrossChainError {
 }
 
 /// Trait for locking a Right on a source chain.
+///
+/// Consumes the Right's seal and returns the lock event data + inclusion proof.
 pub trait LockProvider {
     /// Lock a Right for cross-chain transfer.
     ///
-    /// Consumes the Right's seal and emits a CrossChainLockEvent.
-    /// Returns the lock event and inclusion proof.
+    /// # Arguments
+    /// * `right_id` — The unique identifier of the Right
+    /// * `commitment` — The Right's commitment hash
+    /// * `owner` — Current owner's ownership proof
+    /// * `destination_chain` — Target chain ID
+    /// * `destination_owner` — New owner on destination chain
+    ///
+    /// # Returns
+    /// Lock event data and inclusion proof (chain-specific format)
     fn lock_right(
         &self,
         right_id: Hash,
@@ -234,7 +243,11 @@ pub trait LockProvider {
 pub trait TransferVerifier {
     /// Verify a cross-chain transfer proof.
     ///
-    /// Checks inclusion, finality, registry, and ownership.
+    /// # Checks
+    /// 1. Inclusion proof is valid (source chain finalized)
+    /// 2. Seal NOT in CrossChainSealRegistry (no double-spend)
+    /// 3. Ownership proof valid (owner signature matches)
+    /// 4. Lock event matches expected right_id and commitment
     fn verify_transfer_proof(
         &self,
         proof: &CrossChainTransferProof,
@@ -396,6 +409,9 @@ impl CrossChainRegistry {
 
 // Re-export for convenience
 pub use crate::seal_registry::SealConsumption;
+
+/// Cross-chain seal registry for tracking transfers across all chains
+pub use crate::seal_registry::CrossChainSealRegistry;
 
 #[cfg(test)]
 mod tests {
