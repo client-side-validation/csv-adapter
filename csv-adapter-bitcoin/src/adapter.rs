@@ -27,9 +27,7 @@ use csv_adapter_core::Hash;
 
 use crate::config::BitcoinConfig;
 use crate::error::{BitcoinError, BitcoinResult};
-use crate::rpc::BitcoinRpc;
 use crate::seal::SealRegistry;
-use crate::spv::verify_merkle_proof;
 use crate::tx_builder::CommitmentTxBuilder;
 use crate::types::{BitcoinAnchorRef, BitcoinFinalityProof, BitcoinInclusionProof, BitcoinSealRef};
 use crate::wallet::SealWallet;
@@ -237,6 +235,7 @@ impl BitcoinAnchorLayer {
     }
 
     /// Verify a UTXO is unspent
+    #[cfg_attr(not(feature = "rpc"), allow(unused_variables))]
     fn verify_utxo_unspent(&self, seal: &BitcoinSealRef) -> BitcoinResult<()> {
         #[cfg(feature = "rpc")]
         {

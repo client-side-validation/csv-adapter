@@ -4,7 +4,6 @@
 //! proofs using double-SHA256 Merkle tree implementation.
 
 use crate::types::BitcoinInclusionProof;
-use bitcoin_hashes::Hash;
 use csv_adapter_core::Hash as CoreHash;
 use sha2::{Digest, Sha256};
 
@@ -224,7 +223,7 @@ fn compute_merkle_branch(
             };
 
             // Collect sibling hash (not the target's own hash)
-            let is_target_left = (i == idx);
+            let is_target_left = i == idx;
             let sibling = if is_target_left { right } else { left };
             if i == idx || i + 1 == idx {
                 branch.push(sibling);

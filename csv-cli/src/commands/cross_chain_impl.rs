@@ -1,27 +1,24 @@
 //! Cross-chain trait implementations for each chain adapter
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use csv_adapter_core::cross_chain::{
     ChainId, CrossChainError, CrossChainLockEvent, CrossChainTransferProof,
     CrossChainTransferResult, CrossChainRegistryEntry, InclusionProof,
-    BitcoinMerkleProof, EthereumMPTProof, SuiCheckpointProof, AptosLedgerProof,
-    CrossChainFinalityProof, LockProvider, TransferVerifier, MintProvider,
+    BitcoinMerkleProof, EthereumMPTProof, SuiCheckpointProof, AptosLedgerProof, LockProvider, TransferVerifier, MintProvider,
     CrossChainSealRegistry,
 };
 use csv_adapter_core::hash::Hash;
 use csv_adapter_core::right::OwnershipProof;
 use csv_adapter_core::seal::SealRef;
 
-use crate::state::{State, TrackedTransfer, TransferStatus, DeployedContract};
-use crate::config::{Config, Chain};
 use crate::output;
 
 /// Implement LockProvider for Bitcoin
 pub struct BitcoinLockProvider {
     // In production: reference to BitcoinAnchorLayer
-    pub chain_id: ChainId,
+    pub _chain_id: ChainId,
 }
 
 impl LockProvider for BitcoinLockProvider {
@@ -69,7 +66,7 @@ impl LockProvider for BitcoinLockProvider {
 
 /// Implement LockProvider for Sui
 pub struct SuiLockProvider {
-    pub chain_id: ChainId,
+    pub _chain_id: ChainId,
 }
 
 impl LockProvider for SuiLockProvider {
@@ -118,7 +115,7 @@ impl LockProvider for SuiLockProvider {
 
 /// Implement LockProvider for Aptos
 pub struct AptosLockProvider {
-    pub chain_id: ChainId,
+    pub _chain_id: ChainId,
 }
 
 impl LockProvider for AptosLockProvider {
@@ -166,7 +163,7 @@ impl LockProvider for AptosLockProvider {
 
 /// Implement LockProvider for Ethereum
 pub struct EthereumLockProvider {
-    pub chain_id: ChainId,
+    pub _chain_id: ChainId,
 }
 
 impl LockProvider for EthereumLockProvider {

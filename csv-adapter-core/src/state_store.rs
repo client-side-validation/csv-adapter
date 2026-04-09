@@ -14,7 +14,6 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::commitment::Commitment;
-use crate::consignment::Consignment;
 use crate::hash::Hash;
 use crate::right::Right;
 use crate::seal::SealRef;

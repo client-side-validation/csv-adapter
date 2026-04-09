@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::consignment::{Consignment, Anchor, ConsignmentError};
+use crate::consignment::{Consignment, Anchor};
 use crate::hash::Hash;
 use crate::schema::Schema;
 
@@ -146,7 +146,7 @@ impl RgbConsignmentValidator {
     }
 
     /// Check if genesis has non-zero inputs (invalid per RGB)
-    fn genesis_has_inputs(consignment: &Consignment) -> bool {
+    fn genesis_has_inputs(_consignment: &Consignment) -> bool {
         // Genesis should not consume any previous states
         // This is enforced by convention - genesis has no inputs by definition
         false
@@ -154,14 +154,14 @@ impl RgbConsignmentValidator {
 
     /// Validate topological ordering of transitions
     fn validate_topological_order(consignment: &Consignment) -> Vec<RgbValidationError> {
-        let mut errors = Vec::new();
+        let errors = Vec::new();
 
         // Build a map of which transitions produce which states
         let mut state_producers: std::collections::HashMap<String, usize> =
             std::collections::HashMap::new();
 
         // Genesis produces initial states
-        for (i, assignment) in consignment.genesis.owned_state.iter().enumerate() {
+        for (i, _assignment) in consignment.genesis.owned_state.iter().enumerate() {
             let key = format!("genesis-{}", i);
             state_producers.insert(key, 0);
         }
@@ -212,22 +212,16 @@ impl RgbConsignmentValidator {
     }
 
     /// Validate StateRef resolution
-    fn validate_state_refs(consignment: &Consignment) -> Vec<RgbValidationError> {
+    fn validate_state_refs(_consignment: &Consignment) -> Vec<RgbValidationError> {
         // Simplified validation - full validation requires tracking exact outputs
         Vec::new()
     }
 
     /// Validate anchor-commitment binding
-    fn validate_anchor_commitment_binding(consignment: &Consignment) -> Vec<RgbValidationError> {
-        let mut errors = Vec::new();
-
+    fn validate_anchor_commitment_binding(_consignment: &Consignment) -> Vec<RgbValidationError> {
         // Each anchor's commitment should match the corresponding transition
-        if consignment.anchors.len() != consignment.transitions.len() {
-            // Mismatch is allowed in some cases (e.g., batched anchors)
-            // Full validation would check the specific batching rules
-        }
-
-        errors
+        // Simplified validation - full validation would check the specific batching rules
+        Vec::new()
     }
 
     /// Validate against schema rules

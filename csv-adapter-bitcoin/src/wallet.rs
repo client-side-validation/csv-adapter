@@ -415,8 +415,8 @@ impl SealWallet {
         index: u32,
     ) -> Result<(), WalletError> {
         let path = Bip86Path::external(account, index);
-        let derived = self.derive_key(&path)?;
-        
+        let _derived = self.derive_key(&path)?;
+
         // Verify the outpoint belongs to this address
         // (In production, you'd verify the script_pubkey matches)
         self.add_utxo(outpoint, amount_sat, path);

@@ -8,7 +8,6 @@
 //! merkle tree construction.
 
 use alloc::vec::Vec;
-use sha2::{Digest, Sha256};
 
 use crate::hash::Hash;
 use crate::tagged_hash::csv_tagged_hash;

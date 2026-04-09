@@ -143,7 +143,7 @@ impl Default for Config {
             default_fee: Some(100),
         });
 
-        let mut wallets = HashMap::new();
+        let wallets = HashMap::new();
         let mut faucets = HashMap::new();
 
         // Bitcoin faucet
@@ -179,6 +179,7 @@ impl Default for Config {
     }
 }
 
+#[allow(dead_code)]
 impl Config {
     /// Load configuration from file or return defaults
     pub fn load(path: Option<&str>) -> anyhow::Result<Self> {

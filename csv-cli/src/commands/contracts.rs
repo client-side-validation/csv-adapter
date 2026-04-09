@@ -48,7 +48,7 @@ pub fn execute(action: ContractAction, config: &Config, state: &mut State) -> Re
     }
 }
 
-fn cmd_deploy(chain: Chain, network: Option<String>, deployer_key: Option<String>, config: &Config, state: &mut State) -> Result<()> {
+fn cmd_deploy(chain: Chain, network: Option<String>, _deployer_key: Option<String>, config: &Config, state: &mut State) -> Result<()> {
     let network_str = network.as_deref().unwrap_or("test");
 
     output::header(&format!("Deploying Contracts to {} ({})", chain, network_str));
@@ -171,7 +171,7 @@ fn deploy_aptos(config: &Config, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-fn cmd_status(chain: Chain, config: &Config, state: &State) -> Result<()> {
+fn cmd_status(chain: Chain, _config: &Config, state: &State) -> Result<()> {
     output::header(&format!("Contract Status: {}", chain));
 
     if let Some(contract) = state.get_contract(&chain) {
@@ -189,10 +189,10 @@ fn cmd_status(chain: Chain, config: &Config, state: &State) -> Result<()> {
     Ok(())
 }
 
-fn cmd_verify(chain: Chain, config: &Config, state: &State) -> Result<()> {
+fn cmd_verify(chain: Chain, _config: &Config, state: &State) -> Result<()> {
     output::header(&format!("Verifying Contract: {}", chain));
 
-    if let Some(contract) = state.get_contract(&chain) {
+    if let Some(_contract) = state.get_contract(&chain) {
         output::progress(1, 3, "Checking contract code...");
         output::progress(2, 3, "Verifying functions...");
         output::progress(3, 3, "Testing lock/mint flow...");

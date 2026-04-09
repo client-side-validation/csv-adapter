@@ -6,13 +6,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use csv_adapter_core::hash::Hash;
 use csv_adapter_core::cross_chain::{
-    ChainId, CrossChainError, CrossChainTransferProof,
-    CrossChainTransferResult, CrossChainRegistryEntry, InclusionProof,
+    ChainId, CrossChainTransferProof,
     CrossChainFinalityProof, LockProvider, TransferVerifier, MintProvider,
     CrossChainSealRegistry,
 };
 use csv_adapter_core::right::OwnershipProof;
-use csv_adapter_core::seal::SealRef;
 
 use crate::config::{Config, Chain};
 use crate::state::{State, TrackedTransfer, TransferStatus};
@@ -67,7 +65,7 @@ pub fn execute(action: CrossChainAction, config: &Config, state: &mut State) -> 
     }
 }
 
-fn cmd_transfer(from: Chain, to: Chain, right_id: String, dest_owner: Option<String>, config: &Config, state: &mut State) -> Result<()> {
+fn cmd_transfer(from: Chain, to: Chain, right_id: String, dest_owner: Option<String>, _config: &Config, state: &mut State) -> Result<()> {
     if from == to {
         return Err(anyhow::anyhow!("Source and destination chains must be different"));
     }
@@ -203,10 +201,10 @@ fn cmd_transfer(from: Chain, to: Chain, right_id: String, dest_owner: Option<Str
 
 fn create_lock_provider(chain: &Chain, chain_id: ChainId) -> Box<dyn LockProvider> {
     match chain {
-        Chain::Bitcoin => Box::new(BitcoinLockProvider { chain_id }),
-        Chain::Sui => Box::new(SuiLockProvider { chain_id }),
-        Chain::Aptos => Box::new(AptosLockProvider { chain_id }),
-        Chain::Ethereum => Box::new(EthereumLockProvider { chain_id }),
+        Chain::Bitcoin => Box::new(BitcoinLockProvider { _chain_id: chain_id }),
+        Chain::Sui => Box::new(SuiLockProvider { _chain_id: chain_id }),
+        Chain::Aptos => Box::new(AptosLockProvider { _chain_id: chain_id }),
+        Chain::Ethereum => Box::new(EthereumLockProvider { _chain_id: chain_id }),
     }
 }
 
@@ -298,7 +296,7 @@ fn cmd_list(from: Option<Chain>, to: Option<Chain>, state: &State) -> Result<()>
     Ok(())
 }
 
-fn cmd_retry(transfer_id: String, config: &Config, state: &mut State) -> Result<()> {
+fn cmd_retry(transfer_id: String, _config: &Config, _state: &mut State) -> Result<()> {
     output::header("Retrying Transfer");
     output::kv("Transfer ID", &transfer_id);
     output::info("Retrying failed transfers is not yet implemented");

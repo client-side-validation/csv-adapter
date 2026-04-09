@@ -3,7 +3,6 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use csv_adapter_core::hash::Hash;
 
 use crate::config::{Config, Chain};
 use crate::state::State;
@@ -53,7 +52,7 @@ pub fn execute(action: SealAction, config: &Config, state: &mut State) -> Result
     }
 }
 
-fn cmd_create(chain: Chain, value: Option<u64>, config: &Config, state: &mut State) -> Result<()> {
+fn cmd_create(chain: Chain, value: Option<u64>, _config: &Config, state: &mut State) -> Result<()> {
     output::header(&format!("Creating Seal on {}", chain));
 
     let seal_bytes: Vec<u8> = match chain {
@@ -85,7 +84,7 @@ fn cmd_create(chain: Chain, value: Option<u64>, config: &Config, state: &mut Sta
     Ok(())
 }
 
-fn cmd_consume(chain: Chain, seal_ref: String, config: &Config, state: &mut State) -> Result<()> {
+fn cmd_consume(chain: Chain, seal_ref: String, _config: &Config, state: &mut State) -> Result<()> {
     output::header(&format!("Consuming Seal on {}", chain));
 
     let seal_bytes = hex::decode(seal_ref.trim_start_matches("0x"))
@@ -105,7 +104,7 @@ fn cmd_consume(chain: Chain, seal_ref: String, config: &Config, state: &mut Stat
     Ok(())
 }
 
-fn cmd_verify(chain: Chain, seal_ref: String, config: &Config, state: &State) -> Result<()> {
+fn cmd_verify(chain: Chain, seal_ref: String, _config: &Config, state: &State) -> Result<()> {
     output::header(&format!("Verifying Seal on {}", chain));
 
     let seal_bytes = hex::decode(seal_ref.trim_start_matches("0x"))

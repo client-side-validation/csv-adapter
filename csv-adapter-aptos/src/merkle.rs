@@ -192,7 +192,7 @@ impl MerkleAccumulator {
         proof: &[MerkleProofItem],
     ) -> [u8; 32] {
         let mut current_hash = leaf_hash;
-        let mut current_index = index;
+        let mut _current_index = index;
 
         for item in proof {
             match item {
@@ -205,7 +205,7 @@ impl MerkleAccumulator {
                     current_hash = MerkleNode::compute_internal_hash(current_hash, *hash);
                 }
             }
-            current_index /= 2;
+            _current_index /= 2;
         }
 
         current_hash

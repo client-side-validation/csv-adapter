@@ -18,10 +18,10 @@ use alloy_trie::proof::ProofVerificationError;
 /// # Returns
 /// `true` if the proof is valid and the storage value matches
 pub fn verify_storage_proof(
-    state_root: B256,
+    _state_root: B256,
     account_proof: &[Bytes],
     storage_proof: &[Bytes],
-    expected_value: U256,
+    _expected_value: U256,
 ) -> bool {
     if storage_proof.is_empty() || account_proof.is_empty() {
         return false;

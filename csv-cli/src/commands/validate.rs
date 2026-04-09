@@ -3,7 +3,6 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use csv_adapter_core::hash::Hash;
 
 use crate::config::{Config, Chain};
 use crate::state::State;
@@ -45,11 +44,11 @@ pub fn execute(action: ValidateAction, config: &Config, state: &State) -> Result
     }
 }
 
-fn cmd_consignment(file: String, config: &Config, state: &State) -> Result<()> {
+fn cmd_consignment(file: String, _config: &Config, _state: &State) -> Result<()> {
     output::header("Validating Consignment");
 
     let content = std::fs::read_to_string(&file)?;
-    let consignment: serde_json::Value = serde_json::from_str(&content)
+    let _consignment: serde_json::Value = serde_json::from_str(&content)
         .map_err(|e| anyhow::anyhow!("Invalid consignment JSON: {}", e))?;
 
     output::progress(1, 4, "Checking consignment structure...");
@@ -68,7 +67,7 @@ fn cmd_consignment(file: String, config: &Config, state: &State) -> Result<()> {
     Ok(())
 }
 
-fn cmd_proof(proof_file: String, chain: Chain, config: &Config, state: &State) -> Result<()> {
+fn cmd_proof(proof_file: String, chain: Chain, _config: &Config, _state: &State) -> Result<()> {
     output::header(&format!("Validating Proof on {}", chain));
 
     let content = std::fs::read_to_string(&proof_file)?;
@@ -93,7 +92,7 @@ fn cmd_proof(proof_file: String, chain: Chain, config: &Config, state: &State) -
     Ok(())
 }
 
-fn cmd_seal(seal_ref: String, config: &Config, state: &State) -> Result<()> {
+fn cmd_seal(seal_ref: String, _config: &Config, state: &State) -> Result<()> {
     output::header("Validating Seal Consumption");
 
     let seal_bytes = hex::decode(seal_ref.trim_start_matches("0x"))
@@ -113,7 +112,7 @@ fn cmd_seal(seal_ref: String, config: &Config, state: &State) -> Result<()> {
     Ok(())
 }
 
-fn cmd_commitment_chain(file: String, config: &Config, state: &State) -> Result<()> {
+fn cmd_commitment_chain(file: String, _config: &Config, _state: &State) -> Result<()> {
     output::header("Validating Commitment Chain");
 
     let content = std::fs::read_to_string(&file)?;

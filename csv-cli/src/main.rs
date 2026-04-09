@@ -36,7 +36,6 @@
 //! ```
 
 use clap::{Parser, Subcommand};
-use colored::Colorize;
 
 mod commands;
 mod config;

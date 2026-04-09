@@ -9,9 +9,6 @@
 //! when they don't. If you attempt to call `send_raw_transaction()` on a mock,
 //! it returns an explicit error — not a fabricated txid.
 
-use std::collections::HashSet;
-use std::sync::Mutex;
-
 /// Trait-based RPC interface for real implementations
 pub trait BitcoinRpc: Send + Sync {
     fn get_block_count(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>>;

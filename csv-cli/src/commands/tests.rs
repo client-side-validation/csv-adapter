@@ -86,7 +86,7 @@ fn cmd_run(chain_pair: Option<(Chain, Chain)>, all: bool, config: &Config, state
     Ok(())
 }
 
-fn run_test_pair(from: &Chain, to: &Chain, config: &Config, state: &State) -> Result<()> {
+fn run_test_pair(from: &Chain, to: &Chain, config: &Config, _state: &State) -> Result<()> {
     // Test 1: Check connectivity
     output::progress(1, 5, "Checking chain connectivity...");
     check_chain_connectivity(from, config)?;
@@ -126,7 +126,7 @@ fn check_chain_connectivity(chain: &Chain, config: &Config) -> Result<()> {
     }
 }
 
-fn cmd_scenario(name: String, config: &Config, state: &State) -> Result<()> {
+fn cmd_scenario(name: String, _config: &Config, _state: &State) -> Result<()> {
     output::header(&format!("Scenario: {}", name));
 
     match name.as_str() {

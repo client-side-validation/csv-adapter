@@ -77,7 +77,7 @@ pub fn verify_ethereum_signature(
         ))?;
 
     // Create message
-    let msg = secp256k1::Message::from_slice(message)
+    let msg = secp256k1::Message::from_digest_slice(message)
         .map_err(|e| AdapterError::SignatureVerificationFailed(
             format!("Invalid message hash: {}", e)
         ))?;

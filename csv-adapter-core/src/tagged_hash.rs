@@ -8,7 +8,6 @@
 //! are cryptographically separated.
 
 use alloc::format;
-use alloc::vec::Vec;
 use sha2::{Digest, Sha256};
 
 /// The domain tag prefix for all CSV-related hashes

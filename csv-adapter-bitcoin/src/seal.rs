@@ -38,7 +38,7 @@ impl SealRegistry {
     pub fn is_seal_used_by_path(&self, path: &crate::wallet::Bip86Path) -> bool {
         // Check if any seal with this path has been used
         // Since path uniquely identifies a derived key, we can track by path
-        let path_str = format!("{:?}", path);
+        let _path_str = format!("{:?}", path);
         self.used_seals.iter().any(|seal_bytes| {
             // Simple heuristic: if seal bytes contain path-like data
             // In practice, the seal's txid is derived from the key at that path

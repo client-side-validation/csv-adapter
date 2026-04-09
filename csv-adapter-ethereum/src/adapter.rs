@@ -23,7 +23,6 @@ use crate::error::{EthereumError, EthereumResult};
 use crate::rpc::EthereumRpc;
 use crate::types::{EthereumSealRef, EthereumAnchorRef, EthereumInclusionProof, EthereumFinalityProof};
 use crate::seal::SealRegistry;
-use crate::mpt;
 use crate::finality::FinalityChecker;
 
 /// Ethereum implementation of the AnchorLayer trait
@@ -385,6 +384,7 @@ impl AnchorLayer for EthereumAnchorLayer {
         // If the anchor's block is before current block, the transaction may have been reorged out
         // Clear the seal from registry to allow reuse
         if anchor.block_number < current {
+            #[allow(unused_mut)]
             let mut registry = self.seal_registry.lock().unwrap();
             // Derive the seal that was used for this anchor
             // The nonce is tracked via the log_index

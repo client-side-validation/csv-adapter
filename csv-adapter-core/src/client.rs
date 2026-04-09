@@ -28,14 +28,11 @@ use crate::commitment::Commitment;
 use crate::commitment_chain::{verify_ordered_commitment_chain, ChainVerificationResult, ChainError};
 use crate::consignment::Consignment;
 use crate::hash::Hash;
-use crate::right::{Right, RightId, OwnershipProof, RightError};
-use crate::seal_registry::{CrossChainSealRegistry, SealConsumption, ChainId, SealStatus, DoubleSpendError};
+use crate::right::{Right, RightId, RightError};
+use crate::seal_registry::{CrossChainSealRegistry, SealConsumption, ChainId, SealStatus};
 use crate::state_store::{ContractHistory, StateTransitionRecord, InMemoryStateStore, StateHistoryStore};
 use crate::seal::SealRef;
-use crate::cross_chain::{
-    InclusionProof as CrossChainInclusionProof,
-    BitcoinMerkleProof, EthereumMPTProof, SuiCheckpointProof, AptosLedgerProof,
-};
+use crate::cross_chain::InclusionProof as CrossChainInclusionProof;
 
 /// Result of consignment validation.
 #[derive(Debug)]
@@ -378,11 +375,6 @@ impl ValidationClient {
                     ));
                 }
                 // In production: verify HotStuff ledger signatures
-            }
-            _ => {
-                return Err(ValidationError::InclusionProofFailed(
-                    format!("Inclusion proof type doesn't match chain: {:?}", chain)
-                ));
             }
         }
 

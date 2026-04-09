@@ -39,14 +39,10 @@
 
 use alloc::vec::Vec;
 
-use crate::commitment::Commitment;
-use crate::commitment_chain::{verify_ordered_commitment_chain, ChainVerificationResult, ChainError};
 use crate::consignment::Consignment;
 use crate::hash::Hash;
-use crate::right::Right;
-use crate::seal::SealRef;
-use crate::seal_registry::{CrossChainSealRegistry, SealConsumption, ChainId, SealStatus, DoubleSpendError};
-use crate::state_store::{ContractHistory, StateHistoryStore, InMemoryStateStore};
+use crate::seal_registry::{CrossChainSealRegistry, SealConsumption, ChainId, SealStatus};
+use crate::state_store::InMemoryStateStore;
 
 /// Detailed validation report.
 #[derive(Debug)]

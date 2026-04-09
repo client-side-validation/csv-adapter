@@ -52,14 +52,14 @@ pub fn execute(action: ProofAction, config: &Config, state: &State) -> Result<()
     }
 }
 
-fn cmd_generate(chain: Chain, right_id: String, output: Option<String>, config: &Config, state: &State) -> Result<()> {
+fn cmd_generate(chain: Chain, right_id: String, output: Option<String>, config: &Config, _state: &State) -> Result<()> {
     output::header(&format!("Generating Proof on {}", chain));
 
     let bytes = hex::decode(right_id.trim_start_matches("0x"))
         .map_err(|e| anyhow::anyhow!("Invalid Right ID: {}", e))?;
     let mut hash_bytes = [0u8; 32];
     hash_bytes.copy_from_slice(&bytes[..32]);
-    let right_id_hash = Hash::new(hash_bytes);
+    let _right_id_hash = Hash::new(hash_bytes);
 
     output::kv("Chain", &chain.to_string());
     output::kv_hash("Right ID", &hash_bytes);
@@ -67,7 +67,7 @@ fn cmd_generate(chain: Chain, right_id: String, output: Option<String>, config: 
     match chain {
         Chain::Bitcoin => {
             output::progress(1, 3, "Fetching block data...");
-            let chain_config = config.chain(&chain)?;
+            let _chain_config = config.chain(&chain)?;
             // In production: get block with tx, extract Merkle proof
             output::progress(2, 3, "Extracting Merkle proof...");
             output::progress(3, 3, "Building proof bundle...");
@@ -75,7 +75,7 @@ fn cmd_generate(chain: Chain, right_id: String, output: Option<String>, config: 
         }
         Chain::Ethereum => {
             output::progress(1, 3, "Fetching receipt...");
-            let chain_config = config.chain(&chain)?;
+            let _chain_config = config.chain(&chain)?;
             // In production: get receipt, extract MPT proof
             output::progress(2, 3, "Extracting MPT proof...");
             output::progress(3, 3, "Building proof bundle...");
@@ -83,7 +83,7 @@ fn cmd_generate(chain: Chain, right_id: String, output: Option<String>, config: 
         }
         Chain::Sui => {
             output::progress(1, 3, "Fetching checkpoint...");
-            let chain_config = config.chain(&chain)?;
+            let _chain_config = config.chain(&chain)?;
             // In production: get checkpoint, verify certification
             output::progress(2, 3, "Verifying certification...");
             output::progress(3, 3, "Building proof bundle...");
@@ -91,7 +91,7 @@ fn cmd_generate(chain: Chain, right_id: String, output: Option<String>, config: 
         }
         Chain::Aptos => {
             output::progress(1, 3, "Fetching transaction...");
-            let chain_config = config.chain(&chain)?;
+            let _chain_config = config.chain(&chain)?;
             // In production: get tx by version, verify ledger
             output::progress(2, 3, "Verifying ledger info...");
             output::progress(3, 3, "Building proof bundle...");
@@ -122,7 +122,7 @@ fn cmd_generate(chain: Chain, right_id: String, output: Option<String>, config: 
     Ok(())
 }
 
-fn cmd_verify(chain: Chain, proof_file: Option<String>, config: &Config, state: &State) -> Result<()> {
+fn cmd_verify(chain: Chain, proof_file: Option<String>, _config: &Config, _state: &State) -> Result<()> {
     output::header(&format!("Verifying Proof on {}", chain));
 
     let proof_content = match proof_file {
@@ -148,7 +148,7 @@ fn cmd_verify(chain: Chain, proof_file: Option<String>, config: &Config, state: 
     Ok(())
 }
 
-fn cmd_verify_cross_chain(source: Chain, dest: Chain, proof_file: String, config: &Config, state: &State) -> Result<()> {
+fn cmd_verify_cross_chain(source: Chain, dest: Chain, proof_file: String, _config: &Config, _state: &State) -> Result<()> {
     output::header(&format!("Cross-Chain Proof Verification: {} → {}", source, dest));
 
     let proof_content = std::fs::read_to_string(&proof_file)?;

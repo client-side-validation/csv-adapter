@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use csv_adapter_core::hash::Hash;
-use csv_adapter_core::right::Right;
 use serde::{Deserialize, Serialize};
 
 use crate::config;
@@ -113,6 +112,7 @@ impl State {
         }
     }
 
+    #[allow(dead_code)]
     /// Save state to file
     pub fn save(&self) -> anyhow::Result<()> {
         let path = state_path();
@@ -125,6 +125,7 @@ impl State {
     }
 
     /// Add a Right to tracking
+    #[allow(dead_code)]
     pub fn add_right(&mut self, right: TrackedRight) {
         self.rights.push(right);
     }
@@ -135,6 +136,7 @@ impl State {
     }
 
     /// Mark a Right as consumed
+    #[allow(dead_code)]
     pub fn consume_right(&mut self, id: &Hash) -> anyhow::Result<()> {
         let right = self.rights.iter_mut()
             .find(|r| r.id == *id)
@@ -154,6 +156,7 @@ impl State {
     }
 
     /// Update transfer status
+    #[allow(dead_code)]
     pub fn update_transfer_status(&mut self, id: &Hash, status: TransferStatus) -> anyhow::Result<()> {
         let transfer = self.transfers.iter_mut()
             .find(|t| t.id == *id)

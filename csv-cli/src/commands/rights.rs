@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use clap::Subcommand;
-use sha2::{Sha256, Digest};
+use sha2::Digest;
 
 use csv_adapter_core::hash::Hash;
 
@@ -56,25 +56,27 @@ pub fn execute(action: RightAction, config: &Config, state: &State) -> Result<()
     }
 }
 
-fn cmd_create(chain: Chain, value: Option<u64>, config: &Config, state: &State) -> Result<()> {
+fn cmd_create(chain: Chain, value: Option<u64>, _config: &Config, _state: &State) -> Result<()> {
     output::header(&format!("Creating Right on {}", chain));
 
     // In production, this would call the chain adapter to create a seal
     // For now, generate a Right ID and track it
 
     let right_id_bytes: [u8; 32] = {
-        use sha2::{Sha256, Digest};
+        use sha2::Sha256;
         let mut hasher = Sha256::new();
         hasher.update(b"right-");
         hasher.update(chain.to_string().as_bytes());
         hasher.update(value.unwrap_or(0).to_le_bytes());
-        hasher.update(chrono::Utc::now().timestamp_nanos().to_le_bytes());
+        if let Some(nanos) = chrono::Utc::now().timestamp_nanos_opt() {
+            hasher.update(nanos.to_le_bytes());
+        }
         hasher.finalize().into()
     };
 
     let right_id = Hash::new(right_id_bytes);
 
-    let tracked = TrackedRight {
+    let _tracked = TrackedRight {
         id: right_id,
         chain: chain.clone(),
         seal_ref: vec![], // Would come from adapter
@@ -156,7 +158,7 @@ fn cmd_list(chain: Option<Chain>, state: &State) -> Result<()> {
     Ok(())
 }
 
-fn cmd_transfer(right_id: String, to: String, state: &State) -> Result<()> {
+fn cmd_transfer(right_id: String, to: String, _state: &State) -> Result<()> {
     output::header(&format!("Transferring Right to {}", to));
     output::kv("Right ID", &right_id);
     output::kv("New Owner", &to);
@@ -164,7 +166,7 @@ fn cmd_transfer(right_id: String, to: String, state: &State) -> Result<()> {
     Ok(())
 }
 
-fn cmd_consume(right_id: String, state: &State) -> Result<()> {
+fn cmd_consume(right_id: String, _state: &State) -> Result<()> {
     output::header("Consuming Right");
     output::kv("Right ID", &right_id);
     output::info("This will consume the seal and make the Right unusable");

@@ -3,11 +3,9 @@
 use sha2::Digest;
 use anyhow::Result;
 use clap::Subcommand;
-use colored::Colorize;
 
-use csv_adapter_core::hash::Hash;
 
-use crate::config::{Config, Chain, Network, WalletConfig};
+use crate::config::{Config, Chain, Network};
 use crate::state::State;
 use crate::output;
 
@@ -72,7 +70,7 @@ pub fn execute(action: WalletAction, config: &Config, state: &mut State) -> Resu
     }
 }
 
-fn cmd_generate(chain: Chain, network: Network, config: &Config, state: &mut State) -> Result<()> {
+fn cmd_generate(chain: Chain, network: Network, _config: &Config, state: &mut State) -> Result<()> {
     match chain {
         Chain::Bitcoin => generate_bitcoin(network, state),
         Chain::Ethereum => generate_ethereum(state),
@@ -361,7 +359,7 @@ fn cmd_fund(chain: Chain, address: Option<String>, config: &Config, state: &Stat
     Ok(())
 }
 
-fn cmd_export(chain: Chain, format: String, config: &Config, state: &State) -> Result<()> {
+fn cmd_export(chain: Chain, format: String, _config: &Config, state: &State) -> Result<()> {
     let addr = state.get_address(&chain)
         .ok_or_else(|| anyhow::anyhow!("No wallet for {}. Generate one first.", chain))?;
 
@@ -385,7 +383,7 @@ fn cmd_export(chain: Chain, format: String, config: &Config, state: &State) -> R
     Ok(())
 }
 
-fn cmd_import(chain: Chain, secret: String, config: &Config, state: &mut State) -> Result<()> {
+fn cmd_import(chain: Chain, secret: String, _config: &Config, state: &mut State) -> Result<()> {
     output::header(&format!("Import Wallet: {}", chain));
     output::kv("Chain", &chain.to_string());
 
