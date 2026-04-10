@@ -89,7 +89,8 @@ impl AptosAnchorLayer {
         })
     }
 
-    /// Create a new adapter with mock RPC for testing.
+    /// Create a new adapter with mock RPC for testing (only in debug builds).
+    #[cfg(debug_assertions)]
     pub fn with_mock() -> AptosResult<Self> {
         let config = AptosConfig::default();
         let rpc = Box::new(crate::rpc::MockAptosRpc::new(5000));
@@ -598,7 +599,7 @@ impl AnchorLayer for AptosAnchorLayer {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, debug_assertions))]
 mod tests {
     use super::*;
 

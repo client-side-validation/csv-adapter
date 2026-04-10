@@ -22,6 +22,7 @@
 //! cargo test -p csv-adapter-sui --test testnet_e2e --features rpc -- --ignored --nocapture
 //! ```
 
+#[cfg(debug_assertions)]
 #[test]
 #[ignore]
 fn test_sui_testnet_e2e_publish_and_verify() {

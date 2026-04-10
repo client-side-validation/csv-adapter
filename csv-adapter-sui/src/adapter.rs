@@ -234,7 +234,8 @@ impl SuiAnchorLayer {
         })
     }
 
-    /// Create a new adapter with mock RPC for testing.
+    /// Create a new adapter with mock RPC for testing (only in debug builds).
+    #[cfg(debug_assertions)]
     pub fn with_mock() -> SuiResult<Self> {
         let config = SuiConfig::default();
         let rpc = Box::new(crate::rpc::MockSuiRpc::new(1000));
@@ -707,7 +708,7 @@ impl AnchorLayer for SuiAnchorLayer {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, debug_assertions))]
 mod tests {
     use super::*;
 

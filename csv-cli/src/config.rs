@@ -115,7 +115,7 @@ impl Default for Config {
 
         // Ethereum Sepolia
         chains.insert(Chain::Ethereum, ChainConfig {
-            rpc_url: "https://rpc.sepolia.org".to_string(),
+            rpc_url: "https://ethereum-sepolia-rpc.publicnode.com".to_string(),
             network: Network::Test,
             contract_address: None, // Not deployed yet
             chain_id: Some(11155111),

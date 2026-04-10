@@ -28,6 +28,8 @@ pub use real_rpc::{publish, publish_seal_consumption, verify_seal_consumption_in
 pub use adapter::EthereumAnchorLayer;
 pub use config::EthereumConfig;
 pub use types::{EthereumSealRef, EthereumAnchorRef, EthereumFinalityProof, EthereumInclusionProof};
-pub use rpc::{EthereumRpc, MockEthereumRpc};
+pub use rpc::EthereumRpc;
+#[cfg(debug_assertions)]
+pub use rpc::MockEthereumRpc;
 pub use finality::{FinalityChecker, FinalityConfig};
 pub use seal_contract::CsvSealAbi;

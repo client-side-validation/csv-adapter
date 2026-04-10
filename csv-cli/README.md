@@ -69,11 +69,13 @@ csv proof verify-cross-chain --source bitcoin --dest sui --proof proof.json
 ### Chain Management
 
 **List all supported chains:**
+
 ```bash
 csv chain list
 ```
 
 **Check chain status and connectivity:**
+
 ```bash
 csv chain status bitcoin
 csv chain status ethereum
@@ -82,18 +84,21 @@ csv chain status aptos
 ```
 
 **View RPC endpoint info:**
+
 ```bash
 csv chain info bitcoin
 csv chain info aptos
 ```
 
 **Change RPC URL:**
+
 ```bash
 csv chain set-rpc bitcoin http://localhost:38332
 csv chain set-rpc ethereum https://rpc.sepolia.org
 ```
 
 **Change network:**
+
 ```bash
 csv chain set-network bitcoin test    # Signet
 csv chain set-network bitcoin dev     # Regtest
@@ -101,6 +106,7 @@ csv chain set-network bitcoin main    # Mainnet
 ```
 
 **Set contract address:**
+
 ```bash
 csv chain set-contract ethereum 0x1234...abcd
 csv chain set-contract sui 0x5678...ef01
@@ -111,6 +117,7 @@ csv chain set-contract sui 0x5678...ef01
 ### Wallet Operations
 
 **Generate a new wallet:**
+
 ```bash
 # Bitcoin (BIP-86 Taproot)
 csv wallet generate bitcoin test
@@ -126,6 +133,7 @@ csv wallet generate aptos test
 ```
 
 **Check balance:**
+
 ```bash
 csv wallet balance bitcoin
 csv wallet balance --address tb1p7xr... bitcoin
@@ -135,6 +143,7 @@ csv wallet balance aptos
 ```
 
 **Fund from faucet:**
+
 ```bash
 csv wallet fund bitcoin    # Uses Signet faucet
 csv wallet fund ethereum   # Uses Sepolia faucet
@@ -143,18 +152,21 @@ csv wallet fund aptos      # Uses Aptos Testnet faucet
 ```
 
 **Export wallet:**
+
 ```bash
 csv wallet export bitcoin --format address
 csv wallet export ethereum --format json
 ```
 
 **Import wallet:**
+
 ```bash
 csv wallet import bitcoin 0xabcdef...
 csv wallet import ethereum "word1 word2 word3 ..."
 ```
 
 **List all wallets:**
+
 ```bash
 csv wallet list
 ```
@@ -164,6 +176,7 @@ csv wallet list
 ### Right Operations
 
 **Create a new Right:**
+
 ```bash
 # Bitcoin Right with 100k sats value
 csv right create --chain bitcoin --value 100000
@@ -179,17 +192,20 @@ csv right create --chain aptos
 ```
 
 **Show Right details:**
+
 ```bash
 csv right show 0xabababababababababababababababababababababababababababababababab
 ```
 
 **List tracked Rights:**
+
 ```bash
 csv right list
 csv right list --chain bitcoin    # Filter by chain
 ```
 
 **Consume a Right:**
+
 ```bash
 csv right consume 0xabab...
 ```
@@ -199,6 +215,7 @@ csv right consume 0xabab...
 ### Proof Operations
 
 **Generate inclusion proof:**
+
 ```bash
 # Bitcoin Merkle proof
 csv proof generate --chain bitcoin --right-id 0x... --output btc_proof.json
@@ -214,11 +231,13 @@ csv proof generate --chain aptos --right-id 0x... --output apt_proof.json
 ```
 
 **Verify proof on a chain:**
+
 ```bash
 csv proof verify --chain sui --proof btc_proof.json
 ```
 
 **Verify cross-chain proof:**
+
 ```bash
 # Bitcoin proof verified on Sui
 csv proof verify-cross-chain --source bitcoin --dest sui btc_proof.json
@@ -232,6 +251,7 @@ csv proof verify-cross-chain --source ethereum --dest aptos eth_proof.json
 ### Cross-Chain Transfers
 
 **Execute a cross-chain transfer:**
+
 ```bash
 # Bitcoin → Sui
 csv cross-chain transfer --from bitcoin --to sui --right-id 0x...
@@ -247,11 +267,13 @@ csv cross-chain transfer --from ethereum --to sui --right-id 0x...
 ```
 
 **Check transfer status:**
+
 ```bash
 csv cross-chain status 0xf378a3ffdaa7383a...
 ```
 
 **List all transfers:**
+
 ```bash
 csv cross-chain list
 csv cross-chain list --from bitcoin
@@ -263,6 +285,7 @@ csv cross-chain list --to ethereum
 ### Contract Deployment
 
 **Deploy contracts:**
+
 ```bash
 # Sui Move package
 csv contract deploy --chain sui
@@ -275,6 +298,7 @@ csv contract deploy --chain ethereum
 ```
 
 **Check deployment status:**
+
 ```bash
 csv contract status bitcoin    # N/A — UTXO-native
 csv contract status sui
@@ -283,12 +307,14 @@ csv contract status ethereum
 ```
 
 **Verify deployment:**
+
 ```bash
 csv contract verify sui
 csv contract verify ethereum
 ```
 
 **List deployed contracts:**
+
 ```bash
 csv contract list
 ```
@@ -298,22 +324,26 @@ csv contract list
 ### Seal Operations
 
 **Create a seal:**
+
 ```bash
 csv seal create --chain bitcoin --value 100000
 csv seal create --chain ethereum
 ```
 
 **Consume a seal:**
+
 ```bash
 csv seal consume bitcoin 0x01...
 ```
 
 **Verify seal status:**
+
 ```bash
 csv seal verify bitcoin 0x01...
 ```
 
 **List consumed seals:**
+
 ```bash
 csv seal list
 csv seal list --chain bitcoin
@@ -324,6 +354,7 @@ csv seal list --chain bitcoin
 ### End-to-End Testing
 
 **Run cross-chain tests:**
+
 ```bash
 # Default test: Bitcoin → Sui
 csv test run
@@ -336,6 +367,7 @@ csv test run --all
 ```
 
 **Run specific test scenarios:**
+
 ```bash
 csv test scenario double_spend
 csv test scenario invalid_proof
@@ -343,6 +375,7 @@ csv test scenario ownership_transfer
 ```
 
 **View test results:**
+
 ```bash
 csv test results
 ```
@@ -352,21 +385,25 @@ csv test results
 ### Validation
 
 **Validate a consignment:**
+
 ```bash
 csv validate consignment consignment.json
 ```
 
 **Validate a proof:**
+
 ```bash
 csv validate proof proof.json --chain sui
 ```
 
 **Validate seal consumption:**
+
 ```bash
 csv validate seal 0x01...
 ```
 
 **Validate commitment chain:**
+
 ```bash
 csv validate commitment-chain commitments.json
 ```
@@ -415,6 +452,7 @@ data_dir = "~/.csv/data"
 ```
 
 Use a custom config file:
+
 ```bash
 csv --config /path/to/custom.toml chain list
 ```
@@ -492,22 +530,26 @@ csv proof verify-cross-chain --source bitcoin --dest ethereum proof.json
 ## Troubleshooting
 
 **"No address for bitcoin"** — Generate a wallet first:
+
 ```bash
 csv wallet generate bitcoin test
 ```
 
 **"Chain connection failed"** — Check RPC URL:
+
 ```bash
 csv chain status bitcoin
 csv chain set-rpc bitcoin <new-url>
 ```
 
 **"Right not found"** — List tracked Rights:
+
 ```bash
 csv right list
 ```
 
 **"Transfer not found"** — List all transfers:
+
 ```bash
 csv cross-chain list
 ```

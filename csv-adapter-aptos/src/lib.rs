@@ -52,7 +52,9 @@ pub mod real_rpc;
 pub use adapter::AptosAnchorLayer;
 pub use config::{AptosConfig, AptosNetwork, CheckpointConfig};
 pub use types::{AptosSealRef, AptosAnchorRef, AptosFinalityProof, AptosInclusionProof};
-pub use rpc::{AptosRpc, MockAptosRpc, AptosResource, AptosEvent, AptosTransaction, AptosBlockInfo, AptosLedgerInfo};
+pub use rpc::{AptosRpc, AptosResource, AptosEvent, AptosTransaction, AptosBlockInfo, AptosLedgerInfo};
+#[cfg(debug_assertions)]
+pub use rpc::MockAptosRpc;
 #[cfg(feature = "rpc")]
 pub use real_rpc::AptosRpcClient;
 pub use checkpoint::CheckpointVerifier;

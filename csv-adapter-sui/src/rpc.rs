@@ -289,12 +289,6 @@ impl SuiRpc for MockSuiRpc {
     }
 }
 
-#[cfg(not(debug_assertions))]
-compile_error!(
-    "MockSuiRpc can only be used in debug builds. \
-    This prevents accidental use of mock implementations in production."
-);
-
 #[cfg(test)]
 mod tests {
     use super::*;

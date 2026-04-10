@@ -62,6 +62,8 @@ impl EthereumAnchorLayer {
         })
     }
 
+    /// Create a new adapter with mock RPC (only in debug builds)
+    #[cfg(debug_assertions)]
     pub fn with_mock() -> EthereumResult<Self> {
         let config = EthereumConfig::default();
         let rpc: Box<dyn EthereumRpc> = Box::new(crate::rpc::MockEthereumRpc::new(1000));
@@ -408,7 +410,7 @@ impl AnchorLayer for EthereumAnchorLayer {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, debug_assertions))]
 mod tests {
     use super::*;
 

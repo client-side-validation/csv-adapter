@@ -160,12 +160,8 @@ fn generate_sui(state: &mut State) -> Result<()> {
     let signing_key = SigningKey::from_bytes(&seed);
     let verifying_key = signing_key.verifying_key();
 
-    // Sui address: flag (0x00) + public key (32 bytes)
-    let mut addr_bytes = vec![0x00];
-    addr_bytes.extend_from_slice(verifying_key.as_bytes());
-
-    // Use first 20 bytes as address hex
-    let address = format!("0x{}", hex::encode(&addr_bytes));
+    // Sui address: 0x + 32-byte public key
+    let address = format!("0x{}", hex::encode(verifying_key.as_bytes()));
 
     state.store_address(Chain::Sui, address.clone());
 
@@ -239,17 +235,28 @@ fn cmd_balance(chain: Chain, address: Option<String>, config: &Config, state: &S
                 "params": [addr, "latest"],
                 "id": 1
             });
-            let resp = reqwest::blocking::Client::new()
+            
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()?;
+            
+            let resp = client
                 .post(&chain_config.rpc_url)
                 .json(&rpc_req)
-                .send()?
-                .json::<serde_json::Value>()?;
+                .send()
+                .map_err(|e| anyhow::anyhow!("Failed to connect to Ethereum RPC: {}", e))?
+                .json::<serde_json::Value>()
+                .map_err(|e| anyhow::anyhow!("Failed to parse RPC response: {}", e))?;
 
-            if let Some(balance_hex) = resp.get("result").and_then(|r| r.as_str()) {
+            if let Some(error) = resp.get("error") {
+                output::error(&format!("RPC error: {}", error));
+            } else if let Some(balance_hex) = resp.get("result").and_then(|r| r.as_str()) {
                 let balance_wei = u64::from_str_radix(balance_hex.trim_start_matches("0x"), 16).unwrap_or(0);
                 let balance_eth = balance_wei as f64 / 1e18;
                 output::kv("Balance (ETH)", &format!("{:.6}", balance_eth));
                 output::kv("Balance (wei)", &balance_wei.to_string());
+            } else {
+                output::error("Unexpected RPC response format");
             }
         }
         Chain::Sui => {
@@ -260,37 +267,73 @@ fn cmd_balance(chain: Chain, address: Option<String>, config: &Config, state: &S
                 "params": [addr, "0x2::sui::SUI"],
                 "id": 1
             });
-            let resp = reqwest::blocking::Client::new()
+            
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()?;
+            
+            let resp = client
                 .post(&chain_config.rpc_url)
                 .json(&rpc_req)
-                .send()?
-                .json::<serde_json::Value>()?;
+                .send()
+                .map_err(|e| anyhow::anyhow!("Failed to connect to Sui RPC: {}", e))?
+                .json::<serde_json::Value>()
+                .map_err(|e| anyhow::anyhow!("Failed to parse RPC response: {}", e))?;
 
-            if let Some(result) = resp.get("result") {
+            if let Some(error) = resp.get("error") {
+                output::error(&format!("RPC error: {}", error));
+            } else if let Some(result) = resp.get("result") {
                 if let Some(balance) = result.get("totalBalance").and_then(|b| b.as_str()) {
                     let balance_sui: u64 = balance.parse().unwrap_or(0);
                     let balance_display = balance_sui as f64 / 1e9;
                     output::kv("Balance (SUI)", &format!("{:.4}", balance_display));
                     output::kv("Balance (MIST)", &balance.to_string());
+                } else {
+                    output::warning("No balance found");
                 }
+            } else {
+                output::error("Unexpected RPC response format");
             }
         }
         Chain::Aptos => {
             let chain_config = config.chain(&chain)?;
-            let url = format!("{}/accounts/{}/balances/0x1::aptos_coin::AptosCoin",
+            let url = format!("{}/accounts/{}/balance/0x1::aptos_coin::AptosCoin",
                 chain_config.rpc_url.trim_end_matches('/'), addr);
-            match reqwest::blocking::get(&url)?.json::<serde_json::Value>() {
-                Ok(info) => {
-                    if let Some(balance) = info.get("amount").and_then(|b| b.as_str()) {
-                        let balance_oct: u64 = balance.parse().unwrap_or(0);
-                        let balance_apt = balance_oct as f64 / 1e8;
-                        output::kv("Balance (APT)", &format!("{:.4}", balance_apt));
-                        output::kv("Balance (Octas)", &balance.to_string());
+            
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()?;
+            
+            let resp = client.get(&url).send()
+                .map_err(|e| anyhow::anyhow!("Failed to connect to Aptos RPC: {}", e))?;
+            
+            if resp.status().as_u16() == 404 {
+                output::warning("Account not found or no balance");
+            } else {
+                let body = resp.text()
+                    .map_err(|e| anyhow::anyhow!("Failed to read response: {}", e))?;
+                
+                // API may return a plain number string or JSON
+                let balance_oct: u64 = if body.starts_with('{') {
+                    // Try parsing as JSON
+                    if let Ok(info) = serde_json::from_str::<serde_json::Value>(&body) {
+                        info.get("amount")
+                            .and_then(|b| b.as_str())
+                            .or_else(|| info.as_str())
+                            .unwrap_or("0")
+                            .parse()
+                            .unwrap_or(0)
                     } else {
-                        output::warning("No balance found");
+                        0
                     }
-                }
-                Err(e) => output::error(&format!("Failed to fetch balance: {}", e)),
+                } else {
+                    // Plain number string
+                    body.trim().parse().unwrap_or(0)
+                };
+                
+                let balance_apt = balance_oct as f64 / 1e8;
+                output::kv("Balance (APT)", &format!("{:.4}", balance_apt));
+                output::kv("Balance (Octas)", &balance_oct.to_string());
             }
         }
     }
