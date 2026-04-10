@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::hash::Hash;
+use crate::tagged_hash::csv_tagged_hash;
 
 /// A unique Right identifier.
 ///
@@ -47,6 +48,9 @@ pub struct OwnershipProof {
     pub proof: Vec<u8>,
     /// The owner identifier (address, pubkey, etc.)
     pub owner: Vec<u8>,
+    /// Signature scheme for cryptographic verification.
+    /// Encodes which signature scheme the `proof` field uses.
+    pub scheme: Option<crate::signature::SignatureScheme>,
 }
 
 /// A consumable Right in the USP system.
@@ -64,6 +68,9 @@ pub struct Right {
     pub commitment: Hash,
     /// Proof of ownership
     pub owner: OwnershipProof,
+    /// Salt used to compute the Right ID.
+    /// Stored to enable ID recomputation during deserialization.
+    pub salt: Vec<u8>,
     /// One-time consumption marker (L3+ only)
     ///
     /// L1 (Bitcoin/Sui): None — chain enforces structurally.
@@ -88,25 +95,21 @@ impl Right {
     ///
     /// The Right ID is deterministically computed from the commitment
     /// and salt, ensuring uniqueness even for duplicate commitments.
-    pub fn new(
-        commitment: Hash,
-        owner: OwnershipProof,
-        salt: &[u8],
-    ) -> Self {
+    pub fn new(commitment: Hash, owner: OwnershipProof, salt: &[u8]) -> Self {
         let id = {
-            let mut hasher = Sha256::new();
-            hasher.update(commitment.as_bytes());
-            hasher.update(salt);
-            let result = hasher.finalize();
-            let mut array = [0u8; 32];
-            array.copy_from_slice(&result);
-            RightId(Hash::new(array))
+            // Use tagged hash with domain separation for Right ID computation
+            let mut data = Vec::with_capacity(32 + salt.len());
+            data.extend_from_slice(commitment.as_bytes());
+            data.extend_from_slice(salt);
+            let result = csv_tagged_hash("right-id", &data);
+            RightId(Hash::new(result))
         };
 
         Self {
             id,
             commitment,
             owner,
+            salt: salt.to_vec(),
             nullifier: None,
             state_root: None,
             execution_proof: None,
@@ -132,16 +135,11 @@ impl Right {
     /// nullifier is not needed (but returned for local tracking).
     pub fn consume(&mut self, secret: Option<&[u8]>) -> Option<Hash> {
         if let Some(secret) = secret {
-            // L3: Compute deterministic nullifier
-            let nullifier = {
-                let mut hasher = Sha256::new();
-                hasher.update(self.id.0.as_bytes());
-                hasher.update(secret);
-                let result = hasher.finalize();
-                let mut array = [0u8; 32];
-                array.copy_from_slice(&result);
-                Hash::new(array)
-            };
+            // L3: Compute deterministic nullifier with domain-separated hashing
+            let mut data = Vec::with_capacity(32 + secret.len());
+            data.extend_from_slice(self.id.0.as_bytes());
+            data.extend_from_slice(secret);
+            let nullifier = Hash::new(csv_tagged_hash("right-nullifier", &data));
             self.nullifier = Some(nullifier);
             Some(nullifier)
         } else {
@@ -163,17 +161,9 @@ impl Right {
     ///
     /// # Returns
     /// A new Right instance with the new owner and a fresh ID
-    pub fn transfer(
-        &self,
-        new_owner: OwnershipProof,
-        transfer_salt: &[u8],
-    ) -> Right {
+    pub fn transfer(&self, new_owner: OwnershipProof, transfer_salt: &[u8]) -> Right {
         // Create a new Right with same commitment but new owner
-        let mut new_right = Right::new(
-            self.commitment,
-            new_owner,
-            transfer_salt,
-        );
+        let mut new_right = Right::new(self.commitment, new_owner, transfer_salt);
 
         // Preserve state root if present
         new_right.state_root = self.state_root;
@@ -187,16 +177,42 @@ impl Right {
     /// Verify this Right's ownership and validity.
     ///
     /// This is the core client-side validation function. It checks:
-    /// 1. The owner proof is valid for this Right
-    /// 2. The commitment is well-formed
-    /// 3. The Right has not been consumed (nullifier not set)
+    /// 1. The ownership proof is cryptographically valid
+    /// 2. The Right ID is correctly derived from commitment || salt
+    /// 3. The commitment is well-formed
+    /// 4. The Right has not been consumed (nullifier not set)
     ///
     /// For full consignment validation, use the client-side
     /// validation engine (Sprint 2).
     pub fn verify(&self) -> Result<(), RightError> {
-        // Check ownership proof is present
-        if self.owner.proof.is_empty() {
-            return Err(RightError::MissingOwnershipProof);
+        // Verify Right ID is correctly computed from commitment and salt
+        let expected_id = {
+            let mut data = Vec::with_capacity(32 + self.salt.len());
+            data.extend_from_slice(self.commitment.as_bytes());
+            data.extend_from_slice(&self.salt);
+            RightId(Hash::new(csv_tagged_hash("right-id", &data)))
+        };
+        if self.id != expected_id {
+            return Err(RightError::InvalidRightId);
+        }
+
+        // Cryptographically verify ownership proof
+        if let Some(scheme) = self.owner.scheme {
+            let signature = crate::signature::Signature::new(
+                self.owner.proof.clone(),
+                self.owner.owner.clone(),
+                self.commitment.as_bytes().to_vec(),
+            );
+            signature
+                .verify(scheme)
+                .map_err(|_| RightError::InvalidOwnershipProof)?;
+        } else {
+            // For L1 chains (Bitcoin/Sui) where ownership is structural,
+            // check that the proof is non-empty as a basic sanity check.
+            // Full UTXO/Object ownership is enforced by the chain itself.
+            if self.owner.proof.is_empty() {
+                return Err(RightError::MissingOwnershipProof);
+            }
         }
 
         // Check commitment is non-zero
@@ -223,6 +239,15 @@ impl Right {
         out.extend_from_slice(&self.owner.proof);
         out.extend_from_slice(&(self.owner.owner.len() as u32).to_le_bytes());
         out.extend_from_slice(&self.owner.owner);
+        // Signature scheme (1 byte: 0=none, 1=secp256k1, 2=ed25519)
+        out.push(match self.owner.scheme {
+            None => 0,
+            Some(crate::signature::SignatureScheme::Secp256k1) => 1,
+            Some(crate::signature::SignatureScheme::Ed25519) => 2,
+        });
+        // Salt
+        out.extend_from_slice(&(self.salt.len() as u32).to_le_bytes());
+        out.extend_from_slice(&self.salt);
         out.push(if self.nullifier.is_some() { 1 } else { 0 });
         if let Some(nullifier) = &self.nullifier {
             out.extend_from_slice(nullifier.as_bytes());
@@ -267,8 +292,11 @@ impl Right {
         if bytes.len() < pos + 4 {
             return Err(RightError::InvalidEncoding);
         }
-        let proof_len = u32::from_le_bytes(bytes[pos..pos + 4].try_into()
-            .map_err(|_| RightError::InvalidEncoding)?) as usize;
+        let proof_len = u32::from_le_bytes(
+            bytes[pos..pos + 4]
+                .try_into()
+                .map_err(|_| RightError::InvalidEncoding)?,
+        ) as usize;
         pos += 4;
 
         if bytes.len() < pos + proof_len {
@@ -281,15 +309,47 @@ impl Right {
         if bytes.len() < pos + 4 {
             return Err(RightError::InvalidEncoding);
         }
-        let owner_len = u32::from_le_bytes(bytes[pos..pos + 4].try_into()
-            .map_err(|_| RightError::InvalidEncoding)?) as usize;
+        let owner_len = u32::from_le_bytes(
+            bytes[pos..pos + 4]
+                .try_into()
+                .map_err(|_| RightError::InvalidEncoding)?,
+        ) as usize;
         pos += 4;
 
         if bytes.len() < pos + owner_len {
             return Err(RightError::InvalidEncoding);
         }
-        let owner = bytes[pos..pos + owner_len].to_vec();
+        let owner_data = bytes[pos..pos + owner_len].to_vec();
         pos += owner_len;
+
+        // Read signature scheme (1 byte: 0=none, 1=secp256k1, 2=ed25519)
+        if pos >= bytes.len() {
+            return Err(RightError::InvalidEncoding);
+        }
+        let scheme = match bytes[pos] {
+            0 => None,
+            1 => Some(crate::signature::SignatureScheme::Secp256k1),
+            2 => Some(crate::signature::SignatureScheme::Ed25519),
+            _ => return Err(RightError::InvalidEncoding),
+        };
+        pos += 1;
+
+        // Read salt
+        if bytes.len() < pos + 4 {
+            return Err(RightError::InvalidEncoding);
+        }
+        let salt_len = u32::from_le_bytes(
+            bytes[pos..pos + 4]
+                .try_into()
+                .map_err(|_| RightError::InvalidEncoding)?,
+        ) as usize;
+        pos += 4;
+
+        if bytes.len() < pos + salt_len {
+            return Err(RightError::InvalidEncoding);
+        }
+        let salt = bytes[pos..pos + salt_len].to_vec();
+        pos += salt_len;
 
         // Read nullifier flag and data
         if pos >= bytes.len() {
@@ -333,8 +393,11 @@ impl Right {
         if bytes.len() < pos + 4 {
             return Err(RightError::InvalidEncoding);
         }
-        let proof_data_len = u32::from_le_bytes(bytes[pos..pos + 4].try_into()
-            .map_err(|_| RightError::InvalidEncoding)?) as usize;
+        let proof_data_len = u32::from_le_bytes(
+            bytes[pos..pos + 4]
+                .try_into()
+                .map_err(|_| RightError::InvalidEncoding)?,
+        ) as usize;
         pos += 4;
 
         let execution_proof = if proof_data_len > 0 {
@@ -349,21 +412,32 @@ impl Right {
         // Reconstruct the Right
         let id = RightId(Hash::new(id_bytes));
         let commitment = Hash::new(commitment_bytes);
-        let owner = OwnershipProof { proof, owner };
+        let owner = OwnershipProof {
+            proof,
+            owner: owner_data,
+            scheme,
+        };
+
+        // Verify RightId matches H(commitment || salt) before constructing
+        let expected_id = {
+            let mut data = Vec::with_capacity(32 + salt.len());
+            data.extend_from_slice(commitment.as_bytes());
+            data.extend_from_slice(&salt);
+            RightId(Hash::new(csv_tagged_hash("right-id", &data)))
+        };
+        if id != expected_id {
+            return Err(RightError::InvalidRightId);
+        }
 
         let right = Self {
             id,
             commitment,
             owner,
+            salt,
             nullifier,
             state_root,
             execution_proof,
         };
-
-        // Note: We cannot fully validate the RightId because it was computed
-        // from a salt that is not stored in the Right structure.
-        // The ID validation would require storing the salt, which increases size.
-        // Instead, we validate that the deserialized structure is internally consistent.
 
         Ok(right)
     }
@@ -387,6 +461,8 @@ impl Right {
 pub enum RightError {
     #[error("Missing ownership proof")]
     MissingOwnershipProof,
+    #[error("Invalid ownership proof: signature verification failed")]
+    InvalidOwnershipProof,
     #[error("Invalid commitment (zero hash)")]
     InvalidCommitment,
     #[error("Right has already been consumed")]
@@ -395,6 +471,8 @@ pub enum RightError {
     InvalidNullifier,
     #[error("Invalid canonical encoding")]
     InvalidEncoding,
+    #[error("Invalid RightId: does not match H(commitment || salt)")]
+    InvalidRightId,
 }
 
 #[cfg(test)]
@@ -407,6 +485,7 @@ mod tests {
             OwnershipProof {
                 proof: vec![0x01, 0x02, 0x03],
                 owner: vec![0xFF; 32],
+                scheme: None,
             },
             &[0x42; 16],
         )
@@ -435,6 +514,7 @@ mod tests {
             OwnershipProof {
                 proof: vec![0x01],
                 owner: vec![0xFF; 32],
+                scheme: None,
             },
             &[0x42; 16],
         );
@@ -443,6 +523,7 @@ mod tests {
             OwnershipProof {
                 proof: vec![0x01],
                 owner: vec![0xFF; 32],
+                scheme: None,
             },
             &[0x99; 16],
         );
@@ -466,6 +547,11 @@ mod tests {
     fn test_right_verify_zero_commitment() {
         let mut right = test_right();
         right.commitment = Hash::new([0u8; 32]);
+        // Recompute ID to match the new commitment (so we test commitment check, not ID check)
+        let mut data = Vec::with_capacity(32 + right.salt.len());
+        data.extend_from_slice(right.commitment.as_bytes());
+        data.extend_from_slice(&right.salt);
+        right.id = RightId(Hash::new(csv_tagged_hash("right-id", &data)));
         assert_eq!(right.verify(), Err(RightError::InvalidCommitment));
     }
 
@@ -524,6 +610,7 @@ mod tests {
         let new_owner = OwnershipProof {
             proof: vec![0xAA, 0xBB, 0xCC],
             owner: vec![0xDD; 32],
+            scheme: None,
         };
         let transferred = right.transfer(new_owner.clone(), b"transfer-salt");
 
@@ -548,6 +635,7 @@ mod tests {
         let new_owner = OwnershipProof {
             proof: vec![0x01],
             owner: vec![0xFF; 32],
+            scheme: None,
         };
         let transferred = right.transfer(new_owner, b"transfer");
 
@@ -571,5 +659,133 @@ mod tests {
         let mut right_l3 = test_right();
         right_l3.consume(Some(b"secret")); // L3 does
         assert!(right_l3.requires_nullifier());
+    }
+
+    #[test]
+    fn test_right_verify_ed25519_signature() {
+        use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+        use rand::rngs::OsRng;
+
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let verifying_key: VerifyingKey = signing_key.verifying_key();
+        let commitment = Hash::new([0xAB; 32]);
+
+        // Sign the commitment
+        let signature = signing_key.sign(commitment.as_bytes());
+
+        let right = Right::new(
+            commitment,
+            OwnershipProof {
+                proof: signature.to_bytes().to_vec(),
+                owner: verifying_key.to_bytes().to_vec(),
+                scheme: Some(crate::signature::SignatureScheme::Ed25519),
+            },
+            &[0x42; 16],
+        );
+
+        assert!(right.verify().is_ok());
+    }
+
+    #[test]
+    fn test_right_verify_ed25519_wrong_message_fails() {
+        use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+        use rand::rngs::OsRng;
+
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let verifying_key: VerifyingKey = signing_key.verifying_key();
+
+        // Sign a different message (not the commitment)
+        let wrong_message = [0xCD; 32];
+        let signature = signing_key.sign(&wrong_message);
+
+        let right = Right::new(
+            Hash::new([0xAB; 32]), // Different from what was signed
+            OwnershipProof {
+                proof: signature.to_bytes().to_vec(),
+                owner: verifying_key.to_bytes().to_vec(),
+                scheme: Some(crate::signature::SignatureScheme::Ed25519),
+            },
+            &[0x42; 16],
+        );
+
+        // Verification should fail because the signature doesn't match the commitment
+        assert_eq!(right.verify(), Err(RightError::InvalidOwnershipProof));
+    }
+
+    #[test]
+    fn test_right_verify_secp256k1_signature() {
+        use secp256k1::{Message, Secp256k1, SecretKey};
+
+        let secp = Secp256k1::new();
+        let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
+        let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
+        let commitment = Hash::new([0xAB; 32]);
+
+        // Sign the commitment
+        let msg = Message::from_digest_slice(commitment.as_bytes()).unwrap();
+        let signature = secp.sign_ecdsa(&msg, &secret_key);
+
+        let right = Right::new(
+            commitment,
+            OwnershipProof {
+                proof: signature.serialize_compact().to_vec(),
+                owner: public_key.serialize().to_vec(),
+                scheme: Some(crate::signature::SignatureScheme::Secp256k1),
+            },
+            &[0x42; 16],
+        );
+
+        assert!(right.verify().is_ok());
+    }
+
+    #[test]
+    fn test_right_verify_tampered_proof_fails() {
+        use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+        use rand::rngs::OsRng;
+
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let verifying_key: VerifyingKey = signing_key.verifying_key();
+        let commitment = Hash::new([0xAB; 32]);
+
+        let signature = signing_key.sign(commitment.as_bytes());
+        let mut tampered_sig = signature.to_bytes().to_vec();
+        tampered_sig[0] ^= 0xFF; // Tamper with signature
+
+        let right = Right::new(
+            commitment,
+            OwnershipProof {
+                proof: tampered_sig,
+                owner: verifying_key.to_bytes().to_vec(),
+                scheme: Some(crate::signature::SignatureScheme::Ed25519),
+            },
+            &[0x42; 16],
+        );
+
+        assert_eq!(right.verify(), Err(RightError::InvalidOwnershipProof));
+    }
+
+    #[test]
+    fn test_right_id_spoofing_fails() {
+        // Attempt to create a Right with a mismatched ID
+        let mut right = test_right();
+        // Tamper with the ID
+        right.id = RightId(Hash::new([0xFF; 32]));
+        assert_eq!(right.verify(), Err(RightError::InvalidRightId));
+    }
+
+    #[test]
+    fn test_from_canonical_bytes_rejects_spoofed_id() {
+        let right = test_right();
+        let mut bytes = right.to_canonical_bytes();
+
+        // Tamper with the RightId in the serialized bytes (first 32 bytes)
+        for byte in &mut bytes[0..32] {
+            *byte ^= 0xFF;
+        }
+
+        assert_eq!(
+            Right::from_canonical_bytes(&bytes),
+            Err(RightError::InvalidRightId)
+        );
     }
 }

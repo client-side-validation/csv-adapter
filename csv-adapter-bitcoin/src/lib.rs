@@ -18,23 +18,25 @@ pub mod seal;
 pub mod signatures;
 pub mod spv;
 pub mod tapret;
+pub mod testnet_deploy;
 pub mod tx_builder;
 pub mod types;
 pub mod wallet;
-pub mod testnet_deploy;
 
 #[cfg(feature = "rpc")]
 pub mod real_rpc;
 
 pub use adapter::BitcoinAnchorLayer;
+pub use bip341::{derive_output_key, generate_test_keypair, Bip341Error, TaprootOutput};
 pub use config::{BitcoinConfig, Network};
-pub use types::{BitcoinSealRef, BitcoinAnchorRef, BitcoinInclusionProof, BitcoinFinalityProof};
 pub use rpc::BitcoinRpc;
-pub use tapret::{TapretCommitment, TapretError, OpretCommitment, mine_tapret_nonce, TAPRET_SCRIPT_SIZE};
-pub use tx_builder::{CommitmentTxBuilder, CommitmentData, TxBuilderError};
-pub use wallet::{SealWallet, Bip86Path, DerivedTaprootKey, WalletUtxo, WalletError};
 pub use spv::SpvVerifier;
-pub use bip341::{derive_output_key, TaprootOutput, Bip341Error, generate_test_keypair};
+pub use tapret::{
+    mine_tapret_nonce, OpretCommitment, TapretCommitment, TapretError, TAPRET_SCRIPT_SIZE,
+};
+pub use tx_builder::{CommitmentData, CommitmentTxBuilder, TxBuilderError};
+pub use types::{BitcoinAnchorRef, BitcoinFinalityProof, BitcoinInclusionProof, BitcoinSealRef};
+pub use wallet::{Bip86Path, DerivedTaprootKey, SealWallet, WalletError, WalletUtxo};
 
 #[cfg(feature = "rpc")]
 pub use real_rpc::real_rpc::{RealBitcoinRpc, TxInfo};

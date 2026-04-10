@@ -3,10 +3,9 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-
-use crate::config::{Config, Chain};
-use crate::state::State;
+use crate::config::{Chain, Config};
 use crate::output;
+use crate::state::State;
 
 #[derive(Subcommand)]
 pub enum ValidateAction {
@@ -71,13 +70,19 @@ fn cmd_proof(proof_file: String, chain: Chain, _config: &Config, _state: &State)
     output::header(&format!("Validating Proof on {}", chain));
 
     let content = std::fs::read_to_string(&proof_file)?;
-    let proof: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| anyhow::anyhow!("Invalid proof JSON: {}", e))?;
+    let proof: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| anyhow::anyhow!("Invalid proof JSON: {}", e))?;
 
     output::progress(1, 3, "Parsing proof bundle...");
 
-    let proof_chain = proof.get("chain").and_then(|v| v.as_str()).unwrap_or("unknown");
-    let proof_type = proof.get("proof_type").and_then(|v| v.as_str()).unwrap_or("unknown");
+    let proof_chain = proof
+        .get("chain")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    let proof_type = proof
+        .get("proof_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
 
     output::kv("Proof Chain", proof_chain);
     output::kv("Proof Type", proof_type);
@@ -123,7 +128,11 @@ fn cmd_commitment_chain(file: String, _config: &Config, _state: &State) -> Resul
         output::warning("Commitment chain has fewer than 2 entries");
     }
 
-    output::progress(1, 3, &format!("Checking {} commitments...", commitments.len()));
+    output::progress(
+        1,
+        3,
+        &format!("Checking {} commitments...", commitments.len()),
+    );
 
     // Verify each commitment links to the previous
     for (i, commitment) in commitments.iter().enumerate() {

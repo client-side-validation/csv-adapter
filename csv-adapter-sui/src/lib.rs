@@ -49,14 +49,17 @@ pub mod types;
 pub mod real_rpc;
 
 pub use adapter::SuiAnchorLayer;
-pub use config::{SuiConfig, SuiNetwork, CheckpointConfig, TransactionConfig, SealContractConfig};
-pub use types::{SuiSealRef, SuiAnchorRef, SuiFinalityProof, SuiInclusionProof};
-pub use rpc::{SuiRpc, SuiObject, SuiEvent, SuiTransactionBlock, SuiCheckpoint, SuiLedgerInfo};
-#[cfg(debug_assertions)]
-pub use rpc::MockSuiRpc;
+pub use checkpoint::CheckpointVerifier;
+pub use config::{CheckpointConfig, SealContractConfig, SuiConfig, SuiNetwork, TransactionConfig};
+pub use error::SuiError;
+pub use proofs::{
+    CommitmentEventBuilder, EventProof, EventProofVerifier, StateProof, StateProofVerifier,
+    TransactionProof,
+};
 #[cfg(feature = "rpc")]
 pub use real_rpc::SuiRpcClient;
-pub use checkpoint::CheckpointVerifier;
-pub use seal::{SealRegistry, SealRecord, SealStore};
-pub use proofs::{StateProof, StateProofVerifier, EventProof, EventProofVerifier, TransactionProof, CommitmentEventBuilder};
-pub use error::SuiError;
+#[cfg(debug_assertions)]
+pub use rpc::MockSuiRpc;
+pub use rpc::{SuiCheckpoint, SuiEvent, SuiLedgerInfo, SuiObject, SuiRpc, SuiTransactionBlock};
+pub use seal::{SealRecord, SealRegistry, SealStore};
+pub use types::{SuiAnchorRef, SuiFinalityProof, SuiInclusionProof, SuiSealRef};

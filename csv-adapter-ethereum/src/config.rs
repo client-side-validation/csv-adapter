@@ -68,7 +68,6 @@ impl Default for EthereumConfig {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

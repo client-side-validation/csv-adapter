@@ -1,6 +1,6 @@
 //! Sui-specific type definitions
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Sui seal reference (owned object with one_time attribute)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -16,7 +16,11 @@ pub struct SuiSealRef {
 impl SuiSealRef {
     /// Create a new Sui seal reference
     pub fn new(object_id: [u8; 32], version: u64, nonce: u64) -> Self {
-        Self { object_id, version, nonce }
+        Self {
+            object_id,
+            version,
+            nonce,
+        }
     }
 
     /// Serialize to bytes
@@ -43,7 +47,11 @@ pub struct SuiAnchorRef {
 impl SuiAnchorRef {
     /// Create a new Sui anchor reference
     pub fn new(object_id: [u8; 32], tx_digest: [u8; 32], checkpoint: u64) -> Self {
-        Self { object_id, tx_digest, checkpoint }
+        Self {
+            object_id,
+            tx_digest,
+            checkpoint,
+        }
     }
 }
 
@@ -81,7 +89,10 @@ pub struct SuiFinalityProof {
 impl SuiFinalityProof {
     /// Create a new Sui finality proof
     pub fn new(checkpoint: u64, is_certified: bool) -> Self {
-        Self { checkpoint, is_certified }
+        Self {
+            checkpoint,
+            is_certified,
+        }
     }
 }
 

@@ -11,12 +11,12 @@
 //! structural verification. For full merkle verification, use with the
 //! rust-bitcoin TaprootBuilder directly.
 
+use bitcoin::hashes::Hash as _;
 use bitcoin::key::{TapTweak, TweakedPublicKey, UntweakedPublicKey, XOnlyPublicKey};
-use bitcoin::script::{Builder, PushBytesBuf, ScriptBuf};
 use bitcoin::opcodes::all::OP_RETURN;
+use bitcoin::script::{Builder, PushBytesBuf, ScriptBuf};
 use bitcoin::secp256k1::{Secp256k1, Verification};
 use bitcoin::taproot::TapNodeHash;
-use bitcoin::hashes::Hash as _;
 use sha2::{Digest, Sha256};
 
 use crate::hash::Hash;
@@ -114,9 +114,7 @@ pub fn verify_tapret_output_key<C: Verification>(
     merkle_root: Option<[u8; 32]>,
     expected_output_key: XOnlyPublicKey,
 ) -> bool {
-    let merkle_root_hash = merkle_root.map(|bytes| {
-        TapNodeHash::from_byte_array(bytes)
-    });
+    let merkle_root_hash = merkle_root.map(|bytes| TapNodeHash::from_byte_array(bytes));
 
     let (tweaked_key, _parity) = internal_key.tap_tweak(secp, merkle_root_hash);
     let tweaked_xonly = tweaked_key.to_inner();
@@ -178,11 +176,7 @@ fn verify_commitment_in_script(script: &ScriptBuf, expected: Hash) -> bool {
 /// * `protocol_id` - The protocol identifier (32 bytes)
 /// * `nonce` - The nonce (1 byte)
 /// * `commitment` - The commitment hash (32 bytes)
-pub fn create_tapret_script(
-    protocol_id: [u8; 32],
-    nonce: u8,
-    commitment: Hash,
-) -> ScriptBuf {
+pub fn create_tapret_script(protocol_id: [u8; 32], nonce: u8, commitment: Hash) -> ScriptBuf {
     let mut data = [0u8; 65];
     data[..32].copy_from_slice(&protocol_id);
     data[32] = nonce;

@@ -1,0 +1,44 @@
+[package]
+name = "csv-adapter-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.csv-adapter-core]
+path = ".."
+
+[[bin]]
+name = "fuzz_right_from_canonical_bytes"
+path = "fuzz_targets/fuzz_right_from_canonical_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_seal_ref_from_bytes"
+path = "fuzz_targets/fuzz_seal_ref_from_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_commitment_from_canonical_bytes"
+path = "fuzz_targets/fuzz_commitment_from_canonical_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_consignment_from_bytes"
+path = "fuzz_targets/fuzz_consignment_from_bytes.rs"
+test = false
+doc = false
+bench = false

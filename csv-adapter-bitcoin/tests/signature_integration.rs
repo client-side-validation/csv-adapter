@@ -1,8 +1,8 @@
 //! Adapter signature integration tests
 
 use csv_adapter_bitcoin::signatures::{verify_bitcoin_signature, verify_bitcoin_signatures};
-use secp256k1::{Secp256k1, SecretKey};
 use rand::rngs::OsRng;
+use secp256k1::{Secp256k1, SecretKey};
 
 fn generate_test_signature() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     let secp = Secp256k1::new();
@@ -40,9 +40,7 @@ mod bitcoin_signature_tests {
 
     #[test]
     fn test_bitcoin_multiple_signatures_verification() {
-        let signatures: Vec<_> = (0..5)
-            .map(|_| generate_test_signature())
-            .collect();
+        let signatures: Vec<_> = (0..5).map(|_| generate_test_signature()).collect();
 
         assert!(verify_bitcoin_signatures(&signatures).is_ok());
     }

@@ -1,0 +1,7 @@
+# Fuzzing artifacts
+corpus/
+crashes/
+artifacts/
+*.profraw
+*.profdata
+fuzz_targets/*.proptest-regressions

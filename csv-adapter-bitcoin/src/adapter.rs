@@ -107,7 +107,10 @@ impl BitcoinAnchorLayer {
         &self,
         value_sat: u64,
     ) -> Result<(BitcoinSealRef, crate::wallet::Bip86Path), AdapterError> {
-        let mut next_index = self.next_seal_index.lock().unwrap_or_else(|e| e.into_inner());
+        let mut next_index = self
+            .next_seal_index
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let path = crate::wallet::Bip86Path::external(0, *next_index);
 
         // Derive the Taproot key for this path
@@ -125,14 +128,14 @@ impl BitcoinAnchorLayer {
     }
 
     /// Create a seal backed by a real on-chain UTXO
-    /// 
+    ///
     /// This method creates a seal from an existing UTXO in the wallet.
     /// The UTXO must have been previously added to the wallet via `add_utxo()`
     /// or discovered via `scan_wallet_for_utxos()`.
-    /// 
+    ///
     /// # Arguments
     /// * `outpoint` - The outpoint of the UTXO to use as the seal
-    /// 
+    ///
     /// # Returns
     /// A seal reference and the derivation path, or an error if the UTXO is not found
     pub fn fund_seal(
@@ -140,18 +143,24 @@ impl BitcoinAnchorLayer {
         outpoint: bitcoin::OutPoint,
     ) -> Result<(BitcoinSealRef, crate::wallet::Bip86Path), AdapterError> {
         // Get the UTXO from the wallet
-        let utxo = self.wallet.get_utxo(&outpoint)
-            .ok_or_else(|| AdapterError::Generic(format!(
+        let utxo = self.wallet.get_utxo(&outpoint).ok_or_else(|| {
+            AdapterError::Generic(format!(
                 "UTXO {}:{} not found in wallet - fund the address first",
                 outpoint.txid, outpoint.vout
-            )))?;
+            ))
+        })?;
 
         // Create a seal reference from the actual outpoint
         let txid = outpoint.txid.to_byte_array();
         let seal_ref = BitcoinSealRef::new(txid, outpoint.vout, Some(utxo.amount_sat));
 
         // Check if seal is already used
-        if self.seal_registry.lock().unwrap_or_else(|e| e.into_inner()).is_seal_used(&seal_ref) {
+        if self
+            .seal_registry
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_seal_used(&seal_ref)
+        {
             return Err(AdapterError::Generic(format!(
                 "Seal {}:{} already used",
                 outpoint.txid, outpoint.vout
@@ -162,15 +171,15 @@ impl BitcoinAnchorLayer {
     }
 
     /// Scan the wallet's addresses for on-chain UTXOs
-    /// 
+    ///
     /// This method requires the `rpc` feature to be enabled and an RPC client
     /// to be attached. It will scan addresses and populate the wallet with
     /// any discovered UTXOs.
-    /// 
+    ///
     /// # Arguments
     /// * `account` - The account number to scan (typically 0)
     /// * `gap_limit` - Number of consecutive empty addresses before stopping (typically 20)
-    /// 
+    ///
     /// # Returns
     /// The number of UTXOs discovered
     #[cfg(feature = "rpc")]
@@ -186,21 +195,25 @@ impl BitcoinAnchorLayer {
         })?;
 
         let wallet = &self.wallet;
-        let utxos_discovered = wallet.scan_chain_for_utxos(
-            |address: &Address| {
-                // Use the RPC to fetch UTXOs for this address
-                match rpc.get_address_utxos(address) {
-                    Ok(utxos) => Ok(utxos),
-                    Err(e) => Err(e.to_string()),
-                }
-            },
-            account,
-            gap_limit,
-        ).map_err(|e| AdapterError::Generic(format!(
-            "Failed to scan chain for UTXOs: {}", e
-        )))?;
+        let utxos_discovered = wallet
+            .scan_chain_for_utxos(
+                |address: &Address| {
+                    // Use the RPC to fetch UTXOs for this address
+                    match rpc.get_address_utxos(address) {
+                        Ok(utxos) => Ok(utxos),
+                        Err(e) => Err(e.to_string()),
+                    }
+                },
+                account,
+                gap_limit,
+            )
+            .map_err(|e| AdapterError::Generic(format!("Failed to scan chain for UTXOs: {}", e)))?;
 
-        log::info!("Discovered {} UTXOs on account {}", utxos_discovered, account);
+        log::info!(
+            "Discovered {} UTXOs on account {}",
+            utxos_discovered,
+            account
+        );
         Ok(utxos_discovered)
     }
 
@@ -240,7 +253,8 @@ impl BitcoinAnchorLayer {
         #[cfg(feature = "rpc")]
         {
             if let Some(rpc) = &self.rpc {
-                let unspent = rpc.is_utxo_unspent(seal.txid, seal.vout)
+                let unspent = rpc
+                    .is_utxo_unspent(seal.txid, seal.vout)
                     .map_err(|e| BitcoinError::RpcError(format!("Failed to check UTXO: {}", e)))?;
                 if unspent {
                     return Ok(());
@@ -280,26 +294,34 @@ impl AnchorLayer for BitcoinAnchorLayer {
                         .map_err(|e| AdapterError::Generic(format!("Invalid seal txid: {}", e)))?,
                     seal.vout,
                 );
-                let utxo = self.wallet.get_utxo(&outpoint)
-                    .ok_or_else(|| AdapterError::PublishFailed(
-                        format!("UTXO {}:{} not found in wallet", seal.txid_hex(), seal.vout)
-                    ))?;
+                let utxo = self.wallet.get_utxo(&outpoint).ok_or_else(|| {
+                    AdapterError::PublishFailed(format!(
+                        "UTXO {}:{} not found in wallet",
+                        seal.txid_hex(),
+                        seal.vout
+                    ))
+                })?;
 
                 // Build and sign the Taproot commitment transaction
-                let tx_result = self.tx_builder.build_commitment_tx(
-                    &self.wallet,
-                    &utxo,
-                    *commitment.as_bytes(),
-                    None, // No change path — single UTXO, single output
-                ).map_err(|e| AdapterError::PublishFailed(e.to_string()))?;
+                let tx_result = self
+                    .tx_builder
+                    .build_commitment_tx(
+                        &self.wallet,
+                        &utxo,
+                        *commitment.as_bytes(),
+                        None, // No change path — single UTXO, single output
+                    )
+                    .map_err(|e| AdapterError::PublishFailed(e.to_string()))?;
 
                 // Broadcast the signed transaction via RPC
-                let broadcast_txid = rpc.send_raw_transaction(tx_result.raw_tx.clone())
-                    .map_err(|e: Box<dyn std::error::Error + Send + Sync>| {
+                let broadcast_txid = rpc.send_raw_transaction(tx_result.raw_tx.clone()).map_err(
+                    |e: Box<dyn std::error::Error + Send + Sync>| {
                         AdapterError::PublishFailed(format!(
-                            "Failed to broadcast transaction: {}", e
+                            "Failed to broadcast transaction: {}",
+                            e
                         ))
-                    })?;
+                    },
+                )?;
 
                 log::info!(
                     "Published commitment tx {} on {:?} (tx_builder txid: {})",
@@ -350,20 +372,30 @@ impl AnchorLayer for BitcoinAnchorLayer {
             // If we have an RPC client, fetch real Merkle proof from the blockchain
             if let Some(rpc) = &self.rpc {
                 // Get the block containing the anchor transaction
-                let block_hash = self.rpc.as_ref().ok_or_else(|| {
-                    AdapterError::InclusionProofFailed("No RPC client configured".to_string())
-                }).and_then(|rpc| {
-                    rpc.get_block_hash(anchor.block_height)
-                        .map_err(|e| AdapterError::InclusionProofFailed(
-                            format!("Failed to get block hash: {}", e)
-                        ))
-                })?;
+                let block_hash = self
+                    .rpc
+                    .as_ref()
+                    .ok_or_else(|| {
+                        AdapterError::InclusionProofFailed("No RPC client configured".to_string())
+                    })
+                    .and_then(|rpc| {
+                        rpc.get_block_hash(anchor.block_height).map_err(|e| {
+                            AdapterError::InclusionProofFailed(format!(
+                                "Failed to get block hash: {}",
+                                e
+                            ))
+                        })
+                    })?;
 
                 // Extract the Merkle proof for the anchor transaction
-                let proof = rpc.extract_merkle_proof(anchor.txid, block_hash)
-                    .map_err(|e| AdapterError::InclusionProofFailed(
-                        format!("Failed to extract Merkle proof: {}", e)
-                    ))?;
+                let proof = rpc
+                    .extract_merkle_proof(anchor.txid, block_hash)
+                    .map_err(|e| {
+                        AdapterError::InclusionProofFailed(format!(
+                            "Failed to extract Merkle proof: {}",
+                            e
+                        ))
+                    })?;
 
                 return Ok(proof);
             }

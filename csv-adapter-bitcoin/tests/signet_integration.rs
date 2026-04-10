@@ -10,9 +10,7 @@
 #[ignore] // Requires internet access
 fn test_signet_real_merkle_proof() {
     use csv_adapter_bitcoin::proofs::{
-        extract_merkle_proof_from_block,
-        verify_merkle_proof,
-        compute_merkle_root,
+        compute_merkle_root, extract_merkle_proof_from_block, verify_merkle_proof,
     };
 
     // Fetch a real Signet block header and txids via public API
@@ -24,7 +22,8 @@ fn test_signet_real_merkle_proof() {
 
     // 1. Get the latest block height
     let height_url = "https://mempool.space/signet/api/blocks/tip/height";
-    let height: u64 = client.get(height_url)
+    let height: u64 = client
+        .get(height_url)
         .send()
         .expect("Failed to fetch block height")
         .text()
@@ -37,7 +36,8 @@ fn test_signet_real_merkle_proof() {
 
     // 2. Get the block hash for this height
     let hash_url = format!("https://mempool.space/signet/api/block-height/{}", height);
-    let block_hash_hex = client.get(&hash_url)
+    let block_hash_hex = client
+        .get(&hash_url)
         .send()
         .expect("Failed to fetch block hash")
         .text()
@@ -51,20 +51,25 @@ fn test_signet_real_merkle_proof() {
     block_hash.copy_from_slice(&block_hash_bytes);
 
     // 3. Get the block's txids
-    let txids_url = format!("https://mempool.space/signet/api/block/{}/txids", block_hash_hex);
-    let txids_response = client.get(&txids_url)
+    let txids_url = format!(
+        "https://mempool.space/signet/api/block/{}/txids",
+        block_hash_hex
+    );
+    let txids_response = client
+        .get(&txids_url)
         .send()
         .expect("Failed to fetch txids")
         .text()
         .expect("Failed to read response");
 
-    let txids_hex: Vec<String> = serde_json::from_str(&txids_response)
-        .expect("Failed to parse txids");
+    let txids_hex: Vec<String> =
+        serde_json::from_str(&txids_response).expect("Failed to parse txids");
 
     assert!(!txids_hex.is_empty(), "Block should have transactions");
 
     // Parse txids into byte arrays
-    let txids: Vec<[u8; 32]> = txids_hex.iter()
+    let txids: Vec<[u8; 32]> = txids_hex
+        .iter()
         .map(|hex_str| {
             let bytes = hex::decode(hex_str).expect("Failed to decode txid");
             // Bitcoin txids are displayed in reversed byte order
@@ -81,12 +86,8 @@ fn test_signet_real_merkle_proof() {
 
     // 5. Extract a proof for the coinbase transaction (first txid)
     let coinbase_txid = txids[0];
-    let proof = extract_merkle_proof_from_block(
-        coinbase_txid,
-        &txids,
-        block_hash,
-        height,
-    ).expect("Should extract proof for coinbase tx");
+    let proof = extract_merkle_proof_from_block(coinbase_txid, &txids, block_hash, height)
+        .expect("Should extract proof for coinbase tx");
 
     // Verify the proof has the correct tx index
     assert_eq!(proof.tx_index, 0, "Coinbase should be at index 0");
@@ -94,31 +95,22 @@ fn test_signet_real_merkle_proof() {
     assert_eq!(proof.block_hash, block_hash);
 
     // 6. Verify the proof against the computed merkle root
-    let verified = verify_merkle_proof(
-        &coinbase_txid,
-        &merkle_root,
-        &proof,
-    );
+    let verified = verify_merkle_proof(&coinbase_txid, &merkle_root, &proof);
 
-    assert!(verified, "Merkle proof should verify against real block data");
+    assert!(
+        verified,
+        "Merkle proof should verify against real block data"
+    );
 
     // 7. If block has more than one tx, test a non-coinbase tx
     if txids.len() > 1 {
         let second_tx = txids[1];
-        let proof2 = extract_merkle_proof_from_block(
-            second_tx,
-            &txids,
-            block_hash,
-            height,
-        ).expect("Should extract proof for second tx");
+        let proof2 = extract_merkle_proof_from_block(second_tx, &txids, block_hash, height)
+            .expect("Should extract proof for second tx");
 
         assert_eq!(proof2.tx_index, 1, "Second tx should be at index 1");
 
-        let verified2 = verify_merkle_proof(
-            &second_tx,
-            &merkle_root,
-            &proof2,
-        );
+        let verified2 = verify_merkle_proof(&second_tx, &merkle_root, &proof2);
 
         assert!(verified2, "Second tx proof should also verify");
     }

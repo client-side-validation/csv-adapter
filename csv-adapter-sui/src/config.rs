@@ -3,7 +3,7 @@
 //! This module provides comprehensive configuration for the Sui adapter,
 //! including network selection, checkpoint settings, and transaction parameters.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Sui network type
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,7 +103,8 @@ pub struct SealContractConfig {
 impl Default for SealContractConfig {
     fn default() -> Self {
         Self {
-            package_id: "0x0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+            package_id: "0x0000000000000000000000000000000000000000000000000000000000000000"
+                .to_string(),
             module_name: "csv_seal".to_string(),
             seal_type: "Seal".to_string(),
         }

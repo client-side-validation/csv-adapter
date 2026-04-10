@@ -1867,6 +1867,7 @@ dependencies = [
  "bitcoin",
  "ed25519-dalek",
  "hex",
+ "proptest",
  "rand 0.8.5",
  "secp256k1 0.28.2",
  "serde",

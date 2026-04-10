@@ -1,6 +1,6 @@
 //! Ethereum-specific type definitions
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Ethereum seal reference (storage slot with one-time write)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -157,10 +157,10 @@ mod tests {
     fn test_finality_proof() {
         let proof = EthereumFinalityProof::new(15, 15, false);
         assert!(proof.is_final());
-        
+
         let proof = EthereumFinalityProof::new(10, 15, false);
         assert!(!proof.is_final());
-        
+
         let proof = EthereumFinalityProof::new(5, 15, true);
         assert!(proof.is_final()); // Finalized via checkpoint
     }

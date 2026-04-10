@@ -104,71 +104,95 @@ impl Default for Config {
         let mut chains = HashMap::new();
 
         // Bitcoin Signet (default dev network)
-        chains.insert(Chain::Bitcoin, ChainConfig {
-            rpc_url: "https://mempool.space/signet/api/".to_string(),
-            network: Network::Test,
-            contract_address: None, // UTXO-native, no contract
-            chain_id: None,
-            finality_depth: 6,
-            default_fee: Some(10), // 10 sat/vB
-        });
+        chains.insert(
+            Chain::Bitcoin,
+            ChainConfig {
+                rpc_url: "https://mempool.space/signet/api/".to_string(),
+                network: Network::Test,
+                contract_address: None, // UTXO-native, no contract
+                chain_id: None,
+                finality_depth: 6,
+                default_fee: Some(10), // 10 sat/vB
+            },
+        );
 
         // Ethereum Sepolia
-        chains.insert(Chain::Ethereum, ChainConfig {
-            rpc_url: "https://ethereum-sepolia-rpc.publicnode.com".to_string(),
-            network: Network::Test,
-            contract_address: None, // Not deployed yet
-            chain_id: Some(11155111),
-            finality_depth: 15,
-            default_fee: Some(20_000_000_000), // 20 gwei
-        });
+        chains.insert(
+            Chain::Ethereum,
+            ChainConfig {
+                rpc_url: "https://ethereum-sepolia-rpc.publicnode.com".to_string(),
+                network: Network::Test,
+                contract_address: None, // Not deployed yet
+                chain_id: Some(11155111),
+                finality_depth: 15,
+                default_fee: Some(20_000_000_000), // 20 gwei
+            },
+        );
 
         // Sui Testnet
-        chains.insert(Chain::Sui, ChainConfig {
-            rpc_url: "https://fullnode.testnet.sui.io:443".to_string(),
-            network: Network::Test,
-            contract_address: None, // Not deployed yet
-            chain_id: None,
-            finality_depth: 1, // Checkpoint certified
-            default_fee: Some(1000),
-        });
+        chains.insert(
+            Chain::Sui,
+            ChainConfig {
+                rpc_url: "https://fullnode.testnet.sui.io:443".to_string(),
+                network: Network::Test,
+                contract_address: None, // Not deployed yet
+                chain_id: None,
+                finality_depth: 1, // Checkpoint certified
+                default_fee: Some(1000),
+            },
+        );
 
         // Aptos Testnet
-        chains.insert(Chain::Aptos, ChainConfig {
-            rpc_url: "https://fullnode.testnet.aptoslabs.com/v1".to_string(),
-            network: Network::Test,
-            contract_address: None, // Not deployed yet
-            chain_id: None,
-            finality_depth: 1, // HotStuff consensus
-            default_fee: Some(100),
-        });
+        chains.insert(
+            Chain::Aptos,
+            ChainConfig {
+                rpc_url: "https://fullnode.testnet.aptoslabs.com/v1".to_string(),
+                network: Network::Test,
+                contract_address: None, // Not deployed yet
+                chain_id: None,
+                finality_depth: 1, // HotStuff consensus
+                default_fee: Some(100),
+            },
+        );
 
         let wallets = HashMap::new();
         let mut faucets = HashMap::new();
 
         // Bitcoin faucet
-        faucets.insert(Chain::Bitcoin, FaucetConfig {
-            url: "https://signet.bc-2.jp".to_string(),
-            amount: Some(100_000), // 100k sats
-        });
+        faucets.insert(
+            Chain::Bitcoin,
+            FaucetConfig {
+                url: "https://signet.bc-2.jp".to_string(),
+                amount: Some(100_000), // 100k sats
+            },
+        );
 
         // Sui faucet
-        faucets.insert(Chain::Sui, FaucetConfig {
-            url: "https://faucet.testnet.sui.io/v1/gas".to_string(),
-            amount: Some(10_000_000_000), // 10 SUI
-        });
+        faucets.insert(
+            Chain::Sui,
+            FaucetConfig {
+                url: "https://faucet.testnet.sui.io/v1/gas".to_string(),
+                amount: Some(10_000_000_000), // 10 SUI
+            },
+        );
 
         // Aptos faucet
-        faucets.insert(Chain::Aptos, FaucetConfig {
-            url: "https://faucet.testnet.aptoslabs.com".to_string(),
-            amount: Some(100_000_000), // 1 APT
-        });
+        faucets.insert(
+            Chain::Aptos,
+            FaucetConfig {
+                url: "https://faucet.testnet.aptoslabs.com".to_string(),
+                amount: Some(100_000_000), // 1 APT
+            },
+        );
 
         // Ethereum faucet
-        faucets.insert(Chain::Ethereum, FaucetConfig {
-            url: "https://sepoliafaucet.com".to_string(),
-            amount: Some(100_000_000_000_000_000), // 0.1 ETH
-        });
+        faucets.insert(
+            Chain::Ethereum,
+            FaucetConfig {
+                url: "https://sepoliafaucet.com".to_string(),
+                amount: Some(100_000_000_000_000_000), // 0.1 ETH
+            },
+        );
 
         Self {
             chains,
@@ -209,9 +233,9 @@ impl Config {
 
     /// Get chain configuration
     pub fn chain(&self, chain: &Chain) -> anyhow::Result<&ChainConfig> {
-        self.chains.get(chain).ok_or_else(|| {
-            anyhow::anyhow!("Chain {} not configured", chain)
-        })
+        self.chains
+            .get(chain)
+            .ok_or_else(|| anyhow::anyhow!("Chain {} not configured", chain))
     }
 
     /// Get wallet configuration

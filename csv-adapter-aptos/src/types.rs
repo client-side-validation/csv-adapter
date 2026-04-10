@@ -1,6 +1,6 @@
 //! Aptos-specific type definitions
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Aptos seal reference (resource with key + delete)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -15,7 +15,11 @@ pub struct AptosSealRef {
 
 impl AptosSealRef {
     pub fn new(account_address: [u8; 32], resource_type: String, nonce: u64) -> Self {
-        Self { account_address, resource_type, nonce }
+        Self {
+            account_address,
+            resource_type,
+            nonce,
+        }
     }
 
     pub fn to_vec(&self) -> Vec<u8> {
@@ -41,7 +45,11 @@ pub struct AptosAnchorRef {
 
 impl AptosAnchorRef {
     pub fn new(version: u64, event_handle: [u8; 32], sequence_number: u64) -> Self {
-        Self { version, event_handle, sequence_number }
+        Self {
+            version,
+            event_handle,
+            sequence_number,
+        }
     }
 }
 
@@ -58,7 +66,11 @@ pub struct AptosInclusionProof {
 
 impl AptosInclusionProof {
     pub fn new(transaction_proof: Vec<u8>, event_proof: Vec<u8>, version: u64) -> Self {
-        Self { transaction_proof, event_proof, version }
+        Self {
+            transaction_proof,
+            event_proof,
+            version,
+        }
     }
 }
 
@@ -73,7 +85,10 @@ pub struct AptosFinalityProof {
 
 impl AptosFinalityProof {
     pub fn new(version: u64, is_certified: bool) -> Self {
-        Self { version, is_certified }
+        Self {
+            version,
+            is_certified,
+        }
     }
 }
 

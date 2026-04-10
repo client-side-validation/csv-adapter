@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use crate::hash::Hash;
-use crate::right::{Right, OwnershipProof};
+use crate::right::{OwnershipProof, Right};
 use crate::seal::SealRef;
 
 /// Chain identifier for cross-chain transfers.
@@ -250,10 +250,8 @@ pub trait TransferVerifier {
     /// 2. Seal NOT in CrossChainSealRegistry (no double-spend)
     /// 3. Ownership proof valid (owner signature matches)
     /// 4. Lock event matches expected right_id and commitment
-    fn verify_transfer_proof(
-        &self,
-        proof: &CrossChainTransferProof,
-    ) -> Result<(), CrossChainError>;
+    fn verify_transfer_proof(&self, proof: &CrossChainTransferProof)
+        -> Result<(), CrossChainError>;
 }
 
 /// Trait for minting a Right on a destination chain.
@@ -313,14 +311,14 @@ impl CrossChainTransfer {
         let source_chain = lock_event.source_chain.clone();
         let source_block_height = lock_event.source_block_height;
         let lock_timestamp = lock_event.timestamp;
-        
+
         let transfer_proof = CrossChainTransferProof {
             lock_event,
             inclusion_proof,
             finality_proof: CrossChainFinalityProof {
                 source_chain: source_chain.clone(),
                 height: source_block_height,
-                current_height: 0, // TODO: get from chain oracle
+                current_height: 0,   // TODO: get from chain oracle
                 is_finalized: false, // TODO: verify finality
                 depth: 0,
             },
@@ -426,7 +424,12 @@ mod tests {
 
     #[test]
     fn test_chain_id_roundtrip() {
-        for chain in [ChainId::Bitcoin, ChainId::Sui, ChainId::Aptos, ChainId::Ethereum] {
+        for chain in [
+            ChainId::Bitcoin,
+            ChainId::Sui,
+            ChainId::Aptos,
+            ChainId::Ethereum,
+        ] {
             let id = chain.as_u8();
             assert_eq!(ChainId::from_u8(id), Some(chain));
         }

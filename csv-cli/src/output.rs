@@ -28,7 +28,11 @@ pub fn kv(key: &str, value: &str) {
 }
 
 pub fn kv_hash(key: &str, hash: &[u8]) {
-    println!("  {:<25} {}", format!("{}:", key).bold(), hex::encode(hash).dimmed());
+    println!(
+        "  {:<25} {}",
+        format!("{}:", key).bold(),
+        hex::encode(hash).dimmed()
+    );
 }
 
 pub fn table(headers: &[&str], rows: &[Vec<String>]) {
@@ -43,15 +47,24 @@ pub fn table(headers: &[&str], rows: &[Vec<String>]) {
     }
 
     // Print headers
-    let header_line: String = headers.iter().enumerate()
+    let header_line: String = headers
+        .iter()
+        .enumerate()
         .map(|(i, h)| format!("  {:<width$}", h, width = widths[i]))
         .collect();
     println!("{}", header_line.bold());
-    println!("{}", "─".repeat(widths.iter().sum::<usize>() + widths.len() * 2).dimmed());
+    println!(
+        "{}",
+        "─"
+            .repeat(widths.iter().sum::<usize>() + widths.len() * 2)
+            .dimmed()
+    );
 
     // Print rows
     for row in rows {
-        let row_line: String = row.iter().enumerate()
+        let row_line: String = row
+            .iter()
+            .enumerate()
             .map(|(i, c)| format!("  {:<width$}", c, width = widths[i]))
             .collect();
         println!("{}", row_line);

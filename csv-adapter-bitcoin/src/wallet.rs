@@ -337,7 +337,10 @@ impl SealWallet {
         Ok(())
     }
     pub fn is_seal_used(&self, seal: &BitcoinSealRef) -> bool {
-        self.used_seals.lock().unwrap_or_else(|e| e.into_inner()).contains(&seal.to_vec())
+        self.used_seals
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains(&seal.to_vec())
     }
 
     pub fn network(&self) -> Network {
@@ -347,17 +350,26 @@ impl SealWallet {
         &self.secp
     }
     pub fn get_utxo(&self, op: &OutPoint) -> Option<WalletUtxo> {
-        self.utxos.lock().unwrap_or_else(|e| e.into_inner()).get(op).cloned()
+        self.utxos
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(op)
+            .cloned()
     }
     pub fn list_utxos(&self) -> Vec<WalletUtxo> {
-        self.utxos.lock().unwrap_or_else(|e| e.into_inner()).values().cloned().collect()
+        self.utxos
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// Scan the blockchain for UTXOs belonging to this wallet's addresses
-    /// 
+    ///
     /// This method checks all derived addresses up to `address_gap_limit` consecutive
     /// unused addresses to find UTXOs on the chain and add them to the wallet.
-    /// 
+    ///
     /// Requires a callback that checks whether a given address has UTXOs and returns them.
     pub fn scan_chain_for_utxos<F>(
         &self,
@@ -404,7 +416,7 @@ impl SealWallet {
     }
 
     /// Add a UTXO to the wallet from a known address and outpoint
-    /// 
+    ///
     /// This is used when you manually fund an address by sending bitcoin to it,
     /// then register the UTXO once it's confirmed.
     pub fn add_utxo_from_address(

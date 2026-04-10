@@ -3,9 +3,9 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use crate::config::{Config, Chain};
-use crate::state::State;
+use crate::config::{Chain, Config};
 use crate::output;
+use crate::state::State;
 
 #[derive(Subcommand)]
 pub enum TestAction {
@@ -60,7 +60,12 @@ pub fn execute(action: TestAction, config: &Config, state: &State) -> Result<()>
     }
 }
 
-fn cmd_run(chain_pair: Option<(Chain, Chain)>, all: bool, config: &Config, state: &State) -> Result<()> {
+fn cmd_run(
+    chain_pair: Option<(Chain, Chain)>,
+    all: bool,
+    config: &Config,
+    state: &State,
+) -> Result<()> {
     let pairs = if all {
         vec![
             (Chain::Bitcoin, Chain::Sui),
@@ -76,7 +81,13 @@ fn cmd_run(chain_pair: Option<(Chain, Chain)>, all: bool, config: &Config, state
     };
 
     for (i, (from, to)) in pairs.iter().enumerate() {
-        output::header(&format!("Test {}/{}: {} → {}", i + 1, pairs.len(), from, to));
+        output::header(&format!(
+            "Test {}/{}: {} → {}",
+            i + 1,
+            pairs.len(),
+            from,
+            to
+        ));
 
         run_test_pair(from, to, config, state)?;
         println!();
@@ -121,12 +132,19 @@ fn check_chain_connectivity(chain: &Chain, config: &Config) -> Result<()> {
     match chain {
         Chain::Bitcoin => {
             // Bitcoin mempool.space API - simple GET works
-            let url = format!("{}/blocks/tip/hash", chain_config.rpc_url.trim_end_matches('/'));
+            let url = format!(
+                "{}/blocks/tip/hash",
+                chain_config.rpc_url.trim_end_matches('/')
+            );
             let resp = client.get(&url).send()?;
             if resp.status().is_success() {
                 Ok(())
             } else {
-                Err(anyhow::anyhow!("Chain {} returned status {}", chain, resp.status()))
+                Err(anyhow::anyhow!(
+                    "Chain {} returned status {}",
+                    chain,
+                    resp.status()
+                ))
             }
         }
         Chain::Ethereum => {
@@ -137,13 +155,15 @@ fn check_chain_connectivity(chain: &Chain, config: &Config) -> Result<()> {
                 "params": [],
                 "id": 1
             });
-            let resp = client.post(&chain_config.rpc_url)
-                .json(&rpc_req)
-                .send()?;
+            let resp = client.post(&chain_config.rpc_url).json(&rpc_req).send()?;
             if resp.status().is_success() {
                 Ok(())
             } else {
-                Err(anyhow::anyhow!("Chain {} returned status {}", chain, resp.status()))
+                Err(anyhow::anyhow!(
+                    "Chain {} returned status {}",
+                    chain,
+                    resp.status()
+                ))
             }
         }
         Chain::Sui => {
@@ -154,13 +174,15 @@ fn check_chain_connectivity(chain: &Chain, config: &Config) -> Result<()> {
                 "params": [],
                 "id": 1
             });
-            let resp = client.post(&chain_config.rpc_url)
-                .json(&rpc_req)
-                .send()?;
+            let resp = client.post(&chain_config.rpc_url).json(&rpc_req).send()?;
             if resp.status().is_success() {
                 Ok(())
             } else {
-                Err(anyhow::anyhow!("Chain {} returned status {}", chain, resp.status()))
+                Err(anyhow::anyhow!(
+                    "Chain {} returned status {}",
+                    chain,
+                    resp.status()
+                ))
             }
         }
         Chain::Aptos => {
@@ -170,7 +192,11 @@ fn check_chain_connectivity(chain: &Chain, config: &Config) -> Result<()> {
             if resp.status().is_success() {
                 Ok(())
             } else {
-                Err(anyhow::anyhow!("Chain {} returned status {}", chain, resp.status()))
+                Err(anyhow::anyhow!(
+                    "Chain {} returned status {}",
+                    chain,
+                    resp.status()
+                ))
             }
         }
     }

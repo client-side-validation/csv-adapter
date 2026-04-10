@@ -16,70 +16,67 @@ use csv_adapter_core::error::Result;
 ///
 /// # Returns
 /// Ok(()) if signature is valid, Err otherwise
-pub fn verify_aptos_signature(
-    signature: &[u8],
-    public_key: &[u8],
-    message: &[u8],
-) -> Result<()> {
+pub fn verify_aptos_signature(signature: &[u8], public_key: &[u8], message: &[u8]) -> Result<()> {
     // Validate inputs
     if signature.len() != 64 {
-        return Err(AdapterError::SignatureVerificationFailed(
-            format!("Invalid signature length: {} (expected 64)", signature.len())
-        ));
+        return Err(AdapterError::SignatureVerificationFailed(format!(
+            "Invalid signature length: {} (expected 64)",
+            signature.len()
+        )));
     }
 
     if public_key.len() != 32 {
-        return Err(AdapterError::SignatureVerificationFailed(
-            format!("Invalid public key length: {} (expected 32)", public_key.len())
-        ));
+        return Err(AdapterError::SignatureVerificationFailed(format!(
+            "Invalid public key length: {} (expected 32)",
+            public_key.len()
+        )));
     }
 
     if message.is_empty() {
         return Err(AdapterError::SignatureVerificationFailed(
-            "Message cannot be empty".to_string()
+            "Message cannot be empty".to_string(),
         ));
     }
 
     // Parse the public key
-    let verifying_key = ed25519_dalek::VerifyingKey::from_bytes(
-        public_key.try_into().map_err(|_| {
+    let verifying_key =
+        ed25519_dalek::VerifyingKey::from_bytes(public_key.try_into().map_err(|_| {
             AdapterError::SignatureVerificationFailed("Invalid public key".to_string())
-        })?
-    ).map_err(|e| AdapterError::SignatureVerificationFailed(
-        format!("Invalid Ed25519 public key: {}", e)
-    ))?;
+        })?)
+        .map_err(|e| {
+            AdapterError::SignatureVerificationFailed(format!("Invalid Ed25519 public key: {}", e))
+        })?;
 
     // Parse the signature
-    let sig = ed25519_dalek::Signature::from_bytes(
-        signature.try_into().map_err(|_| {
+    let sig =
+        ed25519_dalek::Signature::from_bytes(signature.try_into().map_err(|_| {
             AdapterError::SignatureVerificationFailed("Invalid signature".to_string())
-        })?
-    );
+        })?);
 
     // Verify the signature
     use ed25519_dalek::Verifier;
-    
-    verifying_key.verify(message, &sig)
-        .map_err(|_| AdapterError::SignatureVerificationFailed(
-            "Ed25519 signature verification failed".to_string()
-        ))
+
+    verifying_key.verify(message, &sig).map_err(|_| {
+        AdapterError::SignatureVerificationFailed(
+            "Ed25519 signature verification failed".to_string(),
+        )
+    })
 }
 
 /// Verify multiple Aptos signatures
-pub fn verify_aptos_signatures(
-    signatures: &[(Vec<u8>, Vec<u8>, Vec<u8>)],
-) -> Result<()> {
+pub fn verify_aptos_signatures(signatures: &[(Vec<u8>, Vec<u8>, Vec<u8>)]) -> Result<()> {
     if signatures.is_empty() {
         return Err(AdapterError::SignatureVerificationFailed(
-            "No signatures to verify".to_string()
+            "No signatures to verify".to_string(),
         ));
     }
 
     for (i, (sig, pk, msg)) in signatures.iter().enumerate() {
         verify_aptos_signature(sig, pk, msg).map_err(|e| {
-            AdapterError::SignatureVerificationFailed(
-                format!("Signature {} verification failed: {}", i, e)
-            )
+            AdapterError::SignatureVerificationFailed(format!(
+                "Signature {} verification failed: {}",
+                i, e
+            ))
         })?;
     }
 
@@ -89,21 +86,21 @@ pub fn verify_aptos_signatures(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::Signer;
     use ed25519_dalek::SigningKey;
     use rand::rngs::OsRng;
-    use ed25519_dalek::Signer;
 
     fn generate_test_signature() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
         let mut csprng = OsRng;
         let signing_key = SigningKey::generate(&mut csprng);
         let verifying_key = signing_key.verifying_key();
-        
+
         // Message to sign
         let message = b"test message for Aptos signature verification";
-        
+
         // Sign the message
         let signature = signing_key.sign(message);
-        
+
         (
             signature.to_bytes().to_vec(),
             verifying_key.to_bytes().to_vec(),
@@ -157,7 +154,7 @@ mod tests {
         let sig1 = generate_test_signature();
         let sig2 = generate_test_signature();
         let sig3 = generate_test_signature();
-        
+
         let signatures = vec![sig1, sig2, sig3];
         assert!(verify_aptos_signatures(&signatures).is_ok());
     }

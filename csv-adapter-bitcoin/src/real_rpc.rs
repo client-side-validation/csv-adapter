@@ -5,14 +5,14 @@
 
 #[cfg(feature = "rpc")]
 pub mod real_rpc {
-    use bitcoincore_rpc::{RpcApi, Client, Auth};
-    use bitcoin::{Network, Txid, OutPoint};
+    use bitcoin::{Network, OutPoint, Txid};
     use bitcoin_hashes::Hash;
+    use bitcoincore_rpc::{Auth, Client, RpcApi};
     use std::time::{Duration, Instant};
 
+    use crate::proofs::extract_merkle_proof_from_block;
     use crate::rpc::BitcoinRpc;
     use crate::types::BitcoinInclusionProof;
-    use crate::proofs::extract_merkle_proof_from_block;
 
     /// Real Bitcoin RPC client backed by bitcoincore-rpc
     pub struct RealBitcoinRpc {
@@ -39,7 +39,7 @@ pub mod real_rpc {
         }
 
         /// Get UTXOs for a specific Bitcoin address
-        /// 
+        ///
         /// Returns a list of (OutPoint, amount_in_satoshis) pairs
         pub fn get_address_utxos(
             &self,
@@ -48,13 +48,13 @@ pub mod real_rpc {
             // Use listunspent RPC call to get UTXOs for the address
             // This requires the Bitcoin Core wallet to be watching this address
             let utxos = self.client.list_unspent(
-                Some(0),      // min_confirmations
-                None,         // max_confirmations  
+                Some(0),          // min_confirmations
+                None,             // max_confirmations
                 Some(&[address]), // addresses filter
-                None,         // include_unsafe
-                None,         // query_options
+                None,             // include_unsafe
+                None,             // query_options
             )?;
-            
+
             let result: Vec<(OutPoint, u64)> = utxos
                 .into_iter()
                 .map(|utxo| {
@@ -63,7 +63,7 @@ pub mod real_rpc {
                     (outpoint, amount_sat)
                 })
                 .collect();
-            
+
             Ok(result)
         }
 
@@ -72,11 +72,10 @@ pub mod real_rpc {
             &self,
             txid: [u8; 32],
         ) -> Result<TxInfo, Box<dyn std::error::Error + Send + Sync>> {
-            let txid = Txid::from_slice(&txid)
-                .map_err(|e| format!("Invalid txid: {}", e))?;
-            
+            let txid = Txid::from_slice(&txid).map_err(|e| format!("Invalid txid: {}", e))?;
+
             let tx_info = self.client.get_raw_transaction_info(&txid, None)?;
-            
+
             // Get block hash if confirmed
             let block_hash = tx_info.blockhash.map(|h| {
                 let bytes = h.as_ref();
@@ -84,7 +83,7 @@ pub mod real_rpc {
                 arr.copy_from_slice(bytes);
                 arr
             });
-            
+
             Ok(TxInfo {
                 confirmations: tx_info.confirmations.unwrap_or(0) as u64,
                 block_hash,
@@ -92,7 +91,7 @@ pub mod real_rpc {
         }
 
         /// Get the funding transaction that created a UTXO at a specific address
-        /// 
+        ///
         /// This is useful for discovering UTXOs by scanning the blockchain
         /// for transactions sent to wallet addresses.
         pub fn get_funding_tx(
@@ -103,12 +102,12 @@ pub mod real_rpc {
             // Scan recent transactions for this address
             // This requires a wallet with transaction indexing
             // For now, return empty - users should manually add UTXOs
-            
+
             // In production, you'd use:
             // 1. listtransactions to find transactions
             // 2. Filter by address
             // 3. Return (txid, amount, vout) for each
-            
+
             Ok(vec![])
         }
 
@@ -144,7 +143,9 @@ pub mod real_rpc {
             let block_height = self.get_block_height(block_hash)?;
 
             // Extract all txids from block
-            let block_txids: Vec<[u8; 32]> = block.txdata.iter()
+            let block_txids: Vec<[u8; 32]> = block
+                .txdata
+                .iter()
                 .map(|tx| tx.txid().to_byte_array())
                 .collect();
 
@@ -200,7 +201,10 @@ pub mod real_rpc {
             Ok(self.client.get_block_count()?)
         }
 
-        fn get_block_hash(&self, height: u64) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
+        fn get_block_hash(
+            &self,
+            height: u64,
+        ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
             let hash = self.client.get_block_hash(height)?;
             let bytes = hash.as_ref();
             let mut result = [0u8; 32];
@@ -208,14 +212,20 @@ pub mod real_rpc {
             Ok(result)
         }
 
-        fn is_utxo_unspent(&self, txid: [u8; 32], vout: u32) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
-            let txid = Txid::from_slice(&txid)
-                .map_err(|e| format!("Invalid txid: {}", e))?;
+        fn is_utxo_unspent(
+            &self,
+            txid: [u8; 32],
+            vout: u32,
+        ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+            let txid = Txid::from_slice(&txid).map_err(|e| format!("Invalid txid: {}", e))?;
             let result = self.client.get_tx_out(&txid, vout, Some(true))?;
             Ok(result.is_some())
         }
 
-        fn send_raw_transaction(&self, tx_bytes: Vec<u8>) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
+        fn send_raw_transaction(
+            &self,
+            tx_bytes: Vec<u8>,
+        ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
             let tx = bitcoin::consensus::encode::deserialize::<bitcoin::Transaction>(&tx_bytes)
                 .map_err(|e| format!("Failed to deserialize transaction: {}", e))?;
             let txid = self.client.send_raw_transaction(&tx)?;
@@ -225,9 +235,11 @@ pub mod real_rpc {
             Ok(result)
         }
 
-        fn get_tx_confirmations(&self, txid: [u8; 32]) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-            let txid = Txid::from_slice(&txid)
-                .map_err(|e| format!("Invalid txid: {}", e))?;
+        fn get_tx_confirmations(
+            &self,
+            txid: [u8; 32],
+        ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+            let txid = Txid::from_slice(&txid).map_err(|e| format!("Invalid txid: {}", e))?;
             let info = self.client.get_raw_transaction_info(&txid, None)?;
             Ok(info.confirmations.map(|c| c as u64).unwrap_or(0))
         }

@@ -5,9 +5,9 @@ use clap::Subcommand;
 
 use csv_adapter_core::hash::Hash;
 
-use crate::config::{Config, Chain};
-use crate::state::State;
+use crate::config::{Chain, Config};
 use crate::output;
+use crate::state::State;
 
 #[derive(Subcommand)]
 pub enum ProofAction {
@@ -46,13 +46,27 @@ pub enum ProofAction {
 
 pub fn execute(action: ProofAction, config: &Config, state: &State) -> Result<()> {
     match action {
-        ProofAction::Generate { chain, right_id, output } => cmd_generate(chain, right_id, output, config, state),
+        ProofAction::Generate {
+            chain,
+            right_id,
+            output,
+        } => cmd_generate(chain, right_id, output, config, state),
         ProofAction::Verify { chain, proof } => cmd_verify(chain, proof, config, state),
-        ProofAction::VerifyCrossChain { source, dest, proof } => cmd_verify_cross_chain(source, dest, proof, config, state),
+        ProofAction::VerifyCrossChain {
+            source,
+            dest,
+            proof,
+        } => cmd_verify_cross_chain(source, dest, proof, config, state),
     }
 }
 
-fn cmd_generate(chain: Chain, right_id: String, output: Option<String>, config: &Config, _state: &State) -> Result<()> {
+fn cmd_generate(
+    chain: Chain,
+    right_id: String,
+    output: Option<String>,
+    config: &Config,
+    _state: &State,
+) -> Result<()> {
     output::header(&format!("Generating Proof on {}", chain));
 
     let bytes = hex::decode(right_id.trim_start_matches("0x"))
@@ -122,7 +136,12 @@ fn cmd_generate(chain: Chain, right_id: String, output: Option<String>, config: 
     Ok(())
 }
 
-fn cmd_verify(chain: Chain, proof_file: Option<String>, _config: &Config, _state: &State) -> Result<()> {
+fn cmd_verify(
+    chain: Chain,
+    proof_file: Option<String>,
+    _config: &Config,
+    _state: &State,
+) -> Result<()> {
     output::header(&format!("Verifying Proof on {}", chain));
 
     let proof_content = match proof_file {
@@ -137,8 +156,20 @@ fn cmd_verify(chain: Chain, proof_file: Option<String>, _config: &Config, _state
     let proof: serde_json::Value = serde_json::from_str(&proof_content)
         .map_err(|e| anyhow::anyhow!("Invalid proof JSON: {}", e))?;
 
-    output::kv("Proof Chain", proof.get("chain").and_then(|v| v.as_str()).unwrap_or("unknown"));
-    output::kv("Proof Type", proof.get("proof_type").and_then(|v| v.as_str()).unwrap_or("unknown"));
+    output::kv(
+        "Proof Chain",
+        proof
+            .get("chain")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown"),
+    );
+    output::kv(
+        "Proof Type",
+        proof
+            .get("proof_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown"),
+    );
 
     output::progress(1, 3, "Parsing proof bundle...");
     output::progress(2, 3, "Verifying cryptographic proof...");
@@ -148,8 +179,17 @@ fn cmd_verify(chain: Chain, proof_file: Option<String>, _config: &Config, _state
     Ok(())
 }
 
-fn cmd_verify_cross_chain(source: Chain, dest: Chain, proof_file: String, _config: &Config, _state: &State) -> Result<()> {
-    output::header(&format!("Cross-Chain Proof Verification: {} → {}", source, dest));
+fn cmd_verify_cross_chain(
+    source: Chain,
+    dest: Chain,
+    proof_file: String,
+    _config: &Config,
+    _state: &State,
+) -> Result<()> {
+    output::header(&format!(
+        "Cross-Chain Proof Verification: {} → {}",
+        source, dest
+    ));
 
     let proof_content = std::fs::read_to_string(&proof_file)?;
     let proof: serde_json::Value = serde_json::from_str(&proof_content)?;
@@ -160,7 +200,11 @@ fn cmd_verify_cross_chain(source: Chain, dest: Chain, proof_file: String, _confi
     // Verify the proof is from the claimed source chain
     if let Some(proof_chain) = proof.get("chain").and_then(|v| v.as_str()) {
         if proof_chain != source.to_string() {
-            return Err(anyhow::anyhow!("Proof claims to be from {} but file says {}", source, proof_chain));
+            return Err(anyhow::anyhow!(
+                "Proof claims to be from {} but file says {}",
+                source,
+                proof_chain
+            ));
         }
     }
 

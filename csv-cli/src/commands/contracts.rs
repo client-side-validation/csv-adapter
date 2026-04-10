@@ -1,13 +1,13 @@
 //! Contract deployment commands
 
-use colored::Colorize;
 use anyhow::Result;
 use clap::Subcommand;
+use colored::Colorize;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::config::{Config, Chain};
-use crate::state::{State, DeployedContract};
+use crate::config::{Chain, Config};
 use crate::output;
+use crate::state::{DeployedContract, State};
 
 #[derive(Subcommand)]
 pub enum ContractAction {
@@ -41,17 +41,30 @@ pub enum ContractAction {
 
 pub fn execute(action: ContractAction, config: &Config, state: &mut State) -> Result<()> {
     match action {
-        ContractAction::Deploy { chain, network, deployer_key } => cmd_deploy(chain, network, deployer_key, config, state),
+        ContractAction::Deploy {
+            chain,
+            network,
+            deployer_key,
+        } => cmd_deploy(chain, network, deployer_key, config, state),
         ContractAction::Status { chain } => cmd_status(chain, config, state),
         ContractAction::Verify { chain } => cmd_verify(chain, config, state),
         ContractAction::List => cmd_list(state),
     }
 }
 
-fn cmd_deploy(chain: Chain, network: Option<String>, _deployer_key: Option<String>, config: &Config, state: &mut State) -> Result<()> {
+fn cmd_deploy(
+    chain: Chain,
+    network: Option<String>,
+    _deployer_key: Option<String>,
+    config: &Config,
+    state: &mut State,
+) -> Result<()> {
     let network_str = network.as_deref().unwrap_or("test");
 
-    output::header(&format!("Deploying Contracts to {} ({})", chain, network_str));
+    output::header(&format!(
+        "Deploying Contracts to {} ({})",
+        chain, network_str
+    ));
 
     match chain {
         Chain::Bitcoin => {
@@ -91,7 +104,10 @@ fn deploy_ethereum(config: &Config, state: &mut State) -> Result<()> {
 
     output::progress(5, 5, "Verifying deployment...");
 
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
 
     state.store_contract(DeployedContract {
         chain: Chain::Ethereum,
@@ -104,7 +120,9 @@ fn deploy_ethereum(config: &Config, state: &mut State) -> Result<()> {
     output::success("Ethereum contracts deployed");
     output::kv("CSVLock", &csvlock_addr);
     output::kv("CSVMint", &csvmint_addr);
-    output::info("Save these addresses. Update config with: csv chain set-contract ethereum <address>");
+    output::info(
+        "Save these addresses. Update config with: csv chain set-contract ethereum <address>",
+    );
 
     Ok(())
 }
@@ -124,7 +142,10 @@ fn deploy_sui(config: &Config, state: &mut State) -> Result<()> {
 
     output::progress(4, 4, "Verifying deployment...");
 
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
 
     state.store_contract(DeployedContract {
         chain: Chain::Sui,
@@ -155,7 +176,10 @@ fn deploy_aptos(config: &Config, state: &mut State) -> Result<()> {
 
     output::progress(4, 4, "Verifying deployment...");
 
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
 
     state.store_contract(DeployedContract {
         chain: Chain::Aptos,
@@ -182,7 +206,10 @@ fn cmd_status(chain: Chain, _config: &Config, state: &State) -> Result<()> {
         output::warning("No contract deployed on this chain");
         match chain {
             Chain::Bitcoin => output::info("Bitcoin doesn't need contracts (UTXO-native)"),
-            _ => output::info(&format!("Deploy with: csv contract deploy --chain {}", chain)),
+            _ => output::info(&format!(
+                "Deploy with: csv contract deploy --chain {}",
+                chain
+            )),
         }
     }
 

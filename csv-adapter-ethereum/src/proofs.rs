@@ -41,24 +41,21 @@ pub struct ReceiptProofResult {
 }
 
 /// Verify Ethereum receipt inclusion with full MPT proof
-pub fn verify_receipt_inclusion(
-    _tx_hash: &[u8; 32],
-    proof: &EthereumInclusionProof,
-) -> bool {
+pub fn verify_receipt_inclusion(_tx_hash: &[u8; 32], proof: &EthereumInclusionProof) -> bool {
     // In production: fully verify MPT proof
     // For now, check proof has data and log index is consistent
     !proof.receipt_rlp.is_empty() || !proof.merkle_proof.is_empty()
 }
 
 /// Full receipt proof verification with MPT traversal and LOG event decoding
-/// 
+///
 /// # Arguments
 /// * `receipt_root` - The receipt trie root from the block header
 /// * `receipt_index` - The index of the receipt in the block
 /// * `receipt_rlp` - The RLP-encoded receipt data
 /// * `proof_nodes` - MPT proof nodes from the receipt root to the receipt
 /// * `expected_seal_id` - If Some, verify the SealUsed event matches
-/// 
+///
 /// # Returns
 /// The decoded receipt proof result
 pub fn verify_receipt_proof(
@@ -79,11 +76,7 @@ pub fn verify_receipt_proof(
         .collect();
     let receipt_root = alloy_primitives::B256::from(receipt_root);
 
-    let proof_valid = mpt::verify_receipt_proof(
-        receipt_root,
-        &proof_nodes_bytes,
-        receipt_index,
-    );
+    let proof_valid = mpt::verify_receipt_proof(receipt_root, &proof_nodes_bytes, receipt_index);
 
     if !proof_valid {
         return ReceiptProofResult {
@@ -436,11 +429,8 @@ pub fn to_core_inclusion_proof(proof: &EthereumInclusionProof) -> csv_adapter_co
     proof_bytes.extend_from_slice(&proof.block_number.to_le_bytes());
     proof_bytes.extend_from_slice(&proof.log_index.to_le_bytes());
 
-    csv_adapter_core::InclusionProof::new(
-        proof_bytes,
-        Hash::new(proof.block_hash),
-        proof.log_index,
-    ).expect("valid inclusion proof")
+    csv_adapter_core::InclusionProof::new(proof_bytes, Hash::new(proof.block_hash), proof.log_index)
+        .expect("valid inclusion proof")
 }
 
 #[cfg(test)]
@@ -450,25 +440,14 @@ mod tests {
     #[test]
     fn test_verify_receipt_inclusion() {
         let tx_hash = [1u8; 32];
-        let proof = EthereumInclusionProof::new(
-            vec![0xAB; 100],
-            vec![0xCD; 64],
-            [2u8; 32],
-            1000,
-            5,
-        );
+        let proof =
+            EthereumInclusionProof::new(vec![0xAB; 100], vec![0xCD; 64], [2u8; 32], 1000, 5);
         assert!(verify_receipt_inclusion(&tx_hash, &proof));
     }
 
     #[test]
     fn test_to_core_inclusion_proof() {
-        let proof = EthereumInclusionProof::new(
-            vec![0xAB; 50],
-            vec![],
-            [3u8; 32],
-            1000,
-            5,
-        );
+        let proof = EthereumInclusionProof::new(vec![0xAB; 50], vec![], [3u8; 32], 1000, 5);
         let core_proof = to_core_inclusion_proof(&proof);
         assert_eq!(core_proof.position, 5);
         assert_eq!(core_proof.block_hash, Hash::new([3u8; 32]));

@@ -13,25 +13,25 @@
 
 use std::sync::Mutex;
 
+use csv_adapter_core::commitment::Commitment;
+use csv_adapter_core::dag::DAGSegment;
+use csv_adapter_core::error::AdapterError;
+use csv_adapter_core::error::Result as CoreResult;
+use csv_adapter_core::proof::{FinalityProof, ProofBundle};
+use csv_adapter_core::seal::AnchorRef as CoreAnchorRef;
+use csv_adapter_core::seal::SealRef as CoreSealRef;
 use csv_adapter_core::AnchorLayer;
 use csv_adapter_core::Hash;
-use csv_adapter_core::error::Result as CoreResult;
-use csv_adapter_core::error::AdapterError;
-use csv_adapter_core::proof::{FinalityProof, ProofBundle};
-use csv_adapter_core::seal::SealRef as CoreSealRef;
-use csv_adapter_core::seal::AnchorRef as CoreAnchorRef;
-use csv_adapter_core::dag::DAGSegment;
-use csv_adapter_core::commitment::Commitment;
 
+use crate::checkpoint::CheckpointVerifier;
 use crate::config::SuiConfig;
 use crate::error::{SuiError, SuiResult};
-use crate::rpc::SuiRpc;
+use crate::proofs::{CommitmentEventBuilder, EventProofVerifier, StateProofVerifier};
 #[cfg(feature = "rpc")]
 use crate::rpc::SuiObject;
-use crate::types::{SuiSealRef, SuiAnchorRef, SuiInclusionProof, SuiFinalityProof};
+use crate::rpc::SuiRpc;
 use crate::seal::SealRegistry;
-use crate::checkpoint::CheckpointVerifier;
-use crate::proofs::{StateProofVerifier, EventProofVerifier, CommitmentEventBuilder};
+use crate::types::{SuiAnchorRef, SuiFinalityProof, SuiInclusionProof, SuiSealRef};
 
 /// Sui implementation of the AnchorLayer trait
 pub struct SuiAnchorLayer {
@@ -156,11 +156,13 @@ fn build_sui_transaction_data(
     tx.extend_from_slice(&bcs_string(function_name));
     // type_arguments: Vec<TypeTag> (empty)
     tx.push(0); // length 0
-    // arguments: Vec<Argument>
-    // Argument::Input(u16) = variant 1
+                // arguments: Vec<Argument>
+                // Argument::Input(u16) = variant 1
     tx.extend_from_slice(&uleb128_encode(2)); // 2 arguments
-    tx.push(1); tx.extend_from_slice(&0u16.to_le_bytes()); // Input(0)
-    tx.push(1); tx.extend_from_slice(&1u16.to_le_bytes()); // Input(1)
+    tx.push(1);
+    tx.extend_from_slice(&0u16.to_le_bytes()); // Input(0)
+    tx.push(1);
+    tx.extend_from_slice(&1u16.to_le_bytes()); // Input(1)
 
     // === sender: SuiAddress (32 bytes) ===
     tx.extend_from_slice(&sender);
@@ -195,9 +197,9 @@ impl SuiAnchorLayer {
     /// * `rpc` - RPC client for Sui node communication
     pub fn from_config(config: SuiConfig, rpc: Box<dyn SuiRpc>) -> SuiResult<Self> {
         // Validate configuration
-        config.validate().map_err(|e| SuiError::SerializationError(
-            format!("Invalid configuration: {}", e)
-        ))?;
+        config
+            .validate()
+            .map_err(|e| SuiError::SerializationError(format!("Invalid configuration: {}", e)))?;
 
         // Build domain separator: "CSV-SUI-" + chain_id padding
         let mut domain = [0u8; 32];
@@ -211,8 +213,7 @@ impl SuiAnchorLayer {
             .map_err(|e| SuiError::SerializationError(e))?;
         let event_type = format!(
             "{}::{}::AnchorEvent",
-            config.seal_contract.package_id,
-            config.seal_contract.module_name
+            config.seal_contract.package_id, config.seal_contract.module_name
         );
         let event_builder = CommitmentEventBuilder::new(package_id, event_type);
 
@@ -287,7 +288,8 @@ impl SuiAnchorLayer {
         if registry.is_seal_used(seal) {
             return Err(SuiError::ObjectUsed(format!(
                 "Object {} with version {} is already consumed",
-                format_object_id(seal.object_id), seal.version
+                format_object_id(seal.object_id),
+                seal.version
             )));
         }
 
@@ -343,7 +345,9 @@ impl SuiAnchorLayer {
     ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), Box<dyn std::error::Error + Send + Sync>> {
         use ed25519_dalek::Signer;
 
-        let signing_key = self.signing_key.as_ref()
+        let signing_key = self
+            .signing_key
+            .as_ref()
             .ok_or("No signing key configured")?;
 
         let package_id = parse_object_id(&self.config.seal_contract.package_id)
@@ -354,16 +358,21 @@ impl SuiAnchorLayer {
         log::debug!(
             "Building Sui MoveCall: {}::{}::{}(seal={}, commitment={})",
             self.config.seal_contract.package_id,
-            module_name, function_name,
+            module_name,
+            function_name,
             format_object_id(seal.object_id),
             hex::encode(commitment),
         );
 
         // Get gas objects and sender address from RPC
-        let sender = self.rpc.sender_address()
+        let sender = self
+            .rpc
+            .sender_address()
             .map_err(|e| format!("Failed to get sender address: {}", e))?;
 
-        let gas_objects = self.rpc.get_gas_objects(sender)
+        let gas_objects = self
+            .rpc
+            .get_gas_objects(sender)
             .map_err(|e| format!("Failed to get gas objects: {}", e))?;
 
         if gas_objects.is_empty() {
@@ -405,16 +414,16 @@ impl SuiAnchorLayer {
         expected_seal: &SuiSealRef,
         expected_commitment: Hash,
     ) -> CoreResult<()> {
-        let expected_event_data = self.event_builder.build(
-            *expected_commitment.as_bytes(),
-            expected_seal.object_id,
-        );
+        let expected_event_data = self
+            .event_builder
+            .build(*expected_commitment.as_bytes(), expected_seal.object_id);
 
         let valid = EventProofVerifier::verify_event_in_tx(
             anchor.tx_digest,
             &expected_event_data,
             self.rpc.as_ref(),
-        ).map_err(|e: SuiError| AdapterError::InclusionProofFailed(e.to_string()))?;
+        )
+        .map_err(|e: SuiError| AdapterError::InclusionProofFailed(e.to_string()))?;
 
         if !valid {
             return Err(AdapterError::InclusionProofFailed(
@@ -445,10 +454,9 @@ impl AnchorLayer for SuiAnchorLayer {
         #[cfg(feature = "rpc")]
         {
             // Build the event data for this commitment
-            let event_data = self.event_builder.build(
-                *commitment.as_bytes(),
-                seal.object_id,
-            );
+            let event_data = self
+                .event_builder
+                .build(*commitment.as_bytes(), seal.object_id);
 
             // Build a MoveCall transaction for csv_seal::consume_seal()
             // The transaction construction requires BCS serialization of:
@@ -456,35 +464,38 @@ impl AnchorLayer for SuiAnchorLayer {
             // - Package ID, module name, function name
             // - Type arguments and call arguments (seal_id, commitment)
             // For production: use sui-sdk's transaction builder
-            let (tx_bytes, signature, public_key) = self.build_and_sign_move_call(
-                &seal,
-                *commitment.as_bytes(),
-            ).map_err(|e| AdapterError::PublishFailed(
-                format!("Failed to build and sign transaction: {}", e),
-            ))?;
+            let (tx_bytes, signature, public_key) = self
+                .build_and_sign_move_call(&seal, *commitment.as_bytes())
+                .map_err(|e| {
+                    AdapterError::PublishFailed(format!(
+                        "Failed to build and sign transaction: {}",
+                        e
+                    ))
+                })?;
 
             // Submit signed transaction via RPC
-            let tx_digest = self.rpc.execute_signed_transaction(
-                tx_bytes,
-                signature,
-                public_key,
-            ).map_err(|e| AdapterError::PublishFailed(
-                format!("Failed to execute transaction: {}", e),
-            ))?;
+            let tx_digest = self
+                .rpc
+                .execute_signed_transaction(tx_bytes, signature, public_key)
+                .map_err(|e| {
+                    AdapterError::PublishFailed(format!("Failed to execute transaction: {}", e))
+                })?;
 
             // Wait for confirmation
-            let block = self.rpc.wait_for_transaction(tx_digest, 30_000)
+            let block = self
+                .rpc
+                .wait_for_transaction(tx_digest, 30_000)
                 .map_err(|e| AdapterError::NetworkError(e.to_string()))?
-                .ok_or_else(|| AdapterError::PublishFailed(
-                    "Transaction not found after submission".to_string(),
-                ))?;
+                .ok_or_else(|| {
+                    AdapterError::PublishFailed(
+                        "Transaction not found after submission".to_string(),
+                    )
+                })?;
 
             // Verify the emitted event matches the expected commitment
-            let valid = EventProofVerifier::verify_event_in_tx(
-                tx_digest,
-                &event_data,
-                self.rpc.as_ref(),
-            ).map_err(|e: SuiError| AdapterError::InclusionProofFailed(e.to_string()))?;
+            let valid =
+                EventProofVerifier::verify_event_in_tx(tx_digest, &event_data, self.rpc.as_ref())
+                    .map_err(|e: SuiError| AdapterError::InclusionProofFailed(e.to_string()))?;
 
             if !valid {
                 return Err(AdapterError::PublishFailed(
@@ -495,7 +506,8 @@ impl AnchorLayer for SuiAnchorLayer {
             // Mark seal as consumed with the block checkpoint
             let checkpoint = block.checkpoint.unwrap_or(0);
             let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
-            registry.mark_seal_used(&seal, checkpoint)
+            registry
+                .mark_seal_used(&seal, checkpoint)
                 .map_err(|e| AdapterError::from(e))?;
 
             Ok(SuiAnchorRef::new(seal.object_id, tx_digest, checkpoint))
@@ -505,14 +517,14 @@ impl AnchorLayer for SuiAnchorLayer {
         {
             // Simulated path
             let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
-            registry.mark_seal_used(&seal, 0)
+            registry
+                .mark_seal_used(&seal, 0)
                 .map_err(|e| AdapterError::from(e))?;
 
             // Build event data for this commitment
-            let _event_data = self.event_builder.build(
-                *commitment.as_bytes(),
-                seal.object_id,
-            );
+            let _event_data = self
+                .event_builder
+                .build(*commitment.as_bytes(), seal.object_id);
 
             // Return simulated anchor
             Ok(SuiAnchorRef::new(seal.object_id, [0u8; 32], 0))
@@ -520,19 +532,24 @@ impl AnchorLayer for SuiAnchorLayer {
     }
 
     fn verify_inclusion(&self, anchor: Self::AnchorRef) -> CoreResult<Self::InclusionProof> {
-        log::debug!("Verifying inclusion for anchor at checkpoint {}", anchor.checkpoint);
+        log::debug!(
+            "Verifying inclusion for anchor at checkpoint {}",
+            anchor.checkpoint
+        );
 
         // Fetch checkpoint info from the Sui node
         let checkpoint_info = match self.rpc.get_checkpoint(anchor.checkpoint) {
             Ok(Some(info)) => info,
             Ok(None) => {
                 return Err(AdapterError::InclusionProofFailed(format!(
-                    "Checkpoint {} not found", anchor.checkpoint
+                    "Checkpoint {} not found",
+                    anchor.checkpoint
                 )));
             }
             Err(e) => {
                 return Err(AdapterError::InclusionProofFailed(format!(
-                    "Failed to fetch checkpoint {}: {}", anchor.checkpoint, e
+                    "Failed to fetch checkpoint {}: {}",
+                    anchor.checkpoint, e
                 )));
             }
         };
@@ -540,10 +557,10 @@ impl AnchorLayer for SuiAnchorLayer {
         // Verify the checkpoint is certified
         if !checkpoint_info.certified {
             // Double-check via verifier
-            let is_certified = match self.checkpoint_verifier.is_checkpoint_certified(
-                anchor.checkpoint,
-                self.rpc.as_ref(),
-            ) {
+            let is_certified = match self
+                .checkpoint_verifier
+                .is_checkpoint_certified(anchor.checkpoint, self.rpc.as_ref())
+            {
                 Ok(info) => info.is_certified,
                 Err(e) => {
                     log::warn!("Checkpoint certification check failed: {}", e);
@@ -553,7 +570,8 @@ impl AnchorLayer for SuiAnchorLayer {
 
             if !is_certified {
                 return Err(AdapterError::InclusionProofFailed(format!(
-                    "Checkpoint {} is not yet certified", anchor.checkpoint
+                    "Checkpoint {} is not yet certified",
+                    anchor.checkpoint
                 )));
             }
         }
@@ -569,12 +587,15 @@ impl AnchorLayer for SuiAnchorLayer {
     }
 
     fn verify_finality(&self, anchor: Self::AnchorRef) -> CoreResult<Self::FinalityProof> {
-        log::debug!("Verifying finality for anchor at checkpoint {}", anchor.checkpoint);
+        log::debug!(
+            "Verifying finality for anchor at checkpoint {}",
+            anchor.checkpoint
+        );
 
-        let is_certified = match self.checkpoint_verifier.is_checkpoint_certified(
-            anchor.checkpoint,
-            self.rpc.as_ref(),
-        ) {
+        let is_certified = match self
+            .checkpoint_verifier
+            .is_checkpoint_certified(anchor.checkpoint, self.rpc.as_ref())
+        {
             Ok(info) => info.is_certified,
             Err(e) => {
                 log::warn!("Finality check failed: {}", e);
@@ -593,12 +614,13 @@ impl AnchorLayer for SuiAnchorLayer {
                 format_object_id(seal.object_id)
             )));
         }
-        registry.mark_seal_used(&seal, 0)
+        registry
+            .mark_seal_used(&seal, 0)
             .map_err(|e| AdapterError::from(e))
     }
 
     fn create_seal(&self, _value: Option<u64>) -> CoreResult<Self::SealRef> {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         // Use timestamp-based nonce for replay resistance
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -628,38 +650,38 @@ impl AnchorLayer for SuiAnchorLayer {
             transition_payload_hash,
             &core_seal,
             self.domain_separator,
-        ).hash()
+        )
+        .hash()
     }
 
-    fn build_proof_bundle(&self, anchor: Self::AnchorRef, transition_dag: DAGSegment) -> CoreResult<ProofBundle> {
+    fn build_proof_bundle(
+        &self,
+        anchor: Self::AnchorRef,
+        transition_dag: DAGSegment,
+    ) -> CoreResult<ProofBundle> {
         let inclusion = self.verify_inclusion(anchor.clone())?;
         let finality = self.verify_finality(anchor.clone())?;
 
-        let seal_ref = CoreSealRef::new(
-            anchor.object_id.to_vec(),
-            Some(anchor.checkpoint),
-        ).map_err(|e| AdapterError::Generic(e.to_string()))?;
+        let seal_ref = CoreSealRef::new(anchor.object_id.to_vec(), Some(anchor.checkpoint))
+            .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
-        let anchor_ref = CoreAnchorRef::new(
-            anchor.object_id.to_vec(),
-            anchor.checkpoint,
-            vec![],
-        ).map_err(|e| AdapterError::Generic(e.to_string()))?;
+        let anchor_ref = CoreAnchorRef::new(anchor.object_id.to_vec(), anchor.checkpoint, vec![])
+            .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
         let inclusion_proof = csv_adapter_core::InclusionProof::new(
             inclusion.object_proof,
             Hash::new(inclusion.checkpoint_hash),
             inclusion.checkpoint_number,
-        ).map_err(|e| AdapterError::Generic(e.to_string()))?;
+        )
+        .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
-        let finality_proof = FinalityProof::new(
-            vec![],
-            finality.checkpoint,
-            finality.is_certified,
-        ).map_err(|e| AdapterError::Generic(e.to_string()))?;
+        let finality_proof = FinalityProof::new(vec![], finality.checkpoint, finality.is_certified)
+            .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
         // Extract signatures from DAG nodes
-        let signatures: Vec<Vec<u8>> = transition_dag.nodes.iter()
+        let signatures: Vec<Vec<u8>> = transition_dag
+            .nodes
+            .iter()
             .flat_map(|node| node.signatures.clone())
             .collect();
 
@@ -670,12 +692,18 @@ impl AnchorLayer for SuiAnchorLayer {
             anchor_ref,
             inclusion_proof,
             finality_proof,
-        ).map_err(|e| AdapterError::Generic(e.to_string()))
+        )
+        .map_err(|e| AdapterError::Generic(e.to_string()))
     }
 
     fn rollback(&self, anchor: Self::AnchorRef) -> CoreResult<()> {
-        log::warn!("Rollback requested for anchor at checkpoint {}", anchor.checkpoint);
-        let current_checkpoint = self.rpc.get_latest_checkpoint_sequence_number()
+        log::warn!(
+            "Rollback requested for anchor at checkpoint {}",
+            anchor.checkpoint
+        );
+        let current_checkpoint = self
+            .rpc
+            .get_latest_checkpoint_sequence_number()
             .map_err(|e| AdapterError::NetworkError(e.to_string()))?;
 
         // If anchor checkpoint is beyond current tip, rollback
@@ -750,7 +778,9 @@ mod tests {
 
     #[test]
     fn test_parse_object_id() {
-        let id = parse_object_id("0x0000000000000000000000000000000000000000000000000000000000000001").unwrap();
+        let id =
+            parse_object_id("0x0000000000000000000000000000000000000000000000000000000000000001")
+                .unwrap();
         assert_eq!(id[31], 1);
         for i in 0..31 {
             assert_eq!(id[i], 0);
@@ -771,8 +801,12 @@ mod tests {
         let seal = adapter.create_seal(None).unwrap();
 
         // Manually mark as used
-        adapter.seal_registry.lock().unwrap_or_else(|e| e.into_inner())
-            .mark_seal_used(&seal, 0).unwrap();
+        adapter
+            .seal_registry
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .mark_seal_used(&seal, 0)
+            .unwrap();
 
         // Try to enforce again
         assert!(adapter.enforce_seal(seal).is_err());

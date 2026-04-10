@@ -42,9 +42,9 @@ mod config;
 mod output;
 mod state;
 
+use commands::*;
 use config::Config;
 use state::State;
-use commands::*;
 
 #[derive(Parser)]
 #[command(
@@ -134,14 +134,14 @@ enum Commands {
 }
 
 use commands::chain::ChainAction;
-use commands::wallet::WalletAction;
-use commands::rights::RightAction;
-use commands::proofs::ProofAction;
-use commands::cross_chain::CrossChainAction;
 use commands::contracts::ContractAction;
+use commands::cross_chain::CrossChainAction;
+use commands::proofs::ProofAction;
+use commands::rights::RightAction;
 use commands::seals::SealAction;
 use commands::tests::TestAction;
 use commands::validate::ValidateAction;
+use commands::wallet::WalletAction;
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();

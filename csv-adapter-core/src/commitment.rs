@@ -133,7 +133,13 @@ impl Commitment {
         seal_ref: &SealRef,
         domain_separator: [u8; 32],
     ) -> Self {
-        Self::simple(contract_id, previous_commitment, transition_payload_hash, seal_ref, domain_separator)
+        Self::simple(
+            contract_id,
+            previous_commitment,
+            transition_payload_hash,
+            seal_ref,
+            domain_separator,
+        )
     }
 
     /// Compute the commitment hash
@@ -150,10 +156,22 @@ impl Commitment {
         // Use tagged hashing for each field to prevent cross-protocol collisions
         hasher.update(csv_tagged_hash("commitment-version", &[self.version]));
         hasher.update(csv_tagged_hash("commitment-protocol-id", &self.protocol_id));
-        hasher.update(csv_tagged_hash("commitment-mpc-root", self.mpc_root.as_bytes()));
-        hasher.update(csv_tagged_hash("commitment-contract-id", self.contract_id.as_bytes()));
-        hasher.update(csv_tagged_hash("commitment-prev", self.previous_commitment.as_bytes()));
-        hasher.update(csv_tagged_hash("commitment-payload", self.transition_payload_hash.as_bytes()));
+        hasher.update(csv_tagged_hash(
+            "commitment-mpc-root",
+            self.mpc_root.as_bytes(),
+        ));
+        hasher.update(csv_tagged_hash(
+            "commitment-contract-id",
+            self.contract_id.as_bytes(),
+        ));
+        hasher.update(csv_tagged_hash(
+            "commitment-prev",
+            self.previous_commitment.as_bytes(),
+        ));
+        hasher.update(csv_tagged_hash(
+            "commitment-payload",
+            self.transition_payload_hash.as_bytes(),
+        ));
         hasher.update(csv_tagged_hash("commitment-seal", self.seal_id.as_bytes()));
         hasher.update(csv_tagged_hash("commitment-domain", &self.domain_separator));
     }
@@ -205,7 +223,7 @@ impl Commitment {
             return Err("Unsupported commitment version");
         }
 
-        // V2 format: version(1) + protocol_id(32) + mpc_root(32) + contract_id(32) + 
+        // V2 format: version(1) + protocol_id(32) + mpc_root(32) + contract_id(32) +
         //             previous_commitment(32) + payload_hash(32) + seal_id(32) + domain_separator(32)
         let min_len = 1 + 32 * 7;
         if bytes.len() < min_len {

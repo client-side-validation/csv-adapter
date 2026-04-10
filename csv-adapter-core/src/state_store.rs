@@ -79,7 +79,7 @@ impl ContractHistory {
 
         // Add to transitions
         self.transitions.push(transition);
-        
+
         Ok(())
     }
 
@@ -246,6 +246,7 @@ mod tests {
             crate::right::OwnershipProof {
                 proof: vec![0x01],
                 owner: vec![0xFF; 32],
+                scheme: None,
             },
             &[0x42],
         );
@@ -277,7 +278,9 @@ mod tests {
         let genesis = make_test_commitment(Hash::new([0u8; 32]), 0x01);
         let history = ContractHistory::from_genesis(genesis.clone());
 
-        store.save_contract_history(genesis.contract_id, &history).unwrap();
+        store
+            .save_contract_history(genesis.contract_id, &history)
+            .unwrap();
 
         let loaded = store.load_contract_history(genesis.contract_id).unwrap();
         assert!(loaded.is_some());

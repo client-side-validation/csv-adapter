@@ -30,8 +30,8 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use crate::hash::Hash;
-use crate::seal::SealRef;
 use crate::right::RightId;
+use crate::seal::SealRef;
 
 /// The chain that enforces this seal's single-use.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -71,9 +71,7 @@ pub enum SealStatus {
         consumption: SealConsumption,
     },
     /// Seal was consumed on multiple chains (double-spend!)
-    DoubleSpent {
-        consumptions: Vec<SealConsumption>,
-    },
+    DoubleSpent { consumptions: Vec<SealConsumption> },
 }
 
 /// Cross-chain seal registry.
@@ -108,7 +106,10 @@ impl CrossChainSealRegistry {
     ) -> Result<(), DoubleSpendError> {
         let seal_key = consumption.seal_ref.to_vec();
         let is_double_spend = self.consumed_seals.contains_key(&seal_key)
-            && !self.consumed_seals.get(&seal_key).map_or(true, |v| v.is_empty());
+            && !self
+                .consumed_seals
+                .get(&seal_key)
+                .map_or(true, |v| v.is_empty());
 
         // Track known chains
         self.known_chains.insert(consumption.chain.clone());
@@ -116,8 +117,7 @@ impl CrossChainSealRegistry {
         // Check if already consumed
         if is_double_spend {
             let existing = self.consumed_seals.get(&seal_key).unwrap();
-            let is_cross_chain = existing.iter()
-                .any(|e| e.chain != consumption.chain);
+            let is_cross_chain = existing.iter().any(|e| e.chain != consumption.chain);
 
             let err = DoubleSpendError {
                 seal_ref: consumption.seal_ref.clone(),
@@ -207,7 +207,8 @@ impl CrossChainSealRegistry {
 
     /// Get number of double-spend incidents detected.
     pub fn double_spend_count(&self) -> usize {
-        self.consumed_seals.values()
+        self.consumed_seals
+            .values()
             .filter(|consumptions| consumptions.len() > 1)
             .count()
     }
@@ -235,11 +236,7 @@ impl core::fmt::Display for DoubleSpendError {
                 self.seal_ref
             )
         } else {
-            write!(
-                f,
-                "Same-chain replay detected for seal {:?}",
-                self.seal_ref
-            )
+            write!(f, "Same-chain replay detected for seal {:?}", self.seal_ref)
         }
     }
 }
@@ -316,7 +313,10 @@ mod tests {
         let registry = CrossChainSealRegistry::new();
         let seal = SealRef::new(vec![0x01], None).unwrap();
 
-        assert!(matches!(registry.check_seal_status(&seal), SealStatus::Unconsumed));
+        assert!(matches!(
+            registry.check_seal_status(&seal),
+            SealStatus::Unconsumed
+        ));
     }
 
     #[test]

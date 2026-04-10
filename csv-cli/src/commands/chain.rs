@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 
-use crate::config::{Config, Chain, Network};
+use crate::config::{Chain, Config, Network};
 use crate::output;
 
 #[derive(Subcommand)]
@@ -73,7 +73,10 @@ fn cmd_list(config: &Config) -> Result<()> {
             chain_config.network.to_string(),
             chain_config.rpc_url.chars().take(40).collect::<String>(),
             chain_config.finality_depth.to_string(),
-            chain_config.contract_address.clone().unwrap_or_else(|| "none".to_string()),
+            chain_config
+                .contract_address
+                .clone()
+                .unwrap_or_else(|| "none".to_string()),
         ]);
     }
 
@@ -90,9 +93,21 @@ fn cmd_status(chain: &Chain, config: &Config) -> Result<()> {
 
     output::kv("Network", &chain_config.network.to_string());
     output::kv("RPC URL", &chain_config.rpc_url);
-    output::kv("Chain ID", &chain_config.chain_id.map(|id| id.to_string()).unwrap_or_else(|| "N/A".to_string()));
+    output::kv(
+        "Chain ID",
+        &chain_config
+            .chain_id
+            .map(|id| id.to_string())
+            .unwrap_or_else(|| "N/A".to_string()),
+    );
     output::kv("Finality Depth", &chain_config.finality_depth.to_string());
-    output::kv("Contract", &chain_config.contract_address.clone().unwrap_or_else(|| "Not deployed".to_string()));
+    output::kv(
+        "Contract",
+        &chain_config
+            .contract_address
+            .clone()
+            .unwrap_or_else(|| "Not deployed".to_string()),
+    );
 
     if let Some(fee) = chain_config.default_fee {
         output::kv("Default Fee", &fee.to_string());
@@ -124,7 +139,10 @@ fn cmd_info(chain: &Chain, config: &Config) -> Result<()> {
     // Try to fetch chain info from RPC
     match chain {
         Chain::Bitcoin => {
-            let url = format!("{}/blocks/tip/height", chain_config.rpc_url.trim_end_matches('/'));
+            let url = format!(
+                "{}/blocks/tip/height",
+                chain_config.rpc_url.trim_end_matches('/')
+            );
             match reqwest::blocking::get(&url)?.text() {
                 Ok(height) => {
                     output::kv("Current Height", height.trim());
@@ -137,7 +155,9 @@ fn cmd_info(chain: &Chain, config: &Config) -> Result<()> {
             output::kv("Endpoint", &chain_config.rpc_url);
         }
         Chain::Sui => {
-            output::info("Sui RPC info requires JSON-RPC call (sui_getLatestCheckpointSequenceNumber)");
+            output::info(
+                "Sui RPC info requires JSON-RPC call (sui_getLatestCheckpointSequenceNumber)",
+            );
             output::kv("Endpoint", &chain_config.rpc_url);
         }
         Chain::Aptos => {

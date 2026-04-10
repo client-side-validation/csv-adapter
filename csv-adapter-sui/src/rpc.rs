@@ -264,7 +264,9 @@ impl SuiRpc for MockSuiRpc {
         _public_key: Vec<u8>,
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
         // Mock: return a deterministic digest with incrementing counter
-        let counter = self.tx_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let counter = self
+            .tx_counter
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let mut digest = [0u8; 32];
         digest[..4].copy_from_slice(b"mock");
         digest[4..12].copy_from_slice(&counter.to_le_bytes());

@@ -49,10 +49,10 @@ pub mod store;
 
 // Client-side validation (Sprint 2)
 pub mod client;
-pub mod validator;
 pub mod commitment_chain;
-pub mod state_store;
 pub mod seal_registry;
+pub mod state_store;
+pub mod validator;
 
 // Cross-chain transfer (Sprint 4 - NORTH STAR)
 pub mod cross_chain;
@@ -66,13 +66,13 @@ pub mod tapret_verify;
 
 // Re-exports: core
 pub use commitment::Commitment;
-pub use right::{Right, RightId, RightError, OwnershipProof};
 pub use hardening::{
     BoundedQueue, CircuitBreaker, CircuitState, MemoryLimits, TimeoutConfig,
     DEFAULT_CIRCUIT_MAX_FAILURES, DEFAULT_CIRCUIT_RESET_TIMEOUT, DEFAULT_HEALTH_CHECK_TIMEOUT,
     DEFAULT_RPC_TIMEOUT, MAX_CACHE_SIZE, MAX_REGISTRY_SIZE, MAX_SEAL_REGISTRY_SIZE,
 };
 pub use hash::Hash;
+pub use right::{OwnershipProof, Right, RightError, RightId};
 pub use seal::{AnchorRef, SealRef};
 
 // Re-exports: state machine (Phase 1)

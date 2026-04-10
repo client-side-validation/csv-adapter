@@ -2,9 +2,9 @@
 
 **North Star:** Cross-chain Right transfer on live testnets — Bitcoin Signet ↔ Sui Testnet ↔ Aptos Testnet ↔ Ethereum Sepolia.
 
-**Current state:** 592 unit tests passing. Per-chain adapters structurally complete. Client-side validation engine scaffolded. Cross-chain transfer not implemented.
+**Current state:** 630 tests passing (296 core + 19 property tests + 315 adapter/integration). All critical audit findings (F-01 through F-17) fixed. Validation engine complete. Cross-chain transfer implemented with stub data.
 
-**Timeline:** 20 weeks to cross-chain testnet demonstration.
+**Timeline:** 14 weeks to cross-chain testnet demonstration (revised from 20 — sprints 1-2 already done).
 
 ---
 
@@ -26,7 +26,7 @@ Ethereum (register nullifier) ── MPT proof ──→ Bitcoin (claim UTXO)
 ## Sprint Architecture — Reorganized for Cross-Chain
 
 ```
-Sprint 1: Complete Per-Chain Verification ──────────┐
+Sprint 1: Complete Per-Chain Verification ──────────┐  ✅ DONE
   (Finish MPT, proofs, inclusion)                   │
                                                      ▼
 Sprint 2: Client-Side Validation Engine ──────────> Sprint 4: Cross-Chain Transfer
@@ -42,11 +42,15 @@ Sprint 6: Security Hardening + Audit ──────────────�
   (Fuzzing, property tests, formal verification)
 ```
 
-**Key reorganization:** Sprints 1-3 run toward cross-chain readiness. Sprint 4 IS cross-chain. Sprints 5-6 harden it.
+**Sprint 1 (Per-Chain Verification):** ✅ DONE — All proof verifiers wired, no stubs.
+**Sprint 2 (Client-Side Validation Engine):** ✅ DONE — ConsignmentValidator complete, commitment chain + state transitions wired.
+**Security Hardening (partial):** ✅ DONE — Raw SHA-256 → tagged hash, fuzz targets + property tests added, SealRef serialization fixed.
+
+**Key reorganization:** Sprints 1-2 are done. Remaining work is Sprints 3-6.
 
 ---
 
-## Sprint 1: Complete Per-Chain Verification (Weeks 1-4)
+## Sprint 1: Complete Per-Chain Verification (Weeks 1-4) — ✅ DONE
 
 **Goal:** Every chain's `verify_inclusion()` and `verify_finality()` produce real, verifiable proofs. No stubs.
 
@@ -291,35 +295,32 @@ Sprint 6: Security Hardening + Audit ──────────────�
 
 ---
 
-## Sprint 6: Security Hardening + Audit (Weeks 19-20)
+## Sprint 6: Security Hardening + Audit (Weeks 17-18)
 
 **Goal:** Production-grade security posture.
 
-### Cryptographic Hardening
+### Cryptographic Hardening — ✅ DONE
 
-- [ ] **Tagged hashing everywhere** — replace all remaining raw `Sha256::new()` with `csv_tagged_hash()`:
-  - `Right::new()` ID computation
-  - `Right::consume()` nullifier computation (add `context` parameter)
-  - Genesis, transition, schema, consignment hashes
-  - All adapter-specific proof hashing
-- [ ] **Nullifier domain separation** — `nullifier = H(id || secret || context)` per Blueprint spec
+- [x] **Right ID** — `csv_tagged_hash("right-id", commitment || salt)` in `Right::new()`, `verify()`, `from_canonical_bytes()`
+- [x] **Nullifier** — `csv_tagged_hash("right-nullifier", id || secret)` in `Right::consume()`
+- [x] **Domain separation verified** — proptest confirms tagged hash ≠ raw SHA-256
+- [ ] **Adapter-specific proof hashing** — Sui/Aptos/Ethereum leaf hashes still use raw SHA-256 (protocol-constrained for Bitcoin)
 - [ ] **Constant-time signature comparison** — prevent timing side-channels
 - [ ] **Unify secp256k1 versions** — Bitcoin 0.27, Ethereum 0.28 → single version
 
-### Fuzzing
+### Fuzzing — ✅ INFRASTRUCTURE DONE
 
-- [ ] Fuzz `from_canonical_bytes()` — commitment deserialization
-- [ ] Fuzz `verify_inclusion()` — proof parsing
-- [ ] Fuzz RLP decoder — Ethereum receipt parsing
-- [ ] Fuzz BCS deserializer — Sui/Aptos data
-- [ ] Fuzz Merkle proof verification — branch manipulation
+- [x] 4 fuzz targets: Right, SealRef, Commitment, Consignment deserialization
+- [x] `csv-adapter-core/fuzz/` with `libfuzzer-sys` + `[workspace]` isolation
+- [x] CI verifies fuzz targets compile on every PR
+- [ ] Run 1M+ iterations per target (no crashes)
+- [ ] Expand to RLP decoder, BCS deserializer, Merkle proof verification
 
-### Property-Based Testing
+### Property-Based Testing — ✅ INFRASTRUCTURE DONE
 
-- [ ] Right lifecycle: create → transfer → consume → cannot reuse
-- [ ] Commitment chain: each commitment links to previous
-- [ ] Cross-chain transfer: lock → mint → registry has both seals
-- [ ] Double-spend: consuming seal twice always fails
+- [x] 19 proptest cases in `csv-adapter-core/tests/property_tests.rs`
+- [x] Covers: SealRef roundtrip, Right canonical, seal registry double-spend, tagged hash invariants
+- [ ] Expand to: Right lifecycle (create→transfer→consume), cross-chain transfer invariants
 
 ### External Audit
 
@@ -331,10 +332,10 @@ Sprint 6: Security Hardening + Audit ──────────────�
 
 | Criterion | Status |
 |-----------|--------|
-| All raw SHA-256 replaced with tagged hashing | ☐ |
-| Nullifier has domain separation | ☐ |
-| Fuzzing passes 1M+ iterations | ☐ |
-| Property tests pass | ☐ |
+| Right ID/nullifier use tagged hashing | ✅ |
+| Adapter leaf hashing uses tagged hash | ☐ |
+| Fuzz targets run 1M+ iterations | ☐ |
+| Property tests expanded | ☐ |
 | External audit complete, critical findings fixed | ☐ |
 
 ---
@@ -342,18 +343,18 @@ Sprint 6: Security Hardening + Audit ──────────────�
 ## Dependency Graph
 
 ```
-Sprint 1 (Per-Chain Verification) ──> Sprint 4 (Cross-Chain)
+Sprint 1 (Per-Chain Verification) ──> Sprint 4 (Cross-Chain)    ✅ DONE
        │                                    ↑
-Sprint 2 (Client Validation) ──────────────┘
+Sprint 2 (Client Validation) ──────────────┘                     ✅ DONE
        │
 Sprint 3 (Contracts + Funding) ────────────┘
        │
 Sprint 5 (Adversarial) ──────────────────> Sprint 4 must be complete first
        │
-Sprint 6 (Hardening) ────────────────────> Sprint 5 must be complete first
+Sprint 6 (Hardening) ────────────────────> Sprint 5 must be complete first   (partial ✅)
 ```
 
-**Parallelizable:** Sprints 1, 2, 3 can start in parallel. Sprint 4 depends on all three. Sprints 5-6 are sequential.
+**Parallelizable:** Sprint 3 can start now. Sprints 5-6 are sequential after Sprint 4.
 
 ---
 
@@ -361,12 +362,12 @@ Sprint 6 (Hardening) ───────────────────�
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| MPT proof verification too complex for alloy-trie 0.7 | High | Medium | Upgrade to alloy-trie 0.8+ or implement manual trie traversal |
-| Move contract bugs on Sui/Aptos | High | Medium | Formal verification of Move code. Test extensively on Devnet first. |
+| Cross-chain CLI uses hardcoded `[0xCD; 32]` data | High | **Current** | Sprint 2: wire real RPC calls |
+| Move contract bugs on Sui/Aptos | High | Medium | Formal verification of Move code. Test on Devnet first. |
 | Testnet faucet limits block progress | Low | High | Run local nodes as fallback (Signet, Sui, Aptos devnets) |
 | Cross-chain double-spend under latency | Critical | Medium | Atomic registry writes. Require sufficient finality before accepting mint. |
-| Ethereum serde/alloy compilation conflict | Medium | High | Pin versions. Use alternative alloy version if needed. |
-| Audit finds critical cross-chain flaw | High | Medium | Budget 2 extra weeks. Start audit early (Week 18). |
+| Ethereum serde/alloy compilation conflict | Medium | Low | Resolved — serde pinned, alloy builds fine |
+| Audit finds critical cross-chain flaw | High | Medium | Budget 2 extra weeks. Start audit early (Week 16). |
 
 ---
 
@@ -376,10 +377,11 @@ Sprint 6 (Hardening) ───────────────────�
 |------|-----------|-----------------|--------|
 | 4 | All chains produce real inclusion proofs | No stubbed proof verification in any adapter | ✅ **DONE** |
 | 8 | Client validates consignments end-to-end | Accept/reject works with real Right mapping | ✅ **DONE** |
+| 8 | Security hardening (audit findings) | Raw SHA-256 → tagged hash, fuzz targets, property tests | ✅ **DONE** |
 | 11 | Contracts deployed, wallets funded, CI green | All testnets operational | ⏳ Next |
-| **16** | **Cross-chain Right transfer on live testnets** | **Right moves BTC→SUI→APT→ETH and back** | ⏳ Target |
-| 18 | All adversarial tests passing | Zero attack vectors succeed | ⏳ Future |
-| 20 | Audit complete, crypto hardened | Production-ready security posture | ⏳ Future |
+| **14** | **Cross-chain Right transfer on live testnets** | **Right moves BTC→SUI→APT→ETH and back** | ⏳ Target |
+| 16 | All adversarial tests passing | Zero attack vectors succeed | ⏳ Future |
+| 18 | Audit complete, crypto hardened | Production-ready security posture | ⏳ Future |
 
 ---
 

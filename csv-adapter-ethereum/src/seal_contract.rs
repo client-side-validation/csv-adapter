@@ -66,11 +66,18 @@ impl CsvSealAbi {
         let mut commitment = [0u8; 32];
         commitment.copy_from_slice(&data[32..64]);
 
-        Some(SealUsedEvent { seal_id, commitment })
+        Some(SealUsedEvent {
+            seal_id,
+            commitment,
+        })
     }
 
     /// Check if a LOG entry matches the CSVSeal contract's SealUsed event
-    pub fn matches_seal_used_event(address: &[u8; 20], contract_address: &[u8; 20], topics: &[[u8; 32]]) -> bool {
+    pub fn matches_seal_used_event(
+        address: &[u8; 20],
+        contract_address: &[u8; 20],
+        topics: &[[u8; 32]],
+    ) -> bool {
         if address != contract_address {
             return false;
         }
@@ -154,7 +161,9 @@ mod tests {
         let contract = [1u8; 20];
         let topics = vec![CsvSealAbi::seal_used_event_signature()];
 
-        assert!(CsvSealAbi::matches_seal_used_event(&address, &contract, &topics));
+        assert!(CsvSealAbi::matches_seal_used_event(
+            &address, &contract, &topics
+        ));
     }
 
     #[test]
@@ -163,7 +172,9 @@ mod tests {
         let contract = [2u8; 20];
         let topics = vec![CsvSealAbi::seal_used_event_signature()];
 
-        assert!(!CsvSealAbi::matches_seal_used_event(&address, &contract, &topics));
+        assert!(!CsvSealAbi::matches_seal_used_event(
+            &address, &contract, &topics
+        ));
     }
 
     #[test]

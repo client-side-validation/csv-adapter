@@ -3,8 +3,8 @@
 //! Provides pre-configured testnet setups for Signet and Testnet3,
 //! including RPC endpoints, contract deployments, and validation tools.
 
-use crate::config::{BitcoinConfig, Network};
 use crate::adapter::BitcoinAnchorLayer;
+use crate::config::{BitcoinConfig, Network};
 use crate::wallet::SealWallet;
 
 /// Testnet deployment configuration
@@ -53,7 +53,9 @@ impl TestnetDeployConfig {
 }
 
 /// Create a testnet-ready adapter with a random wallet
-pub fn create_testnet_adapter(network: Network) -> Result<BitcoinAnchorLayer, Box<dyn std::error::Error + Send + Sync>> {
+pub fn create_testnet_adapter(
+    network: Network,
+) -> Result<BitcoinAnchorLayer, Box<dyn std::error::Error + Send + Sync>> {
     let config = match network {
         Network::Signet => TestnetDeployConfig::signet().to_config(),
         Network::Testnet => TestnetDeployConfig::testnet3().to_config(),
@@ -71,7 +73,7 @@ pub fn validate_testnet_connectivity(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Try to get current block height
     let height = adapter.get_current_height_for_test();
-    
+
     if height > 0 {
         Ok(())
     } else {

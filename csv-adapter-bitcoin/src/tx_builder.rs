@@ -5,16 +5,15 @@
 //! - Real Taproot tree building with proper nonce positioning
 //! - Fee estimation and dust protection
 
-use bitcoin::{
-    absolute::LockTime, Amount, ScriptBuf, Sequence, TxIn, Txid, TxOut,
-    Address,
-    consensus::encode::serialize as tx_serialize,
-};
 #[allow(unused_imports)]
 use bitcoin::hashes::Hash as _;
+use bitcoin::{
+    absolute::LockTime, consensus::encode::serialize as tx_serialize, Address, Amount, ScriptBuf,
+    Sequence, TxIn, TxOut, Txid,
+};
 
 use crate::tapret::TapretCommitment;
-use crate::wallet::{SealWallet, Bip86Path, WalletUtxo};
+use crate::wallet::{Bip86Path, SealWallet, WalletUtxo};
 
 /// Dust threshold for P2TR outputs (BIP-0448: 330 sat for P2TR)
 const P2TR_DUST_SAT: u64 = 330;
@@ -101,17 +100,22 @@ impl CommitmentTxBuilder {
         }
 
         // Build Tapret commitment output
-        let tapret = TapretCommitment::new(self.protocol_id, csv_adapter_core::hash::Hash::new(commitment_hash));
+        let tapret = TapretCommitment::new(
+            self.protocol_id,
+            csv_adapter_core::hash::Hash::new(commitment_hash),
+        );
         let leaf_script = tapret.leaf_script();
 
         // Build Taproot tree with single tapret leaf at depth 0
         // For a single leaf, depth 0 produces the simplest tree (key-path only with one hidden script)
         let builder = bitcoin::taproot::TaprootBuilder::new();
-        let builder = builder.add_leaf(0, leaf_script.clone())
+        let builder = builder
+            .add_leaf(0, leaf_script.clone())
             .map_err(|e| TxBuilderError::TaprootBuildFailed(format!("{:?}", e)))?;
 
         let internal_xonly = seal_key.output_key.to_inner();
-        let taproot_spend_info = builder.finalize(secp, internal_xonly)
+        let taproot_spend_info = builder
+            .finalize(secp, internal_xonly)
             .map_err(|e| TxBuilderError::TaprootBuildFailed(format!("{:?}", e)))?;
 
         let output_key = taproot_spend_info.output_key();
@@ -146,12 +150,14 @@ impl CommitmentTxBuilder {
                     script_pubkey: seal_key.address.script_pubkey(),
                 }]),
                 bitcoin::sighash::TapSighashType::Default,
-            ).map_err(|e| TxBuilderError::SighashFailed(format!("{}", e)))?;
+            )
+            .map_err(|e| TxBuilderError::SighashFailed(format!("{}", e)))?;
 
         // Sign with wallet's taproot keypath method
         let mut sighash_bytes = [0u8; 32];
         sighash_bytes.copy_from_slice(sighash.as_ref());
-        let schnorr_sig = wallet.sign_taproot_keypath(&seal_utxo.path, &sighash_bytes)
+        let schnorr_sig = wallet
+            .sign_taproot_keypath(&seal_utxo.path, &sighash_bytes)
             .map_err(|e| TxBuilderError::WalletError(e.to_string()))?;
 
         // Build the witness: [64-byte Schnorr signature]
@@ -237,8 +243,13 @@ impl CommitmentTxResult {
 
 /// Commitment data output (for backward compatibility)
 pub enum CommitmentData {
-    Tapret { script: ScriptBuf, payload: [u8; 64] },
-    Opret { script: ScriptBuf },
+    Tapret {
+        script: ScriptBuf,
+        payload: [u8; 64],
+    },
+    Opret {
+        script: ScriptBuf,
+    },
 }
 
 impl CommitmentData {
@@ -281,9 +292,7 @@ mod tests {
     use bitcoin::{Network, OutPoint};
 
     fn make_utxo(path: Bip86Path, amount: u64) -> WalletUtxo {
-        let txid = Txid::from_raw_hash(
-            bitcoin::hashes::sha256d::Hash::from_byte_array([0xAB; 32])
-        );
+        let txid = Txid::from_raw_hash(bitcoin::hashes::sha256d::Hash::from_byte_array([0xAB; 32]));
         WalletUtxo {
             outpoint: OutPoint::new(txid, 0),
             amount_sat: amount,
@@ -302,8 +311,7 @@ mod tests {
 
     #[test]
     fn test_builder_with_fee_rate() {
-        let builder = CommitmentTxBuilder::new([1u8; 32], 5)
-            .with_fee_rate(20);
+        let builder = CommitmentTxBuilder::new([1u8; 32], 5).with_fee_rate(20);
         assert_eq!(builder.fee_rate_sat_per_vb, 20);
     }
 
@@ -324,8 +332,7 @@ mod tests {
 
     #[test]
     fn test_max_fee_rate_cap() {
-        let builder = CommitmentTxBuilder::new([1u8; 32], 1000)
-            .with_max_fee_rate(10);
+        let builder = CommitmentTxBuilder::new([1u8; 32], 1000).with_max_fee_rate(10);
         let fee = builder.calculate_fee(1, 1);
         let vbytes = CommitmentTxBuilder::estimate_vbytes(1, 1);
         assert_eq!(fee, vbytes as u64 * 10);
@@ -360,12 +367,9 @@ mod tests {
         wallet.add_utxo(seal_utxo.outpoint, seal_utxo.amount_sat, path);
 
         let builder = CommitmentTxBuilder::new([0xAB; 32], 10);
-        let result = builder.build_commitment_tx(
-            &wallet,
-            &seal_utxo,
-            [0xCD; 32],
-            None,
-        ).expect("tx build should succeed");
+        let result = builder
+            .build_commitment_tx(&wallet, &seal_utxo, [0xCD; 32], None)
+            .expect("tx build should succeed");
 
         assert!(result.fee_sat > 0);
         assert_eq!(result.input_value_sat, 1_000_000);
@@ -384,12 +388,9 @@ mod tests {
         wallet.add_utxo(seal_utxo.outpoint, seal_utxo.amount_sat, path);
 
         let builder = CommitmentTxBuilder::new([0xAB; 32], 10);
-        let result = builder.build_commitment_tx(
-            &wallet,
-            &seal_utxo,
-            [0xCD; 32],
-            None,
-        ).expect("tx build should succeed");
+        let result = builder
+            .build_commitment_tx(&wallet, &seal_utxo, [0xCD; 32], None)
+            .expect("tx build should succeed");
 
         // Transaction should have valid witness data
         assert!(!result.tx.input[0].witness.is_empty());
@@ -404,12 +405,7 @@ mod tests {
         wallet.add_utxo(seal_utxo.outpoint, seal_utxo.amount_sat, path);
 
         let builder = CommitmentTxBuilder::new([0xAB; 32], 10);
-        let result = builder.build_commitment_tx(
-            &wallet,
-            &seal_utxo,
-            [0xCD; 32],
-            None,
-        );
+        let result = builder.build_commitment_tx(&wallet, &seal_utxo, [0xCD; 32], None);
 
         // Should fail due to dust or insufficient funds
         assert!(result.is_err());

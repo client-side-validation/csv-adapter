@@ -3,10 +3,9 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-
-use crate::config::{Config, Chain};
-use crate::state::State;
+use crate::config::{Chain, Config};
 use crate::output;
+use crate::state::State;
 
 #[derive(Subcommand)]
 pub enum SealAction {
@@ -78,7 +77,12 @@ fn cmd_create(chain: Chain, value: Option<u64>, _config: &Config, state: &mut St
 
     output::kv("Chain", &chain.to_string());
     output::kv_hash("Seal", &seal_bytes);
-    output::kv("Value", &value.map(|v| v.to_string()).unwrap_or_else(|| "default".to_string()));
+    output::kv(
+        "Value",
+        &value
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "default".to_string()),
+    );
     output::kv("Status", "Created");
 
     Ok(())

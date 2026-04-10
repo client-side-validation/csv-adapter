@@ -50,14 +50,20 @@ impl From<EthereumError> for csv_adapter_core::AdapterError {
             EthereumError::CoreError(e) => e,
             EthereumError::RpcError(msg) => csv_adapter_core::AdapterError::NetworkError(msg),
             EthereumError::SlotUsed(msg) => csv_adapter_core::AdapterError::InvalidSeal(msg),
-            EthereumError::InvalidReceiptProof(msg) => csv_adapter_core::AdapterError::InclusionProofFailed(msg),
-            EthereumError::ReorgDetected { block, depth } => csv_adapter_core::AdapterError::ReorgInvalid(
-                format!("Reorg at block {}, depth {}", block, depth)
-            ),
+            EthereumError::InvalidReceiptProof(msg) => {
+                csv_adapter_core::AdapterError::InclusionProofFailed(msg)
+            }
+            EthereumError::ReorgDetected { block, depth } => {
+                csv_adapter_core::AdapterError::ReorgInvalid(format!(
+                    "Reorg at block {}, depth {}",
+                    block, depth
+                ))
+            }
             EthereumError::InsufficientConfirmations { got, need } => {
-                csv_adapter_core::AdapterError::FinalityNotReached(
-                    format!("Got {} confirmations, need {}", got, need)
-                )
+                csv_adapter_core::AdapterError::FinalityNotReached(format!(
+                    "Got {} confirmations, need {}",
+                    got, need
+                ))
             }
         }
     }

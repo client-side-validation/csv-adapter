@@ -125,7 +125,7 @@ mod tests {
     use crate::signature::SignatureScheme;
 
     fn make_secp256k1_signature_bytes(message: &[u8; 32]) -> Vec<u8> {
-        use secp256k1::{Secp256k1, SecretKey, Message};
+        use secp256k1::{Message, Secp256k1, SecretKey};
         let secp = Secp256k1::new();
         let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
         let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
@@ -142,7 +142,7 @@ mod tests {
     }
 
     fn make_ed25519_signature_bytes(message: &[u8]) -> Vec<u8> {
-        use ed25519_dalek::{SigningKey, Signer};
+        use ed25519_dalek::{Signer, SigningKey};
         let signing_key = SigningKey::generate(&mut rand::rngs::OsRng);
         let verifying_key = signing_key.verifying_key();
         let signature = signing_key.sign(message);

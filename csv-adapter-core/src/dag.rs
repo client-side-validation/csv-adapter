@@ -643,7 +643,7 @@ mod tests {
 
         #[test]
         fn test_dag_in_verify_proof_pipeline() {
-            use secp256k1::{Secp256k1, SecretKey, Message};
+            use secp256k1::{Message, Secp256k1, SecretKey};
             // The message signed is the DAG root commitment
             let root_commitment = Hash::new([99u8; 32]);
             let message: [u8; 32] = *root_commitment.as_bytes();
@@ -691,7 +691,7 @@ mod tests {
 
         #[test]
         fn test_dag_with_invalid_parent_fails_in_proof_bundle() {
-            use secp256k1::{Secp256k1, SecretKey, Message};
+            use secp256k1::{Message, Secp256k1, SecretKey};
             let root_commitment = Hash::zero();
             let message: [u8; 32] = *root_commitment.as_bytes();
             let secp = Secp256k1::new();

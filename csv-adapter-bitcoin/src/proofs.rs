@@ -115,7 +115,9 @@ pub fn to_core_inclusion_proof(proof: &BitcoinInclusionProof) -> csv_adapter_cor
 }
 
 /// Convert core inclusion proof to Bitcoin type
-pub fn from_core_inclusion_proof(proof: &csv_adapter_core::InclusionProof) -> BitcoinInclusionProof {
+pub fn from_core_inclusion_proof(
+    proof: &csv_adapter_core::InclusionProof,
+) -> BitcoinInclusionProof {
     let proof_bytes = &proof.proof_bytes;
 
     // Need at least 32 (block_hash) + 8 (tx_index) + 8 (block_height) = 48 bytes
@@ -268,7 +270,7 @@ pub fn compute_merkle_root(txids: &[[u8; 32]]) -> Option<[u8; 32]> {
 
     while current_level.len() > 1 {
         let mut next_level = Vec::new();
-        
+
         // Pair up hashes and hash them together
         for i in (0..current_level.len()).step_by(2) {
             let left = current_level[i];
@@ -345,12 +347,7 @@ mod tests {
 
     #[test]
     fn test_to_core_inclusion_proof() {
-        let proof = BitcoinInclusionProof::new(
-            vec![[1u8; 32], [2u8; 32]],
-            [3u8; 32],
-            5,
-            100,
-        );
+        let proof = BitcoinInclusionProof::new(vec![[1u8; 32], [2u8; 32]], [3u8; 32], 5, 100);
         let core_proof = to_core_inclusion_proof(&proof);
         assert_eq!(core_proof.position, 5);
         assert_eq!(core_proof.block_hash, CoreHash::new([3u8; 32]));
@@ -358,11 +355,9 @@ mod tests {
 
     #[test]
     fn test_from_core_inclusion_proof() {
-        let core_proof = csv_adapter_core::InclusionProof::new(
-            vec![0xAB; 64],
-            CoreHash::new([1u8; 32]),
-            5,
-        ).unwrap();
+        let core_proof =
+            csv_adapter_core::InclusionProof::new(vec![0xAB; 64], CoreHash::new([1u8; 32]), 5)
+                .unwrap();
         let bitcoin_proof = from_core_inclusion_proof(&core_proof);
         // Just check it doesn't panic
         let _ = bitcoin_proof;

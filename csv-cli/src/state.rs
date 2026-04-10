@@ -138,7 +138,9 @@ impl State {
     /// Mark a Right as consumed
     #[allow(dead_code)]
     pub fn consume_right(&mut self, id: &Hash) -> anyhow::Result<()> {
-        let right = self.rights.iter_mut()
+        let right = self
+            .rights
+            .iter_mut()
             .find(|r| r.id == *id)
             .ok_or_else(|| anyhow::anyhow!("Right {:?} not found", id))?;
         right.consumed = true;
@@ -157,8 +159,14 @@ impl State {
 
     /// Update transfer status
     #[allow(dead_code)]
-    pub fn update_transfer_status(&mut self, id: &Hash, status: TransferStatus) -> anyhow::Result<()> {
-        let transfer = self.transfers.iter_mut()
+    pub fn update_transfer_status(
+        &mut self,
+        id: &Hash,
+        status: TransferStatus,
+    ) -> anyhow::Result<()> {
+        let transfer = self
+            .transfers
+            .iter_mut()
             .find(|t| t.id == *id)
             .ok_or_else(|| anyhow::anyhow!("Transfer {:?} not found", id))?;
         transfer.status = status;

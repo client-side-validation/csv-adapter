@@ -22,7 +22,8 @@ pub fn verify_merkle_proof_rust_bitcoin(
     _tx_index: u32,
 ) -> bool {
     let txid = Txid::from_slice(txid).expect("valid txid");
-    let _mroot = bitcoin::hashes::sha256d::Hash::from_slice(merkle_root).expect("valid merkle root");
+    let _mroot =
+        bitcoin::hashes::sha256d::Hash::from_slice(merkle_root).expect("valid merkle root");
 
     // Build the partial merkle tree from the branch
     // We need to reconstruct the tree from the branch hashes
@@ -38,10 +39,7 @@ pub fn verify_merkle_proof_rust_bitcoin(
 }
 
 /// Build a PartialMerkleTree from transaction IDs and match flags using rust-bitcoin
-pub fn build_merkle_proof_from_txids(
-    txids: &[Txid],
-    matches: &[bool],
-) -> PartialMerkleTree {
+pub fn build_merkle_proof_from_txids(txids: &[Txid], matches: &[bool]) -> PartialMerkleTree {
     PartialMerkleTree::from_txids(txids, matches)
 }
 
@@ -96,9 +94,9 @@ pub fn verify_full_spv_proof_rust_bitcoin(
     let txid = Txid::from_slice(txid).expect("valid txid");
     let mut extracted_txids = Vec::new();
     let mut indexes = Vec::new();
-    
+
     match pmt.extract_matches(&mut extracted_txids, &mut indexes) {
-        Ok(_merkle_root) => {},
+        Ok(_merkle_root) => {}
         Err(_) => return false,
     };
 
@@ -126,12 +124,7 @@ pub fn from_rust_bitcoin_merkle_proof(
     // The branch hashes are embedded in the PartialMerkleTree structure
     let merkle_branch = extract_merkle_branch_from_pmt(pmt);
 
-    crate::types::BitcoinInclusionProof::new(
-        merkle_branch,
-        block_hash,
-        tx_index,
-        block_height,
-    )
+    crate::types::BitcoinInclusionProof::new(merkle_branch, block_hash, tx_index, block_height)
 }
 
 /// Extract merkle branch hashes from PartialMerkleTree
@@ -139,7 +132,7 @@ fn extract_merkle_branch_from_pmt(pmt: &PartialMerkleTree) -> Vec<[u8; 32]> {
     // The PMT structure contains hashes in the vBits and vTxid fields
     // We extract the branch hashes for serialization
     let serialized = bitcoin::consensus::encode::serialize(pmt);
-    
+
     // For compatibility with our BitcoinInclusionProof type,
     // we chunk the serialized data into 32-byte hashes
     let mut branch = Vec::new();
@@ -170,15 +163,11 @@ pub fn compute_merkle_root_rust_bitcoin(txids: &[Txid]) -> Option<[u8; 32]> {
         return None;
     }
 
-    bitcoin::merkle_tree::calculate_root(txids.iter().copied())
-        .map(|h| h.to_byte_array())
+    bitcoin::merkle_tree::calculate_root(txids.iter().copied()).map(|h| h.to_byte_array())
 }
 
 /// Verify a block's merkle root using rust-bitcoin's implementation
-pub fn verify_block_merkle_root_rust_bitcoin(
-    txids: &[Txid],
-    expected_root: [u8; 32],
-) -> bool {
+pub fn verify_block_merkle_root_rust_bitcoin(txids: &[Txid], expected_root: [u8; 32]) -> bool {
     if txids.is_empty() {
         return false;
     }
@@ -202,7 +191,12 @@ mod tests {
         let merkle_root = txid;
         let branch = [];
 
-        assert!(verify_merkle_proof_rust_bitcoin(&txid, &merkle_root, &branch, 0));
+        assert!(verify_merkle_proof_rust_bitcoin(
+            &txid,
+            &merkle_root,
+            &branch,
+            0
+        ));
     }
 
     #[test]

@@ -48,25 +48,17 @@ pub enum SuiError {
     /// Timeout while waiting for transaction confirmation.
     /// Recovery: Resubmit transaction with higher gas, check mempool status.
     #[error("Transaction confirmation timeout after {timeout_ms}ms: {tx_digest}")]
-    ConfirmationTimeout {
-        tx_digest: String,
-        timeout_ms: u64,
-    },
+    ConfirmationTimeout { tx_digest: String, timeout_ms: u64 },
 
     /// Chain reorg detected affecting anchor validity.
     /// Recovery: Re-publish commitment at new chain tip.
     #[error("Chain reorg detected at checkpoint {checkpoint}: anchor may be invalid")]
-    ReorgDetected {
-        checkpoint: u64,
-    },
+    ReorgDetected { checkpoint: u64 },
 
     /// Network mismatch (e.g., mainnet seal on testnet).
     /// Recovery: Ensure network configuration matches chain ID.
     #[error("Network mismatch: expected chain_id {expected}, got {actual}")]
-    NetworkMismatch {
-        expected: String,
-        actual: String,
-    },
+    NetworkMismatch { expected: String, actual: String },
 
     /// Core adapter error from csv-adapter-core.
     #[error(transparent)]
@@ -115,21 +107,25 @@ impl From<SuiError> for csv_adapter_core::AdapterError {
     fn from(err: SuiError) -> Self {
         match err {
             SuiError::CoreError(e) => e,
-            SuiError::RpcError(msg)
-            | SuiError::TransactionFailed(msg) => csv_adapter_core::AdapterError::NetworkError(msg),
+            SuiError::RpcError(msg) | SuiError::TransactionFailed(msg) => {
+                csv_adapter_core::AdapterError::NetworkError(msg)
+            }
             SuiError::ObjectUsed(msg) => csv_adapter_core::AdapterError::InvalidSeal(msg),
-            SuiError::StateProofFailed(msg)
-            | SuiError::EventProofFailed(msg) => csv_adapter_core::AdapterError::InclusionProofFailed(msg),
+            SuiError::StateProofFailed(msg) | SuiError::EventProofFailed(msg) => {
+                csv_adapter_core::AdapterError::InclusionProofFailed(msg)
+            }
             SuiError::CheckpointFailed(msg) => csv_adapter_core::AdapterError::NetworkError(msg),
             SuiError::SerializationError(msg) => csv_adapter_core::AdapterError::InvalidSeal(msg),
-            SuiError::ConfirmationTimeout { tx_digest, timeout_ms } => {
-                csv_adapter_core::AdapterError::NetworkError(
-                    format!("Timeout waiting for tx {} after {}ms", tx_digest, timeout_ms)
-                )
-            }
-            SuiError::ReorgDetected { checkpoint } => {
-                csv_adapter_core::AdapterError::ReorgInvalid(format!("Reorg at checkpoint {}", checkpoint))
-            }
+            SuiError::ConfirmationTimeout {
+                tx_digest,
+                timeout_ms,
+            } => csv_adapter_core::AdapterError::NetworkError(format!(
+                "Timeout waiting for tx {} after {}ms",
+                tx_digest, timeout_ms
+            )),
+            SuiError::ReorgDetected { checkpoint } => csv_adapter_core::AdapterError::ReorgInvalid(
+                format!("Reorg at checkpoint {}", checkpoint),
+            ),
             sui_err => csv_adapter_core::AdapterError::NetworkError(format!("{}", sui_err)),
         }
     }
@@ -145,7 +141,11 @@ mod tests {
     #[test]
     fn test_transient_errors() {
         assert!(SuiError::RpcError("connection refused".to_string()).is_transient());
-        assert!(SuiError::ConfirmationTimeout { tx_digest: "abc".to_string(), timeout_ms: 30000 }.is_transient());
+        assert!(SuiError::ConfirmationTimeout {
+            tx_digest: "abc".to_string(),
+            timeout_ms: 30000
+        }
+        .is_transient());
         assert!(SuiError::TransactionFailed("execution failed".to_string()).is_transient());
     }
 
@@ -160,6 +160,9 @@ mod tests {
     fn test_error_conversion() {
         let sui_err = SuiError::StateProofFailed("bad proof".to_string());
         let core_err: csv_adapter_core::AdapterError = sui_err.into();
-        assert!(matches!(core_err, csv_adapter_core::AdapterError::InclusionProofFailed(_)));
+        assert!(matches!(
+            core_err,
+            csv_adapter_core::AdapterError::InclusionProofFailed(_)
+        ));
     }
 }

@@ -50,14 +50,19 @@ pub mod types;
 pub mod real_rpc;
 
 pub use adapter::AptosAnchorLayer;
+pub use checkpoint::CheckpointVerifier;
 pub use config::{AptosConfig, AptosNetwork, CheckpointConfig};
-pub use types::{AptosSealRef, AptosAnchorRef, AptosFinalityProof, AptosInclusionProof};
-pub use rpc::{AptosRpc, AptosResource, AptosEvent, AptosTransaction, AptosBlockInfo, AptosLedgerInfo};
-#[cfg(debug_assertions)]
-pub use rpc::MockAptosRpc;
+pub use error::AptosError;
+pub use proofs::{
+    CommitmentEventBuilder, EventProof, EventProofVerifier, StateProof, StateProofVerifier,
+    TransactionProof,
+};
 #[cfg(feature = "rpc")]
 pub use real_rpc::AptosRpcClient;
-pub use checkpoint::CheckpointVerifier;
-pub use seal::{SealRegistry, SealRecord, SealStore};
-pub use proofs::{StateProof, StateProofVerifier, EventProof, EventProofVerifier, TransactionProof, CommitmentEventBuilder};
-pub use error::AptosError;
+#[cfg(debug_assertions)]
+pub use rpc::MockAptosRpc;
+pub use rpc::{
+    AptosBlockInfo, AptosEvent, AptosLedgerInfo, AptosResource, AptosRpc, AptosTransaction,
+};
+pub use seal::{SealRecord, SealRegistry, SealStore};
+pub use types::{AptosAnchorRef, AptosFinalityProof, AptosInclusionProof, AptosSealRef};

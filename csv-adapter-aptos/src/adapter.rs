@@ -13,23 +13,23 @@
 
 use std::sync::Mutex;
 
+use csv_adapter_core::commitment::Commitment;
+use csv_adapter_core::dag::DAGSegment;
+use csv_adapter_core::error::AdapterError;
+use csv_adapter_core::error::Result as CoreResult;
+use csv_adapter_core::proof::{FinalityProof, ProofBundle};
+use csv_adapter_core::seal::AnchorRef as CoreAnchorRef;
+use csv_adapter_core::seal::SealRef as CoreSealRef;
 use csv_adapter_core::AnchorLayer;
 use csv_adapter_core::Hash;
-use csv_adapter_core::error::Result as CoreResult;
-use csv_adapter_core::error::AdapterError;
-use csv_adapter_core::proof::{FinalityProof, ProofBundle};
-use csv_adapter_core::seal::SealRef as CoreSealRef;
-use csv_adapter_core::seal::AnchorRef as CoreAnchorRef;
-use csv_adapter_core::dag::DAGSegment;
-use csv_adapter_core::commitment::Commitment;
 
+use crate::checkpoint::CheckpointVerifier;
 use crate::config::AptosConfig;
 use crate::error::{AptosError, AptosResult};
+use crate::proofs::{CommitmentEventBuilder, EventProofVerifier, StateProofVerifier};
 use crate::rpc::AptosRpc;
-use crate::types::{AptosSealRef, AptosAnchorRef, AptosInclusionProof, AptosFinalityProof};
 use crate::seal::SealRegistry;
-use crate::checkpoint::CheckpointVerifier;
-use crate::proofs::{StateProofVerifier, EventProofVerifier, CommitmentEventBuilder};
+use crate::types::{AptosAnchorRef, AptosFinalityProof, AptosInclusionProof, AptosSealRef};
 
 /// Aptos implementation of the AnchorLayer trait
 pub struct AptosAnchorLayer {
@@ -54,9 +54,9 @@ impl AptosAnchorLayer {
     /// * `rpc` - RPC client for Aptos node communication
     pub fn from_config(config: AptosConfig, rpc: Box<dyn AptosRpc>) -> AptosResult<Self> {
         // Validate configuration
-        config.validate().map_err(|e| AptosError::SerializationError(
-            format!("Invalid configuration: {}", e)
-        ))?;
+        config
+            .validate()
+            .map_err(|e| AptosError::SerializationError(format!("Invalid configuration: {}", e)))?;
 
         // Build domain separator: "CSV-APTOS-" + chain_id padding
         let mut domain = [0u8; 32];
@@ -66,7 +66,10 @@ impl AptosAnchorLayer {
         // Build event builder for the configured module
         let module_address = parse_aptos_address(&config.seal_contract.module_address)
             .map_err(|e| AptosError::SerializationError(e))?;
-        let event_type = format!("{}::csv_seal::AnchorEvent", config.seal_contract.module_address);
+        let event_type = format!(
+            "{}::csv_seal::AnchorEvent",
+            config.seal_contract.module_address
+        );
         let event_builder = CommitmentEventBuilder::new(module_address, event_type);
 
         let checkpoint_verifier = CheckpointVerifier::with_config(config.checkpoint.clone());
@@ -149,8 +152,7 @@ impl AptosAnchorLayer {
         // Check on-chain resource
         let resource_type = format!(
             "{}::csv_seal::{}",
-            self.config.seal_contract.module_address,
-            self.config.seal_contract.seal_resource
+            self.config.seal_contract.module_address, self.config.seal_contract.seal_resource
         );
 
         let exists = StateProofVerifier::verify_resource_exists(
@@ -195,20 +197,28 @@ impl AptosAnchorLayer {
     ) -> Result<(serde_json::Value, Vec<u8>), Box<dyn std::error::Error + Send + Sync>> {
         use ed25519_dalek::Signer;
 
-        let signing_key = self.signing_key.as_ref()
+        let signing_key = self
+            .signing_key
+            .as_ref()
             .ok_or("No signing key configured")?;
 
         // Get account sequence number from RPC
-        let sender = self.rpc.sender_address()
+        let sender = self
+            .rpc
+            .sender_address()
             .map_err(|e| format!("Failed to get sender address: {}", e))?;
         let sender_hex = format_address(sender);
 
         // Get sequence number
-        let sequence_number = self.rpc.get_account_sequence_number(sender)
+        let sequence_number = self
+            .rpc
+            .get_account_sequence_number(sender)
             .map_err(|e| format!("Failed to get sequence number: {}", e))?;
 
         // Get chain ID and ledger info for expiration
-        let ledger = self.rpc.get_ledger_info()
+        let ledger = self
+            .rpc
+            .get_ledger_info()
             .map_err(|e| format!("Failed to get ledger info: {}", e))?;
 
         // Build event data for verification
@@ -295,7 +305,8 @@ impl AptosAnchorLayer {
             anchor.version,
             &expected_event_data,
             self.rpc.as_ref(),
-        ).map_err(|e: AptosError| AdapterError::InclusionProofFailed(e.to_string()))?;
+        )
+        .map_err(|e: AptosError| AdapterError::InclusionProofFailed(e.to_string()))?;
 
         if !valid {
             return Err(AdapterError::InclusionProofFailed(
@@ -350,21 +361,24 @@ impl AnchorLayer for AptosAnchorLayer {
         #[cfg(feature = "rpc")]
         {
             // Build the Entry Function payload and sign the transaction
-            let (tx_json, expected_event_data) = self.build_and_sign_entry_function(
-                &seal,
-                *commitment.as_bytes(),
-            ).map_err(|e| AdapterError::PublishFailed(
-                format!("Failed to build and sign transaction: {}", e),
-            ))?;
+            let (tx_json, expected_event_data) = self
+                .build_and_sign_entry_function(&seal, *commitment.as_bytes())
+                .map_err(|e| {
+                    AdapterError::PublishFailed(format!(
+                        "Failed to build and sign transaction: {}",
+                        e
+                    ))
+                })?;
 
             // Submit signed transaction via REST API
-            let submit_result = self.rpc.submit_signed_transaction(tx_json)
-                .map_err(|e| AdapterError::PublishFailed(
-                    format!("Failed to submit transaction: {}", e),
-                ))?;
+            let submit_result = self.rpc.submit_signed_transaction(tx_json).map_err(|e| {
+                AdapterError::PublishFailed(format!("Failed to submit transaction: {}", e))
+            })?;
 
             // Wait for transaction confirmation
-            let tx = self.rpc.wait_for_transaction(submit_result)
+            let tx = self
+                .rpc
+                .wait_for_transaction(submit_result)
                 .map_err(|e| AdapterError::NetworkError(e.to_string()))?;
 
             // Verify the emitted event matches the expected commitment
@@ -372,7 +386,8 @@ impl AnchorLayer for AptosAnchorLayer {
                 tx.version,
                 &expected_event_data,
                 self.rpc.as_ref(),
-            ).map_err(|e: AptosError| AdapterError::InclusionProofFailed(e.to_string()))?;
+            )
+            .map_err(|e: AptosError| AdapterError::InclusionProofFailed(e.to_string()))?;
 
             if !valid {
                 return Err(AdapterError::PublishFailed(
@@ -383,7 +398,8 @@ impl AnchorLayer for AptosAnchorLayer {
             // Mark seal as consumed with the transaction version
             let version = tx.version;
             let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
-            registry.mark_seal_used(&seal, version)
+            registry
+                .mark_seal_used(&seal, version)
                 .map_err(|e| AdapterError::from(e))?;
 
             Ok(AptosAnchorRef::new(version, seal.account_address, version))
@@ -393,14 +409,14 @@ impl AnchorLayer for AptosAnchorLayer {
         {
             // Simulated path
             let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
-            registry.mark_seal_used(&seal, 0)
+            registry
+                .mark_seal_used(&seal, 0)
                 .map_err(|e| AdapterError::from(e))?;
 
             // Build event data for this commitment
-            let _event_data = self.event_builder.build(
-                *commitment.as_bytes(),
-                seal.account_address,
-            );
+            let _event_data = self
+                .event_builder
+                .build(*commitment.as_bytes(), seal.account_address);
 
             // Return simulated anchor
             Ok(AptosAnchorRef::new(0, seal.account_address, 0))
@@ -408,19 +424,24 @@ impl AnchorLayer for AptosAnchorLayer {
     }
 
     fn verify_inclusion(&self, anchor: Self::AnchorRef) -> CoreResult<Self::InclusionProof> {
-        log::debug!("Verifying inclusion for anchor at version {}", anchor.version);
+        log::debug!(
+            "Verifying inclusion for anchor at version {}",
+            anchor.version
+        );
 
         // Fetch transaction from the Aptos node by version
         let tx = match self.rpc.get_transaction(anchor.version) {
             Ok(Some(tx)) => tx,
             Ok(None) => {
                 return Err(AdapterError::InclusionProofFailed(format!(
-                    "Transaction at version {} not found", anchor.version
+                    "Transaction at version {} not found",
+                    anchor.version
                 )));
             }
             Err(e) => {
                 return Err(AdapterError::InclusionProofFailed(format!(
-                    "Failed to fetch transaction at version {}: {}", anchor.version, e
+                    "Failed to fetch transaction at version {}: {}",
+                    anchor.version, e
                 )));
             }
         };
@@ -428,7 +449,8 @@ impl AnchorLayer for AptosAnchorLayer {
         // Verify transaction succeeded
         if !tx.success {
             return Err(AdapterError::InclusionProofFailed(format!(
-                "Transaction at version {} failed: {}", anchor.version, tx.vm_status
+                "Transaction at version {} failed: {}",
+                anchor.version, tx.vm_status
             )));
         }
 
@@ -437,7 +459,8 @@ impl AnchorLayer for AptosAnchorLayer {
             Ok(info) => info,
             Err(e) => {
                 return Err(AdapterError::InclusionProofFailed(format!(
-                    "Failed to fetch ledger info: {}", e
+                    "Failed to fetch ledger info: {}",
+                    e
                 )));
             }
         };
@@ -462,7 +485,10 @@ impl AnchorLayer for AptosAnchorLayer {
     }
 
     fn verify_finality(&self, anchor: Self::AnchorRef) -> CoreResult<Self::FinalityProof> {
-        log::debug!("Verifying finality for anchor at version {}", anchor.version);
+        log::debug!(
+            "Verifying finality for anchor at version {}",
+            anchor.version
+        );
 
         let f_plus_one = self.config.f_plus_one();
 
@@ -489,12 +515,13 @@ impl AnchorLayer for AptosAnchorLayer {
                 format_address(seal.account_address)
             )));
         }
-        registry.mark_seal_used(&seal, 0)
+        registry
+            .mark_seal_used(&seal, 0)
             .map_err(|e| AdapterError::from(e))
     }
 
     fn create_seal(&self, _value: Option<u64>) -> CoreResult<Self::SealRef> {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(b"aptos-seal");
         let result = hasher.finalize();
@@ -518,37 +545,37 @@ impl AnchorLayer for AptosAnchorLayer {
             transition_payload_hash,
             &core_seal,
             self.domain_separator,
-        ).hash()
+        )
+        .hash()
     }
 
-    fn build_proof_bundle(&self, anchor: Self::AnchorRef, transition_dag: DAGSegment) -> CoreResult<ProofBundle> {
+    fn build_proof_bundle(
+        &self,
+        anchor: Self::AnchorRef,
+        transition_dag: DAGSegment,
+    ) -> CoreResult<ProofBundle> {
         let inclusion = self.verify_inclusion(anchor.clone())?;
         let finality = self.verify_finality(anchor.clone())?;
-        let seal_ref = CoreSealRef::new(
-            anchor.event_handle.to_vec(),
-            Some(anchor.version),
-        ).map_err(|e| AdapterError::Generic(e.to_string()))?;
+        let seal_ref = CoreSealRef::new(anchor.event_handle.to_vec(), Some(anchor.version))
+            .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
-        let anchor_ref = CoreAnchorRef::new(
-            anchor.event_handle.to_vec(),
-            anchor.version,
-            vec![],
-        ).map_err(|e| AdapterError::Generic(e.to_string()))?;
+        let anchor_ref = CoreAnchorRef::new(anchor.event_handle.to_vec(), anchor.version, vec![])
+            .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
         let inclusion_proof = csv_adapter_core::InclusionProof::new(
             inclusion.transaction_proof,
             Hash::zero(),
             inclusion.version,
-        ).map_err(|e| AdapterError::Generic(e.to_string()))?;
+        )
+        .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
-        let finality_proof = FinalityProof::new(
-            vec![],
-            finality.version,
-            finality.is_certified,
-        ).map_err(|e| AdapterError::Generic(e.to_string()))?;
+        let finality_proof = FinalityProof::new(vec![], finality.version, finality.is_certified)
+            .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
         // Extract signatures from DAG nodes before moving transition_dag
-        let signatures: Vec<Vec<u8>> = transition_dag.nodes.iter()
+        let signatures: Vec<Vec<u8>> = transition_dag
+            .nodes
+            .iter()
             .flat_map(|node| node.signatures.clone())
             .collect();
 
@@ -559,12 +586,18 @@ impl AnchorLayer for AptosAnchorLayer {
             anchor_ref,
             inclusion_proof,
             finality_proof,
-        ).map_err(|e| AdapterError::Generic(e.to_string()))
+        )
+        .map_err(|e| AdapterError::Generic(e.to_string()))
     }
 
     fn rollback(&self, anchor: Self::AnchorRef) -> CoreResult<()> {
-        log::warn!("Rollback requested for anchor at version {}", anchor.version);
-        let current_version = self.rpc.get_latest_version()
+        log::warn!(
+            "Rollback requested for anchor at version {}",
+            anchor.version
+        );
+        let current_version = self
+            .rpc
+            .get_latest_version()
             .map_err(|e| AdapterError::NetworkError(e.to_string()))?;
 
         // If anchor version is beyond current tip, rollback
@@ -645,12 +678,13 @@ mod tests {
         // Register the seal resource in the mock so verify_seal_available finds it
         let resource_type = format!(
             "{}::csv_seal::{}",
-            config.seal_contract.module_address,
-            config.seal_contract.seal_resource
+            config.seal_contract.module_address, config.seal_contract.seal_resource
         );
-        mock.set_resource([1u8; 32], resource_type.as_str(), crate::rpc::AptosResource {
-            data: vec![0u8; 8],
-        });
+        mock.set_resource(
+            [1u8; 32],
+            resource_type.as_str(),
+            crate::rpc::AptosResource { data: vec![0u8; 8] },
+        );
 
         let rpc = Box::new(mock);
         let adapter = AptosAnchorLayer::from_config(config.clone(), rpc).unwrap();
@@ -670,12 +704,13 @@ mod tests {
         // Register the seal resource in the mock
         let resource_type = format!(
             "{}::csv_seal::{}",
-            config.seal_contract.module_address,
-            config.seal_contract.seal_resource
+            config.seal_contract.module_address, config.seal_contract.seal_resource
         );
-        mock.set_resource([1u8; 32], resource_type.as_str(), crate::rpc::AptosResource {
-            data: vec![0u8; 8],
-        });
+        mock.set_resource(
+            [1u8; 32],
+            resource_type.as_str(),
+            crate::rpc::AptosResource { data: vec![0u8; 8] },
+        );
 
         let rpc = Box::new(mock);
         let adapter = AptosAnchorLayer::from_config(config.clone(), rpc).unwrap();

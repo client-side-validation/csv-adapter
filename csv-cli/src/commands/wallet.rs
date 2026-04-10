@@ -1,13 +1,12 @@
 //! Wallet management commands
 
-use sha2::Digest;
 use anyhow::Result;
 use clap::Subcommand;
+use sha2::Digest;
 
-
-use crate::config::{Config, Chain, Network};
-use crate::state::State;
+use crate::config::{Chain, Config, Network};
 use crate::output;
+use crate::state::State;
 
 #[derive(Subcommand)]
 pub enum WalletAction {
@@ -97,7 +96,8 @@ fn generate_bitcoin(network: Network, state: &mut State) -> Result<()> {
 
     // Derive first address
     let path = csv_adapter_bitcoin::wallet::Bip86Path::external(0, 0);
-    let key = wallet.derive_key(&path)
+    let key = wallet
+        .derive_key(&path)
         .map_err(|e| anyhow::anyhow!("Failed to derive key: {}", e))?;
 
     let address = key.address.to_string();
@@ -202,20 +202,36 @@ fn generate_aptos(state: &mut State) -> Result<()> {
     Ok(())
 }
 
-fn cmd_balance(chain: Chain, address: Option<String>, config: &Config, state: &State) -> Result<()> {
-    let addr = address.or_else(|| state.get_address(&chain).cloned())
-        .ok_or_else(|| anyhow::anyhow!("No address for {}. Generate or import a wallet first.", chain))?;
+fn cmd_balance(
+    chain: Chain,
+    address: Option<String>,
+    config: &Config,
+    state: &State,
+) -> Result<()> {
+    let addr = address
+        .or_else(|| state.get_address(&chain).cloned())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "No address for {}. Generate or import a wallet first.",
+                chain
+            )
+        })?;
 
     output::header(&format!("Balance: {} ({})", chain, addr));
 
     match chain {
         Chain::Bitcoin => {
             let chain_config = config.chain(&chain)?;
-            let url = format!("{}/address/{}/utxo", chain_config.rpc_url.trim_end_matches('/'), addr);
+            let url = format!(
+                "{}/address/{}/utxo",
+                chain_config.rpc_url.trim_end_matches('/'),
+                addr
+            );
             match reqwest::blocking::get(&url)?.json::<serde_json::Value>() {
                 Ok(utxos) => {
                     if let Some(arr) = utxos.as_array() {
-                        let total_sat: u64 = arr.iter()
+                        let total_sat: u64 = arr
+                            .iter()
                             .filter_map(|u| u.get("value").and_then(|v| v.as_u64()))
                             .sum();
                         output::kv("Total (sats)", &total_sat.to_string());
@@ -235,11 +251,11 @@ fn cmd_balance(chain: Chain, address: Option<String>, config: &Config, state: &S
                 "params": [addr, "latest"],
                 "id": 1
             });
-            
+
             let client = reqwest::blocking::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()?;
-            
+
             let resp = client
                 .post(&chain_config.rpc_url)
                 .json(&rpc_req)
@@ -251,7 +267,8 @@ fn cmd_balance(chain: Chain, address: Option<String>, config: &Config, state: &S
             if let Some(error) = resp.get("error") {
                 output::error(&format!("RPC error: {}", error));
             } else if let Some(balance_hex) = resp.get("result").and_then(|r| r.as_str()) {
-                let balance_wei = u64::from_str_radix(balance_hex.trim_start_matches("0x"), 16).unwrap_or(0);
+                let balance_wei =
+                    u64::from_str_radix(balance_hex.trim_start_matches("0x"), 16).unwrap_or(0);
                 let balance_eth = balance_wei as f64 / 1e18;
                 output::kv("Balance (ETH)", &format!("{:.6}", balance_eth));
                 output::kv("Balance (wei)", &balance_wei.to_string());
@@ -267,11 +284,11 @@ fn cmd_balance(chain: Chain, address: Option<String>, config: &Config, state: &S
                 "params": [addr, "0x2::sui::SUI"],
                 "id": 1
             });
-            
+
             let client = reqwest::blocking::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()?;
-            
+
             let resp = client
                 .post(&chain_config.rpc_url)
                 .json(&rpc_req)
@@ -297,22 +314,28 @@ fn cmd_balance(chain: Chain, address: Option<String>, config: &Config, state: &S
         }
         Chain::Aptos => {
             let chain_config = config.chain(&chain)?;
-            let url = format!("{}/accounts/{}/balance/0x1::aptos_coin::AptosCoin",
-                chain_config.rpc_url.trim_end_matches('/'), addr);
-            
+            let url = format!(
+                "{}/accounts/{}/balance/0x1::aptos_coin::AptosCoin",
+                chain_config.rpc_url.trim_end_matches('/'),
+                addr
+            );
+
             let client = reqwest::blocking::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()?;
-            
-            let resp = client.get(&url).send()
+
+            let resp = client
+                .get(&url)
+                .send()
                 .map_err(|e| anyhow::anyhow!("Failed to connect to Aptos RPC: {}", e))?;
-            
+
             if resp.status().as_u16() == 404 {
                 output::warning("Account not found or no balance");
             } else {
-                let body = resp.text()
+                let body = resp
+                    .text()
                     .map_err(|e| anyhow::anyhow!("Failed to read response: {}", e))?;
-                
+
                 // API may return a plain number string or JSON
                 let balance_oct: u64 = if body.starts_with('{') {
                     // Try parsing as JSON
@@ -330,7 +353,7 @@ fn cmd_balance(chain: Chain, address: Option<String>, config: &Config, state: &S
                     // Plain number string
                     body.trim().parse().unwrap_or(0)
                 };
-                
+
                 let balance_apt = balance_oct as f64 / 1e8;
                 output::kv("Balance (APT)", &format!("{:.4}", balance_apt));
                 output::kv("Balance (Octas)", &balance_oct.to_string());
@@ -342,10 +365,12 @@ fn cmd_balance(chain: Chain, address: Option<String>, config: &Config, state: &S
 }
 
 fn cmd_fund(chain: Chain, address: Option<String>, config: &Config, state: &State) -> Result<()> {
-    let addr = address.or_else(|| state.get_address(&chain).cloned())
+    let addr = address
+        .or_else(|| state.get_address(&chain).cloned())
         .ok_or_else(|| anyhow::anyhow!("No address for {}. Generate a wallet first.", chain))?;
 
-    let faucet = config.faucet(&chain)
+    let faucet = config
+        .faucet(&chain)
         .ok_or_else(|| anyhow::anyhow!("No faucet configured for {}", chain))?;
 
     output::header(&format!("Funding {} from faucet", chain));
@@ -360,7 +385,10 @@ fn cmd_fund(chain: Chain, address: Option<String>, config: &Config, state: &Stat
         }
         Chain::Ethereum => {
             output::info("Ethereum Sepolia funding requires manual interaction");
-            output::info(&format!("Visit {} or use Alchemy/Cloudflare faucet", faucet.url));
+            output::info(&format!(
+                "Visit {} or use Alchemy/Cloudflare faucet",
+                faucet.url
+            ));
         }
         Chain::Sui => {
             output::progress(1, 3, "Requesting SUI from faucet...");
@@ -383,10 +411,12 @@ fn cmd_fund(chain: Chain, address: Option<String>, config: &Config, state: &Stat
         }
         Chain::Aptos => {
             output::progress(1, 3, "Requesting APT from faucet...");
-            let url = format!("{}/mint?amount=100000000&address={}", faucet.url.trim_end_matches('/'), addr);
-            let resp = reqwest::blocking::Client::new()
-                .post(&url)
-                .send()?;
+            let url = format!(
+                "{}/mint?amount=100000000&address={}",
+                faucet.url.trim_end_matches('/'),
+                addr
+            );
+            let resp = reqwest::blocking::Client::new().post(&url).send()?;
 
             if resp.status().is_success() || resp.status().as_u16() == 409 {
                 // 409 = already funded recently
@@ -403,7 +433,8 @@ fn cmd_fund(chain: Chain, address: Option<String>, config: &Config, state: &Stat
 }
 
 fn cmd_export(chain: Chain, format: String, _config: &Config, state: &State) -> Result<()> {
-    let addr = state.get_address(&chain)
+    let addr = state
+        .get_address(&chain)
         .ok_or_else(|| anyhow::anyhow!("No wallet for {}. Generate one first.", chain))?;
 
     output::header(&format!("Wallet Export: {}", chain));
@@ -452,11 +483,13 @@ fn cmd_list(config: &Config, state: &State) -> Result<()> {
     let mut rows = Vec::new();
 
     for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos] {
-        let address = state.get_address(&chain)
+        let address = state
+            .get_address(&chain)
             .map(|a| a.as_str())
             .unwrap_or("Not generated");
 
-        let network = config.chain(&chain)
+        let network = config
+            .chain(&chain)
             .map(|c| c.network.to_string())
             .unwrap_or_else(|_| "unknown".to_string());
 

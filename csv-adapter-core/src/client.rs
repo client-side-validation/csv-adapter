@@ -21,18 +21,22 @@
 //!     4. Accept or reject the consignment
 //! ```
 
-use alloc::vec::Vec;
 use alloc::string::String;
+use alloc::vec::Vec;
 
 use crate::commitment::Commitment;
-use crate::commitment_chain::{verify_ordered_commitment_chain, ChainVerificationResult, ChainError};
+use crate::commitment_chain::{
+    verify_ordered_commitment_chain, ChainError, ChainVerificationResult,
+};
 use crate::consignment::Consignment;
-use crate::hash::Hash;
-use crate::right::{Right, RightId, RightError};
-use crate::seal_registry::{CrossChainSealRegistry, SealConsumption, ChainId, SealStatus};
-use crate::state_store::{ContractHistory, StateTransitionRecord, InMemoryStateStore, StateHistoryStore};
-use crate::seal::SealRef;
 use crate::cross_chain::InclusionProof as CrossChainInclusionProof;
+use crate::hash::Hash;
+use crate::right::{Right, RightError, RightId};
+use crate::seal::SealRef;
+use crate::seal_registry::{ChainId, CrossChainSealRegistry, SealConsumption, SealStatus};
+use crate::state_store::{
+    ContractHistory, InMemoryStateStore, StateHistoryStore, StateTransitionRecord,
+};
 
 /// Result of consignment validation.
 #[derive(Debug)]
@@ -142,16 +146,19 @@ impl ValidationClient {
         let commitments = self.extract_commitments(consignment);
         let chain_result = match self.verify_commitment_chain(&commitments) {
             Ok(result) => result,
-            Err(e) => return ValidationResult::Rejected {
-                reason: ValidationError::CommitmentChainError(e),
-            },
+            Err(e) => {
+                return ValidationResult::Rejected {
+                    reason: ValidationError::CommitmentChainError(e),
+                }
+            }
         };
 
         // Step 3: Verify seal consumption
-        let seals_consumed = match self.verify_seal_consumption(consignment, &chain_result, &anchor_chain) {
-            Ok(count) => count,
-            Err(e) => return ValidationResult::Rejected { reason: e },
-        };
+        let seals_consumed =
+            match self.verify_seal_consumption(consignment, &chain_result, &anchor_chain) {
+                Ok(count) => count,
+                Err(e) => return ValidationResult::Rejected { reason: e },
+            };
 
         // Step 4: Update local state
         if let Err(e) = self.update_local_state(consignment, &chain_result) {
@@ -174,7 +181,9 @@ impl ValidationClient {
         event: SealConsumptionEvent,
     ) -> Result<(), ValidationError> {
         // Step 1: Verify the Right itself
-        event.right.verify()
+        event
+            .right
+            .verify()
             .map_err(|e| ValidationError::RightValidationError(e))?;
 
         // Step 2: Check seal not already consumed (cross-chain)
@@ -183,13 +192,14 @@ impl ValidationClient {
                 // OK — first consumption
             }
             SealStatus::ConsumedOnChain { chain, .. } => {
-                return Err(ValidationError::DoubleSpend(
-                    format!("Seal already consumed on {:?}", chain)
-                ));
+                return Err(ValidationError::DoubleSpend(format!(
+                    "Seal already consumed on {:?}",
+                    chain
+                )));
             }
             SealStatus::DoubleSpent { .. } => {
                 return Err(ValidationError::DoubleSpend(
-                    "Seal has been double-spent across chains".to_string()
+                    "Seal has been double-spent across chains".to_string(),
                 ));
             }
         }
@@ -288,7 +298,10 @@ impl ValidationClient {
 
         for seal_assignment in &consignment.seal_assignments {
             // Check if seal has already been consumed
-            match self.seal_registry.check_seal_status(&seal_assignment.seal_ref) {
+            match self
+                .seal_registry
+                .check_seal_status(&seal_assignment.seal_ref)
+            {
                 SealStatus::Unconsumed => {
                     // Seal is fresh — record consumption
                     let right_id_bytes: [u8; 32] = {
@@ -303,7 +316,7 @@ impl ValidationClient {
                         chain: anchor_chain.clone(),
                         seal_ref: seal_assignment.seal_ref.clone(),
                         right_id: RightId(Hash::new(right_id_bytes)),
-                        block_height: 0, // Would come from anchor
+                        block_height: 0,               // Would come from anchor
                         tx_hash: Hash::new([0u8; 32]), // Would come from anchor
                         recorded_at: 0,
                     };
@@ -315,13 +328,14 @@ impl ValidationClient {
                     seals_consumed += 1;
                 }
                 SealStatus::ConsumedOnChain { chain, .. } => {
-                    return Err(ValidationError::DoubleSpend(
-                        format!("Seal already consumed on {:?}", chain)
-                    ));
+                    return Err(ValidationError::DoubleSpend(format!(
+                        "Seal already consumed on {:?}",
+                        chain
+                    )));
                 }
                 SealStatus::DoubleSpent { .. } => {
                     return Err(ValidationError::DoubleSpend(
-                        "Seal has been double-spent".to_string()
+                        "Seal has been double-spent".to_string(),
                     ));
                 }
             }
@@ -341,12 +355,12 @@ impl ValidationClient {
                 // Verify Merkle branch is non-empty and structurally valid
                 if proof.merkle_branch.is_empty() {
                     return Err(ValidationError::InclusionProofFailed(
-                        "Empty Merkle branch".to_string()
+                        "Empty Merkle branch".to_string(),
                     ));
                 }
                 if proof.block_header.is_empty() {
                     return Err(ValidationError::InclusionProofFailed(
-                        "Empty block header".to_string()
+                        "Empty block header".to_string(),
                     ));
                 }
                 // In production: verify Merkle root matches block header
@@ -355,7 +369,7 @@ impl ValidationClient {
             (CrossChainInclusionProof::Ethereum(proof), _) => {
                 if proof.receipt_rlp.is_empty() && proof.merkle_nodes.is_empty() {
                     return Err(ValidationError::InclusionProofFailed(
-                        "Empty MPT proof".to_string()
+                        "Empty MPT proof".to_string(),
                     ));
                 }
                 // In production: verify MPT proof via alloy-trie
@@ -363,7 +377,7 @@ impl ValidationClient {
             (CrossChainInclusionProof::Sui(proof), _) => {
                 if !proof.certified {
                     return Err(ValidationError::InclusionProofFailed(
-                        "Checkpoint not certified".to_string()
+                        "Checkpoint not certified".to_string(),
                     ));
                 }
                 // In production: verify checkpoint certification
@@ -371,7 +385,7 @@ impl ValidationClient {
             (CrossChainInclusionProof::Aptos(proof), _) => {
                 if !proof.success {
                     return Err(ValidationError::InclusionProofFailed(
-                        "Transaction failed".to_string()
+                        "Transaction failed".to_string(),
                     ));
                 }
                 // In production: verify HotStuff ledger signatures
@@ -429,7 +443,9 @@ impl ValidationClient {
                 verified: true,
             };
 
-            history.add_transition(record).map_err(|e| ValidationError::StoreError(e.to_string()))?;
+            history
+                .add_transition(record)
+                .map_err(|e| ValidationError::StoreError(e.to_string()))?;
         }
 
         // Save updated history
@@ -476,13 +492,7 @@ mod tests {
 
     fn make_test_consignment() -> Consignment {
         let genesis = make_test_genesis();
-        Consignment::new(
-            genesis,
-            vec![],
-            vec![],
-            vec![],
-            Hash::new([0x01; 32]),
-        )
+        Consignment::new(genesis, vec![], vec![], vec![], Hash::new([0x01; 32]))
     }
 
     #[test]
@@ -500,7 +510,11 @@ mod tests {
         let result = client.receive_consignment(&consignment, ChainId::Bitcoin);
 
         match result {
-            ValidationResult::Accepted { rights_count, seals_consumed, .. } => {
+            ValidationResult::Accepted {
+                rights_count,
+                seals_consumed,
+                ..
+            } => {
                 // Empty consignment with no seal assignments is valid
                 assert_eq!(rights_count, 0);
                 assert_eq!(seals_consumed, 0);
@@ -519,13 +533,8 @@ mod tests {
         for i in 0..3 {
             let mut genesis = make_test_genesis();
             genesis.contract_id = Hash::new([i + 1; 32]);
-            let consignment = Consignment::new(
-                genesis,
-                vec![],
-                vec![],
-                vec![],
-                Hash::new([0x01; 32]),
-            );
+            let consignment =
+                Consignment::new(genesis, vec![], vec![], vec![], Hash::new([0x01; 32]));
 
             let _ = client.receive_consignment(&consignment, ChainId::Bitcoin);
         }
@@ -543,19 +552,18 @@ mod tests {
             OwnershipProof {
                 proof: vec![0x01, 0x02, 0x03],
                 owner: vec![0xFF; 32],
+                scheme: None,
             },
             &[0x42],
         );
 
-        let inclusion = CrossChainInclusionProof::Bitcoin(
-            crate::cross_chain::BitcoinMerkleProof {
-                txid: [0xAB; 32],
-                merkle_branch: vec![[0xCD; 32], [0xEF; 32]],
-                block_header: vec![0x01; 80],
-                block_height: 1000,
-                confirmations: 6,
-            }
-        );
+        let inclusion = CrossChainInclusionProof::Bitcoin(crate::cross_chain::BitcoinMerkleProof {
+            txid: [0xAB; 32],
+            merkle_branch: vec![[0xCD; 32], [0xEF; 32]],
+            block_header: vec![0x01; 80],
+            block_height: 1000,
+            confirmations: 6,
+        });
 
         let event = SealConsumptionEvent {
             chain: ChainId::Bitcoin,
@@ -582,19 +590,18 @@ mod tests {
             OwnershipProof {
                 proof: vec![0x01],
                 owner: vec![0xFF; 32],
+                scheme: None,
             },
             &[0x42],
         );
 
-        let inclusion = CrossChainInclusionProof::Bitcoin(
-            crate::cross_chain::BitcoinMerkleProof {
-                txid: [0xAB; 32],
-                merkle_branch: vec![[0xCD; 32]],
-                block_header: vec![0x01; 80],
-                block_height: 1000,
-                confirmations: 6,
-            }
-        );
+        let inclusion = CrossChainInclusionProof::Bitcoin(crate::cross_chain::BitcoinMerkleProof {
+            txid: [0xAB; 32],
+            merkle_branch: vec![[0xCD; 32]],
+            block_header: vec![0x01; 80],
+            block_height: 1000,
+            confirmations: 6,
+        });
 
         let seal = SealRef::new(vec![0x01], None).unwrap();
 
@@ -615,6 +622,7 @@ mod tests {
             OwnershipProof {
                 proof: vec![0x02],
                 owner: vec![0xEE; 32],
+                scheme: None,
             },
             &[0x99],
         );
@@ -630,7 +638,10 @@ mod tests {
 
         let result = client.verify_seal_consumption_event(event2);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ValidationError::DoubleSpend(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            ValidationError::DoubleSpend(_)
+        ));
     }
 
     #[test]
@@ -642,22 +653,22 @@ mod tests {
             OwnershipProof {
                 proof: vec![0x01],
                 owner: vec![0xFF; 32],
+                scheme: None,
             },
             &[0x42],
         );
 
-        let btc_inclusion = CrossChainInclusionProof::Bitcoin(
-            crate::cross_chain::BitcoinMerkleProof {
+        let btc_inclusion =
+            CrossChainInclusionProof::Bitcoin(crate::cross_chain::BitcoinMerkleProof {
                 txid: [0xAB; 32],
                 merkle_branch: vec![[0xCD; 32]],
                 block_header: vec![0x01; 80],
                 block_height: 1000,
                 confirmations: 6,
-            }
-        );
+            });
 
-        let eth_inclusion = CrossChainInclusionProof::Ethereum(
-            crate::cross_chain::EthereumMPTProof {
+        let eth_inclusion =
+            CrossChainInclusionProof::Ethereum(crate::cross_chain::EthereumMPTProof {
                 tx_hash: [0xAB; 32],
                 receipt_root: [0xCD; 32],
                 receipt_rlp: vec![0x01; 100],
@@ -665,8 +676,7 @@ mod tests {
                 block_header: vec![0x02; 80],
                 log_index: 0,
                 confirmations: 15,
-            }
-        );
+            });
 
         let seal = SealRef::new(vec![0x01], None).unwrap();
 
@@ -687,6 +697,7 @@ mod tests {
             OwnershipProof {
                 proof: vec![0x02],
                 owner: vec![0xEE; 32],
+                scheme: None,
             },
             &[0x99],
         );
@@ -713,20 +724,19 @@ mod tests {
             OwnershipProof {
                 proof: vec![0x01],
                 owner: vec![0xFF; 32],
+                scheme: None,
             },
             &[0x42],
         );
 
         // Empty Merkle branch should fail
-        let inclusion = CrossChainInclusionProof::Bitcoin(
-            crate::cross_chain::BitcoinMerkleProof {
-                txid: [0xAB; 32],
-                merkle_branch: vec![], // Empty!
-                block_header: vec![0x01; 80],
-                block_height: 1000,
-                confirmations: 6,
-            }
-        );
+        let inclusion = CrossChainInclusionProof::Bitcoin(crate::cross_chain::BitcoinMerkleProof {
+            txid: [0xAB; 32],
+            merkle_branch: vec![], // Empty!
+            block_header: vec![0x01; 80],
+            block_height: 1000,
+            confirmations: 6,
+        });
 
         let event = SealConsumptionEvent {
             chain: ChainId::Bitcoin,
@@ -739,6 +749,9 @@ mod tests {
 
         let result = client.verify_seal_consumption_event(event);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ValidationError::InclusionProofFailed(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            ValidationError::InclusionProofFailed(_)
+        ));
     }
 }

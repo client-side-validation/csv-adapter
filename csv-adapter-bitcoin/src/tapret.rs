@@ -39,7 +39,10 @@ pub struct TapretCommitment {
 
 impl TapretCommitment {
     pub fn new(protocol_id: [u8; 32], commitment: Hash) -> Self {
-        Self { protocol_id, commitment }
+        Self {
+            protocol_id,
+            commitment,
+        }
     }
 
     pub fn payload(&self) -> [u8; 64] {
@@ -84,7 +87,10 @@ pub struct OpretCommitment {
 
 impl OpretCommitment {
     pub fn new(protocol_id: [u8; 32], commitment: Hash) -> Self {
-        Self { protocol_id, commitment }
+        Self {
+            protocol_id,
+            commitment,
+        }
     }
 
     pub fn script(&self) -> ScriptBuf {

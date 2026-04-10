@@ -1,7 +1,7 @@
 //! Sui signature integration tests
 
 use csv_adapter_sui::signatures::{verify_sui_signature, verify_sui_signatures};
-use ed25519_dalek::{SigningKey, Signer};
+use ed25519_dalek::{Signer, SigningKey};
 use rand::rngs::OsRng;
 
 fn generate_test_signature() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
@@ -49,15 +49,14 @@ mod sui_signature_tests {
                 &signature.to_bytes().to_vec(),
                 &verifying_key.to_bytes().to_vec(),
                 &msg
-            ).is_ok());
+            )
+            .is_ok());
         }
     }
 
     #[test]
     fn test_sui_multiple_signatures_verification() {
-        let signatures: Vec<_> = (0..5)
-            .map(|_| generate_test_signature())
-            .collect();
+        let signatures: Vec<_> = (0..5).map(|_| generate_test_signature()).collect();
 
         assert!(verify_sui_signatures(&signatures).is_ok());
     }

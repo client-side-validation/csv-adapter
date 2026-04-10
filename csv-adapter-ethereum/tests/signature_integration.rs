@@ -1,8 +1,8 @@
 //! Ethereum signature integration tests
 
 use csv_adapter_ethereum::signatures::{verify_ethereum_signature, verify_ethereum_signatures};
-use secp256k1::{Secp256k1, SecretKey};
 use rand::rngs::OsRng;
+use secp256k1::{Secp256k1, SecretKey};
 
 fn generate_test_signature() -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     let secp = Secp256k1::new();
@@ -39,9 +39,7 @@ mod ethereum_signature_tests {
 
     #[test]
     fn test_ethereum_multiple_signatures_verification() {
-        let signatures: Vec<_> = (0..5)
-            .map(|_| generate_test_signature())
-            .collect();
+        let signatures: Vec<_> = (0..5).map(|_| generate_test_signature()).collect();
 
         assert!(verify_ethereum_signatures(&signatures).is_ok());
     }

@@ -26,17 +26,15 @@
 #[test]
 #[ignore]
 fn test_sui_testnet_e2e_publish_and_verify() {
-    use csv_adapter_sui::{
-        SuiAnchorLayer, SuiConfig, SuiNetwork,
-        SealContractConfig,
-    };
-    use csv_adapter_core::{Hash, AnchorLayer};
+    use csv_adapter_core::{AnchorLayer, Hash};
+    use csv_adapter_sui::{SealContractConfig, SuiAnchorLayer, SuiConfig, SuiNetwork};
 
     // Get configuration from environment
     let rpc_url = std::env::var("CSV_TESTNET_SUI_RPC_URL")
         .unwrap_or_else(|_| "https://fullnode.testnet.sui.io:443".to_string());
-    let package_id = std::env::var("CSV_TESTNET_SUI_PACKAGE_ID")
-        .unwrap_or_else(|_| "0x0000000000000000000000000000000000000000000000000000000000000001".to_string());
+    let package_id = std::env::var("CSV_TESTNET_SUI_PACKAGE_ID").unwrap_or_else(|_| {
+        "0x0000000000000000000000000000000000000000000000000000000000000001".to_string()
+    });
 
     println!("=== Sui Testnet E2E Test ===");
     println!("RPC URL: {}", rpc_url);
@@ -64,39 +62,47 @@ fn test_sui_testnet_e2e_publish_and_verify() {
         },
     };
 
-    let adapter = SuiAnchorLayer::with_mock()
-        .expect("Failed to create mock Sui adapter");
+    let adapter = SuiAnchorLayer::with_mock().expect("Failed to create mock Sui adapter");
 
     // Step 1: Create a seal
-    let seal = adapter.create_seal(Some(0))
-        .expect("Failed to create seal");
+    let seal = adapter.create_seal(Some(0)).expect("Failed to create seal");
     println!("Created seal: object_id={}", hex::encode(seal.object_id));
 
     // Step 2: Publish commitment (simulated without real node)
     let commitment = Hash::new([0xCD; 32]);
 
-    let anchor = adapter.publish(commitment, seal.clone())
+    let anchor = adapter
+        .publish(commitment, seal.clone())
         .expect("Failed to publish commitment");
     println!("Anchor: tx_digest={}", hex::encode(anchor.tx_digest));
 
     // Step 3: Verify inclusion
-    let inclusion = adapter.verify_inclusion(anchor.clone())
+    let inclusion = adapter
+        .verify_inclusion(anchor.clone())
         .expect("Failed to verify inclusion");
-    println!("Inclusion proof: checkpoint={}", inclusion.checkpoint_number);
+    println!(
+        "Inclusion proof: checkpoint={}",
+        inclusion.checkpoint_number
+    );
 
     // Step 4: Verify finality
-    let finality = adapter.verify_finality(anchor.clone())
+    let finality = adapter
+        .verify_finality(anchor.clone())
         .expect("Failed to verify finality");
-    println!("Finality: checkpoint={}, certified={}",
-             finality.checkpoint, finality.is_certified);
+    println!(
+        "Finality: checkpoint={}, certified={}",
+        finality.checkpoint, finality.is_certified
+    );
 
     // Step 5: Test rollback
-    adapter.rollback(anchor.clone())
+    adapter
+        .rollback(anchor.clone())
         .expect("Rollback should succeed for valid anchor");
     println!("Rollback succeeded");
 
     // Step 6: Test replay prevention
-    adapter.enforce_seal(seal.clone())
+    adapter
+        .enforce_seal(seal.clone())
         .expect("First enforcement should succeed");
 
     let replay_result = adapter.enforce_seal(seal);
@@ -135,7 +141,8 @@ fn test_sui_testnet_real_block_data() {
         "params": []
     });
 
-    let response: serde_json::Value = client.post(&rpc_url)
+    let response: serde_json::Value = client
+        .post(&rpc_url)
         .json(&payload)
         .send()
         .expect("Failed to fetch latest checkpoint")
@@ -146,9 +153,9 @@ fn test_sui_testnet_real_block_data() {
         panic!("RPC error: {}", error);
     }
 
-    let result = response.get("result")
-        .expect("No result in response");
-    let checkpoint_seq: u64 = result.as_str()
+    let result = response.get("result").expect("No result in response");
+    let checkpoint_seq: u64 = result
+        .as_str()
         .expect("Expected string result")
         .parse()
         .expect("Failed to parse checkpoint sequence");
@@ -167,27 +174,33 @@ fn test_sui_testnet_real_block_data() {
         ]
     });
 
-    let checkpoint_response: serde_json::Value = client.post(&rpc_url)
+    let checkpoint_response: serde_json::Value = client
+        .post(&rpc_url)
         .json(&checkpoint_payload)
         .send()
         .expect("Failed to fetch checkpoint")
         .json()
         .expect("Failed to parse response");
 
-    let checkpoint = checkpoint_response.get("result")
+    let checkpoint = checkpoint_response
+        .get("result")
         .expect("No checkpoint in response");
 
-    let epoch: u64 = checkpoint.get("epoch")
+    let epoch: u64 = checkpoint
+        .get("epoch")
         .and_then(|e| e.as_str())
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
 
-    let certified = checkpoint.get("certified")
+    let certified = checkpoint
+        .get("certified")
         .and_then(|c| c.as_bool())
         .unwrap_or(false);
 
-    println!("Checkpoint {} — epoch: {}, certified: {}",
-             checkpoint_seq, epoch, certified);
+    println!(
+        "Checkpoint {} — epoch: {}, certified: {}",
+        checkpoint_seq, epoch, certified
+    );
 
     // Verify we can query objects
     // Use the zero address as a test (should return empty)
@@ -203,14 +216,16 @@ fn test_sui_testnet_real_block_data() {
         ]
     });
 
-    let objects_response: serde_json::Value = client.post(&rpc_url)
+    let objects_response: serde_json::Value = client
+        .post(&rpc_url)
         .json(&objects_payload)
         .send()
         .expect("Failed to fetch owned objects")
         .json()
         .expect("Failed to parse response");
 
-    let data = objects_response.get("result")
+    let data = objects_response
+        .get("result")
         .and_then(|r| r.get("data"))
         .and_then(|d| d.as_array())
         .map(|a| a.len())

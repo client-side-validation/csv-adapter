@@ -53,7 +53,9 @@ pub enum ChainError {
     EmptyChain,
     #[error("Chain does not start at genesis (first commitment has non-zero previous_commitment)")]
     NotGenesis,
-    #[error("Commitment chain broken at index {index}: expected previous {expected}, got {actual}")]
+    #[error(
+        "Commitment chain broken at index {index}: expected previous {expected}, got {actual}"
+    )]
     BrokenChain {
         index: usize,
         expected: Hash,
@@ -66,13 +68,9 @@ pub enum ChainError {
         actual: Hash,
     },
     #[error("Duplicate commitment found at index {index}")]
-    DuplicateCommitment {
-        index: usize,
-    },
+    DuplicateCommitment { index: usize },
     #[error("Cycle detected in commitment chain at index {index}")]
-    CycleDetected {
-        index: usize,
-    },
+    CycleDetected { index: usize },
 }
 
 /// Verifies a commitment chain from a collection of commitments.
@@ -112,25 +110,23 @@ pub fn verify_commitment_chain(
     loop {
         // Check for cycles
         if seen.contains(&current_hash) {
-            return Err(ChainError::CycleDetected {
-                index: chain.len(),
-            });
+            return Err(ChainError::CycleDetected { index: chain.len() });
         }
         seen.insert(current_hash);
 
         // Find the commitment with this hash
-        let commitment = commitment_map.get(&current_hash)
-            .ok_or_else(|| ChainError::BrokenChain {
-                index: chain.len(),
-                expected: current_hash,
-                actual: Hash::new([0u8; 32]),
-            })?;
+        let commitment =
+            commitment_map
+                .get(&current_hash)
+                .ok_or_else(|| ChainError::BrokenChain {
+                    index: chain.len(),
+                    expected: current_hash,
+                    actual: Hash::new([0u8; 32]),
+                })?;
 
         // Check for duplicates
         if chain.iter().any(|c: &Commitment| c.hash() == current_hash) {
-            return Err(ChainError::DuplicateCommitment {
-                index: chain.len(),
-            });
+            return Err(ChainError::DuplicateCommitment { index: chain.len() });
         }
 
         chain.push((**commitment).clone());
@@ -147,8 +143,7 @@ pub fn verify_commitment_chain(
     }
 
     // Verify the first commitment is actually genesis
-    let genesis = chain.last()
-        .ok_or(ChainError::EmptyChain)?;
+    let genesis = chain.last().ok_or(ChainError::EmptyChain)?;
 
     if genesis.previous_commitment != Hash::new([0u8; 32]) {
         return Err(ChainError::NotGenesis);
@@ -300,11 +295,7 @@ mod tests {
         )
     }
 
-    fn make_commitment(
-        contract_id: Hash,
-        previous_commitment: Hash,
-        seal_id: u8,
-    ) -> Commitment {
+    fn make_commitment(contract_id: Hash, previous_commitment: Hash, seal_id: u8) -> Commitment {
         let domain = [0u8; 32];
         let seal = SealRef::new(vec![seal_id], None).unwrap();
         Commitment::simple(
@@ -343,7 +334,10 @@ mod tests {
 
         let result = verify_ordered_commitment_chain(&[genesis, c1, c2]);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ChainError::BrokenChain { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            ChainError::BrokenChain { .. }
+        ));
     }
 
     #[test]
@@ -369,7 +363,10 @@ mod tests {
 
         let result = verify_ordered_commitment_chain(&[genesis, c1]);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ChainError::ContractIdMismatch { .. }));
+        assert!(matches!(
+            result.unwrap_err(),
+            ChainError::ContractIdMismatch { .. }
+        ));
     }
 
     #[test]

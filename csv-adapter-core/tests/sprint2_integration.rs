@@ -15,30 +15,22 @@ use csv_adapter_core::commitment_chain::verify_ordered_commitment_chain;
 use csv_adapter_core::consignment::Consignment;
 use csv_adapter_core::genesis::Genesis;
 use csv_adapter_core::hash::Hash;
-use csv_adapter_core::right::{Right, OwnershipProof};
+use csv_adapter_core::right::{OwnershipProof, Right};
 use csv_adapter_core::seal::SealRef;
-use csv_adapter_core::seal_registry::{CrossChainSealRegistry, SealConsumption, ChainId, SealStatus};
-use csv_adapter_core::state_store::{ContractHistory, StateTransitionRecord, InMemoryStateStore, StateHistoryStore};
+use csv_adapter_core::seal_registry::{
+    ChainId, CrossChainSealRegistry, SealConsumption, SealStatus,
+};
+use csv_adapter_core::state_store::{
+    ContractHistory, InMemoryStateStore, StateHistoryStore, StateTransitionRecord,
+};
 use csv_adapter_core::validator::ConsignmentValidator;
 
 fn make_genesis(contract_id: Hash) -> Genesis {
-    Genesis::new(
-        contract_id,
-        Hash::new([0x01; 32]),
-        vec![],
-        vec![],
-        vec![],
-    )
+    Genesis::new(contract_id, Hash::new([0x01; 32]), vec![], vec![], vec![])
 }
 
 fn make_consignment(genesis: Genesis, schema_id: Hash) -> Consignment {
-    Consignment::new(
-        genesis,
-        vec![],
-        vec![],
-        vec![],
-        schema_id,
-    )
+    Consignment::new(genesis, vec![], vec![], vec![], schema_id)
 }
 
 fn make_test_commitment(previous: Hash, seal_id: u8) -> Commitment {
@@ -65,7 +57,11 @@ fn test_validation_client_receives_consignment() {
 
     // Should get a validation result (may be rejected due to empty commitments)
     match result {
-        ValidationResult::Accepted { rights_count, seals_consumed, .. } => {
+        ValidationResult::Accepted {
+            rights_count,
+            seals_consumed,
+            ..
+        } => {
             // If accepted, verify counts
             assert_eq!(rights_count, 0);
             assert_eq!(seals_consumed, 0);
@@ -92,7 +88,9 @@ fn test_consignment_validator_report() {
     assert!(!report.steps.is_empty());
 
     // Structural validation should pass (genesis/consignment are valid)
-    let structural_step = report.steps.iter()
+    let structural_step = report
+        .steps
+        .iter()
         .find(|s| s.name == "Structural Validation");
     assert!(structural_step.is_some());
     // May pass or fail depending on internal validation rules
@@ -180,6 +178,7 @@ fn test_right_lifecycle_with_transfer() {
         OwnershipProof {
             proof: vec![0x01, 0x02, 0x03],
             owner: vec![0xFF; 32],
+            scheme: None,
         },
         &[0x42],
     );
@@ -192,6 +191,7 @@ fn test_right_lifecycle_with_transfer() {
     let new_owner = OwnershipProof {
         proof: vec![0xAA, 0xBB],
         owner: vec![0xEE; 32],
+        scheme: None,
     };
     let transferred = right.transfer(new_owner.clone(), b"transfer-salt");
 
@@ -311,7 +311,10 @@ fn test_seal_registry_statistics() {
     assert_eq!(registry.known_chains().len(), 0);
 
     // Add consumptions on different chains
-    for (i, chain) in [ChainId::Bitcoin, ChainId::Sui, ChainId::Aptos].iter().enumerate() {
+    for (i, chain) in [ChainId::Bitcoin, ChainId::Sui, ChainId::Aptos]
+        .iter()
+        .enumerate()
+    {
         let seal_ref = SealRef::new(vec![i as u8 + 1], None).unwrap();
         let right_id = csv_adapter_core::right::RightId(Hash::new([i as u8 + 1; 32]));
         let consumption = SealConsumption {

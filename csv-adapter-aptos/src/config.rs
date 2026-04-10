@@ -67,9 +67,9 @@ impl AptosNetwork {
     /// Known validator count for 2f+1 verification calculations.
     pub fn known_validator_count(&self) -> u64 {
         match self {
-            AptosNetwork::Mainnet => 100,   // ~100 validators on mainnet
-            AptosNetwork::Testnet => 10,    // ~10 validators on testnet
-            AptosNetwork::Devnet => 4,      // 4 validators on devnet
+            AptosNetwork::Mainnet => 100, // ~100 validators on mainnet
+            AptosNetwork::Testnet => 10,  // ~10 validators on testnet
+            AptosNetwork::Devnet => 4,    // 4 validators on devnet
             AptosNetwork::Custom { .. } => 4,
         }
     }
@@ -235,7 +235,14 @@ mod tests {
         assert_eq!(AptosNetwork::Mainnet.chain_id(), 1);
         assert_eq!(AptosNetwork::Testnet.chain_id(), 2);
         assert_eq!(AptosNetwork::Devnet.chain_id(), 4);
-        assert_eq!(AptosNetwork::Custom { chain_id: 99, name: "local".to_string() }.chain_id(), 99);
+        assert_eq!(
+            AptosNetwork::Custom {
+                chain_id: 99,
+                name: "local".to_string()
+            }
+            .chain_id(),
+            99
+        );
     }
 
     #[test]

@@ -6,9 +6,8 @@
 use bitcoin::{
     key::{TapTweak, XOnlyPublicKey},
     secp256k1::Secp256k1,
-    ScriptBuf,
-    Address, Network,
     taproot::TaprootSpendInfo,
+    Address, Network, ScriptBuf,
 };
 
 use csv_adapter_core::hash::Hash as CsvHash;
@@ -22,7 +21,10 @@ pub struct TapretCommitment {
 
 impl TapretCommitment {
     pub fn new(protocol_id: [u8; 32], commitment: CsvHash) -> Self {
-        Self { protocol_id, commitment }
+        Self {
+            protocol_id,
+            commitment,
+        }
     }
 
     pub fn leaf_script(&self) -> ScriptBuf {
@@ -133,8 +135,9 @@ mod tests {
 
         // Create a fake merkle root
         let fake_root = bitcoin::taproot::TapNodeHash::from_str(
-            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-        ).unwrap();
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        )
+        .unwrap();
         let output_with_root = derive_output_key(internal_key, Some(fake_root)).unwrap();
         assert_ne!(output_no_root, output_with_root);
     }

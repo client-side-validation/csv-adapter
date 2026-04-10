@@ -54,7 +54,11 @@ impl InclusionProof {
         })
     }
 
-    /// Create a new inclusion proof without validation (for internal use only)
+    /// Create a new inclusion proof without validation.
+    ///
+    /// # Safety
+    /// This bypasses size and structure validation. Use only for internal protocol conversions
+    /// where the input is already known to be valid.
     pub fn new_unchecked(proof_bytes: Vec<u8>, block_hash: Hash, position: u64) -> Self {
         Self {
             proof_bytes,
@@ -106,7 +110,10 @@ impl FinalityProof {
         })
     }
 
-    /// Create a new finality proof without validation (for internal use only)
+    /// Create a new $1 without validation.
+    ///
+    /// # Safety
+    /// This bypasses validation. Use only for internal protocol conversions.
     pub fn new_unchecked(
         finality_data: Vec<u8>,
         confirmations: u64,
@@ -173,7 +180,10 @@ impl ProofBundle {
         })
     }
 
-    /// Create a new proof bundle without validation (for internal use only)
+    /// Create a new $1 without validation.
+    ///
+    /// # Safety
+    /// This bypasses validation. Use only for internal protocol conversions.
     pub fn new_unchecked(
         transition_dag: DAGSegment,
         signatures: Vec<Vec<u8>>,
@@ -205,7 +215,8 @@ impl ProofBundle {
                 "ProofBundle too large: {} bytes (max {})",
                 bytes.len(),
                 MAX_SIZE
-            )).into());
+            ))
+            .into());
         }
         bincode::deserialize(bytes)
     }

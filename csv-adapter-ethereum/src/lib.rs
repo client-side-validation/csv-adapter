@@ -23,13 +23,18 @@ pub mod types;
 pub mod real_rpc;
 
 #[cfg(feature = "rpc")]
-pub use real_rpc::{publish, publish_seal_consumption, verify_seal_consumption_in_receipt, AlloyRpcError, RealEthereumRpc};
+pub use real_rpc::{
+    publish, publish_seal_consumption, verify_seal_consumption_in_receipt, AlloyRpcError,
+    RealEthereumRpc,
+};
 
 pub use adapter::EthereumAnchorLayer;
 pub use config::EthereumConfig;
-pub use types::{EthereumSealRef, EthereumAnchorRef, EthereumFinalityProof, EthereumInclusionProof};
+pub use finality::{FinalityChecker, FinalityConfig};
 pub use rpc::EthereumRpc;
 #[cfg(debug_assertions)]
 pub use rpc::MockEthereumRpc;
-pub use finality::{FinalityChecker, FinalityConfig};
 pub use seal_contract::CsvSealAbi;
+pub use types::{
+    EthereumAnchorRef, EthereumFinalityProof, EthereumInclusionProof, EthereumSealRef,
+};

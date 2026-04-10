@@ -259,7 +259,8 @@ impl Consignment {
                 "Consignment too large: {} bytes (max {})",
                 bytes.len(),
                 MAX_SIZE
-            )).into());
+            ))
+            .into());
         }
 
         let consignment: Consignment = bincode::deserialize(bytes)?;

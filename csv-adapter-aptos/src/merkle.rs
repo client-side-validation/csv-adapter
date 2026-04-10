@@ -100,11 +100,13 @@ impl MerkleAccumulator {
         let leaf_nodes: Vec<MerkleNode> = leaves
             .iter()
             .enumerate()
-            .map(|(i, &hash)| MerkleNode::Leaf(Leaf {
-                hash,
-                index: i as u64,
-                data: Vec::new(),
-            }))
+            .map(|(i, &hash)| {
+                MerkleNode::Leaf(Leaf {
+                    hash,
+                    index: i as u64,
+                    data: Vec::new(),
+                })
+            })
             .collect();
 
         // Build the tree
@@ -169,12 +171,7 @@ impl MerkleAccumulator {
     }
 
     /// Verify a Merkle proof for a leaf at a given index
-    pub fn verify_proof(
-        &self,
-        leaf_hash: [u8; 32],
-        index: u64,
-        proof: &[MerkleProofItem],
-    ) -> bool {
+    pub fn verify_proof(&self, leaf_hash: [u8; 32], index: u64, proof: &[MerkleProofItem]) -> bool {
         if proof.is_empty() {
             // If no proof, we're at the root
             return self.root_hash() == leaf_hash && self.num_leaves == 1;
@@ -282,7 +279,7 @@ impl StateProof {
     /// Verify this state proof against an expected root
     pub fn verify(&self, expected_root: [u8; 32]) -> bool {
         let leaf_hash = self.compute_leaf_hash();
-        
+
         // Verify the leaf hash matches what we computed
         if leaf_hash != self.leaf_hash {
             return false;
@@ -358,11 +355,7 @@ pub struct EventProof {
 
 impl EventProof {
     /// Create a new event proof
-    pub fn new(
-        hash: [u8; 32],
-        index: u64,
-        event_proof: Vec<MerkleProofItem>,
-    ) -> Self {
+    pub fn new(hash: [u8; 32], index: u64, event_proof: Vec<MerkleProofItem>) -> Self {
         Self {
             hash,
             index,
@@ -372,11 +365,8 @@ impl EventProof {
 
     /// Verify this event proof against an event root
     pub fn verify(&self, event_root: [u8; 32]) -> bool {
-        let computed_root = MerkleAccumulator::compute_root_from_leaf(
-            self.hash,
-            self.index,
-            &self.event_proof,
-        );
+        let computed_root =
+            MerkleAccumulator::compute_root_from_leaf(self.hash, self.index, &self.event_proof);
 
         computed_root == event_root
     }
@@ -475,13 +465,7 @@ mod tests {
 
     #[test]
     fn test_ledger_proof_verification() {
-        let proof = LedgerProof::new(
-            100,
-            [1u8; 32],
-            1,
-            1,
-            vec![],
-        );
+        let proof = LedgerProof::new(100, [1u8; 32], 1, 1, vec![]);
         assert!(proof.verify());
     }
 }

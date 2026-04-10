@@ -312,7 +312,9 @@ impl AptosRpc for MockAptosRpc {
         // Store the JSON and return a mock hash
         let tx_bytes = serde_json::to_vec(&signed_tx_json).unwrap_or_default();
         self.sent_transactions.lock().unwrap().push(tx_bytes);
-        let counter = self.tx_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let counter = self
+            .tx_counter
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let mut hash = [0u8; 32];
         hash[..4].copy_from_slice(b"mock");
         hash[4..12].copy_from_slice(&counter.to_le_bytes());

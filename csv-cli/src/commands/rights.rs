@@ -6,9 +6,9 @@ use sha2::Digest;
 
 use csv_adapter_core::hash::Hash;
 
-use crate::config::{Config, Chain};
-use crate::state::{State, TrackedRight};
+use crate::config::{Chain, Config};
 use crate::output;
+use crate::state::{State, TrackedRight};
 
 #[derive(Subcommand)]
 pub enum RightAction {
@@ -88,7 +88,12 @@ fn cmd_create(chain: Chain, value: Option<u64>, _config: &Config, _state: &State
 
     output::kv("Chain", &chain.to_string());
     output::kv_hash("Right ID", right_id_bytes.as_slice());
-    output::kv("Value", &value.map(|v| v.to_string()).unwrap_or_else(|| "default".to_string()));
+    output::kv(
+        "Value",
+        &value
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "default".to_string()),
+    );
     output::kv("Status", "Created");
 
     // Note: state is &State, not &mut State — can't save here
@@ -104,7 +109,10 @@ fn cmd_show(right_id: String, state: &State) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("Invalid Right ID: {}", e))?;
 
     if bytes.len() != 32 {
-        return Err(anyhow::anyhow!("Right ID must be 32 bytes ({} bytes provided)", bytes.len()));
+        return Err(anyhow::anyhow!(
+            "Right ID must be 32 bytes ({} bytes provided)",
+            bytes.len()
+        ));
     }
 
     let mut hash_bytes = [0u8; 32];
@@ -116,7 +124,14 @@ fn cmd_show(right_id: String, state: &State) -> Result<()> {
     if let Some(tracked) = state.get_right(&right_id) {
         output::kv("Chain", &tracked.chain.to_string());
         output::kv_hash("Commitment", tracked.commitment.as_bytes());
-        output::kv("Status", if tracked.consumed { "Consumed" } else { "Active" });
+        output::kv(
+            "Status",
+            if tracked.consumed {
+                "Consumed"
+            } else {
+                "Active"
+            },
+        );
         if let Some(nullifier) = &tracked.nullifier {
             output::kv_hash("Nullifier", nullifier.as_bytes());
         }
@@ -144,7 +159,11 @@ fn cmd_list(chain: Option<Chain>, state: &State) -> Result<()> {
         rows.push(vec![
             hex::encode(right.id.as_bytes())[..16].to_string(),
             right.chain.to_string(),
-            if right.consumed { "Consumed".to_string() } else { "Active".to_string() },
+            if right.consumed {
+                "Consumed".to_string()
+            } else {
+                "Active".to_string()
+            },
             hex::encode(right.commitment.as_bytes())[..16].to_string(),
         ]);
     }

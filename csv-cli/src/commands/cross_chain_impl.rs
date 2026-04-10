@@ -4,10 +4,10 @@ use anyhow::Result;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use csv_adapter_core::cross_chain::{
-    ChainId, CrossChainError, CrossChainLockEvent, CrossChainTransferProof,
-    CrossChainTransferResult, CrossChainRegistryEntry, InclusionProof,
-    BitcoinMerkleProof, EthereumMPTProof, SuiCheckpointProof, AptosLedgerProof, LockProvider, TransferVerifier, MintProvider,
-    CrossChainSealRegistry,
+    AptosLedgerProof, BitcoinMerkleProof, ChainId, CrossChainError, CrossChainLockEvent,
+    CrossChainRegistryEntry, CrossChainSealRegistry, CrossChainTransferProof,
+    CrossChainTransferResult, EthereumMPTProof, InclusionProof, LockProvider, MintProvider,
+    SuiCheckpointProof, TransferVerifier,
 };
 use csv_adapter_core::hash::Hash;
 use csv_adapter_core::right::OwnershipProof;
@@ -55,7 +55,7 @@ impl LockProvider for BitcoinLockProvider {
         let inclusion = InclusionProof::Bitcoin(BitcoinMerkleProof {
             txid: (*tx_hash.as_bytes()).clone(),
             merkle_branch: vec![[0xCD; 32], [0xEF; 32]], // Placeholder
-            block_header: vec![0x01; 80], // Placeholder
+            block_header: vec![0x01; 80],                // Placeholder
             block_height,
             confirmations: 6,
         });
@@ -275,7 +275,10 @@ impl TransferVerifier for UniversalTransferVerifier {
 
         output::progress(3, 4, "Checking CrossChainSealRegistry for double-spend...");
         // Step 3: Check registry
-        if self.registry.is_seal_consumed(&proof.lock_event.source_seal) {
+        if self
+            .registry
+            .is_seal_consumed(&proof.lock_event.source_seal)
+        {
             return Err(CrossChainError::AlreadyLocked);
         }
 

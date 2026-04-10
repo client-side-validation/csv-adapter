@@ -6,11 +6,11 @@
 //! Sui uses Narwhal consensus, which provides deterministic finality:
 //! once a checkpoint is certified by 2f+1 validators, it cannot be reverted.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::rpc::SuiRpc;
 use crate::config::CheckpointConfig;
 use crate::error::{SuiError, SuiResult};
+use crate::rpc::SuiRpc;
 
 /// Checkpoint information with certification details.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -77,7 +77,10 @@ impl CheckpointVerifier {
 
         let cp = rpc.get_checkpoint(checkpoint_seq).map_err(|e| {
             if start.elapsed().as_millis() > self.config.timeout_ms as u128 {
-                SuiError::timeout(&format!("checkpoint_{}", checkpoint_seq), self.config.timeout_ms)
+                SuiError::timeout(
+                    &format!("checkpoint_{}", checkpoint_seq),
+                    self.config.timeout_ms,
+                )
             } else {
                 SuiError::CheckpointFailed(format!("Failed to get checkpoint: {}", e))
             }
@@ -100,7 +103,8 @@ impl CheckpointVerifier {
                 })
             }
             None => Err(SuiError::CheckpointFailed(format!(
-                "Checkpoint {} not found", checkpoint_seq
+                "Checkpoint {} not found",
+                checkpoint_seq
             ))),
         }
     }
@@ -110,11 +114,7 @@ impl CheckpointVerifier {
     /// # Arguments
     /// * `tx_checkpoint` - The checkpoint sequence number containing the transaction
     /// * `rpc` - RPC client for fetching checkpoint data
-    pub fn is_tx_finalized(
-        &self,
-        tx_checkpoint: u64,
-        rpc: &dyn SuiRpc,
-    ) -> SuiResult<bool> {
+    pub fn is_tx_finalized(&self, tx_checkpoint: u64, rpc: &dyn SuiRpc) -> SuiResult<bool> {
         let info = self.is_checkpoint_certified(tx_checkpoint, rpc)?;
         Ok(info.is_finalized())
     }
@@ -123,12 +123,10 @@ impl CheckpointVerifier {
     ///
     /// # Arguments
     /// * `rpc` - RPC client for fetching checkpoint data
-    pub fn latest_certified_checkpoint(
-        &self,
-        rpc: &dyn SuiRpc,
-    ) -> SuiResult<Option<u64>> {
-        let latest = rpc.get_latest_checkpoint_sequence_number()
-            .map_err(|e| SuiError::CheckpointFailed(format!("Failed to get latest checkpoint: {}", e)))?;
+    pub fn latest_certified_checkpoint(&self, rpc: &dyn SuiRpc) -> SuiResult<Option<u64>> {
+        let latest = rpc.get_latest_checkpoint_sequence_number().map_err(|e| {
+            SuiError::CheckpointFailed(format!("Failed to get latest checkpoint: {}", e))
+        })?;
 
         // Walk backwards to find the first certified checkpoint
         let max_lookback = self.config.max_epoch_lookback;
@@ -152,8 +150,9 @@ impl CheckpointVerifier {
         let latest = self.latest_certified_checkpoint(rpc)?;
         match latest {
             Some(seq) => {
-                let cp = rpc.get_checkpoint(seq)
-                    .map_err(|e| SuiError::CheckpointFailed(format!("Failed to get checkpoint: {}", e)))?;
+                let cp = rpc.get_checkpoint(seq).map_err(|e| {
+                    SuiError::CheckpointFailed(format!("Failed to get checkpoint: {}", e))
+                })?;
                 Ok(cp.map(|c| c.epoch).unwrap_or(0))
             }
             None => Ok(0),
@@ -165,11 +164,7 @@ impl CheckpointVerifier {
     /// # Arguments
     /// * `expected_epoch` - The epoch we expect the network to be in
     /// * `rpc` - RPC client for fetching current epoch
-    pub fn is_epoch_passed(
-        &self,
-        expected_epoch: u64,
-        rpc: &dyn SuiRpc,
-    ) -> SuiResult<bool> {
+    pub fn is_epoch_passed(&self, expected_epoch: u64, rpc: &dyn SuiRpc) -> SuiResult<bool> {
         let current = self.current_epoch(rpc)?;
         Ok(current >= expected_epoch)
     }

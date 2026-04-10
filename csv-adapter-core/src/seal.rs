@@ -49,25 +49,79 @@ impl SealRef {
         Ok(Self { seal_id, nonce })
     }
 
-    /// Create a new SealRef without validation (for internal use only)
+    /// Create a new SealRef without validation.
     ///
     /// # Safety
-    /// This bypasses size validation and should only be used when
-    /// the input is already known to be valid.
+    /// This bypasses size validation. Use only for internal protocol conversions
+    /// where the input is already known to be valid.
     pub fn new_unchecked(seal_id: Vec<u8>, nonce: Option<u64>) -> Self {
         Self { seal_id, nonce }
     }
 
     /// Serialize to bytes
+    ///
+    /// Format: `[nonce_flag(1) | nonce_bytes(8 if flag=1) | seal_id_len(varuint) | seal_id]`
+    /// The nonce_flag is 1 for `Some(nonce)`, 0 for `None`.
     pub fn to_vec(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(8 + self.seal_id.len());
+        let mut out = Vec::with_capacity(9 + self.seal_id.len());
         if let Some(nonce) = self.nonce {
+            out.push(1);
             out.extend_from_slice(&nonce.to_le_bytes());
         } else {
-            out.extend_from_slice(&[0u8; 8]);
+            out.push(0);
         }
+        out.extend_from_slice(&(self.seal_id.len() as u32).to_le_bytes());
         out.extend_from_slice(&self.seal_id);
         out
+    }
+
+    /// Deserialize from bytes
+    ///
+    /// # Errors
+    /// Returns an error if the bytes are malformed or seal_id exceeds the maximum allowed size.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, &'static str> {
+        if bytes.is_empty() {
+            return Err("empty bytes");
+        }
+        let mut pos = 0;
+
+        let nonce = match bytes[pos] {
+            0 => {
+                pos += 1;
+                None
+            }
+            1 => {
+                pos += 1;
+                if bytes.len() < pos + 8 {
+                    return Err("truncated nonce");
+                }
+                let nonce_bytes: [u8; 8] = bytes[pos..pos + 8]
+                    .try_into()
+                    .map_err(|_| "truncated nonce")?;
+                pos += 8;
+                Some(u64::from_le_bytes(nonce_bytes))
+            }
+            _ => return Err("invalid nonce flag"),
+        };
+
+        if bytes.len() < pos + 4 {
+            return Err("truncated seal_id length");
+        }
+        let seal_id_len = u32::from_le_bytes(bytes[pos..pos + 4].try_into().map_err(|_| "truncated seal_id length")?) as usize;
+        pos += 4;
+
+        if seal_id_len > MAX_SEAL_ID_SIZE {
+            return Err("seal_id exceeds maximum allowed size (1KB)");
+        }
+        if seal_id_len == 0 {
+            return Err("seal_id cannot be empty");
+        }
+        if bytes.len() < pos + seal_id_len {
+            return Err("truncated seal_id");
+        }
+        let seal_id = bytes[pos..pos + seal_id_len].to_vec();
+
+        Ok(Self { seal_id, nonce })
     }
 }
 
@@ -118,7 +172,10 @@ impl AnchorRef {
         })
     }
 
-    /// Create a new AnchorRef without validation (for internal use only)
+    /// Create a new $1 without validation.
+    ///
+    /// # Safety
+    /// This bypasses validation. Use only for internal protocol conversions.
     ///
     /// # Safety
     /// This bypasses size validation and should only be used when
@@ -165,6 +222,57 @@ mod tests {
         let seal = SealRef::new(vec![1, 2, 3], Some(42)).unwrap();
         let bytes = seal.to_vec();
         assert!(!bytes.is_empty());
+    }
+
+    #[test]
+    fn test_seal_ref_roundtrip() {
+        // Test with Some(nonce)
+        let seal1 = SealRef::new(vec![1, 2, 3], Some(42)).unwrap();
+        let bytes1 = seal1.to_vec();
+        let restored1 = SealRef::from_bytes(&bytes1).unwrap();
+        assert_eq!(restored1.seal_id, vec![1, 2, 3]);
+        assert_eq!(restored1.nonce, Some(42));
+
+        // Test with None nonce
+        let seal2 = SealRef::new(vec![4, 5, 6], None).unwrap();
+        let bytes2 = seal2.to_vec();
+        let restored2 = SealRef::from_bytes(&bytes2).unwrap();
+        assert_eq!(restored2.seal_id, vec![4, 5, 6]);
+        assert_eq!(restored2.nonce, None);
+
+        // Verify that None and Some(0) produce different bytes
+        let seal_none = SealRef::new(vec![1, 2, 3], None).unwrap();
+        let seal_zero = SealRef::new(vec![1, 2, 3], Some(0)).unwrap();
+        assert_ne!(seal_none.to_vec(), seal_zero.to_vec());
+    }
+
+    #[test]
+    fn test_seal_ref_from_bytes_errors() {
+        // Empty bytes
+        assert_eq!(SealRef::from_bytes(&[]), Err("empty bytes"));
+
+        // Invalid nonce flag
+        assert_eq!(SealRef::from_bytes(&[5]), Err("invalid nonce flag"));
+
+        // Truncated nonce
+        assert_eq!(SealRef::from_bytes(&[1, 0, 0]), Err("truncated nonce"));
+
+        // Truncated seal_id length
+        assert_eq!(SealRef::from_bytes(&[0]), Err("truncated seal_id length"));
+
+        // Truncated seal_id data
+        assert_eq!(SealRef::from_bytes(&[0, 3, 0, 0, 0, 1]), Err("truncated seal_id"));
+
+        // Seal_id too large
+        let mut large = vec![0, 0x01, 0x04, 0x00, 0x00]; // length 1025
+        large.extend(vec![0u8; 1025]);
+        assert_eq!(
+            SealRef::from_bytes(&large),
+            Err("seal_id exceeds maximum allowed size (1KB)")
+        );
+
+        // Empty seal_id
+        assert_eq!(SealRef::from_bytes(&[0, 0, 0, 0, 0]), Err("seal_id cannot be empty"));
     }
 
     #[test]

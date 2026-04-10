@@ -1,6 +1,6 @@
 //! Core signature structural validation tests
 
-use csv_adapter_core::signature::{Signature, SignatureScheme, verify_signatures};
+use csv_adapter_core::signature::{verify_signatures, Signature, SignatureScheme};
 
 #[cfg(test)]
 mod core_signature_tests {
@@ -8,7 +8,7 @@ mod core_signature_tests {
 
     #[test]
     fn test_secp256k1_valid_structure() {
-        use secp256k1::{Secp256k1, SecretKey, Message};
+        use secp256k1::{Message, Secp256k1, SecretKey};
 
         let secp = Secp256k1::new();
         let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
@@ -25,7 +25,7 @@ mod core_signature_tests {
 
     #[test]
     fn test_secp256k1_65_byte_signature() {
-        use secp256k1::{Secp256k1, SecretKey, Message};
+        use secp256k1::{Message, Secp256k1, SecretKey};
 
         let secp = Secp256k1::new();
         let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
@@ -76,7 +76,7 @@ mod core_signature_tests {
 
     #[test]
     fn test_ed25519_valid_structure() {
-        use ed25519_dalek::{SigningKey, Signer};
+        use ed25519_dalek::{Signer, SigningKey};
         use rand::rngs::OsRng;
 
         let signing_key = SigningKey::generate(&mut OsRng);
@@ -84,7 +84,11 @@ mod core_signature_tests {
         let message = b"test message".to_vec();
         let signature = signing_key.sign(&message);
 
-        let sig = Signature::new(signature.to_bytes().to_vec(), verifying_key.to_bytes().to_vec(), message);
+        let sig = Signature::new(
+            signature.to_bytes().to_vec(),
+            verifying_key.to_bytes().to_vec(),
+            message,
+        );
         assert!(sig.verify(SignatureScheme::Ed25519).is_ok());
     }
 
@@ -110,20 +114,22 @@ mod core_signature_tests {
 
     #[test]
     fn test_verify_multiple_signatures() {
-        use secp256k1::{Secp256k1, SecretKey, Message};
+        use secp256k1::{Message, Secp256k1, SecretKey};
 
         let secp = Secp256k1::new();
         let message = [0xAB; 32];
         let msg = Message::from_digest_slice(&message).unwrap();
 
-        let sigs: Vec<Signature> = (0..3).map(|_| {
-            let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
-            let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
-            let signature = secp.sign_ecdsa(&msg, &secret_key);
-            let sig_bytes = signature.serialize_compact();
-            let pubkey_bytes = public_key.serialize();
-            Signature::new(sig_bytes.to_vec(), pubkey_bytes.to_vec(), message.to_vec())
-        }).collect();
+        let sigs: Vec<Signature> = (0..3)
+            .map(|_| {
+                let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
+                let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
+                let signature = secp.sign_ecdsa(&msg, &secret_key);
+                let sig_bytes = signature.serialize_compact();
+                let pubkey_bytes = public_key.serialize();
+                Signature::new(sig_bytes.to_vec(), pubkey_bytes.to_vec(), message.to_vec())
+            })
+            .collect();
 
         assert!(verify_signatures(&sigs, SignatureScheme::Secp256k1).is_ok());
     }

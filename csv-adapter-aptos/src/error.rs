@@ -48,25 +48,17 @@ pub enum AptosError {
     /// Timeout while waiting for transaction confirmation.
     /// Recovery: Resubmit transaction with higher gas, check mempool status.
     #[error("Transaction confirmation timeout after {timeout_ms}ms: {tx_hash}")]
-    ConfirmationTimeout {
-        tx_hash: String,
-        timeout_ms: u64,
-    },
+    ConfirmationTimeout { tx_hash: String, timeout_ms: u64 },
 
     /// Chain reorg detected affecting anchor validity.
     /// Recovery: Re-publish commitment at new chain tip.
     #[error("Chain reorg detected at version {version}: anchor may be invalid")]
-    ReorgDetected {
-        version: u64,
-    },
+    ReorgDetected { version: u64 },
 
     /// Network mismatch (e.g., mainnet seal on testnet).
     /// Recovery: Ensure network configuration matches chain ID.
     #[error("Network mismatch: expected chain_id {expected}, got {actual}")]
-    NetworkMismatch {
-        expected: u64,
-        actual: u64,
-    },
+    NetworkMismatch { expected: u64, actual: u64 },
 
     /// Core adapter error from csv-adapter-core.
     #[error(transparent)]
@@ -115,21 +107,25 @@ impl From<AptosError> for csv_adapter_core::AdapterError {
     fn from(err: AptosError) -> Self {
         match err {
             AptosError::CoreError(e) => e,
-            AptosError::RpcError(msg)
-            | AptosError::TransactionFailed(msg) => csv_adapter_core::AdapterError::NetworkError(msg),
+            AptosError::RpcError(msg) | AptosError::TransactionFailed(msg) => {
+                csv_adapter_core::AdapterError::NetworkError(msg)
+            }
             AptosError::ResourceUsed(msg) => csv_adapter_core::AdapterError::InvalidSeal(msg),
-            AptosError::StateProofFailed(msg)
-            | AptosError::EventProofFailed(msg) => csv_adapter_core::AdapterError::InclusionProofFailed(msg),
+            AptosError::StateProofFailed(msg) | AptosError::EventProofFailed(msg) => {
+                csv_adapter_core::AdapterError::InclusionProofFailed(msg)
+            }
             AptosError::CheckpointFailed(msg) => csv_adapter_core::AdapterError::NetworkError(msg),
             AptosError::SerializationError(msg) => csv_adapter_core::AdapterError::InvalidSeal(msg),
-            AptosError::ConfirmationTimeout { tx_hash, timeout_ms } => {
-                csv_adapter_core::AdapterError::NetworkError(
-                    format!("Timeout waiting for tx {} after {}ms", tx_hash, timeout_ms)
-                )
-            }
-            AptosError::ReorgDetected { version } => {
-                csv_adapter_core::AdapterError::ReorgInvalid(format!("Reorg at version {}", version))
-            }
+            AptosError::ConfirmationTimeout {
+                tx_hash,
+                timeout_ms,
+            } => csv_adapter_core::AdapterError::NetworkError(format!(
+                "Timeout waiting for tx {} after {}ms",
+                tx_hash, timeout_ms
+            )),
+            AptosError::ReorgDetected { version } => csv_adapter_core::AdapterError::ReorgInvalid(
+                format!("Reorg at version {}", version),
+            ),
             aptos_err => csv_adapter_core::AdapterError::NetworkError(format!("{}", aptos_err)),
         }
     }
@@ -144,7 +140,11 @@ mod tests {
     #[test]
     fn test_transient_errors() {
         assert!(AptosError::RpcError("connection refused".to_string()).is_transient());
-        assert!(AptosError::ConfirmationTimeout { tx_hash: "abc".to_string(), timeout_ms: 30000 }.is_transient());
+        assert!(AptosError::ConfirmationTimeout {
+            tx_hash: "abc".to_string(),
+            timeout_ms: 30000
+        }
+        .is_transient());
         assert!(AptosError::TransactionFailed("out of gas".to_string()).is_transient());
     }
 
@@ -159,6 +159,9 @@ mod tests {
     fn test_error_conversion() {
         let aptos_err = AptosError::StateProofFailed("bad proof".to_string());
         let core_err: csv_adapter_core::AdapterError = aptos_err.into();
-        assert!(matches!(core_err, csv_adapter_core::AdapterError::InclusionProofFailed(_)));
+        assert!(matches!(
+            core_err,
+            csv_adapter_core::AdapterError::InclusionProofFailed(_)
+        ));
     }
 }
