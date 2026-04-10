@@ -26,6 +26,8 @@ use csv_adapter_core::commitment::Commitment;
 use crate::config::SuiConfig;
 use crate::error::{SuiError, SuiResult};
 use crate::rpc::SuiRpc;
+#[cfg(feature = "rpc")]
+use crate::rpc::SuiObject;
 use crate::types::{SuiSealRef, SuiAnchorRef, SuiInclusionProof, SuiFinalityProof};
 use crate::seal::SealRegistry;
 use crate::checkpoint::CheckpointVerifier;

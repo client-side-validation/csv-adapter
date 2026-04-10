@@ -43,7 +43,7 @@ fn test_sui_testnet_e2e_publish_and_verify() {
     println!("Package ID: {}", package_id);
 
     // Create configuration for Testnet
-    let config = SuiConfig {
+    let _config = SuiConfig {
         network: SuiNetwork::Testnet,
         rpc_url: rpc_url.clone(),
         checkpoint: csv_adapter_sui::CheckpointConfig {

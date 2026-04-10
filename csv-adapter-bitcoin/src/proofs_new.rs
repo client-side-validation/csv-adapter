@@ -216,7 +216,7 @@ mod tests {
         let pmt = build_merkle_proof_from_txids(&txids, &matches);
 
         // Get the merkle root
-        let root = bitcoin::merkle_tree::calculate_root(txids.iter().copied()).unwrap();
+        let _root = bitcoin::merkle_tree::calculate_root(txids.iter().copied()).unwrap();
 
         // Verify the proof
         let mut extracted = Vec::new();

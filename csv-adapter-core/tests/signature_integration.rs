@@ -8,23 +8,39 @@ mod core_signature_tests {
 
     #[test]
     fn test_secp256k1_valid_structure() {
-        // Valid 64-byte signature
-        let signature = vec![0x01; 64];
-        let public_key = vec![0x02; 33]; // Compressed
-        let message = vec![0xAB; 32];
+        use secp256k1::{Secp256k1, SecretKey, Message};
 
-        let sig = Signature::new(signature, public_key, message);
+        let secp = Secp256k1::new();
+        let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
+        let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
+        let message = [0xAB; 32];
+        let msg = Message::from_digest_slice(&message).unwrap();
+        let signature = secp.sign_ecdsa(&msg, &secret_key);
+        let sig_bytes = signature.serialize_compact();
+        let pubkey_bytes = public_key.serialize();
+
+        let sig = Signature::new(sig_bytes.to_vec(), pubkey_bytes.to_vec(), message.to_vec());
         assert!(sig.verify(SignatureScheme::Secp256k1).is_ok());
     }
 
     #[test]
     fn test_secp256k1_65_byte_signature() {
-        // 65 bytes with recovery ID
-        let signature = vec![0x01; 65];
-        let public_key = vec![0x02; 33];
-        let message = vec![0xAB; 32];
+        use secp256k1::{Secp256k1, SecretKey, Message};
 
-        let sig = Signature::new(signature, public_key, message);
+        let secp = Secp256k1::new();
+        let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
+        let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
+        let message = [0xAB; 32];
+        let msg = Message::from_digest_slice(&message).unwrap();
+        let signature = secp.sign_ecdsa(&msg, &secret_key);
+        let sig_bytes = signature.serialize_compact();
+        // Build 65-byte signature: [recovery_id (1 byte)] + [r || s (64 bytes)]
+        let mut sig_65 = vec![0u8; 65];
+        sig_65[0] = 0; // recovery ID
+        sig_65[1..].copy_from_slice(&sig_bytes);
+        let pubkey_bytes = public_key.serialize();
+
+        let sig = Signature::new(sig_65, pubkey_bytes.to_vec(), message.to_vec());
         assert!(sig.verify(SignatureScheme::Secp256k1).is_ok());
     }
 
@@ -60,11 +76,15 @@ mod core_signature_tests {
 
     #[test]
     fn test_ed25519_valid_structure() {
-        let signature = vec![0x01; 64];
-        let public_key = vec![0xAB; 32];
-        let message = b"test message".to_vec();
+        use ed25519_dalek::{SigningKey, Signer};
+        use rand::rngs::OsRng;
 
-        let sig = Signature::new(signature, public_key, message);
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let verifying_key = signing_key.verifying_key();
+        let message = b"test message".to_vec();
+        let signature = signing_key.sign(&message);
+
+        let sig = Signature::new(signature.to_bytes().to_vec(), verifying_key.to_bytes().to_vec(), message);
         assert!(sig.verify(SignatureScheme::Ed25519).is_ok());
     }
 
@@ -90,10 +110,19 @@ mod core_signature_tests {
 
     #[test]
     fn test_verify_multiple_signatures() {
-        let sigs: Vec<Signature> = (0..3).map(|i| {
-            let mut sig_bytes = vec![0u8; 64];
-            sig_bytes[0] = i as u8;
-            Signature::new(sig_bytes, vec![0x02; 33], vec![i; 32])
+        use secp256k1::{Secp256k1, SecretKey, Message};
+
+        let secp = Secp256k1::new();
+        let message = [0xAB; 32];
+        let msg = Message::from_digest_slice(&message).unwrap();
+
+        let sigs: Vec<Signature> = (0..3).map(|_| {
+            let secret_key = SecretKey::new(&mut secp256k1::rand::thread_rng());
+            let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
+            let signature = secp.sign_ecdsa(&msg, &secret_key);
+            let sig_bytes = signature.serialize_compact();
+            let pubkey_bytes = public_key.serialize();
+            Signature::new(sig_bytes.to_vec(), pubkey_bytes.to_vec(), message.to_vec())
         }).collect();
 
         assert!(verify_signatures(&sigs, SignatureScheme::Secp256k1).is_ok());

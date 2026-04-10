@@ -11,7 +11,7 @@
 
 use csv_adapter_core::client::{ValidationClient, ValidationResult};
 use csv_adapter_core::commitment::Commitment;
-use csv_adapter_core::commitment_chain::{verify_ordered_commitment_chain, ChainVerificationResult};
+use csv_adapter_core::commitment_chain::verify_ordered_commitment_chain;
 use csv_adapter_core::consignment::Consignment;
 use csv_adapter_core::genesis::Genesis;
 use csv_adapter_core::hash::Hash;
@@ -108,7 +108,7 @@ fn test_state_history_persistence() {
     let mut store = InMemoryStateStore::new();
     let contract_id = Hash::new([0xEF; 32]);
     let genesis_commitment = make_test_commitment(Hash::new([0u8; 32]), 0x01);
-    let mut history = ContractHistory::from_genesis(genesis_commitment);
+    let history = ContractHistory::from_genesis(genesis_commitment);
 
     // Save and reload
     store.save_contract_history(contract_id, &history).unwrap();
@@ -254,7 +254,7 @@ fn test_commitment_chain_with_state_store() {
     let mut history = ContractHistory::from_genesis(genesis_c);
 
     // Add transitions
-    history.add_transition(StateTransitionRecord {
+    let _ = history.add_transition(StateTransitionRecord {
         commitment: c1.clone(),
         seal_ref: seal_1,
         rights: vec![],
@@ -262,7 +262,7 @@ fn test_commitment_chain_with_state_store() {
         verified: true,
     });
 
-    history.add_transition(StateTransitionRecord {
+    let _ = history.add_transition(StateTransitionRecord {
         commitment: c2.clone(),
         seal_ref: seal_2,
         rights: vec![],
@@ -286,8 +286,8 @@ fn test_multiple_contracts_in_store() {
     let contract_a = Hash::new([0xAA; 32]);
     let contract_b = Hash::new([0xBB; 32]);
 
-    let genesis_a = make_genesis(contract_a);
-    let genesis_b = make_genesis(contract_b);
+    let _genesis_a = make_genesis(contract_a);
+    let _genesis_b = make_genesis(contract_b);
 
     let history_a = ContractHistory::from_genesis(make_test_commitment(Hash::new([0u8; 32]), 0x01));
     let history_b = ContractHistory::from_genesis(make_test_commitment(Hash::new([0u8; 32]), 0x02));

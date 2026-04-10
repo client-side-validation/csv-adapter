@@ -154,7 +154,7 @@ impl SuiRpc for SuiRpcClient {
         digest: [u8; 32],
     ) -> Result<Vec<SuiEvent>, Box<dyn std::error::Error + Send + Sync>> {
         let tx_block = self.get_transaction_block(digest)?;
-        if let Some(block) = tx_block {
+        if let Some(_block) = tx_block {
             // Events are embedded in the transaction block response
             // In real implementation, parse from sui_getTransactionBlock events array
             Ok(vec![])

@@ -114,15 +114,65 @@ fn run_test_pair(from: &Chain, to: &Chain, config: &Config, _state: &State) -> R
 
 fn check_chain_connectivity(chain: &Chain, config: &Config) -> Result<()> {
     let chain_config = config.chain(chain)?;
-    match reqwest::blocking::get(&chain_config.rpc_url) {
-        Ok(resp) => {
-            if resp.status().is_success() || resp.status().is_server_error() {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
+
+    match chain {
+        Chain::Bitcoin => {
+            // Bitcoin mempool.space API - simple GET works
+            let url = format!("{}/blocks/tip/hash", chain_config.rpc_url.trim_end_matches('/'));
+            let resp = client.get(&url).send()?;
+            if resp.status().is_success() {
                 Ok(())
             } else {
                 Err(anyhow::anyhow!("Chain {} returned status {}", chain, resp.status()))
             }
         }
-        Err(e) => Err(anyhow::anyhow!("Chain {} connection failed: {}", chain, e)),
+        Chain::Ethereum => {
+            // Ethereum JSON-RPC - POST required
+            let rpc_req = serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "eth_blockNumber",
+                "params": [],
+                "id": 1
+            });
+            let resp = client.post(&chain_config.rpc_url)
+                .json(&rpc_req)
+                .send()?;
+            if resp.status().is_success() {
+                Ok(())
+            } else {
+                Err(anyhow::anyhow!("Chain {} returned status {}", chain, resp.status()))
+            }
+        }
+        Chain::Sui => {
+            // Sui JSON-RPC - POST required
+            let rpc_req = serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "sui_getLatestCheckpointSequenceNumber",
+                "params": [],
+                "id": 1
+            });
+            let resp = client.post(&chain_config.rpc_url)
+                .json(&rpc_req)
+                .send()?;
+            if resp.status().is_success() {
+                Ok(())
+            } else {
+                Err(anyhow::anyhow!("Chain {} returned status {}", chain, resp.status()))
+            }
+        }
+        Chain::Aptos => {
+            // Aptos REST API - simple GET works
+            let url = format!("{}/", chain_config.rpc_url.trim_end_matches('/'));
+            let resp = client.get(&url).send()?;
+            if resp.status().is_success() {
+                Ok(())
+            } else {
+                Err(anyhow::anyhow!("Chain {} returned status {}", chain, resp.status()))
+            }
+        }
     }
 }
 

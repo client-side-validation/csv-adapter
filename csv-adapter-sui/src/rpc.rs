@@ -1,6 +1,8 @@
 //! Sui RPC trait and mock implementation
 
+#[cfg(debug_assertions)]
 use std::collections::HashMap;
+#[cfg(debug_assertions)]
 use std::sync::Mutex;
 
 /// Trait for Sui RPC operations

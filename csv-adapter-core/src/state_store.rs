@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn test_contract_history_creation() {
         let genesis = make_test_commitment(Hash::new([0u8; 32]), 0x01);
-        let mut history = ContractHistory::from_genesis(genesis.clone());
+        let history = ContractHistory::from_genesis(genesis.clone());
 
         assert_eq!(history.contract_id, genesis.contract_id);
         assert_eq!(history.transition_count(), 0);

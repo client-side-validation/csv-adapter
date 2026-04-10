@@ -357,7 +357,7 @@ impl CommitmentEventBuilder {
 mod tests {
     use super::*;
     use crate::rpc::MockAptosRpc;
-    use crate::rpc::{AptosEvent, AptosResource, AptosTransaction, AptosBlockInfo};
+    use crate::rpc::{AptosEvent, AptosResource, AptosTransaction};
 
     #[test]
     fn test_state_proof_leaf_hash() {

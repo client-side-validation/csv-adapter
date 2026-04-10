@@ -90,6 +90,7 @@ mod tests {
             hasher.finalize()
         };
         // Tagged hash should NOT equal raw SHA-256
-        assert_ne!(&tagged, raw.as_slice());
+        let raw_arr: [u8; 32] = raw.into();
+        assert_ne!(&tagged, &raw_arr);
     }
 }

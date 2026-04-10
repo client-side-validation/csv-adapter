@@ -128,7 +128,7 @@ mod tests {
         
         // Message to sign (32 bytes)
         let message = [0xAB; 32];
-        let msg = secp256k1::Message::from_slice(&message).unwrap();
+        let msg = secp256k1::Message::from_digest_slice(&message).unwrap();
         
         // Sign the message
         let signature = secp.sign_ecdsa(&msg, &secret_key);

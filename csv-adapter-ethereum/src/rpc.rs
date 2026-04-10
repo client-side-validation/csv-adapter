@@ -3,7 +3,9 @@
 //! Defines the minimal set of Ethereum JSON-RPC calls needed
 //! by the CSV adapter: storage proofs, receipts, block queries, finality.
 
+#[cfg(debug_assertions)]
 use std::collections::HashMap;
+#[cfg(debug_assertions)]
 use std::sync::Mutex;
 
 /// Trait for Ethereum RPC operations

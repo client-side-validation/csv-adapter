@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn test_stub_rpc_utxo_lifecycle() {
         let mut rpc = StubBitcoinRpc::new(100);
-        let txid = [1u8, 2, 3].to_vec().into_boxed_slice();
+        let _txid = [1u8, 2, 3].to_vec().into_boxed_slice();
         let txid_bytes: [u8; 32] = {
             let mut arr = [0u8; 32];
             arr[..3].copy_from_slice(&[1, 2, 3]);
