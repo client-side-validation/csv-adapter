@@ -120,8 +120,10 @@ mod tests {
     #[test]
     fn test_confirmations_at_depth() {
         let rpc = MockEthereumRpc::new(100);
-        let mut config = FinalityConfig::default();
-        config.confirmation_depth = 5;
+        let config = FinalityConfig {
+            confirmation_depth: 5,
+            ..Default::default()
+        };
         let checker = FinalityChecker::new(config);
         // Block 95 has 5 confirmations, need 5
         assert!(checker.is_finalized(95, &rpc).unwrap());

@@ -16,11 +16,16 @@ mod tests {
     use csv_adapter_core::{AnchorLayer, Hash};
 
     fn get_env(key: &str) -> String {
-        std::env::var(key)
-            .unwrap_or_else(|_| panic!("⚠️  {} is not set. Copy .env.example to .env and fill in your keys.", key))
+        std::env::var(key).unwrap_or_else(|_| {
+            panic!(
+                "⚠️  {} is not set. Copy .env.example to .env and fill in your keys.",
+                key
+            )
+        })
     }
 
-    const TEST_FUNDING_TXID: &str = "88e66fcd5976257bbef6e4613e797a39e36e371d8d0f41a81333eea42d472fbe";
+    const TEST_FUNDING_TXID: &str =
+        "88e66fcd5976257bbef6e4613e797a39e36e371d8d0f41a81333eea42d472fbe";
     const TEST_FUNDING_VOUT: u32 = 239;
     const TEST_FUNDING_AMOUNT: u64 = 500_000;
 
@@ -33,7 +38,10 @@ mod tests {
         let rpc = MempoolSignetRpc::new();
         let current_height = rpc.get_block_count().expect("Failed to get block count");
         println!("📊 Current Signet height: {}", current_height);
-        assert!(current_height > 299_000, "Signet height should be > 299,000");
+        assert!(
+            current_height > 299_000,
+            "Signet height should be > 299,000"
+        );
 
         // Step 2: Create wallet from seed
         let seed_bytes = hex::decode(get_env("BTC_SEED_HEX")).expect("Invalid seed hex");
@@ -52,10 +60,10 @@ mod tests {
         txid_arr.copy_from_slice(&txid_bytes);
         txid_arr.reverse(); // Convert to internal order
         let txid = Txid::from_slice(&txid_arr).expect("Invalid txid");
-        
+
         let outpoint = OutPoint::new(txid, TEST_FUNDING_VOUT);
         wallet.add_utxo(outpoint, TEST_FUNDING_AMOUNT, path.clone());
-        
+
         let utxos = wallet.list_utxos();
         println!("💰 Wallet has {} UTXO(s)", utxos.len());
         assert!(!utxos.is_empty(), "Wallet should have at least one UTXO");
@@ -68,20 +76,21 @@ mod tests {
             rpc_url: "https://mempool.space/signet".to_string(),
         };
 
-        let adapter = BitcoinAnchorLayer::with_wallet(config, wallet)
-            .expect("Failed to create adapter");
+        let adapter =
+            BitcoinAnchorLayer::with_wallet(config, wallet).expect("Failed to create adapter");
 
         // Step 5: Create a seal from the funding UTXO
         println!("\n--- Creating seal from real UTXO ---");
-        let seal = adapter.create_seal(Some(TEST_FUNDING_AMOUNT))
+        let seal = adapter
+            .create_seal(Some(TEST_FUNDING_AMOUNT))
             .expect("Failed to create seal");
         println!("✅ Created seal:");
         println!("   TXID: {}", seal.txid_hex());
-        println!("   VOUT: {}", seal.vout);
 
         // Step 6: Verify seal was created
         assert!(!seal.txid_hex().is_empty(), "Seal should have a valid txid");
-        assert!(seal.vout >= 0, "Seal should have a valid vout");
+        // vout is u32, so it's always >= 0 by definition
+        println!("   VOUT: {} (valid)", seal.vout);
 
         // Step 7: Publish commitment (this will use mock publishing in current implementation)
         println!("\n--- Publishing commitment ---");
@@ -94,7 +103,8 @@ mod tests {
 
                 // Step 8: Verify inclusion proof
                 println!("\n--- Verifying inclusion proof ---");
-                let inclusion = adapter.verify_inclusion(anchor.clone())
+                let inclusion = adapter
+                    .verify_inclusion(anchor.clone())
                     .expect("Failed to verify inclusion");
                 println!("✅ Inclusion proof verified:");
                 println!("   TX index: {}", inclusion.tx_index);
@@ -161,9 +171,10 @@ mod tests {
 
         // Get block info for the funding transaction
         let block_id = "00000012ef89c3aa47c97db367ca46ae9e0bf0530a0f01994b10ad543358468e";
-        let block_info = rpc.get_block_info(block_id)
+        let block_info = rpc
+            .get_block_info(block_id)
             .expect("Failed to get block info");
-        
+
         println!("Block at height {}:", block_info.height);
         println!("  Transactions: {}", block_info.tx_count);
         println!("  Block ID: {}", block_info.id);

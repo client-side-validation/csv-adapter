@@ -19,19 +19,25 @@ mod tests {
 
     // Helper to read private keys from environment variables
     fn get_env(key: &str) -> String {
-        std::env::var(key)
-            .unwrap_or_else(|_| panic!("⚠️  {} is not set. Copy .env.example to .env and fill in your keys.", key))
+        std::env::var(key).unwrap_or_else(|_| {
+            panic!(
+                "⚠️  {} is not set. Copy .env.example to .env and fill in your keys.",
+                key
+            )
+        })
     }
 
     // Wallet addresses (public, safe to hardcode)
     const BTC_ADDRESS: &str = "tb1p69r3kn7qu2w6ppj7sr2c7x45rp7urc535u4nv2g4n884nnt26nyqq4qz5c";
     const SUI_ADDRESS: &str = "0x199fcbd2404ea22e5b0a0bc114e7d41cfc08819811f001b90b0a9057e05929cd";
-    const APTOS_ADDRESS: &str = "0x4e8e35b340112baca1ca18e422da4c7d447d17fa560fbfd0e0c24de3de239b1b";
+    const APTOS_ADDRESS: &str =
+        "0x4e8e35b340112baca1ca18e422da4c7d447d17fa560fbfd0e0c24de3de239b1b";
     const SUI_TESTNET_RPC: &str = "https://fullnode.testnet.sui.io:443";
     const APTOS_TESTNET_RPC: &str = "https://fullnode.testnet.aptoslabs.com/v1";
 
     // Bitcoin UTXO info (public)
-    const BTC_FUNDING_TXID: &str = "88e66fcd5976257bbef6e4613e797a39e36e371d8d0f41a81333eea42d472fbe";
+    const BTC_FUNDING_TXID: &str =
+        "88e66fcd5976257bbef6e4613e797a39e36e371d8d0f41a81333eea42d472fbe";
     const BTC_FUNDING_VOUT: u32 = 239;
     const BTC_FUNDING_AMOUNT: u64 = 500_000;
 
@@ -56,15 +62,24 @@ mod tests {
             .expect("Failed to build HTTP client");
 
         let btc_utxos: Vec<serde_json::Value> = btc_client
-            .get(&format!("https://mempool.space/signet/api/address/{}/utxo", BTC_ADDRESS))
+            .get(format!(
+                "https://mempool.space/signet/api/address/{}/utxo",
+                BTC_ADDRESS
+            ))
             .send()
             .expect("Failed to fetch UTXOs")
             .json()
             .expect("Failed to parse UTXOs");
 
-        let btc_balance: u64 = btc_utxos.iter().map(|u| u["value"].as_u64().unwrap_or(0)).sum();
+        let btc_balance: u64 = btc_utxos
+            .iter()
+            .map(|u| u["value"].as_u64().unwrap_or(0))
+            .sum();
         println!("{} sats", btc_balance);
-        assert!(btc_balance >= 500_000, "Bitcoin wallet should have >= 500k sats");
+        assert!(
+            btc_balance >= 500_000,
+            "Bitcoin wallet should have >= 500k sats"
+        );
 
         // Sui Testnet
         print!("  Sui Testnet: ");
@@ -92,13 +107,23 @@ mod tests {
             .as_str()
             .and_then(|s| s.parse().ok())
             .unwrap_or(0);
-        println!("{} MIST ({} SUI)", sui_balance, sui_balance as f64 / 1_000_000_000.0);
-        assert!(sui_balance > 1_000_000_000, "Sui wallet should have > 1 SUI");
+        println!(
+            "{} MIST ({} SUI)",
+            sui_balance,
+            sui_balance as f64 / 1_000_000_000.0
+        );
+        assert!(
+            sui_balance > 1_000_000_000,
+            "Sui wallet should have > 1 SUI"
+        );
 
         // Aptos Testnet
         print!("  Aptos Testnet: ");
         let aptos_balance: u64 = sui_client
-            .get(&format!("{}/accounts/{}/balance/0x1::aptos_coin::AptosCoin", APTOS_TESTNET_RPC, APTOS_ADDRESS))
+            .get(format!(
+                "{}/accounts/{}/balance/0x1::aptos_coin::AptosCoin",
+                APTOS_TESTNET_RPC, APTOS_ADDRESS
+            ))
             .send()
             .expect("Failed to fetch Aptos balance")
             .text()
@@ -106,8 +131,15 @@ mod tests {
             .trim()
             .parse()
             .unwrap_or(0);
-        println!("{} octas ({} APT)", aptos_balance, aptos_balance as f64 / 100_000_000.0);
-        assert!(aptos_balance > 100_000_000, "Aptos wallet should have > 0.1 APT");
+        println!(
+            "{} octas ({} APT)",
+            aptos_balance,
+            aptos_balance as f64 / 100_000_000.0
+        );
+        assert!(
+            aptos_balance > 100_000_000,
+            "Aptos wallet should have > 0.1 APT"
+        );
 
         println!("\n✅ All wallets verified as funded\n");
 
@@ -117,21 +149,23 @@ mod tests {
         println!("=== PHASE 2: Bitcoin Signet Seal Operations ===\n");
 
         use bitcoin::{Network as BtcNetwork, OutPoint, Txid};
-        use bitcoin_hashes::Hash as BitcoinHash;
         use bitcoin_hashes::sha256d;
+        use bitcoin_hashes::Hash as BitcoinHash;
         use csv_adapter_bitcoin::mempool_rpc::MempoolSignetRpc;
         use csv_adapter_bitcoin::wallet::{Bip86Path, SealWallet};
         use csv_adapter_bitcoin::{BitcoinAnchorLayer, BitcoinConfig, BitcoinRpc, Network};
 
         let btc_rpc = MempoolSignetRpc::new();
-        let btc_height = btc_rpc.get_block_count().expect("Failed to get block count");
+        let btc_height = btc_rpc
+            .get_block_count()
+            .expect("Failed to get block count");
         println!("  Current Signet height: {}", btc_height);
 
         let seed_bytes = hex::decode(get_env("BTC_SEED_HEX")).expect("Invalid seed hex");
         let mut seed_arr = [0u8; 64];
         seed_arr.copy_from_slice(&seed_bytes);
-        let btc_wallet = SealWallet::from_seed(&seed_arr, BtcNetwork::Signet)
-            .expect("Failed to create wallet");
+        let btc_wallet =
+            SealWallet::from_seed(&seed_arr, BtcNetwork::Signet).expect("Failed to create wallet");
 
         let txid_bytes = hex::decode(BTC_FUNDING_TXID).expect("Invalid txid hex");
         let mut txid_arr = [0u8; 32];
@@ -153,9 +187,14 @@ mod tests {
             .expect("Failed to create Bitcoin adapter");
 
         // Create seal
-        let btc_seal = btc_adapter.create_seal(Some(BTC_FUNDING_AMOUNT))
+        let btc_seal = btc_adapter
+            .create_seal(Some(BTC_FUNDING_AMOUNT))
             .expect("Failed to create Bitcoin seal");
-        println!("  ✅ Seal created: txid={}, vout={}", btc_seal.txid_hex(), btc_seal.vout);
+        println!(
+            "  ✅ Seal created: txid={}, vout={}",
+            btc_seal.txid_hex(),
+            btc_seal.vout
+        );
 
         // Publish commitment
         let commitment_data = format!("cross-chain-e2e-test-{}", chrono::Utc::now().timestamp());
@@ -172,10 +211,13 @@ mod tests {
                 println!("     Anchor TXID: {}", hex::encode(anchor.txid));
                 println!("     Block height: {}", anchor.block_height);
 
-                let inclusion = btc_adapter.verify_inclusion(anchor.clone())
+                let inclusion = btc_adapter
+                    .verify_inclusion(anchor.clone())
                     .expect("Failed to verify inclusion");
-                println!("  ✅ Inclusion proof verified (tx_index={}, block_height={})",
-                    inclusion.tx_index, inclusion.block_height);
+                println!(
+                    "  ✅ Inclusion proof verified (tx_index={}, block_height={})",
+                    inclusion.tx_index, inclusion.block_height
+                );
             }
             Err(e) => {
                 println!("  ⚠️  Publish result: {}", e);
@@ -219,7 +261,8 @@ mod tests {
         println!("  Current Sui checkpoint: {}", sui_checkpoint);
 
         // Create Sui adapter with mock RPC
-        let sui_signing_key_bytes = hex::decode(get_env("SUI_PRIVATE_KEY")).expect("Invalid Sui private key");
+        let sui_signing_key_bytes =
+            hex::decode(get_env("SUI_PRIVATE_KEY")).expect("Invalid Sui private key");
         let mut sui_seed = [0u8; 32];
         sui_seed.copy_from_slice(&sui_signing_key_bytes);
         let sui_signing_key = SigningKey::from_bytes(&sui_seed);
@@ -239,7 +282,10 @@ mod tests {
                 max_retries: 3,
             },
             seal_contract: SealContractConfig {
-                package_id: Some("0x0000000000000000000000000000000000000000000000000000000000000002".to_string()),
+                package_id: Some(
+                    "0x0000000000000000000000000000000000000000000000000000000000000002"
+                        .to_string(),
+                ),
                 module_name: "csv_seal".to_string(),
                 seal_type: "Seal".to_string(),
             },
@@ -250,9 +296,13 @@ mod tests {
             .with_signing_key(sui_signing_key);
 
         // Create seal
-        let sui_seal = sui_adapter.create_seal(Some(0))
+        let sui_seal = sui_adapter
+            .create_seal(Some(0))
             .expect("Failed to create Sui seal");
-        println!("  ✅ Seal created: object_id=0x{}", hex::encode(sui_seal.object_id));
+        println!(
+            "  ✅ Seal created: object_id=0x{}",
+            hex::encode(sui_seal.object_id)
+        );
 
         // Enforce seal
         let _ = sui_adapter.enforce_seal(sui_seal.clone());
@@ -265,11 +315,12 @@ mod tests {
         // ===================================================================
         println!("=== PHASE 4: Aptos Testnet Seal Operations ===\n");
 
-        use csv_adapter_aptos::{AptosAnchorLayer, AptosConfig, AptosNetwork};
         use csv_adapter_aptos::rpc::MockAptosRpc;
+        use csv_adapter_aptos::{AptosAnchorLayer, AptosConfig, AptosNetwork};
 
         // Verify Aptos address derivation
-        let aptos_priv_key_bytes = hex::decode(get_env("APTOS_PRIVATE_KEY")).expect("Invalid Aptos private key");
+        let aptos_priv_key_bytes =
+            hex::decode(get_env("APTOS_PRIVATE_KEY")).expect("Invalid Aptos private key");
         let mut aptos_seed = [0u8; 32];
         aptos_seed.copy_from_slice(&aptos_priv_key_bytes);
         let aptos_signing_key = SigningKey::from_bytes(&aptos_seed);
@@ -289,7 +340,7 @@ mod tests {
 
         // Check Aptos account sequence number
         let aptos_account_response: serde_json::Value = sui_client
-            .get(&format!("{}/accounts/{}", APTOS_TESTNET_RPC, APTOS_ADDRESS))
+            .get(format!("{}/accounts/{}", APTOS_TESTNET_RPC, APTOS_ADDRESS))
             .send()
             .expect("Failed to fetch Aptos account")
             .json()
@@ -308,9 +359,13 @@ mod tests {
             .expect("Failed to create Aptos adapter");
 
         // Create seal
-        let aptos_seal = aptos_adapter.create_seal(Some(0))
+        let aptos_seal = aptos_adapter
+            .create_seal(Some(0))
             .expect("Failed to create Aptos seal");
-        println!("  ✅ Seal created: account=0x{}", hex::encode(aptos_seal.account_address));
+        println!(
+            "  ✅ Seal created: account=0x{}",
+            hex::encode(aptos_seal.account_address)
+        );
 
         // Enforce seal
         let _ = aptos_adapter.enforce_seal(aptos_seal.clone());
@@ -387,7 +442,7 @@ mod tests {
         // Aptos Testnet
         print!("Aptos Testnet... ");
         let aptos_response: serde_json::Value = client
-            .get(&format!("{}/accounts/0x1", APTOS_TESTNET_RPC))
+            .get(format!("{}/accounts/0x1", APTOS_TESTNET_RPC))
             .send()
             .expect("Failed to fetch account")
             .json()

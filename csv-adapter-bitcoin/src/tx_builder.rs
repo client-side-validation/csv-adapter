@@ -408,7 +408,7 @@ mod tests {
 
         // Transaction should have valid witness data
         assert!(!result.tx.input[0].witness.is_empty());
-        assert!(result.raw_tx.len() > 0);
+        assert!(!result.raw_tx.is_empty());
     }
 
     #[test]

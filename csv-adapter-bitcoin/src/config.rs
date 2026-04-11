@@ -97,22 +97,28 @@ mod tests {
 
     #[test]
     fn test_config_validate_empty_rpc_url() {
-        let mut config = BitcoinConfig::default();
-        config.rpc_url = String::new();
+        let config = BitcoinConfig {
+            rpc_url: String::new(),
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
     }
 
     #[test]
     fn test_config_validate_zero_finality_depth() {
-        let mut config = BitcoinConfig::default();
-        config.finality_depth = 0;
+        let config = BitcoinConfig {
+            finality_depth: 0,
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
     }
 
     #[test]
     fn test_config_validate_excessive_finality_depth() {
-        let mut config = BitcoinConfig::default();
-        config.finality_depth = 1001;
+        let config = BitcoinConfig {
+            finality_depth: 1001,
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
     }
 

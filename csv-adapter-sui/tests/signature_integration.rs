@@ -46,8 +46,8 @@ mod sui_signature_tests {
         for msg in test_messages {
             let signature = signing_key.sign(&msg);
             assert!(verify_sui_signature(
-                &signature.to_bytes().to_vec(),
-                &verifying_key.to_bytes().to_vec(),
+                signature.to_bytes().as_ref(),
+                verifying_key.to_bytes().as_ref(),
                 &msg
             )
             .is_ok());

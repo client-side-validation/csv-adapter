@@ -273,12 +273,19 @@ mod tests {
 
     #[test]
     fn test_invalid_config() {
-        let mut config = AptosConfig::default();
-        config.rpc_url = "".to_string();
+        let config = AptosConfig {
+            rpc_url: "".to_string(),
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
 
-        let mut config = AptosConfig::default();
-        config.transaction.max_gas = 0;
+        let config = AptosConfig {
+            transaction: TransactionConfig {
+                max_gas: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
     }
 }

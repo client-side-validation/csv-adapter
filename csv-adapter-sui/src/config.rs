@@ -196,11 +196,19 @@ mod tests {
 
     #[test]
     fn test_config_validation() {
-        let mut config = SuiConfig::default();
-        config.seal_contract.package_id = Some("0x1234".to_string());
+        let config = SuiConfig {
+            seal_contract: SealContractConfig {
+                package_id: Some("0x1234".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
         assert!(config.validate().is_ok());
 
-        config.rpc_url = "".to_string();
+        let config = SuiConfig {
+            rpc_url: "".to_string(),
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
     }
 
@@ -213,8 +221,13 @@ mod tests {
 
     #[test]
     fn test_invalid_config() {
-        let mut config = SuiConfig::default();
-        config.seal_contract.package_id = Some("".to_string());
+        let config = SuiConfig {
+            seal_contract: SealContractConfig {
+                package_id: Some("".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
         assert!(config.validate().is_err());
     }
 }

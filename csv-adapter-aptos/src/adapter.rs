@@ -742,8 +742,8 @@ mod tests {
     fn test_parse_aptos_address() {
         let addr = parse_aptos_address("0x1").unwrap();
         assert_eq!(addr[31], 1);
-        for i in 0..31 {
-            assert_eq!(addr[i], 0);
+        for (i, byte) in addr.iter().take(31).enumerate() {
+            assert_eq!(*byte, 0, "Byte at index {} should be 0", i);
         }
     }
 

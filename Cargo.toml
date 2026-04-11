@@ -21,6 +21,8 @@ rust-version = "1.75"
 [workspace.dependencies]
 parking_lot = "0.12"
 serde = { version = "1.0.227", features = ["derive"] }
+# Force aws-lc-sys >= 0.39 to fix RUSTSEC-2026-0044 and RUSTSEC-2026-0048
+aws-lc-sys = "0.39"
 
 [workspace.lints.rust]
 missing_docs = "warn"

@@ -382,7 +382,7 @@ mod tests {
         let contract_id = Hash::new([0xAB; 32]);
         let genesis = make_genesis_commitment(contract_id);
 
-        let result = verify_ordered_commitment_chain(&[genesis.clone()]);
+        let result = verify_ordered_commitment_chain(std::slice::from_ref(&genesis));
         assert!(result.is_ok());
 
         let result = result.unwrap();

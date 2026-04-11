@@ -8,13 +8,17 @@
 
 #[cfg(feature = "rpc")]
 mod tests {
-    use csv_adapter_core::{AnchorLayer, Hash};
+    use csv_adapter_core::AnchorLayer;
     use csv_adapter_sui::{SealContractConfig, SuiAnchorLayer, SuiConfig, SuiNetwork};
     use ed25519_dalek::SigningKey;
 
     fn get_env(key: &str) -> String {
-        std::env::var(key)
-            .unwrap_or_else(|_| panic!("⚠️  {} is not set. Copy .env.example to .env and fill in your keys.", key))
+        std::env::var(key).unwrap_or_else(|_| {
+            panic!(
+                "⚠️  {} is not set. Copy .env.example to .env and fill in your keys.",
+                key
+            )
+        })
     }
 
     const TEST_ADDRESS: &str = "0x199fcbd2404ea22e5b0a0bc114e7d41cfc08819811f001b90b0a9057e05929cd";
@@ -60,7 +64,10 @@ mod tests {
 
         println!("✅ Connected to Sui Testnet");
         println!("   Latest checkpoint: {}", checkpoint_seq);
-        assert!(checkpoint_seq > 324_000_000, "Testnet checkpoint should be > 324M");
+        assert!(
+            checkpoint_seq > 324_000_000,
+            "Testnet checkpoint should be > 324M"
+        );
 
         // Step 2: Verify wallet balance
         println!("\n--- Verifying Wallet Balance ---");
@@ -90,19 +97,25 @@ mod tests {
 
         println!("✅ Wallet balance verified:");
         println!("   Address: {}", TEST_ADDRESS);
-        println!("   Balance: {} MIST ({} SUI)", total_balance, total_balance as f64 / 1_000_000_000.0);
+        println!(
+            "   Balance: {} MIST ({} SUI)",
+            total_balance,
+            total_balance as f64 / 1_000_000_000.0
+        );
         println!("   Coin objects: {}", coin_count);
         assert!(total_balance > 1_000_000_000, "Wallet should have > 1 SUI");
 
         // Step 3: Create signing key
         println!("\n--- Creating Signing Key ---");
-        let priv_key_bytes = hex::decode(get_env("SUI_PRIVATE_KEY")).expect("Invalid private key hex");
-        let signing_key = SigningKey::from_bytes(&priv_key_bytes.try_into().expect("Invalid key length"));
+        let priv_key_bytes =
+            hex::decode(get_env("SUI_PRIVATE_KEY")).expect("Invalid private key hex");
+        let signing_key =
+            SigningKey::from_bytes(&priv_key_bytes.try_into().expect("Invalid key length"));
         println!("✅ Signing key created from private key");
 
         // Step 4: Create Sui adapter with real RPC
         println!("\n--- Creating Sui Adapter ---");
-        let config = SuiConfig {
+        let _config = SuiConfig {
             network: SuiNetwork::Testnet,
             rpc_url: TESTNET_RPC.to_string(),
             checkpoint: csv_adapter_sui::CheckpointConfig {
@@ -117,7 +130,10 @@ mod tests {
                 max_retries: 3,
             },
             seal_contract: SealContractConfig {
-                package_id: Some("0x0000000000000000000000000000000000000000000000000000000000000002".to_string()),
+                package_id: Some(
+                    "0x0000000000000000000000000000000000000000000000000000000000000002"
+                        .to_string(),
+                ),
                 module_name: "csv_seal".to_string(),
                 seal_type: "Seal".to_string(),
             },
@@ -131,14 +147,14 @@ mod tests {
 
         // Step 5: Create a seal
         println!("\n--- Creating Seal ---");
-        let seal = adapter.create_seal(Some(0))
-            .expect("Failed to create seal");
+        let seal = adapter.create_seal(Some(0)).expect("Failed to create seal");
         println!("✅ Seal created:");
         println!("   Object ID: 0x{}", hex::encode(seal.object_id));
 
         // Step 6: Enforce seal (test replay prevention)
         println!("\n--- Testing Seal Enforcement ---");
-        adapter.enforce_seal(seal.clone())
+        adapter
+            .enforce_seal(seal.clone())
             .expect("First enforcement should succeed");
         println!("✅ First enforcement succeeded");
 
@@ -148,7 +164,10 @@ mod tests {
 
         println!("\n=== Sui Testnet Real E2E Test PASSED ===");
         println!("✅ Connected to Sui Testnet");
-        println!("✅ Verified wallet balance ({} SUI)", total_balance as f64 / 1_000_000_000.0);
+        println!(
+            "✅ Verified wallet balance ({} SUI)",
+            total_balance as f64 / 1_000_000_000.0
+        );
         println!("✅ Created signing key");
         println!("✅ Created and enforced seal");
         println!("✅ Verified replay prevention");

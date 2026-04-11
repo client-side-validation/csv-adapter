@@ -8,14 +8,18 @@
 
 #[cfg(feature = "rpc")]
 mod tests {
-    use csv_adapter_aptos::{AptosAnchorLayer, AptosConfig, AptosNetwork};
     use csv_adapter_aptos::rpc::MockAptosRpc;
+    use csv_adapter_aptos::{AptosAnchorLayer, AptosConfig, AptosNetwork};
     use csv_adapter_core::AnchorLayer;
     use ed25519_dalek::SigningKey;
 
     fn get_env(key: &str) -> String {
-        std::env::var(key)
-            .unwrap_or_else(|_| panic!("⚠️  {} is not set. Copy .env.example to .env and fill in your keys.", key))
+        std::env::var(key).unwrap_or_else(|_| {
+            panic!(
+                "⚠️  {} is not set. Copy .env.example to .env and fill in your keys.",
+                key
+            )
+        })
     }
 
     const TEST_ADDRESS: &str = "0x4e8e35b340112baca1ca18e422da4c7d447d17fa560fbfd0e0c24de3de239b1b";
@@ -28,20 +32,21 @@ mod tests {
 
         // Step 1: Verify address derivation
         println!("\n--- Verifying Address Derivation ---");
-        let priv_key_bytes = hex::decode(get_env("APTOS_PRIVATE_KEY")).expect("Invalid private key hex");
+        let priv_key_bytes =
+            hex::decode(get_env("APTOS_PRIVATE_KEY")).expect("Invalid private key hex");
         let mut seed = [0u8; 32];
         seed.copy_from_slice(&priv_key_bytes);
-        
+
         let signing_key = SigningKey::from_bytes(&seed);
         let verifying_key = signing_key.verifying_key();
-        
+
         // Aptos address: SHA3-256(public_key || authentication_scheme_byte)
         use sha3::{Digest, Sha3_256};
         let mut hasher = Sha3_256::new();
         hasher.update(verifying_key.as_bytes());
         hasher.update([0x00]);
         let auth_key = hasher.finalize();
-        
+
         let derived_address = format!("0x{}", hex::encode(auth_key));
         println!("✅ Address derived:");
         println!("   Derived:  {}", derived_address);
@@ -75,7 +80,10 @@ mod tests {
 
         // Step 3: Check balance
         println!("\n--- Checking Balance ---");
-        let balance_url = format!("{}/accounts/{}/balance/0x1::aptos_coin::AptosCoin", TESTNET_RPC, TEST_ADDRESS);
+        let balance_url = format!(
+            "{}/accounts/{}/balance/0x1::aptos_coin::AptosCoin",
+            TESTNET_RPC, TEST_ADDRESS
+        );
         let balance_response: String = client
             .get(&balance_url)
             .send()
@@ -83,11 +91,16 @@ mod tests {
             .text()
             .expect("Failed to read balance response");
 
-        let balance: u64 = balance_response.trim()
+        let balance: u64 = balance_response
+            .trim()
             .parse()
             .expect("Failed to parse balance");
 
-        println!("💰 Account balance: {} octas ({} APT)", balance, balance as f64 / 100_000_000.0);
+        println!(
+            "💰 Account balance: {} octas ({} APT)",
+            balance,
+            balance as f64 / 100_000_000.0
+        );
         assert!(balance >= 1_000_000_000, "Account should have >= 1 APT");
 
         // Step 4: Create adapter and test functionality
@@ -96,18 +109,18 @@ mod tests {
 
         // Create adapter with mock RPC (real RPC requires full Aptos SDK)
         let mock_rpc = Box::new(MockAptosRpc::new(5000));
-        let adapter = AptosAnchorLayer::from_config(config, mock_rpc)
-            .expect("Failed to create adapter");
+        let adapter =
+            AptosAnchorLayer::from_config(config, mock_rpc).expect("Failed to create adapter");
 
         // Step 5: Create a seal
         println!("\n--- Creating Seal ---");
-        let seal = adapter.create_seal(Some(0))
-            .expect("Failed to create seal");
+        let seal = adapter.create_seal(Some(0)).expect("Failed to create seal");
         println!("✅ Seal created");
 
         // Step 6: Test enforcement
         println!("\n--- Testing Seal Enforcement ---");
-        adapter.enforce_seal(seal.clone())
+        adapter
+            .enforce_seal(seal.clone())
             .expect("First enforcement should succeed");
         println!("✅ First enforcement succeeded");
 

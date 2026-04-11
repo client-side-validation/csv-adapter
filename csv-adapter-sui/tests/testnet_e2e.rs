@@ -26,7 +26,7 @@
 #[test]
 #[ignore]
 fn test_sui_testnet_e2e_publish_and_verify() {
-    use csv_adapter_core::{AnchorLayer, Hash};
+    use csv_adapter_core::AnchorLayer;
     use csv_adapter_sui::SuiAnchorLayer;
 
     println!("=== Sui Testnet E2E Test (Mock Mode) ===");

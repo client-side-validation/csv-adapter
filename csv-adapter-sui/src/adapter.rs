@@ -248,9 +248,16 @@ impl SuiAnchorLayer {
     /// Create a new adapter with mock RPC for testing (only in debug builds).
     #[cfg(debug_assertions)]
     pub fn with_mock() -> SuiResult<Self> {
-        let mut config = SuiConfig::default();
-        config.seal_contract.package_id =
-            Some("0x0000000000000000000000000000000000000000000000000000000000000002".to_string());
+        let config = SuiConfig {
+            seal_contract: crate::SealContractConfig {
+                package_id: Some(
+                    "0x0000000000000000000000000000000000000000000000000000000000000002"
+                        .to_string(),
+                ),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
         let rpc = Box::new(crate::rpc::MockSuiRpc::new(1000));
         Self::from_config(config, rpc)
     }
@@ -802,8 +809,8 @@ mod tests {
             parse_object_id("0x0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap();
         assert_eq!(id[31], 1);
-        for i in 0..31 {
-            assert_eq!(id[i], 0);
+        for (i, byte) in id.iter().take(31).enumerate() {
+            assert_eq!(*byte, 0, "Byte at index {} should be 0", i);
         }
     }
 
