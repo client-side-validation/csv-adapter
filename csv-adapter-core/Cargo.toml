@@ -3,7 +3,20 @@ name = "csv-adapter-core"
 version = "0.1.0"
 edition = "2021"
 description = "Chain-agnostic core traits and types for CSV (Client-Side Validation) adapters"
-license = "MIT"
+license = "MIT OR Apache-2.0"
+authors = ["Amin Razavi, Qwen3"]
+repository = "https://github.com/zorvan/csv-adapter"
+homepage = "https://github.com/zorvan/csv-adapter"
+documentation = "https://docs.rs/csv-adapter-core"
+readme = "README.md"
+keywords = ["blockchain", "cryptography", "client-side-validation", "cross-chain", "smart-contracts"]
+categories = ["cryptography::cryptocurrencies", "authentication"]
+publish = true
+rust-version = "1.75"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"], default-features = false }
@@ -24,3 +37,11 @@ tapret = ["bitcoin"]
 ed25519-dalek = { version = "2.0", features = ["rand_core"] }
 rand = "0.8"
 proptest = "1.4"
+
+[[example]]
+name = "basic_right"
+path = "examples/basic_right.rs"
+
+[[example]]
+name = "commitment_chain"
+path = "examples/commitment_chain.rs"

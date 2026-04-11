@@ -30,7 +30,10 @@ pub const DEFAULT_CIRCUIT_MAX_FAILURES: usize = 5;
 /// Default reset timeout for circuit breaker
 pub const DEFAULT_CIRCUIT_RESET_TIMEOUT: Duration = Duration::from_secs(60);
 
-/// Bounded queue for seal registry operations
+/// Bounded queue for enforcing size limits on collections
+///
+/// Prevents unbounded growth of caches, registries, and other
+/// in-memory data structures that could lead to memory exhaustion.
 #[derive(Clone, Debug)]
 pub struct BoundedQueue<T> {
     queue: VecDeque<T>,
@@ -38,6 +41,7 @@ pub struct BoundedQueue<T> {
 }
 
 impl<T> BoundedQueue<T> {
+    /// Create a new bounded queue with the given maximum size
     pub fn new(max_size: usize) -> Self {
         Self {
             queue: VecDeque::new(),
@@ -45,6 +49,9 @@ impl<T> BoundedQueue<T> {
         }
     }
 
+    /// Push an item to the back of the queue
+    ///
+    /// Returns `true` if the item was added, `false` if the queue is full.
     pub fn push(&mut self, item: T) -> bool {
         if self.queue.len() >= self.max_size {
             return false;
@@ -53,18 +60,22 @@ impl<T> BoundedQueue<T> {
         true
     }
 
+    /// Pop an item from the front of the queue (FIFO order)
     pub fn pop(&mut self) -> Option<T> {
         self.queue.pop_front()
     }
 
+    /// Returns the number of items in the queue
     pub fn len(&self) -> usize {
         self.queue.len()
     }
 
+    /// Returns `true` if the queue is empty
     pub fn is_empty(&self) -> bool {
         self.queue.is_empty()
     }
 
+    /// Returns `true` if the queue is at maximum capacity
     pub fn is_full(&self) -> bool {
         self.queue.len() >= self.max_size
     }
@@ -76,15 +87,21 @@ impl<T> Default for BoundedQueue<T> {
     }
 }
 
-/// Circuit breaker state
+/// Circuit breaker state for managing service availability
 #[derive(Clone, Debug, PartialEq)]
 pub enum CircuitState {
+    /// Normal operation — requests are allowed
     Closed,
+    /// Failure threshold exceeded — requests are blocked
     Open,
+    /// Testing recovery — a single request is allowed through
     HalfOpen,
 }
 
-/// Circuit breaker for failure detection
+/// Circuit breaker for failure detection and automatic service isolation
+///
+/// Transitions from `Closed` to `Open` when failures exceed the threshold,
+/// then to `HalfOpen` after a timeout period to test recovery.
 pub struct CircuitBreaker {
     failure_count: usize,
     max_failures: usize,
@@ -94,6 +111,7 @@ pub struct CircuitBreaker {
 }
 
 impl CircuitBreaker {
+    /// Create a new circuit breaker with the given failure threshold and reset timeout
     pub fn new(max_failures: usize, reset_timeout: Duration) -> Self {
         Self {
             failure_count: 0,
@@ -104,6 +122,7 @@ impl CircuitBreaker {
         }
     }
 
+    /// Record a failure and potentially trip the circuit open
     pub fn record_failure(&mut self) {
         self.failure_count += 1;
         self.last_failure_time = Some(std::time::SystemTime::now());
@@ -113,11 +132,16 @@ impl CircuitBreaker {
         }
     }
 
+    /// Record a success, resetting the circuit to closed state
     pub fn record_success(&mut self) {
         self.failure_count = 0;
         self.state = CircuitState::Closed;
     }
 
+    /// Check whether a request should be allowed through
+    ///
+    /// Returns `true` if the circuit is closed, or if the timeout
+    /// has elapsed and the circuit is transitioning to half-open.
     pub fn allow_request(&mut self) -> bool {
         match self.state {
             CircuitState::Closed => true,
@@ -138,10 +162,12 @@ impl CircuitBreaker {
         }
     }
 
+    /// Returns the current circuit state
     pub fn state(&self) -> &CircuitState {
         &self.state
     }
 
+    /// Returns the current consecutive failure count
     pub fn failure_count(&self) -> usize {
         self.failure_count
     }
@@ -153,10 +179,12 @@ impl Default for CircuitBreaker {
     }
 }
 
-/// Timeout configuration
+/// Timeout configuration for RPC calls and health checks
 #[derive(Clone, Debug)]
 pub struct TimeoutConfig {
+    /// Timeout for individual RPC calls
     pub rpc_call: Duration,
+    /// Timeout for health check requests
     pub health_check: Duration,
 }
 
@@ -169,10 +197,12 @@ impl Default for TimeoutConfig {
     }
 }
 
-/// Memory limits configuration
+/// Memory limits configuration for caches and registries
 #[derive(Clone, Debug)]
 pub struct MemoryLimits {
+    /// Maximum number of entries in caches
     pub cache_size: usize,
+    /// Maximum number of entries in registries
     pub registry_size: usize,
 }
 

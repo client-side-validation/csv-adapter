@@ -10,6 +10,14 @@ members = [
 ]
 resolver = "2"
 
+[workspace.package]
+authors = ["Amin Razavi, Qwen3"]
+repository = "https://github.com/zorvan/csv-adapter"
+homepage = "https://github.com/zorvan/csv-adapter"
+license = "MIT OR Apache-2.0"
+edition = "2021"
+rust-version = "1.75"
+
 [workspace.dependencies]
 parking_lot = "0.12"
 serde = { version = "1.0.227", features = ["derive"] }

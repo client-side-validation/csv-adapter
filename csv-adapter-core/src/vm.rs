@@ -16,6 +16,7 @@ use crate::state::{GlobalState, Metadata, OwnedState, StateAssignment, StateRef,
 
 /// Errors that can occur during VM execution
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum VMError {
     /// Bytecode is malformed or invalid
     InvalidBytecode(String),
@@ -62,15 +63,18 @@ impl core::fmt::Display for VMError {
 }
 
 /// Input state for VM execution
+///
+/// Contains all state that must be consumed as input to a transition,
+/// including owned states, global state, metadata, and seal data.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VMInputs {
-    /// Owned state being consumed (resolved StateRef → actual state)
+    /// Owned states being consumed (resolved from StateRef)
     pub owned_inputs: Vec<OwnedState>,
     /// Current global state values
     pub global_state: Vec<GlobalState>,
     /// Transition metadata
     pub metadata: Vec<Metadata>,
-    /// Seal data being consumed (the seal that authorized this transition)
+    /// Seal data being consumed (authorizes this transition)
     pub seal_data: Vec<u8>,
 }
 
@@ -191,7 +195,7 @@ pub trait DeterministicVM {
 /// It validates that total input value >= total output value for
 /// each type ID (conservation of supply).
 pub struct PassthroughVM {
-    /// Maximum execution steps (for loop detection)
+    /// Maximum execution steps before loop detection triggers
     pub max_steps: u64,
 }
 

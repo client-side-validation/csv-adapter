@@ -91,6 +91,7 @@ pub struct InMemorySealStore {
 }
 
 impl InMemorySealStore {
+    /// Create a new empty in-memory store
     pub fn new() -> Self {
         Self {
             seals: Vec::new(),
@@ -198,6 +199,7 @@ impl SealStore for InMemorySealStore {
 
 /// Store error types
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum StoreError {
     /// Database I/O error
     IoError(String),

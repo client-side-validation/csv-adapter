@@ -18,6 +18,9 @@ use crate::transition::Transition;
 pub const CONSIGNMENT_VERSION: u8 = 1;
 
 /// Anchor proof: links a commitment to an on-chain reference
+///
+/// An anchor provides cryptographic proof that a commitment was
+/// published to a blockchain at a specific location.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Anchor {
     /// Anchor reference (on-chain location of the commitment)
@@ -31,7 +34,7 @@ pub struct Anchor {
 }
 
 impl Anchor {
-    /// Create a new anchor
+    /// Create a new anchor from its components
     pub fn new(
         anchor_ref: AnchorRef,
         commitment: Hash,
@@ -48,9 +51,11 @@ impl Anchor {
 }
 
 /// Seal assignment record in a consignment
+///
+/// Records which state was assigned to which seal during a transition.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SealAssignment {
-    /// Seal being assigned
+    /// Seal being assigned to
     pub seal_ref: crate::seal::SealRef,
     /// State being assigned to this seal
     pub assignment: StateAssignment,
@@ -286,15 +291,16 @@ impl Consignment {
 
 /// Consignment validation errors
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum ConsignmentError {
-    /// Version mismatch
+    /// Version mismatch between expected and actual consignment
     VersionMismatch { expected: u8, actual: u8 },
     /// Schema ID doesn't match between genesis and consignment
     SchemaMismatch {
         genesis_schema: Hash,
         consignment_schema: Hash,
     },
-    /// Contract ID inconsistency
+    /// Contract ID inconsistency between components
     ContractIdMismatch,
     /// Transition count doesn't match anchor count
     AnchorCountMismatch { transitions: usize, anchors: usize },

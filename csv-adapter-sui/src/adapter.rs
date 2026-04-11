@@ -242,7 +242,8 @@ impl SuiAnchorLayer {
     /// Create a new adapter with mock RPC for testing (only in debug builds).
     #[cfg(debug_assertions)]
     pub fn with_mock() -> SuiResult<Self> {
-        let config = SuiConfig::default();
+        let mut config = SuiConfig::default();
+        config.seal_contract.package_id = Some("0x0000000000000000000000000000000000000000000000000000000000000002".to_string());
         let rpc = Box::new(crate::rpc::MockSuiRpc::new(1000));
         Self::from_config(config, rpc)
     }

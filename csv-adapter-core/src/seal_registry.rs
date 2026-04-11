@@ -35,15 +35,21 @@ use crate::seal::SealRef;
 
 /// The chain that enforces this seal's single-use.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub enum ChainId {
+    /// Bitcoin chain (UTXO seals)
     Bitcoin,
+    /// Sui blockchain (Object seals)
     Sui,
+    /// Aptos blockchain (Resource seals)
     Aptos,
+    /// Ethereum blockchain (Nullifier seals)
     Ethereum,
+    /// Custom or unknown chain
     Custom(String),
 }
 
-/// A seal consumption event.
+/// A seal consumption event recording when and where a seal was used.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SealConsumption {
     /// Which chain enforced this consumption
@@ -62,15 +68,16 @@ pub struct SealConsumption {
 
 /// Result of checking if a seal has been consumed.
 #[derive(Debug, Clone)]
+#[allow(missing_docs)]
 pub enum SealStatus {
     /// Seal has not been consumed
     Unconsumed,
-    /// Seal was consumed on this chain
+    /// Seal was consumed on a specific chain
     ConsumedOnChain {
         chain: ChainId,
         consumption: SealConsumption,
     },
-    /// Seal was consumed on multiple chains (double-spend!)
+    /// Seal was consumed on multiple chains (double-spend detected)
     DoubleSpent { consumptions: Vec<SealConsumption> },
 }
 
@@ -216,6 +223,7 @@ impl CrossChainSealRegistry {
 
 /// Error returned when a double-spend is detected.
 #[derive(Debug, Clone)]
+#[allow(missing_docs)]
 pub struct DoubleSpendError {
     /// The seal that was double-spent
     pub seal_ref: SealRef,

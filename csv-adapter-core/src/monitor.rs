@@ -16,17 +16,17 @@ use crate::store::{SealStore, StoreError};
 pub struct ReorgEvent {
     /// Chain identifier
     pub chain: String,
-    /// Fork point (last common block)
+    /// Fork point (last common block height)
     pub fork_height: u64,
     /// Depth of the reorg (blocks invalidated)
     pub depth: u64,
-    /// Old chain tip hash
+    /// Old chain tip hash (now orphaned)
     pub old_tip: [u8; 32],
-    /// New chain tip hash
+    /// New chain tip hash (current best chain)
     pub new_tip: [u8; 32],
 }
 
-/// Chain tip tracker for reorg detection
+/// Chain tip tracker for detecting blockchain reorganizations
 pub struct ReorgMonitor {
     /// Known chain tips (chain → (height, hash))
     tips: BTreeMap<String, (u64, [u8; 32])>,
@@ -35,6 +35,7 @@ pub struct ReorgMonitor {
 }
 
 impl ReorgMonitor {
+    /// Create a new reorg monitor with empty state
     pub fn new() -> Self {
         Self {
             tips: BTreeMap::new(),
@@ -42,7 +43,7 @@ impl ReorgMonitor {
         }
     }
 
-    /// Update the chain tip. Returns Some(ReorgEvent) if a reorg is detected.
+    /// Update the chain tip. Returns `Some(ReorgEvent)` if a reorg is detected.
     pub fn update_tip(
         &mut self,
         chain: &str,
@@ -85,7 +86,7 @@ impl ReorgMonitor {
         Ok(removed)
     }
 
-    /// Get recent reorgs for a chain
+    /// Get recent reorgs for a specific chain
     pub fn recent_reorgs(&self, chain: &str) -> Vec<&ReorgEvent> {
         self.reorgs.iter().filter(|r| r.chain == chain).collect()
     }
@@ -102,25 +103,30 @@ impl Default for ReorgMonitor {
     }
 }
 
-/// Publication tracker for censorship detection
+/// Publication tracker for detecting censorship or stuck transactions
 ///
-/// Tracks pending publications and alerts if they're not included
-/// within the configured timeout.
+/// Tracks pending publications and flags them if not included
+/// within the configured timeout period.
 pub struct PublicationTracker {
-    /// Pending publications (chain → Vec<(tx_hash, submitted_at)>)
+    /// Pending publications (chain → Vec)
     pending: BTreeMap<String, Vec<PendingPublication>>,
     /// Publication timeout in seconds
     pub timeout_seconds: u64,
 }
 
+/// Represents a transaction awaiting on-chain inclusion
 #[derive(Clone, Debug)]
 pub struct PendingPublication {
+    /// Transaction hash
     pub tx_hash: Vec<u8>,
+    /// Commitment hash being published
     pub commitment_hash: Hash,
-    pub submitted_at: u64, // Unix epoch seconds
+    /// Unix epoch seconds when submission occurred
+    pub submitted_at: u64,
 }
 
 impl PublicationTracker {
+    /// Create a new tracker with the given timeout
     pub fn new(timeout_seconds: u64) -> Self {
         Self {
             pending: BTreeMap::new(),

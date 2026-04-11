@@ -191,6 +191,7 @@ mod tests {
     #[test]
     fn test_config_validation() {
         let mut config = SuiConfig::default();
+        config.seal_contract.package_id = Some("0x1234".to_string());
         assert!(config.validate().is_ok());
 
         config.rpc_url = "".to_string();

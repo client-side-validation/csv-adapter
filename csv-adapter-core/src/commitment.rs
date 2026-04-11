@@ -1,9 +1,14 @@
 //! Commitment type with canonical encoding (MPC-aware, multi-protocol)
 //!
 //! Commitments bind off-chain state transitions to the anchoring layer.
+//! Each commitment is a node in a **commitment chain** — a sequence of
+//! linked state transitions that clients validate independently of the blockchain.
+//!
+//! ## Stability Guarantee
 //!
 //! **Only V2 is supported.** V1 was removed to prevent silent divergence
-//! between clients. All commitments must use the V2 format.
+//! between clients. All commitments must use the V2 format. This format
+//! will not change without a version bump and backward-compatible migration.
 
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
@@ -14,29 +19,96 @@ use crate::mpc::MpcTree;
 use crate::seal::SealRef;
 use crate::tagged_hash::csv_tagged_hash;
 
-/// Current commitment version
+/// Current commitment format version.
+///
+/// This constant is the authoritative version number. Any commitment
+/// with `version != COMMITMENT_VERSION` should be rejected.
 pub const COMMITMENT_VERSION: u8 = 2;
 
-/// Commitment (MPC-aware, multi-protocol)
+/// A V2 commitment binding state to an anchor.
 ///
-/// This is the only supported commitment format. Legacy V1 was removed
-/// to prevent silent divergence between clients.
+/// A commitment is the core data structure in CSV. It captures everything
+/// needed to verify a state transition:
+///
+/// - **Which protocol** it belongs to (`protocol_id`)
+/// - **What state** it represents (`mpc_root`, `contract_id`)
+/// - **Where it came from** (`previous_commitment`)
+/// - **What changed** (`transition_payload_hash`)
+/// - **What seal was consumed** (`seal_id`)
+/// - **Which chain context** it's valid in (`domain_separator`)
+///
+/// ## Commitment Chain
+///
+/// Commitments form a linked chain: each commitment references the hash
+/// of the previous one via `previous_commitment`. Clients validate the
+/// entire chain from genesis to the current state without querying the
+/// blockchain for each step.
+///
+/// ## Collision Resistance
+///
+/// Each field is hashed with a unique domain tag (e.g., `"commitment-version"`,
+/// `"commitment-protocol-id"`) using [`csv_tagged_hash`]. This prevents
+/// cross-field and cross-protocol collision attacks where an attacker could
+/// rearrange field bytes to forge a valid-looking commitment.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Commitment {
+    /// Format version. Currently always [`COMMITMENT_VERSION`].
     pub version: u8,
-    /// Protocol this commitment belongs to
+
+    /// Protocol identifier this commitment belongs to.
+    ///
+    /// This is a 32-byte namespace that isolates commitments from different
+    /// protocols sharing the same anchoring layer. For example:
+    /// - Bitcoin adapter: `b"CSV-BTC-\x00\x00..."` (magic bytes padded)
+    /// - Ethereum adapter: `b"CSV-ETH-\x00\x00..."`
     pub protocol_id: [u8; 32],
-    /// MPC tree root (all protocols sharing this witness)
+
+    /// Merkle root of the MPC tree for multi-protocol witnessing.
+    ///
+    /// When multiple protocols share a single witness (e.g., a threshold
+    /// signature spanning Bitcoin and Ethereum), this root commits to
+    /// all participating protocols' individual roots.
+    ///
+    /// For single-protocol use (the common case), this is set to a
+    /// deterministic empty root: `SHA256("csv-empty-mpc-root")`.
     pub mpc_root: Hash,
-    /// Unique contract identifier
+
+    /// Unique contract/right identifier.
+    ///
+    /// For NFTs, this is the token ID. For credentials, this is the
+    /// credential hash. For assets, this is the asset identifier.
+    ///
+    /// Must be unique within the protocol namespace.
     pub contract_id: Hash,
-    /// Previous commitment hash
+
+    /// Hash of the previous commitment in the chain.
+    ///
+    /// For the first commitment (genesis), this is typically `Hash::zero()`.
+    /// For subsequent commitments, this is `previous_commitment.hash()`.
+    ///
+    /// This forms the commitment chain that clients validate independently.
     pub previous_commitment: Hash,
-    /// Hash of the transition payload
+
+    /// SHA-256 hash of the state transition payload.
+    ///
+    /// This commits to the actual data being transitioned (e.g., new owner,
+    /// metadata update, transfer details). Clients must verify this hash
+    /// matches the payload they expect.
     pub transition_payload_hash: Hash,
-    /// Seal reference hash
+
+    /// SHA-256 hash of the consumed seal reference.
+    ///
+    /// This binds the commitment to the specific seal that was consumed
+    /// to authorize this transition. The seal reference includes the
+    /// chain-specific identifier (UTXO txid, object ID, etc.) and the
+    /// seal's nonce/value.
     pub seal_id: Hash,
-    /// Domain separator for chain-specific isolation
+
+    /// Domain separator for chain-specific commitment isolation.
+    ///
+    /// Prevents cross-chain replay attacks by ensuring a commitment
+    /// created on one chain cannot be used on another. Typically
+    /// constructed as `H(chain_id || network || protocol_version)`.
     pub domain_separator: [u8; 32],
 }
 

@@ -15,18 +15,19 @@ use crate::transition::Transition;
 
 /// Schema validation errors
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum SchemaError {
     /// Type ID not defined in schema
     TypeNotFound { type_id: StateTypeId },
     /// Transition ID not defined in schema
     TransitionNotFound { transition_id: u16 },
-    /// Transition input type mismatch
+    /// Transition input types don't match schema definition
     InputTypeMismatch {
         transition_id: u16,
         expected: Vec<StateTypeId>,
         actual: Vec<StateTypeId>,
     },
-    /// Transition output type mismatch
+    /// Transition output types don't match schema definition
     OutputTypeMismatch {
         transition_id: u16,
         expected: Vec<StateTypeId>,
@@ -71,8 +72,9 @@ impl core::fmt::Display for SchemaError {
 
 /// Transition validation errors
 #[derive(Debug)]
+#[allow(missing_docs)]
 pub enum TransitionValidationError {
-    /// Input state not found
+    /// Input state type not found in schema
     InputNotFound { type_id: StateTypeId },
     /// Output state type not defined in schema
     OutputTypeNotDefined { type_id: StateTypeId },
@@ -136,19 +138,23 @@ impl StateDataType {
 }
 
 /// Definition of a global state type in the schema
+///
+/// Global state types represent shared, non-owned state that all
+/// participants can see but no single party owns (e.g., total supply).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GlobalStateType {
     /// Type ID (unique within schema)
     pub type_id: StateTypeId,
     /// Human-readable name
     pub name: String,
-    /// Data type
+    /// Data type for values of this state
     pub data_type: StateDataType,
-    /// Whether this state is homomorphic (supports additive operations)
+    /// Whether this state supports homomorphic operations (e.g., additive commitments)
     pub is_homomorphic: bool,
 }
 
 impl GlobalStateType {
+    /// Create a new global state type definition
     pub fn new(
         type_id: StateTypeId,
         name: impl Into<String>,
@@ -165,19 +171,23 @@ impl GlobalStateType {
 }
 
 /// Definition of an owned state type in the schema
+///
+/// Owned state types represent state that is controlled by a specific
+/// owner (tied to a seal). These are the primary vehicle for rights.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OwnedStateType {
     /// Type ID (unique within schema)
     pub type_id: StateTypeId,
     /// Human-readable name
     pub name: String,
-    /// Data type
+    /// Data type for values of this state
     pub data_type: StateDataType,
     /// Whether this state represents a fungible asset (adds to total supply)
     pub is_fungible: bool,
 }
 
 impl OwnedStateType {
+    /// Create a new owned state type definition
     pub fn new(
         type_id: StateTypeId,
         name: impl Into<String>,
@@ -194,6 +204,9 @@ impl OwnedStateType {
 }
 
 /// Transition definition in the schema
+///
+/// Defines what inputs a transition consumes, what outputs it produces,
+/// and what validation script must pass.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransitionDef {
     /// Transition ID (unique within schema)
@@ -206,11 +219,12 @@ pub struct TransitionDef {
     pub owned_outputs: Vec<StateTypeId>,
     /// Updated global state type IDs
     pub global_updates: Vec<StateTypeId>,
-    /// Validation script (bytecode for the VM)
+    /// Validation script bytecode (executed by the VM)
     pub validation_script: Vec<u8>,
 }
 
 impl TransitionDef {
+    /// Create a new transition definition
     pub fn new(
         transition_id: u16,
         name: impl Into<String>,

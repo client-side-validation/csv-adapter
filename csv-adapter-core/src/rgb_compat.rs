@@ -15,7 +15,7 @@ use crate::tapret_verify;
 /// RGB-specific consignment validation result
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RgbValidationResult {
-    /// Whether the consignment is valid
+    /// Whether the consignment is valid under RGB rules
     pub is_valid: bool,
     /// Validation errors (empty if valid)
     pub errors: Vec<RgbValidationError>,
@@ -25,10 +25,11 @@ pub struct RgbValidationResult {
     pub contract_id: Hash,
 }
 
-/// RGB-specific validation error
+/// RGB-specific validation errors
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub enum RgbValidationError {
-    /// Topological ordering violation
+    /// Topological ordering violation in transitions
     TopologicalOrderViolation {
         transition_index: usize,
         depends_on: usize,
@@ -55,18 +56,18 @@ pub enum RgbValidationError {
         transition_index: usize,
         error: String,
     },
-    /// Genesis has non-zero inputs (invalid)
+    /// Genesis has non-zero inputs (invalid for RGB)
     GenesisHasInputs,
-    /// Value conservation violation (fungible assets)
+    /// Value conservation violation (fungible assets inflated)
     ValueInflation {
         transition_index: usize,
         type_id: u16,
         input_sum: u64,
         output_sum: u64,
     },
-    /// Missing schema for validation
+    /// Missing schema required for validation
     MissingSchema,
-    /// Invalid signature on transition
+    /// Invalid signature on a transition
     InvalidSignature { transition_index: usize },
 }
 
@@ -349,8 +350,9 @@ impl CrossChainValidator {
 
 /// Cross-chain validation error
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub enum CrossChainError {
-    /// Commitment hash doesn't match across chains
+    /// Commitment hash doesn't match between source and destination chains
     CommitmentMismatch {
         anchor_index: usize,
         expected: Hash,

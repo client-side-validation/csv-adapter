@@ -23,17 +23,17 @@ use crate::seal::SealRef;
 pub struct StateTransitionRecord {
     /// The commitment that resulted from this transition
     pub commitment: Commitment,
-    /// The seal that was consumed/assigned
+    /// The seal that was consumed or assigned
     pub seal_ref: SealRef,
     /// The Rights involved in this transition
     pub rights: Vec<Right>,
-    /// Block height when this was anchored
+    /// Block height when this was anchored on-chain
     pub block_height: u64,
-    /// Whether this has been verified by the client
+    /// Whether this transition has been verified by the client
     pub verified: bool,
 }
 
-/// A contract's full state history.
+/// A contract's full state history from genesis to present.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ContractHistory {
     /// The contract's unique identifier
@@ -42,9 +42,9 @@ pub struct ContractHistory {
     pub transitions: Vec<StateTransitionRecord>,
     /// Current active Rights (not yet consumed)
     pub active_rights: BTreeMap<Hash, Right>,
-    /// All consumed seals
+    /// All consumed seals indexed by seal ID
     pub consumed_seals: BTreeMap<Vec<u8>, SealRef>,
-    /// The latest commitment hash
+    /// The latest commitment hash in the chain
     pub latest_commitment_hash: Hash,
 }
 
@@ -180,6 +180,7 @@ impl StateHistoryStore for InMemoryStateStore {
 
 /// Errors that can occur in state storage.
 #[derive(Debug, thiserror::Error)]
+#[allow(missing_docs)]
 pub enum StoreError {
     #[error("Contract not found: {0}")]
     ContractNotFound(Hash),

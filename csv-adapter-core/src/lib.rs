@@ -1,12 +1,28 @@
-//! CSV Adapter Core - Chain-agnostic traits and types for Client-Side Validation
+//! CSV Core — Client-Side Validation for Cross-Chain Rights
 //!
-//! This crate provides the foundational abstractions for anchoring CSV logic
-//! to heterogeneous base layers without modifying the CSV core.
+//! This crate provides the foundational types and traits for the CSV protocol:
+//!
+//! - **[`Right`]** — A verifiable, single-use digital right that can be
+//!   transferred cross-chain
+//! - **[`struct@Hash`]** — A 32-byte cryptographic hash (SHA-256 based)
+//! - **[`Commitment`]** — A binding between a right's state and its anchor
+//!   on a blockchain
+//! - **[`SealRef`]** / **[`AnchorRef`]** — References to consumed seals
+//!   and published anchors
+//! - **[`InclusionProof`]** / **[`FinalityProof`]** / **[`ProofBundle`]** —
+//!   Cryptographic proofs that a right was locked on the source chain
+//! - **[`AnchorLayer`]** — The core trait each blockchain adapter implements
+//! - **[`SignatureScheme`]** — Supported signing algorithms (secp256k1, ed25519)
+//!
+//! ## Stability
+//!
+//! The types re-exported from this module are considered **stable API**.
+//! They will not change without a semver-major version bump. Internal modules
+//! (state machine, VM, MPC) may evolve as the protocol matures.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![warn(missing_docs)]
 #![warn(rustdoc::broken_intra_doc_links)]
-#![allow(missing_docs)]
 
 extern crate alloc;
 

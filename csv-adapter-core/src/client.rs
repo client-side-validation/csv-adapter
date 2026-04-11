@@ -57,8 +57,9 @@ pub enum ValidationResult {
     },
 }
 
-/// Errors that can occur during validation.
+/// Errors that can occur during consignment validation.
 #[derive(Debug, thiserror::Error)]
+#[allow(missing_docs)]
 pub enum ValidationError {
     #[error("Empty consignment")]
     EmptyConsignment,

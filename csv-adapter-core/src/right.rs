@@ -481,18 +481,25 @@ impl Right {
 /// Right validation errors.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum RightError {
+    /// The ownership proof is missing from the Right
     #[error("Missing ownership proof")]
     MissingOwnershipProof,
+    /// The ownership proof failed cryptographic signature verification
     #[error("Invalid ownership proof: signature verification failed")]
     InvalidOwnershipProof,
+    /// The commitment is invalid (zero hash)
     #[error("Invalid commitment (zero hash)")]
     InvalidCommitment,
+    /// The Right has already been consumed and cannot be used again
     #[error("Right has already been consumed")]
     AlreadyConsumed,
+    /// The nullifier is invalid or does not match the expected format
     #[error("Invalid nullifier")]
     InvalidNullifier,
+    /// The canonical encoding of the Right is invalid
     #[error("Invalid canonical encoding")]
     InvalidEncoding,
+    /// The RightId does not match the computed H(commitment || salt)
     #[error("Invalid RightId: does not match H(commitment || salt)")]
     InvalidRightId,
 }

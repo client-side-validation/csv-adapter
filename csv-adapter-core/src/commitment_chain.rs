@@ -48,6 +48,7 @@ pub struct ChainVerificationResult {
 
 /// Errors that can occur during commitment chain verification.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[allow(missing_docs)]
 pub enum ChainError {
     #[error("Empty commitment chain")]
     EmptyChain,

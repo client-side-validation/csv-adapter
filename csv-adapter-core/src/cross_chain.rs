@@ -15,10 +15,15 @@ use crate::seal::SealRef;
 
 /// Chain identifier for cross-chain transfers.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub enum ChainId {
+    /// Bitcoin (UTXO seals)
     Bitcoin,
+    /// Sui (Object seals)
     Sui,
+    /// Aptos (Resource seals)
     Aptos,
+    /// Ethereum (Nullifier seals)
     Ethereum,
 }
 
@@ -56,7 +61,7 @@ impl core::fmt::Display for ChainId {
     }
 }
 
-/// Event emitted when a Right is locked on the source chain.
+/// Event emitted when a Right is locked on the source chain for cross-chain transfer.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrossChainLockEvent {
     /// The Right being locked
@@ -65,19 +70,19 @@ pub struct CrossChainLockEvent {
     pub commitment: Hash,
     /// The owner who initiated the lock
     pub owner: OwnershipProof,
-    /// Source chain (where the Right is being locked)
+    /// Source chain where the Right is being locked
     pub source_chain: ChainId,
-    /// Destination chain
+    /// Destination chain for the transfer
     pub destination_chain: ChainId,
     /// Destination owner (may differ from source owner)
     pub destination_owner: OwnershipProof,
-    /// Source chain's seal reference (consumed)
+    /// Source chain's seal reference (consumed during lock)
     pub source_seal: SealRef,
     /// Source transaction hash
     pub source_tx_hash: Hash,
     /// Source block height
     pub source_block_height: u64,
-    /// Timestamp of lock
+    /// Unix timestamp of the lock event
     pub timestamp: u64,
 }
 
@@ -94,100 +99,129 @@ pub enum InclusionProof {
     Aptos(AptosLedgerProof),
 }
 
-/// Bitcoin Merkle proof of transaction inclusion.
+/// Bitcoin Merkle proof of transaction inclusion in a block.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub struct BitcoinMerkleProof {
+    /// Transaction ID
     pub txid: [u8; 32],
+    /// Merkle branch nodes
     pub merkle_branch: Vec<[u8; 32]>,
+    /// Serialized block header
     pub block_header: Vec<u8>,
+    /// Block height
     pub block_height: u64,
+    /// Number of confirmations
     pub confirmations: u64,
 }
 
-/// Ethereum MPT proof of receipt inclusion.
+/// Ethereum MPT proof of receipt inclusion in state.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub struct EthereumMPTProof {
+    /// Transaction hash
     pub tx_hash: [u8; 32],
+    /// Receipt root hash
     pub receipt_root: [u8; 32],
+    /// RLP-encoded receipt
     pub receipt_rlp: Vec<u8>,
+    /// MPT proof nodes
     pub merkle_nodes: Vec<Vec<u8>>,
+    /// Serialized block header
     pub block_header: Vec<u8>,
+    /// Log index in the receipt
     pub log_index: u64,
+    /// Number of confirmations
     pub confirmations: u64,
 }
 
-/// Sui checkpoint proof of transaction effects.
+/// Sui checkpoint proof of transaction effects certification.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub struct SuiCheckpointProof {
+    /// Transaction digest
     pub tx_digest: [u8; 32],
+    /// Checkpoint sequence number
     pub checkpoint_sequence: u64,
+    /// Checkpoint contents hash
     pub checkpoint_contents_hash: [u8; 32],
+    /// Transaction effects bytes
     pub effects: Vec<u8>,
+    /// Event bytes
     pub events: Vec<u8>,
+    /// Whether the checkpoint is certified
     pub certified: bool,
 }
 
 /// Aptos ledger info proof of transaction execution.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub struct AptosLedgerProof {
+    /// Transaction version
     pub version: u64,
+    /// Transaction proof bytes
     pub transaction_proof: Vec<u8>,
+    /// Ledger info bytes
     pub ledger_info: Vec<u8>,
+    /// Event bytes
     pub events: Vec<u8>,
+    /// Whether the transaction succeeded
     pub success: bool,
 }
 
-/// Finality proof — confirms source transaction is finalized.
+/// Finality proof confirming source transaction is finalized.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrossChainFinalityProof {
-    /// Source chain
+    /// Source chain identifier
     pub source_chain: ChainId,
-    /// Block/checkpoint/ledger height
+    /// Block/checkpoint/ledger height of the transaction
     pub height: u64,
-    /// Current height on source chain
+    /// Current height on the source chain
     pub current_height: u64,
-    /// Whether finality is achieved
+    /// Whether finality depth has been achieved
     pub is_finalized: bool,
-    /// Finality depth
+    /// Required finality depth in blocks
     pub depth: u64,
 }
 
-/// The complete proof bundle submitted to the destination chain.
+/// Complete proof bundle submitted to the destination chain.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrossChainTransferProof {
-    /// The lock event data
+    /// The lock event data from the source chain
     pub lock_event: CrossChainLockEvent,
     /// Inclusion proof (chain-specific format)
     pub inclusion_proof: InclusionProof,
-    /// Finality proof
+    /// Finality proof confirming source transaction
     pub finality_proof: CrossChainFinalityProof,
-    /// Source chain's state root at lock block
+    /// Source chain's state root at the lock block
     pub source_state_root: Hash,
 }
 
-/// Entry in the cross-chain seal registry.
+/// Entry in the cross-chain seal registry recording a completed transfer.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrossChainRegistryEntry {
     /// The Right's unique ID (preserved across chains)
     pub right_id: Hash,
-    /// Source chain and seal
+    /// Source chain identifier
     pub source_chain: ChainId,
+    /// Source chain's seal reference
     pub source_seal: SealRef,
-    /// Destination chain and seal
+    /// Destination chain identifier
     pub destination_chain: ChainId,
+    /// Destination chain's seal reference
     pub destination_seal: SealRef,
-    /// Lock transaction hash on source
+    /// Lock transaction hash on source chain
     pub lock_tx_hash: Hash,
-    /// Mint transaction hash on destination
+    /// Mint transaction hash on destination chain
     pub mint_tx_hash: Hash,
-    /// Timestamp of transfer
+    /// Unix timestamp of the transfer
     pub timestamp: u64,
 }
 
-/// Result of a cross-chain transfer.
+/// Result of a successful cross-chain transfer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CrossChainTransferResult {
-    /// The new Right on the destination chain
+    /// The new Right created on the destination chain
     pub destination_right: Right,
     /// The destination chain's seal reference
     pub destination_seal: SealRef,
@@ -197,6 +231,7 @@ pub struct CrossChainTransferResult {
 
 /// Errors that can occur during cross-chain transfer.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[allow(missing_docs)]
 pub enum CrossChainError {
     #[error("Right already locked on source chain")]
     AlreadyLocked,
