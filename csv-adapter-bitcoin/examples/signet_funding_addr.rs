@@ -10,7 +10,7 @@ use csv_adapter_bitcoin::wallet::SealWallet;
 
 fn main() {
     let wallet = SealWallet::generate_random(BtcNetwork::Signet);
-    let (key, path) = wallet.next_address(0).expect("Failed to derive address");
+    let (key, _path) = wallet.next_address(0).expect("Failed to derive address");
 
     println!("=== Bitcoin Signet Funding Address ===\n");
     println!("  Address:  {}", key.address);

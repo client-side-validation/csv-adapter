@@ -21,7 +21,7 @@ fn main() {
     }
 
     let wallet = SealWallet::from_seed(&seed, BtcNetwork::Signet).unwrap();
-    let (key, path) = wallet.next_address(0).unwrap();
+    let (key, _path) = wallet.next_address(0).unwrap();
 
     println!("=== Bitcoin Signet Wallet (Fixed Seed) ===\n");
     println!("  Address:  {}", key.address);

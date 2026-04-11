@@ -284,8 +284,8 @@ impl BitcoinAnchorLayer {
 
 /// Helper to get address UTXOs from any RPC implementation
 fn get_address_utxos(
-    rpc: &dyn BitcoinRpc,
-    address: &bitcoin::Address,
+    _rpc: &dyn BitcoinRpc,
+    _address: &bitcoin::Address,
 ) -> Result<Vec<(bitcoin::OutPoint, u64)>, String> {
     // This is a placeholder - actual implementation depends on the RPC backend
     // For mempool.space, we'd use REST API

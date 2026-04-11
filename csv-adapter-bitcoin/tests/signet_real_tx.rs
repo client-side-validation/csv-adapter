@@ -32,7 +32,7 @@
 use bitcoin::{Network as BtcNetwork, OutPoint, Txid};
 use bitcoin_hashes::Hash as BitcoinHash;
 use csv_adapter_bitcoin::mempool_rpc::{get_address_utxos, MempoolSignetRpc};
-use csv_adapter_bitcoin::wallet::{Bip86Path, SealWallet};
+use csv_adapter_bitcoin::wallet::SealWallet;
 use csv_adapter_bitcoin::{
     BitcoinAnchorLayer, BitcoinConfig, BitcoinRpc, Network,
 };

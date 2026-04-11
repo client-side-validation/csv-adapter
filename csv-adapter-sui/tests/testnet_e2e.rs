@@ -56,7 +56,7 @@ fn test_sui_testnet_e2e_publish_and_verify() {
             max_retries: 3,
         },
         seal_contract: SealContractConfig {
-            package_id: package_id.clone(),
+            package_id: Some(package_id.clone()),
             module_name: "csv_seal".to_string(),
             seal_type: "Seal".to_string(),
         },

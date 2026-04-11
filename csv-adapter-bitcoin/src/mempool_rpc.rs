@@ -245,7 +245,7 @@ impl MempoolSignetRpc {
         let all_txids: Vec<[u8; 32]> = all_txids_hex
             .iter()
             .map(|t| {
-                let mut decoded = hex::decode(t)?;
+                let decoded = hex::decode(t)?;
                 let mut arr = [0u8; 32];
                 arr.copy_from_slice(&decoded);
                 Ok(arr)
