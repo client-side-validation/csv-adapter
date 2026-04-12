@@ -1,13 +1,19 @@
 /// Seals list page with filtering and pagination.
 
 use dioxus::prelude::*;
+use csv_explorer_shared::SealRecord;
 
-use crate::{components, routes};
+use crate::app::routes::Route;
 
 #[component]
 pub fn SealsList() -> Element {
-    let seals = use_resource(move || async move {
-        fetch_seals().await
+    let mut seals: Signal<Option<Vec<SealRecord>>> = use_signal(|| None);
+
+    use_effect(move || {
+        spawn(async move {
+            let result = fetch_seals().await;
+            seals.set(result);
+        });
     });
 
     rsx! {
@@ -15,7 +21,7 @@ pub fn SealsList() -> Element {
             div { class: "flex items-center justify-between",
                 h1 { class: "text-2xl font-bold", "Seals" }
                 span { class: "text-gray-400 text-sm",
-                    {seals.with(|s| match s.as_ref() {
+                    {seals.with(|s| match s {
                         Some(records) => format!("{} seals found", records.len()),
                         None => "Loading...".to_string(),
                     })}
@@ -63,28 +69,25 @@ pub fn SealsList() -> Element {
                         }
                     }
                     tbody { class: "divide-y divide-gray-800",
-                        {seals.with(|s| match s.as_ref() {
-                            Some(records) => rsx! {
-                                {records.iter().map(|seal| rsx! {
-                                    SealRow {
-                                        key: "{seal.id}",
-                                        id: seal.id.clone(),
-                                        chain: seal.chain.clone(),
-                                        seal_type: seal.seal_type.to_string(),
-                                        status: seal.status.to_string(),
-                                        right_id: seal.right_id.clone().unwrap_or_else(|| "—".to_string()),
-                                        block_height: seal.block_height,
-                                    }
-                                }).collect::<Vec<Element>>()}
-                            },
-                            None => rsx! {
-                                tr {
-                                    td { col_span: 6, class: "px-6 py-12 text-center text-gray-500",
-                                        "Loading seals..."
-                                    }
+                        if let Some(records) = seals.read().as_ref() {
+                            {records.iter().map(|seal| rsx! {
+                                SealRow {
+                                    key: "{seal.id}",
+                                    id: seal.id.clone(),
+                                    chain: seal.chain.clone(),
+                                    seal_type: seal.seal_type.to_string(),
+                                    status: seal.status.to_string(),
+                                    right_id: seal.right_id.clone().unwrap_or_else(|| "—".to_string()),
+                                    block_height: seal.block_height,
                                 }
-                            },
-                        })}
+                            })}
+                        } else {
+                            tr {
+                                td { colspan: 6, class: "px-6 py-12 text-center text-gray-500",
+                                    "Loading seals..."
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -97,13 +100,13 @@ fn SealRow(id: String, chain: String, seal_type: String, status: String, right_i
     rsx! {
         tr { class: "hover:bg-gray-800/50 transition-colors",
             td { class: "px-6 py-4",
-                Link { to: routes::Route::SealDetail { id: id.clone() },
-                    class: "font-mono text-sm text-blue-400 hover:text-blue-300"
+                Link { to: Route::SealDetail { id: id.clone() },
+                    class: "font-mono text-sm text-blue-400 hover:text-blue-300",
                     "{id}"
                 }
             }
             td { class: "px-6 py-4",
-                components::chain_badge::ChainBadge { chain }
+                crate::components::chain_badge::ChainBadge { chain }
             }
             td { class: "px-6 py-4",
                 span { class: "px-2 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-300",
@@ -111,15 +114,15 @@ fn SealRow(id: String, chain: String, seal_type: String, status: String, right_i
                 }
             }
             td { class: "px-6 py-4",
-                components::status_badge::StatusBadge { status }
+                crate::components::status_badge::StatusBadge { status }
             }
             td { class: "px-6 py-4 font-mono text-sm text-gray-300",
                 {if right_id == "—" {
                     rsx! { span { class: "text-gray-600", "—" } }
                 } else {
                     rsx! {
-                        Link { to: routes::Route::RightDetail { id: right_id.clone() },
-                            class: "text-blue-400 hover:text-blue-300"
+                        Link { to: Route::RightDetail { id: right_id.clone() },
+                            class: "text-blue-400 hover:text-blue-300",
                             "{right_id}"
                         }
                     }
@@ -132,6 +135,6 @@ fn SealRow(id: String, chain: String, seal_type: String, status: String, right_i
     }
 }
 
-async fn fetch_seals() -> Option<Vec<shared::SealRecord>> {
+async fn fetch_seals() -> Option<Vec<SealRecord>> {
     None
 }

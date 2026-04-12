@@ -28,38 +28,40 @@ pub fn TransferTimeline(status: String, created_at: String, completed_at: Option
 
     rsx! {
         div { class: "space-y-0",
-            {steps.iter().enumerate().map(|(i, step)| rsx! {
-                div { key: "{i}", class: "flex gap-4",
-                    // Line
-                    div { class: "flex flex-col items-center",
-                        div {
-                            class: "w-8 h-8 rounded-full flex items-center justify-center text-sm {step_icon_class(step.completed)}",
-                            if step.completed {
-                                "✓"
-                            } else {
-                                "○"
+            {steps.iter().enumerate().map(|(i, step)| {
+                rsx! {
+                    div { key: "{i}", class: "flex gap-4",
+                        // Line
+                        div { class: "flex flex-col items-center",
+                            div {
+                                class: "w-8 h-8 rounded-full flex items-center justify-center text-sm {step_icon_class(step.completed)}",
+                                if step.completed {
+                                    "✓"
+                                } else {
+                                    "○"
+                                }
+                            }
+                            if i < steps.len() - 1 {
+                                div { class: "w-0.5 h-12 {step_line_class(step.completed)}" }
                             }
                         }
-                        if i < steps.len() - 1 {
-                            div { class: "w-0.5 h-12 {step_line_class(step.completed)}" }
-                        }
-                    }
-                    // Content
-                    div { class: "pb-8",
-                        div { class: "font-medium {step_text_class(step.completed)}",
-                            "{step.label}"
-                        }
-                        div { class: "text-sm text-gray-500",
-                            "{step.description}"
-                        }
-                        if !step.time.is_empty() {
-                            div { class: "text-xs text-gray-600 mt-1",
-                                "{step.time}"
+                        // Content
+                        div { class: "pb-8",
+                            div { class: "font-medium {step_text_class(step.completed)}",
+                                "{step.label}"
+                            }
+                            div { class: "text-sm text-gray-500",
+                                "{step.description}"
+                            }
+                            if !step.time.is_empty() {
+                                div { class: "text-xs text-gray-600 mt-1",
+                                    "{step.time}"
+                                }
                             }
                         }
                     }
                 }
-            }).collect::<Vec<Element>>()}
+            })}
         }
     }
 }

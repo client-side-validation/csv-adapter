@@ -2,44 +2,17 @@
 
 use dioxus::prelude::*;
 
-pub mod routes {
-    use dioxus_router::prelude::*;
-    use super::*;
+use crate::app::routes::Route;
+use crate::pages::{Home, RightsList, TransfersList, SealsList, Stats, Wallet};
 
-    #[derive(Routable, Clone, PartialEq)]
-    #[rustfmt::skip]
-    pub enum Route {
-        #[route("/")]
-        Home {},
-        #[route("/rights")]
-        RightsList {},
-        #[route("/rights/:id")]
-        RightDetail { id: String },
-        #[route("/transfers")]
-        TransfersList {},
-        #[route("/transfers/:id")]
-        TransferDetail { id: String },
-        #[route("/seals")]
-        SealsList {},
-        #[route("/seals/:id")]
-        SealDetail { id: String },
-        #[route("/contracts")]
-        ContractsList {},
-        #[route("/stats")]
-        Stats {},
-        #[route("/chains")]
-        Chains {},
-        #[route("/wallet")]
-        Wallet {},
-    }
-}
+pub mod routes;
 
 /// Root application component.
 #[component]
 pub fn App() -> Element {
     rsx! {
-        document::Stylesheet { href: "/assets/tailwind.css" }
-        document::Stylesheet { href: "/assets/styles.css" }
+        // document::Stylesheet { href: "/assets/tailwind.css" }
+        // document::Stylesheet { href: "/assets/styles.css" }
 
         div { class: "min-h-screen bg-gray-950 text-gray-100",
             // Header
@@ -48,24 +21,24 @@ pub fn App() -> Element {
                     div { class: "flex items-center justify-between h-16",
                         // Logo and nav
                         div { class: "flex items-center gap-8",
-                            Link { to: routes::Route::Home {},
+                            Link { to: Route::Home {},
                                 span { class: "text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent",
                                     "CSV Explorer"
                                 }
                             }
                             nav { class: "hidden md:flex gap-6",
-                                NavLink { to: routes::Route::RightsList {}, class: "nav-link", "Rights" }
-                                NavLink { to: routes::Route::TransfersList {}, class: "nav-link", "Transfers" }
-                                NavLink { to: routes::Route::SealsList {}, class: "nav-link", "Seals" }
-                                NavLink { to: routes::Route::ContractsList {}, class: "nav-link", "Contracts" }
-                                NavLink { to: routes::Route::Stats {}, class: "nav-link", "Stats" }
-                                NavLink { to: routes::Route::Chains {}, class: "nav-link", "Chains" }
+                                NavLink { to: Route::RightsList {}, class: "nav-link".to_string(), "Rights" }
+                                NavLink { to: Route::TransfersList {}, class: "nav-link".to_string(), "Transfers" }
+                                NavLink { to: Route::SealsList {}, class: "nav-link".to_string(), "Seals" }
+                                NavLink { to: Route::ContractsList {}, class: "nav-link".to_string(), "Contracts" }
+                                NavLink { to: Route::Stats {}, class: "nav-link".to_string(), "Stats" }
+                                NavLink { to: Route::Chains {}, class: "nav-link".to_string(), "Chains" }
                             }
                         }
                         // Right side: search and wallet
                         div { class: "flex items-center gap-4",
-                            components::search::GlobalSearch {}
-                            Link { to: routes::Route::Wallet {},
+                            crate::components::search::GlobalSearch {}
+                            Link { to: Route::Wallet {},
                                 button { class: "px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium transition-colors",
                                     "Connect Wallet"
                                 }
@@ -77,7 +50,7 @@ pub fn App() -> Element {
 
             // Main content
             main { class: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8",
-                Outlet::<routes::Route> {}
+                Outlet::<Route> {}
             }
 
             // Footer

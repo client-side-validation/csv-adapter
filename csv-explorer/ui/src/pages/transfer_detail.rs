@@ -1,94 +1,95 @@
-/// Transfer detail page with full info and timeline.
+/// Transfer detail page showing full information about a cross-chain transfer.
 
 use dioxus::prelude::*;
 
-use crate::{components, routes};
+use crate::app::routes::Route;
 
 #[component]
 pub fn TransferDetail(id: String) -> Element {
-    let transfer = use_resource(move || async move {
-        fetch_transfer(&id).await
+    let mut transfer: Signal<Option<csv_explorer_shared::TransferRecord>> = use_signal(|| None);
+
+    use_effect({
+        let id = id.clone();
+        move || {
+            spawn(async move {
+                // TODO: Fetch from API when endpoint is available
+                transfer.set(None);
+            });
+        }
     });
 
     rsx! {
-        div { class: "space-y-6",
+        div { class: "space-y-8",
             // Breadcrumb
-            nav { class: "text-sm text-gray-400",
-                Link { to: routes::Route::Home {}, class: "hover:text-white", "Home" }
-                span { " / " }
-                Link { to: routes::Route::TransfersList {}, class: "hover:text-white", "Transfers" }
-                span { " / " }
-                span { class: "text-gray-200 font-mono text-xs", "{id}" }
+            div { class: "flex items-center gap-2 text-sm text-gray-500",
+                Link { to: Route::TransfersList {}, class: "hover:text-gray-300", "Transfers" }
+                span { "→" }
+                span { class: "text-gray-300 font-mono", "{id}" }
             }
 
-            if let Some(Some(t)) = transfer.value() {
-                div {
-                    // Header
-                    div { class: "flex items-center justify-between",
-                        h1 { class: "text-2xl font-bold", "Transfer Detail" }
-                        components::status_badge::StatusBadge { status: t.status.to_string() }
-                    }
+            // Header
+            div { class: "flex items-center justify-between",
+                h1 { class: "text-2xl font-bold", "Transfer Detail" }
+                if let Some(ref t) = *transfer.read() {
+                    StatusBadge { status: t.status.to_string() }
+                }
+            }
 
-                    // Route visualization
-                    div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
-                        div { class: "flex items-center justify-center gap-4 py-4",
-                            div { class: "text-center",
-                                components::chain_badge::ChainBadge { chain: t.from_chain.clone() }
-                                div { class: "text-sm text-gray-400 mt-2", "Source" }
-                            }
-                            span { class: "text-2xl text-blue-400", "→" }
-                            div { class: "text-center",
-                                components::chain_badge::ChainBadge { chain: t.to_chain.clone() }
-                                div { class: "text-sm text-gray-400 mt-2", "Destination" }
-                            }
-                        }
-                    }
-
-                    // Details grid
+            if let Some(ref t) = *transfer.read() {
+                // Transfer overview
+                div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
                     div { class: "grid grid-cols-1 md:grid-cols-2 gap-6",
-                        DetailCard { title: "Transfer ID", value: t.id.clone(), copyable: true }
-                        DetailCard { title: "Right ID", value: t.right_id.clone(), copyable: true }
-                        DetailCard { title: "From Owner", value: t.from_owner.clone(), copyable: true }
-                        DetailCard { title: "To Owner", value: t.to_owner.clone(), copyable: true }
-                        DetailCard { title: "Lock TX", value: t.lock_tx.clone(), copyable: true }
-                        if let Some(ref mint) = t.mint_tx {
-                            DetailCard { title: "Mint TX", value: mint.clone(), copyable: true }
+                        DetailRow { label: "Transfer ID", value: t.id.clone() }
+                        DetailRow { label: "Right ID", value: t.right_id.clone() }
+                        DetailRow { label: "From Chain", value: t.from_chain.clone() }
+                        DetailRow { label: "To Chain", value: t.to_chain.clone() }
+                        DetailRow { label: "From Owner", value: t.from_owner.clone() }
+                        DetailRow { label: "To Owner", value: t.to_owner.clone() }
+                        DetailRow { label: "Lock TX", value: t.lock_tx.clone() }
+                        DetailRow { label: "Created", value: t.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string() }
+                        if let Some(ref mint_tx) = t.mint_tx {
+                            DetailRow { label: "Mint TX", value: mint_tx.clone() }
                         }
-                        if let Some(ref proof) = t.proof_ref {
-                            DetailCard { title: "Proof Reference", value: proof.clone(), copyable: true }
+                        if let Some(ref proof_ref) = t.proof_ref {
+                            DetailRow { label: "Proof Reference", value: proof_ref.clone() }
                         }
-                        DetailCard { title: "Created At", value: t.created_at.to_rfc3339() }
-                        if let Some(completed) = t.completed_at {
-                            DetailCard { title: "Completed At", value: completed.to_rfc3339() }
+                        if let Some(completed_at) = t.completed_at {
+                            DetailRow { label: "Completed", value: completed_at.format("%Y-%m-%d %H:%M:%S UTC").to_string() }
                         }
-                        if let Some(duration) = t.duration_ms {
-                            DetailCard { title: "Duration", value: format!("{}ms", duration) }
+                        if let Some(duration_ms) = t.duration_ms {
+                            DetailRow { label: "Duration", value: format_duration(duration_ms) }
                         }
                     }
+                }
 
-                    // Timeline
+                // Transfer timeline
+                div {
+                    h2 { class: "text-lg font-semibold mb-4", "Transfer Progress" }
                     div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
-                        h2 { class: "text-lg font-semibold mb-6", "Transfer Timeline" }
-                        components::timeline::TransferTimeline {
+                        TransferTimeline {
                             status: t.status.to_string(),
-                            created_at: t.created_at.to_rfc3339(),
-                            completed_at: t.completed_at.map(|dt| dt.to_rfc3339()),
+                            lock_tx: t.lock_tx.clone(),
+                            mint_tx: t.mint_tx.clone(),
+                            created_at: t.created_at,
+                            completed_at: t.completed_at,
                         }
                     }
+                }
 
-                    // Raw JSON
-                    div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
-                        h2 { class: "text-lg font-semibold mb-4", "Raw Data" }
-                        pre { class: "text-sm text-gray-300 overflow-x-auto",
-                            "{serde_json::to_string_pretty(&t).unwrap_or_default()}"
+                // Related links
+                div { class: "flex items-center gap-4",
+                    Link { to: Route::RightDetail { id: t.right_id.clone() },
+                        button { class: "px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors",
+                            "View Right →"
                         }
                     }
                 }
             } else {
+                // Loading state
                 div { class: "bg-gray-900 rounded-xl border border-gray-800 p-12 text-center",
                     div { class: "animate-pulse space-y-4",
                         div { class: "h-8 bg-gray-800 rounded w-48 mx-auto" }
-                        div { class: "h-4 bg-gray-800 rounded w-96 mx-auto" }
+                        div { class: "h-4 bg-gray-800 rounded w-32 mx-auto" }
                     }
                 }
             }
@@ -97,20 +98,128 @@ pub fn TransferDetail(id: String) -> Element {
 }
 
 #[component]
-fn DetailCard(title: String, value: String, copyable: Option<bool>) -> Element {
+fn DetailRow(label: String, value: String) -> Element {
     rsx! {
-        div { class: "bg-gray-900 rounded-xl border border-gray-800 p-4",
-            div { class: "text-sm text-gray-400 mb-1", "{title}" }
-            div { class: "flex items-center gap-2",
-                span { class: "font-mono text-sm text-gray-200 break-all", "{value}" }
-                if copyable.unwrap_or(false) {
-                    button { class: "text-gray-500 hover:text-gray-300", "⧉" }
-                }
-            }
+        div {
+            div { class: "text-sm text-gray-500 mb-1", "{label}" }
+            div { class: "font-mono text-sm text-gray-200 break-all", "{value}" }
         }
     }
 }
 
-async fn fetch_transfer(_id: &str) -> Option<shared::TransferRecord> {
-    None
+#[component]
+fn StatusBadge(status: String) -> Element {
+    let color_class = match status.to_lowercase().as_str() {
+        "pending" => "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+        "in_progress" => "bg-blue-500/20 text-blue-400 border-blue-500/30",
+        "completed" => "bg-green-500/20 text-green-400 border-green-500/30",
+        "failed" => "bg-red-500/20 text-red-400 border-red-500/30",
+        _ => "bg-gray-800 text-gray-400 border-gray-700",
+    };
+
+    rsx! {
+        span { class: "px-3 py-1 rounded-full text-xs font-medium border {color_class}",
+            "{status}"
+        }
+    }
+}
+
+#[component]
+fn TransferTimeline(status: String, lock_tx: String, mint_tx: Option<String>, created_at: chrono::DateTime<chrono::Utc>, completed_at: Option<chrono::DateTime<chrono::Utc>>) -> Element {
+    let steps = vec![
+        TimelineStep {
+            label: "Lock Submitted".to_string(),
+            description: "Transaction submitted on source chain".to_string(),
+            time: created_at.format("%Y-%m-%d %H:%M").to_string(),
+            completed: true,
+        },
+        TimelineStep {
+            label: "Proof Generated".to_string(),
+            description: "Cross-chain proof generated".to_string(),
+            time: String::new(),
+            completed: matches!(status.to_lowercase().as_str(), "in_progress" | "completed"),
+        },
+        TimelineStep {
+            label: "Mint Completed".to_string(),
+            description: "Right minted on destination chain".to_string(),
+            time: completed_at.map(|t| t.format("%Y-%m-%d %H:%M").to_string()).unwrap_or_default(),
+            completed: status.to_lowercase() == "completed",
+        },
+    ];
+
+    rsx! {
+        div { class: "space-y-0",
+            {steps.iter().enumerate().map(|(i, step)| rsx! {
+                div { key: "{i}", class: "flex gap-4",
+                    div { class: "flex flex-col items-center",
+                        div {
+                            class: "w-8 h-8 rounded-full flex items-center justify-center text-sm {step_icon_class(step.completed)}",
+                            if step.completed { "✓" } else { "○" }
+                        }
+                        if i < steps.len() - 1 {
+                            div { class: "w-0.5 h-12 {step_line_class(step.completed)}" }
+                        }
+                    }
+                    div { class: "pb-8",
+                        div { class: "font-medium {step_text_class(step.completed)}",
+                            "{step.label}"
+                        }
+                        div { class: "text-sm text-gray-500",
+                            "{step.description}"
+                        }
+                        if !step.time.is_empty() {
+                            div { class: "text-xs text-gray-600 mt-1",
+                                "{step.time}"
+                            }
+                        }
+                    }
+                }
+            })}
+        }
+    }
+}
+
+struct TimelineStep {
+    label: String,
+    description: String,
+    time: String,
+    completed: bool,
+}
+
+fn step_icon_class(completed: bool) -> &'static str {
+    if completed {
+        "bg-green-500/20 text-green-400 border border-green-500/30"
+    } else {
+        "bg-gray-800 text-gray-600 border border-gray-700"
+    }
+}
+
+fn step_line_class(completed: bool) -> &'static str {
+    if completed {
+        "bg-green-500/30"
+    } else {
+        "bg-gray-800"
+    }
+}
+
+fn step_text_class(completed: bool) -> &'static str {
+    if completed {
+        "text-gray-200"
+    } else {
+        "text-gray-500"
+    }
+}
+
+fn format_duration(duration_ms: u64) -> String {
+    let seconds = duration_ms / 1000;
+    let minutes = seconds / 60;
+    let hours = minutes / 60;
+    
+    if hours > 0 {
+        format!("{}h {}m", hours, minutes % 60)
+    } else if minutes > 0 {
+        format!("{}m {}s", minutes, seconds % 60)
+    } else {
+        format!("{}s", seconds)
+    }
 }

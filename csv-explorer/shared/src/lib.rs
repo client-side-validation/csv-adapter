@@ -8,6 +8,6 @@ pub mod error;
 pub mod types;
 
 // Re-export commonly used types at the crate root for convenience.
-pub use config::{ExplorerConfig, ChainConfig};
+pub use config::{ExplorerConfig, ChainConfig, ApiConfig};
 pub use error::{ExplorerError, Result};
 pub use types::*;

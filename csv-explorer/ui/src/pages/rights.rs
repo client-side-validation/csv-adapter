@@ -1,18 +1,24 @@
 /// Rights list page with filtering, sorting, and pagination.
 
 use dioxus::prelude::*;
+use csv_explorer_shared::RightRecord;
 
-use crate::{components, routes};
+use crate::app::routes::Route;
 
 #[component]
 pub fn RightsList() -> Element {
     let chain_filter = use_signal(|| String::new());
     let status_filter = use_signal(|| String::new());
-    let search_query = use_signal(|| String::new());
-    let page = use_signal(|| 1u64);
+    let mut search_query = use_signal(|| String::new());
+    let mut page = use_signal(|| 1u64);
+    let mut rights: Signal<Option<Vec<RightRecord>>> = use_signal(|| None);
 
-    let rights = use_resource(move || async move {
-        fetch_rights(&chain_filter.read(), &status_filter.read(), page.read()).await
+    // Fetch rights when component mounts or filters change
+    use_effect(move || {
+        spawn(async move {
+            let result = fetch_rights(&chain_filter.read(), &status_filter.read(), *page.read()).await;
+            rights.set(result);
+        });
     });
 
     rsx! {
@@ -21,7 +27,7 @@ pub fn RightsList() -> Element {
             div { class: "flex items-center justify-between",
                 h1 { class: "text-2xl font-bold", "Rights" }
                 span { class: "text-gray-400 text-sm",
-                    {rights.with(|r| match r.as_ref() {
+                    {rights.with(|r| match r {
                         Some(records) => format!("{} rights found", records.len()),
                         None => "Loading...".to_string(),
                     })}
@@ -76,28 +82,25 @@ pub fn RightsList() -> Element {
                         }
                     }
                     tbody { class: "divide-y divide-gray-800",
-                        {rights.with(|r| match r.as_ref() {
-                            Some(records) => rsx! {
-                                {records.iter().map(|right| rsx! {
-                                    RightRow {
-                                        key: "{right.id}",
-                                        id: right.id.clone(),
-                                        chain: right.chain.clone(),
-                                        owner: right.owner.clone(),
-                                        status: right.status.to_string(),
-                                        created_at: right.created_at.to_rfc3339(),
-                                        transfer_count: right.transfer_count,
-                                    }
-                                }).collect::<Vec<Element>>()}
-                            },
-                            None => rsx! {
-                                tr {
-                                    td { col_span: 6, class: "px-6 py-12 text-center text-gray-500",
-                                        "Loading rights..."
-                                    }
+                        if let Some(records) = rights.read().as_ref() {
+                            {records.iter().map(|right| rsx! {
+                                RightRow {
+                                    key: "{right.id}",
+                                    id: right.id.clone(),
+                                    chain: right.chain.clone(),
+                                    owner: right.owner.clone(),
+                                    status: right.status.to_string(),
+                                    created_at: right.created_at.to_rfc3339(),
+                                    transfer_count: right.transfer_count,
                                 }
-                            },
-                        })}
+                            })}
+                        } else {
+                            tr {
+                                td { colspan: 6, class: "px-6 py-12 text-center text-gray-500",
+                                    "Loading rights..."
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -105,15 +108,23 @@ pub fn RightsList() -> Element {
             // Pagination
             div { class: "flex items-center justify-between",
                 button {
-                    onclick: move |_| { if *page.read() > 1 { page.set(page.read() - 1); } },
+                    onclick: move |_| { 
+                        let current_page = *page.read();
+                        if current_page > 1 { 
+                            page.set(current_page - 1); 
+                        } 
+                    },
                     disabled: *page.read() <= 1,
-                    class: "px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    class: "px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
                     "Previous"
                 }
-                span { class: "text-gray-400", "Page {page.read()}" }
+                span { class: "text-gray-400", "Page {*page.read()}" }
                 button {
-                    onclick: move |_| page.set(page.read() + 1),
-                    class: "px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
+                    onclick: move |_| {
+                        let current_page = *page.read();
+                        page.set(current_page + 1);
+                    },
+                    class: "px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors",
                     "Next"
                 }
             }
@@ -127,19 +138,19 @@ fn RightRow(id: String, chain: String, owner: String, status: String, created_at
         tr { class: "hover:bg-gray-800/50 transition-colors",
             td { class: "px-6 py-4",
                 Link {
-                    to: routes::Route::RightDetail { id: id.clone() },
-                    class: "font-mono text-sm text-blue-400 hover:text-blue-300"
+                    to: Route::RightDetail { id: id.clone() },
+                    class: "font-mono text-sm text-blue-400 hover:text-blue-300",
                     "{id}"
                 }
             }
             td { class: "px-6 py-4",
-                components::chain_badge::ChainBadge { chain }
+                crate::components::chain_badge::ChainBadge { chain }
             }
             td { class: "px-6 py-4 font-mono text-sm text-gray-300",
                 "{owner}"
             }
             td { class: "px-6 py-4",
-                components::status_badge::StatusBadge { status }
+                crate::components::status_badge::StatusBadge { status }
             }
             td { class: "px-6 py-4 text-sm text-gray-400",
                 "{created_at}"
@@ -151,7 +162,7 @@ fn RightRow(id: String, chain: String, owner: String, status: String, created_at
     }
 }
 
-async fn fetch_rights(_chain: &str, _status: &str, _page: u64) -> Option<Vec<shared::RightRecord>> {
+async fn fetch_rights(_chain: &str, _status: &str, _page: u64) -> Option<Vec<RightRecord>> {
     // In production, fetch from API
     None
 }

@@ -1,77 +1,84 @@
-/// Seal detail page.
+/// Seal detail page showing full information about a CSV seal.
 
 use dioxus::prelude::*;
 
-use crate::{components, routes};
+use crate::app::routes::Route;
 
 #[component]
 pub fn SealDetail(id: String) -> Element {
-    let seal = use_resource(move || async move {
-        fetch_seal(&id).await
+    let mut seal: Signal<Option<csv_explorer_shared::SealRecord>> = use_signal(|| None);
+
+    use_effect({
+        let id = id.clone();
+        move || {
+            spawn(async move {
+                // TODO: Fetch from API when endpoint is available
+                seal.set(None);
+            });
+        }
     });
 
     rsx! {
-        div { class: "space-y-6",
+        div { class: "space-y-8",
             // Breadcrumb
-            nav { class: "text-sm text-gray-400",
-                Link { to: routes::Route::Home {}, class: "hover:text-white", "Home" }
-                span { " / " }
-                Link { to: routes::Route::SealsList {}, class: "hover:text-white", "Seals" }
-                span { " / " }
-                span { class: "text-gray-200 font-mono text-xs", "{id}" }
+            div { class: "flex items-center gap-2 text-sm text-gray-500",
+                Link { to: Route::SealsList {}, class: "hover:text-gray-300", "Seals" }
+                span { "→" }
+                span { class: "text-gray-300 font-mono", "{id}" }
             }
 
-            if let Some(Some(s)) = seal.value() {
-                div {
-                    // Header
-                    div { class: "flex items-center justify-between",
-                        h1 { class: "text-2xl font-bold", "Seal Detail" }
-                        components::status_badge::StatusBadge { status: s.status.to_string() }
-                    }
+            // Header
+            div { class: "flex items-center justify-between",
+                h1 { class: "text-2xl font-bold", "Seal Detail" }
+                if let Some(ref s) = *seal.read() {
+                    StatusBadge { status: s.status.to_string() }
+                }
+            }
 
-                    // Details grid
+            if let Some(ref s) = *seal.read() {
+                // Main info card
+                div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
                     div { class: "grid grid-cols-1 md:grid-cols-2 gap-6",
-                        DetailCard { title: "Seal ID", value: s.id.clone(), copyable: true }
-                        DetailCard { title: "Chain", value: s.chain.clone() }
-                        DetailCard { title: "Seal Type", value: s.seal_type.to_string() }
-                        DetailCard { title: "Seal Reference", value: s.seal_ref.clone(), copyable: true }
-                        DetailCard { title: "Block Height", value: s.block_height.to_string() }
+                        DetailRow { label: "Seal ID", value: s.id.clone() }
+                        DetailRow { label: "Chain", value: s.chain.clone() }
+                        DetailRow { label: "Seal Type", value: s.seal_type.to_string() }
+                        DetailRow { label: "Seal Reference", value: s.seal_ref.clone() }
+                        DetailRow { label: "Block Height", value: s.block_height.to_string() }
                         if let Some(ref right_id) = s.right_id {
-                            DetailCard { title: "Linked Right", value: right_id.clone(), copyable: true }
+                            DetailRow { label: "Linked Right", value: right_id.clone() }
                         }
+                        DetailRow { label: "Status", value: s.status.to_string() }
                         if let Some(consumed_at) = s.consumed_at {
-                            DetailCard { title: "Consumed At", value: consumed_at.to_rfc3339() }
+                            DetailRow { label: "Consumed At", value: consumed_at.format("%Y-%m-%d %H:%M:%S UTC").to_string() }
                         }
                         if let Some(ref consumed_tx) = s.consumed_tx {
-                            DetailCard { title: "Consumed TX", value: consumed_tx.clone(), copyable: true }
+                            DetailRow { label: "Consumed TX", value: consumed_tx.clone() }
                         }
                     }
+                }
 
-                    // Linked right
-                    if let Some(ref right_id) = s.right_id {
-                        div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
-                            h2 { class: "text-lg font-semibold mb-4", "Linked Right" }
-                            Link {
-                                to: routes::Route::RightDetail { id: right_id.clone() },
-                                class: "font-mono text-sm text-blue-400 hover:text-blue-300"
-                                "{right_id}"
+                // Seal type explanation
+                div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
+                    h2 { class: "text-lg font-semibold mb-4", "Seal Type Information" }
+                    SealTypeInfo { seal_type: s.seal_type.to_string() }
+                }
+
+                // Related links
+                if let Some(ref right_id) = s.right_id {
+                    div { class: "flex items-center gap-4",
+                        Link { to: Route::RightDetail { id: right_id.clone() },
+                            button { class: "px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors",
+                                "View Linked Right →"
                             }
-                        }
-                    }
-
-                    // Raw JSON
-                    div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
-                        h2 { class: "text-lg font-semibold mb-4", "Raw Data" }
-                        pre { class: "text-sm text-gray-300 overflow-x-auto",
-                            "{serde_json::to_string_pretty(&s).unwrap_or_default()}"
                         }
                     }
                 }
             } else {
+                // Loading state
                 div { class: "bg-gray-900 rounded-xl border border-gray-800 p-12 text-center",
                     div { class: "animate-pulse space-y-4",
                         div { class: "h-8 bg-gray-800 rounded w-48 mx-auto" }
-                        div { class: "h-4 bg-gray-800 rounded w-96 mx-auto" }
+                        div { class: "h-4 bg-gray-800 rounded w-32 mx-auto" }
                     }
                 }
             }
@@ -80,20 +87,72 @@ pub fn SealDetail(id: String) -> Element {
 }
 
 #[component]
-fn DetailCard(title: String, value: String, copyable: Option<bool>) -> Element {
+fn DetailRow(label: String, value: String) -> Element {
     rsx! {
-        div { class: "bg-gray-900 rounded-xl border border-gray-800 p-4",
-            div { class: "text-sm text-gray-400 mb-1", "{title}" }
-            div { class: "flex items-center gap-2",
-                span { class: "font-mono text-sm text-gray-200 break-all", "{value}" }
-                if copyable.unwrap_or(false) {
-                    button { class: "text-gray-500 hover:text-gray-300", "⧉" }
-                }
-            }
+        div {
+            div { class: "text-sm text-gray-500 mb-1", "{label}" }
+            div { class: "font-mono text-sm text-gray-200 break-all", "{value}" }
         }
     }
 }
 
-async fn fetch_seal(_id: &str) -> Option<shared::SealRecord> {
-    None
+#[component]
+fn StatusBadge(status: String) -> Element {
+    let color_class = match status.to_lowercase().as_str() {
+        "available" => "bg-green-500/20 text-green-400 border-green-500/30",
+        "consumed" => "bg-gray-800 text-gray-400 border-gray-700",
+        _ => "bg-gray-800 text-gray-400 border-gray-700",
+    };
+
+    rsx! {
+        span { class: "px-3 py-1 rounded-full text-xs font-medium border {color_class}",
+            "{status}"
+        }
+    }
+}
+
+#[component]
+fn SealTypeInfo(seal_type: String) -> Element {
+    let (description, example) = match seal_type.as_str() {
+        "utxo" => (
+            "A UTXO-based seal that locks a right in a specific unspent transaction output on Bitcoin.",
+            "Created by committing a right to a Taproot output with a specific spending condition.",
+        ),
+        "object" => (
+            "An object-based seal that stores a right in a Sui object on the Sui blockchain.",
+            "Created by wrapping a right in a Sui object with sealed transfer capabilities.",
+        ),
+        "resource" => (
+            "A resource-based seal that embeds a right in an Aptos resource.",
+            "Created by storing a right in an Aptos account resource with access controls.",
+        ),
+        "nullifier" => (
+            "A nullifier-based seal that prevents double-spending by recording a nullifier.",
+            "Created by generating a cryptographic nullifier from the right's commitment.",
+        ),
+        "account" => (
+            "An account-based seal that associates a right with a Solana account state.",
+            "Created by storing a right in a Solana program-derived account (PDA).",
+        ),
+        _ => (
+            "Unknown seal type. This may indicate a new or unsupported seal mechanism.",
+            "Please check the documentation for supported seal types.",
+        ),
+    };
+
+    rsx! {
+        div { class: "space-y-4",
+            div {
+                h3 { class: "text-sm font-semibold text-gray-400 mb-2", "Description" }
+                p { class: "text-sm text-gray-300", "{description}" }
+            }
+            div {
+                h3 { class: "text-sm font-semibold text-gray-400 mb-2", "Example" }
+                p { class: "text-sm text-gray-300", "{example}" }
+            }
+            div { class: "bg-gray-800 rounded-lg p-3",
+                code { class: "text-xs font-mono text-blue-400", "{seal_type}" }
+            }
+        }
+    }
 }

@@ -18,10 +18,12 @@ use csv_explorer_shared::{ExplorerError, RightFilter, SealFilter, TransferFilter
 // Application state
 // ---------------------------------------------------------------------------
 
-#[derive(Clone)]
-pub struct AppState {
-    pub pool: SqlitePool,
-}
+// The full application state tuple
+type AppState = (async_graphql::Schema<
+    crate::graphql::schema::Query,
+    crate::graphql::schema::Mutation,
+    crate::graphql::schema::EmptySubscription,
+>, sqlx::SqlitePool);
 
 // ---------------------------------------------------------------------------
 // Response wrappers
@@ -73,9 +75,9 @@ pub struct ListRightsQuery {
 /// GET /api/v1/rights
 pub async fn list_rights(
     Query(query): Query<ListRightsQuery>,
-    State(state): State<AppState>,
+    State((_, pool)): State<AppState>,
 ) -> Result<Json<ApiResponse<PaginatedResponse<csv_explorer_shared::RightRecord>>>, (StatusCode, Json<ErrorResponse>)> {
-    let repo = RightsRepository::new(state.pool);
+    let repo = RightsRepository::new(pool);
 
     let limit = query.limit.unwrap_or(20);
     let offset = query.offset.unwrap_or(0);
@@ -112,9 +114,9 @@ pub async fn list_rights(
 /// GET /api/v1/rights/:id
 pub async fn get_right(
     Path(id): Path<String>,
-    State(state): State<AppState>,
+    State((_, pool)): State<AppState>,
 ) -> Result<Json<ApiResponse<csv_explorer_shared::RightRecord>>, (StatusCode, Json<ErrorResponse>)> {
-    let repo = RightsRepository::new(state.pool);
+    let repo = RightsRepository::new(pool);
 
     let right = repo.get(&id)
         .await
@@ -144,9 +146,9 @@ pub struct ListTransfersQuery {
 /// GET /api/v1/transfers
 pub async fn list_transfers(
     Query(query): Query<ListTransfersQuery>,
-    State(state): State<AppState>,
+    State((_, pool)): State<AppState>,
 ) -> Result<Json<ApiResponse<PaginatedResponse<csv_explorer_shared::TransferRecord>>>, (StatusCode, Json<ErrorResponse>)> {
-    let repo = TransfersRepository::new(state.pool);
+    let repo = TransfersRepository::new(pool);
 
     let limit = query.limit.unwrap_or(20);
     let offset = query.offset.unwrap_or(0);
@@ -185,9 +187,9 @@ pub async fn list_transfers(
 /// GET /api/v1/transfers/:id
 pub async fn get_transfer(
     Path(id): Path<String>,
-    State(state): State<AppState>,
+    State((_, pool)): State<AppState>,
 ) -> Result<Json<ApiResponse<csv_explorer_shared::TransferRecord>>, (StatusCode, Json<ErrorResponse>)> {
-    let repo = TransfersRepository::new(state.pool);
+    let repo = TransfersRepository::new(pool);
 
     let transfer = repo.get(&id)
         .await
@@ -217,9 +219,9 @@ pub struct ListSealsQuery {
 /// GET /api/v1/seals
 pub async fn list_seals(
     Query(query): Query<ListSealsQuery>,
-    State(state): State<AppState>,
+    State((_, pool)): State<AppState>,
 ) -> Result<Json<ApiResponse<PaginatedResponse<csv_explorer_shared::SealRecord>>>, (StatusCode, Json<ErrorResponse>)> {
-    let repo = SealsRepository::new(state.pool);
+    let repo = SealsRepository::new(pool);
 
     let limit = query.limit.unwrap_or(20);
     let offset = query.offset.unwrap_or(0);
@@ -263,9 +265,9 @@ pub async fn list_seals(
 /// GET /api/v1/seals/:id
 pub async fn get_seal(
     Path(id): Path<String>,
-    State(state): State<AppState>,
+    State((_, pool)): State<AppState>,
 ) -> Result<Json<ApiResponse<csv_explorer_shared::SealRecord>>, (StatusCode, Json<ErrorResponse>)> {
-    let repo = SealsRepository::new(state.pool);
+    let repo = SealsRepository::new(pool);
 
     let seal = repo.get(&id)
         .await
@@ -283,9 +285,9 @@ pub async fn get_seal(
 
 /// GET /api/v1/stats
 pub async fn get_stats(
-    State(state): State<AppState>,
+    State((_, pool)): State<AppState>,
 ) -> Result<Json<ApiResponse<csv_explorer_shared::ExplorerStats>>, (StatusCode, Json<ErrorResponse>)> {
-    let repo = StatsRepository::new(state.pool);
+    let repo = StatsRepository::new(pool);
 
     let stats = repo.get_stats()
         .await

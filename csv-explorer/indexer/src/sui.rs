@@ -100,14 +100,12 @@ impl ChainIndexer for SuiIndexer {
         let checkpoint = self.fetch_checkpoint(block).await?;
         let mut rights = Vec::new();
 
-        if let Some(txns) = checkpoint.transactions {
-            for txn in &txns {
-                if let Some(events) = &txn.events {
-                    for event in events {
-                        if event.type_.contains("RightCreated") {
-                            if let Some(right) = self.parse_right_from_event(event, &txn.digest) {
-                                rights.push(right);
-                            }
+        for txn in &checkpoint.transactions {
+            if let Some(events) = &txn.events {
+                for event in events {
+                    if event.type_.contains("RightCreated") {
+                        if let Some(right) = self.parse_right_from_event(event, &txn.digest) {
+                            rights.push(right);
                         }
                     }
                 }
@@ -122,14 +120,12 @@ impl ChainIndexer for SuiIndexer {
         let checkpoint = self.fetch_checkpoint(block).await?;
         let mut seals = Vec::new();
 
-        if let Some(txns) = checkpoint.transactions {
-            for txn in &txns {
-                if let Some(events) = &txn.events {
-                    for event in events {
-                        if event.type_.contains("SealCreated") || event.type_.contains("SealConsumed") {
-                            if let Some(seal) = self.parse_seal_from_event(event, block) {
-                                seals.push(seal);
-                            }
+        for txn in &checkpoint.transactions {
+            if let Some(events) = &txn.events {
+                for event in events {
+                    if event.type_.contains("SealCreated") || event.type_.contains("SealConsumed") {
+                        if let Some(seal) = self.parse_seal_from_event(event, block) {
+                            seals.push(seal);
                         }
                     }
                 }
@@ -144,14 +140,12 @@ impl ChainIndexer for SuiIndexer {
         let checkpoint = self.fetch_checkpoint(block).await?;
         let mut transfers = Vec::new();
 
-        if let Some(txns) = checkpoint.transactions {
-            for txn in &txns {
-                if let Some(events) = &txn.events {
-                    for event in events {
-                        if event.type_.contains("CrossChainTransfer") {
-                            if let Some(transfer) = self.parse_transfer_from_event(event, &txn.digest) {
-                                transfers.push(transfer);
-                            }
+        for txn in &checkpoint.transactions {
+            if let Some(events) = &txn.events {
+                for event in events {
+                    if event.type_.contains("CrossChainTransfer") {
+                        if let Some(transfer) = self.parse_transfer_from_event(event, &txn.digest) {
+                            transfers.push(transfer);
                         }
                     }
                 }

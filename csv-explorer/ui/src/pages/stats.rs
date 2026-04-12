@@ -1,22 +1,19 @@
 /// Statistics dashboard with charts and aggregate data.
 
 use dioxus::prelude::*;
+use csv_explorer_shared::ExplorerStats;
 
 use crate::hooks::use_api::ApiClient;
 
 #[component]
 pub fn Stats() -> Element {
-    let api = use_resource(|| async move { ApiClient::new() });
+    let mut stats: Signal<Option<ExplorerStats>> = use_signal(|| None);
 
-    let stats = use_resource(move || {
-        let api = api.clone();
-        async move {
-            if let Some(client) = api.value().flatten() {
-                client.get_stats().await.ok()
-            } else {
-                None
-            }
-        }
+    use_effect(move || {
+        spawn(async move {
+            let result = fetch_stats().await;
+            stats.set(result);
+        });
     });
 
     rsx! {
@@ -36,10 +33,10 @@ pub fn Stats() -> Element {
                 // Success rate
                 div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
                     h2 { class: "text-lg font-semibold mb-4", "Transfer Success Rate" }
-                    if let Some(Some(ref s)) = stats.value() {
+                    if let Some(ref s) = *stats.read() {
                         div { class: "text-center",
                             div { class: "text-5xl font-bold text-green-400 mb-2",
-                                "{format!("{:.1}%", s.transfer_success_rate)}"
+                                {format!("{:.1}%", s.transfer_success_rate)}
                             }
                             if let Some(avg_ms) = s.average_transfer_time_ms {
                                 div { class: "text-gray-400 text-sm",
@@ -53,7 +50,7 @@ pub fn Stats() -> Element {
                 // Rights by chain (bar chart placeholder)
                 div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
                     h2 { class: "text-lg font-semibold mb-4", "Rights by Chain" }
-                    if let Some(Some(ref s)) = stats.value() {
+                    if let Some(ref s) = *stats.read() {
                         div { class: "space-y-3",
                             {s.rights_by_chain.iter().map(|rc| rsx! {
                                 ChainBar {
@@ -62,7 +59,7 @@ pub fn Stats() -> Element {
                                     count: rc.count,
                                     max: s.rights_by_chain.first().map(|c| c.count).unwrap_or(1),
                                 }
-                            }).collect::<Vec<Element>>()}
+                            })}
                         }
                     } else {
                         div { class: "text-gray-500 text-center py-8", "Loading..." }
@@ -73,7 +70,7 @@ pub fn Stats() -> Element {
             // Transfers by chain pair
             div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
                 h2 { class: "text-lg font-semibold mb-4", "Transfers by Chain Pair" }
-                if let Some(Some(ref s)) = stats.value() {
+                if let Some(ref s) = *stats.read() {
                     if s.transfers_by_chain_pair.is_empty() {
                         div { class: "text-gray-500 text-center py-8", "No transfer data yet" }
                     } else {
@@ -96,7 +93,7 @@ pub fn Stats() -> Element {
                                         }
                                         td { class: "px-4 py-2 text-right font-mono", "{tp.count}" }
                                     }
-                                }).collect::<Vec<Element>>()}
+                                })}
                             }
                         }
                     }
@@ -108,14 +105,14 @@ pub fn Stats() -> Element {
             // Active seals by chain
             div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
                 h2 { class: "text-lg font-semibold mb-4", "Active Seals by Chain" }
-                if let Some(Some(ref s)) = stats.value() {
+                if let Some(ref s) = *stats.read() {
                     div { class: "grid grid-cols-2 md:grid-cols-5 gap-4",
                         {s.active_seals_by_chain.iter().map(|sc| rsx! {
                             div { key: "{sc.chain}", class: "text-center",
                                 div { class: "text-2xl font-bold", "{sc.count}" }
                                 div { class: "text-sm text-gray-400", "{sc.chain}" }
                             }
-                        }).collect::<Vec<Element>>()}
+                        })}
                     }
                 }
             }
@@ -152,6 +149,6 @@ fn ChainBar(chain: String, count: u64, max: u64) -> Element {
     }
 }
 
-async fn fetch_stats() -> Option<shared::ExplorerStats> {
+async fn fetch_stats() -> Option<ExplorerStats> {
     None
 }

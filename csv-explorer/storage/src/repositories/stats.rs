@@ -96,7 +96,7 @@ impl StatsRepository {
         };
 
         // Average transfer time (for completed transfers)
-        let avg_transfer_time: Option<i64> = sqlx::query_scalar(
+        let avg_transfer_time: Option<f64> = sqlx::query_scalar(
             "SELECT AVG(duration_ms) FROM transfers WHERE status = 'completed' AND duration_ms IS NOT NULL",
         )
         .fetch_one(&self.pool)
@@ -111,7 +111,7 @@ impl StatsRepository {
             transfers_by_chain_pair,
             active_seals_by_chain,
             transfer_success_rate,
-            average_transfer_time_ms: avg_transfer_time.map(|v| v as u64),
+            average_transfer_time_ms: avg_transfer_time.map(|v| v.round() as u64),
         })
     }
 

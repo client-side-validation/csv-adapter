@@ -9,12 +9,16 @@ use serde_json::Value as JsonValue;
 // ---------------------------------------------------------------------------
 
 /// DateTime scalar for GraphQL.
+#[derive(Clone, Debug)]
+pub struct DateTimeScalar(DateTime<Utc>);
+
 #[Scalar]
-impl ScalarType for DateTime<Utc> {
+impl ScalarType for DateTimeScalar {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(s) = &value {
             DateTime::parse_from_rfc3339(s)
                 .map(|dt| dt.with_timezone(&Utc))
+                .map(DateTimeScalar)
                 .map_err(|e| InputValueError::custom(format!("Invalid DateTime: {}", e)))
         } else {
             Err(InputValueError::expected_type(value))
@@ -22,23 +26,26 @@ impl ScalarType for DateTime<Utc> {
     }
 
     fn to_value(&self) -> Value {
-        Value::String(self.to_rfc3339())
+        Value::String(self.0.to_rfc3339())
     }
 }
 
 /// JSON Value scalar.
+#[derive(Clone, Debug)]
+pub struct JsonValueScalar(JsonValue);
+
 #[Scalar]
-impl ScalarType for JsonValue {
+impl ScalarType for JsonValueScalar {
     fn parse(value: Value) -> InputValueResult<Self> {
         let json_str = match &value {
             Value::String(s) => s.clone(),
             _ => value.to_string(),
         };
-        serde_json::from_str(&json_str).map_err(|e| InputValueError::custom(e.to_string()))
+        serde_json::from_str(&json_str).map(JsonValueScalar).map_err(|e| InputValueError::custom(e.to_string()))
     }
 
     fn to_value(&self) -> Value {
-        Value::String(self.to_string())
+        Value::String(self.0.to_string())
     }
 }
 
@@ -54,12 +61,12 @@ pub struct Right {
     pub seal_ref: String,
     pub commitment: String,
     pub owner: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: DateTimeScalar,
     pub created_tx: String,
     pub status: String,
-    pub metadata: Option<JsonValue>,
+    pub metadata: Option<JsonValueScalar>,
     pub transfer_count: i64,
-    pub last_transfer_at: Option<DateTime<Utc>>,
+    pub last_transfer_at: Option<DateTimeScalar>,
 }
 
 impl From<csv_explorer_shared::RightRecord> for Right {
@@ -70,12 +77,12 @@ impl From<csv_explorer_shared::RightRecord> for Right {
             seal_ref: r.seal_ref,
             commitment: r.commitment,
             owner: r.owner,
-            created_at: r.created_at,
+            created_at: DateTimeScalar(r.created_at),
             created_tx: r.created_tx,
             status: r.status.to_string(),
-            metadata: r.metadata,
+            metadata: r.metadata.map(JsonValueScalar),
             transfer_count: r.transfer_count as i64,
-            last_transfer_at: r.last_transfer_at,
+            last_transfer_at: r.last_transfer_at.map(DateTimeScalar),
         }
     }
 }
@@ -93,8 +100,8 @@ pub struct Transfer {
     pub mint_tx: Option<String>,
     pub proof_ref: Option<String>,
     pub status: String,
-    pub created_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
+    pub created_at: DateTimeScalar,
+    pub completed_at: Option<DateTimeScalar>,
     pub duration_ms: Option<i64>,
 }
 
@@ -111,8 +118,8 @@ impl From<csv_explorer_shared::TransferRecord> for Transfer {
             mint_tx: t.mint_tx,
             proof_ref: t.proof_ref,
             status: t.status.to_string(),
-            created_at: t.created_at,
-            completed_at: t.completed_at,
+            created_at: DateTimeScalar(t.created_at),
+            completed_at: t.completed_at.map(DateTimeScalar),
             duration_ms: t.duration_ms.map(|v| v as i64),
         }
     }
@@ -127,7 +134,7 @@ pub struct Seal {
     pub seal_ref: String,
     pub right_id: Option<String>,
     pub status: String,
-    pub consumed_at: Option<DateTime<Utc>>,
+    pub consumed_at: Option<DateTimeScalar>,
     pub consumed_tx: Option<String>,
     pub block_height: i64,
 }
@@ -141,7 +148,7 @@ impl From<csv_explorer_shared::SealRecord> for Seal {
             seal_ref: s.seal_ref,
             right_id: s.right_id,
             status: s.status.to_string(),
-            consumed_at: s.consumed_at,
+            consumed_at: s.consumed_at.map(DateTimeScalar),
             consumed_tx: s.consumed_tx,
             block_height: s.block_height as i64,
         }
@@ -156,7 +163,7 @@ pub struct CsvContractGql {
     pub contract_type: String,
     pub address: String,
     pub deployed_tx: String,
-    pub deployed_at: DateTime<Utc>,
+    pub deployed_at: DateTimeScalar,
     pub version: String,
     pub status: String,
 }
@@ -169,7 +176,7 @@ impl From<csv_explorer_shared::CsvContract> for CsvContractGql {
             contract_type: c.contract_type.to_string(),
             address: c.address,
             deployed_tx: c.deployed_tx,
-            deployed_at: c.deployed_at,
+            deployed_at: DateTimeScalar(c.deployed_at),
             version: c.version,
             status: c.status.to_string(),
         }
@@ -328,7 +335,7 @@ impl PageInfo {
 // ---------------------------------------------------------------------------
 
 /// Input type for filtering rights.
-#[derive(InputObject)]
+#[derive(Default, InputObject)]
 pub struct RightFilterInput {
     pub chain: Option<String>,
     pub owner: Option<String>,
@@ -338,7 +345,7 @@ pub struct RightFilterInput {
 }
 
 /// Input type for filtering transfers.
-#[derive(InputObject)]
+#[derive(Default, InputObject)]
 pub struct TransferFilterInput {
     pub right_id: Option<String>,
     pub from_chain: Option<String>,
@@ -349,7 +356,7 @@ pub struct TransferFilterInput {
 }
 
 /// Input type for filtering seals.
-#[derive(InputObject)]
+#[derive(Default, InputObject)]
 pub struct SealFilterInput {
     pub chain: Option<String>,
     pub seal_type: Option<String>,
@@ -360,7 +367,7 @@ pub struct SealFilterInput {
 }
 
 /// Input type for filtering contracts.
-#[derive(InputObject)]
+#[derive(Default, InputObject)]
 pub struct ContractFilterInput {
     pub chain: Option<String>,
     pub contract_type: Option<String>,

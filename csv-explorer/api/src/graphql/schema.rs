@@ -12,12 +12,13 @@ use csv_explorer_storage::repositories::{
 
 use super::types::*;
 
+// Re-export EmptySubscription for use in server
+pub use async_graphql::EmptySubscription;
+
 /// GraphQL context holding the database pool.
 pub struct GraphqlContext {
     pub pool: SqlitePool,
 }
-
-impl Context for GraphqlContext {}
 
 /// Root query type.
 pub struct Query;
@@ -26,9 +27,9 @@ pub struct Query;
 impl Query {
     /// Get a single right by ID.
     async fn right(&self, ctx: &Context<'_>, id: String) -> Result<Option<Right>> {
-        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(e.to_string(), None))?;
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = RightsRepository::new(gql_ctx.pool.clone());
-        let record = repo.get(&id).await.map_err(|e| ServerError::new(e.to_string(), None))?;
+        let record = repo.get(&id).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         Ok(record.map(Right::from))
     }
 
@@ -38,7 +39,7 @@ impl Query {
         ctx: &Context<'_>,
         filter: Option<RightFilterInput>,
     ) -> Result<RightConnection> {
-        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(e.to_string(), None))?;
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = RightsRepository::new(gql_ctx.pool.clone());
 
         let filter = filter.unwrap_or_default();
@@ -58,8 +59,8 @@ impl Query {
             offset: Some(offset),
         };
 
-        let records = repo.list(shared_filter.clone()).await.map_err(|e| ServerError::new(e.to_string(), None))?;
-        let total_count = repo.count(shared_filter).await.map_err(|e| ServerError::new(e.to_string(), None))?;
+        let records = repo.list(shared_filter.clone()).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
+        let total_count = repo.count(shared_filter).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
 
         let edges: Vec<RightEdge> = records
             .into_iter()
@@ -84,9 +85,9 @@ impl Query {
 
     /// Get a single transfer by ID.
     async fn transfer(&self, ctx: &Context<'_>, id: String) -> Result<Option<Transfer>> {
-        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(e.to_string(), None))?;
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = TransfersRepository::new(gql_ctx.pool.clone());
-        let record = repo.get(&id).await.map_err(|e| ServerError::new(e.to_string(), None))?;
+        let record = repo.get(&id).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         Ok(record.map(Transfer::from))
     }
 
@@ -96,7 +97,7 @@ impl Query {
         ctx: &Context<'_>,
         filter: Option<TransferFilterInput>,
     ) -> Result<TransferConnection> {
-        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(e.to_string(), None))?;
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = TransfersRepository::new(gql_ctx.pool.clone());
 
         let filter = filter.unwrap_or_default();
@@ -118,8 +119,8 @@ impl Query {
             offset: Some(offset),
         };
 
-        let records = repo.list(shared_filter.clone()).await.map_err(|e| ServerError::new(e.to_string(), None))?;
-        let total_count = repo.count(shared_filter).await.map_err(|e| ServerError::new(e.to_string(), None))?;
+        let records = repo.list(shared_filter.clone()).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
+        let total_count = repo.count(shared_filter).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
 
         let edges: Vec<TransferEdge> = records
             .into_iter()
@@ -144,9 +145,9 @@ impl Query {
 
     /// Get a single seal by ID.
     async fn seal(&self, ctx: &Context<'_>, id: String) -> Result<Option<Seal>> {
-        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(e.to_string(), None))?;
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = SealsRepository::new(gql_ctx.pool.clone());
-        let record = repo.get(&id).await.map_err(|e| ServerError::new(e.to_string(), None))?;
+        let record = repo.get(&id).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         Ok(record.map(Seal::from))
     }
 
@@ -156,7 +157,7 @@ impl Query {
         ctx: &Context<'_>,
         filter: Option<SealFilterInput>,
     ) -> Result<SealConnection> {
-        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(e.to_string(), None))?;
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = SealsRepository::new(gql_ctx.pool.clone());
 
         let filter = filter.unwrap_or_default();
@@ -183,8 +184,8 @@ impl Query {
             offset: Some(offset),
         };
 
-        let records = repo.list(shared_filter.clone()).await.map_err(|e| ServerError::new(e.to_string(), None))?;
-        let total_count = repo.count(shared_filter).await.map_err(|e| ServerError::new(e.to_string(), None))?;
+        let records = repo.list(shared_filter.clone()).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
+        let total_count = repo.count(shared_filter).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
 
         let edges: Vec<SealEdge> = records
             .into_iter()
@@ -209,9 +210,9 @@ impl Query {
 
     /// Get a single contract by ID.
     async fn contract(&self, ctx: &Context<'_>, id: String) -> Result<Option<CsvContractGql>> {
-        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(e.to_string(), None))?;
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = ContractsRepository::new(gql_ctx.pool.clone());
-        let record = repo.get(&id).await.map_err(|e| ServerError::new(e.to_string(), None))?;
+        let record = repo.get(&id).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         Ok(record.map(CsvContractGql::from))
     }
 
@@ -221,7 +222,7 @@ impl Query {
         ctx: &Context<'_>,
         filter: Option<ContractFilterInput>,
     ) -> Result<ContractConnection> {
-        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(e.to_string(), None))?;
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = ContractsRepository::new(gql_ctx.pool.clone());
 
         let filter = filter.unwrap_or_default();
@@ -247,8 +248,8 @@ impl Query {
             offset: Some(offset),
         };
 
-        let records = repo.list(shared_filter.clone()).await.map_err(|e| ServerError::new(e.to_string(), None))?;
-        let total_count = repo.count(shared_filter).await.map_err(|e| ServerError::new(e.to_string(), None))?;
+        let records = repo.list(shared_filter.clone()).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
+        let total_count = repo.count(shared_filter).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
 
         let edges: Vec<ContractEdge> = records
             .into_iter()
@@ -273,9 +274,9 @@ impl Query {
 
     /// Get aggregate statistics.
     async fn stats(&self, ctx: &Context<'_>) -> Result<Stats> {
-        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(e.to_string(), None))?;
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = StatsRepository::new(gql_ctx.pool.clone());
-        let stats = repo.get_stats().await.map_err(|e| ServerError::new(e.to_string(), None))?;
+        let stats = repo.get_stats().await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         Ok(Stats::from(stats))
     }
 
@@ -288,25 +289,25 @@ impl Query {
 
     /// Get rights by owner address.
     async fn rights_by_owner(&self, ctx: &Context<'_>, owner: String) -> Result<Vec<Right>> {
-        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(e.to_string(), None))?;
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = RightsRepository::new(gql_ctx.pool.clone());
-        let records = repo.by_owner(&owner).await.map_err(|e| ServerError::new(e.to_string(), None))?;
+        let records = repo.by_owner(&owner).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         Ok(records.into_iter().map(Right::from).collect())
     }
 
     /// Get transfers for a specific right.
     async fn transfers_by_right(&self, ctx: &Context<'_>, right_id: String) -> Result<Vec<Transfer>> {
-        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(e.to_string(), None))?;
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = TransfersRepository::new(gql_ctx.pool.clone());
-        let records = repo.by_right(&right_id).await.map_err(|e| ServerError::new(e.to_string(), None))?;
+        let records = repo.by_right(&right_id).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         Ok(records.into_iter().map(Transfer::from).collect())
     }
 
     /// Get seals for a specific right.
     async fn seals_by_right(&self, ctx: &Context<'_>, right_id: String) -> Result<Vec<Seal>> {
-        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(e.to_string(), None))?;
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = SealsRepository::new(gql_ctx.pool.clone());
-        let records = repo.by_right(&right_id).await.map_err(|e| ServerError::new(e.to_string(), None))?;
+        let records = repo.by_right(&right_id).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         Ok(records.into_iter().map(Seal::from).collect())
     }
 }

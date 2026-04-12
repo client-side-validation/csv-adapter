@@ -124,7 +124,7 @@ pub fn init_metrics() -> Arc<Registry> {
         .register(Box::new(LATEST_BLOCK.clone()))
         .expect("Failed to register metric");
 
-    Arc::clone(&REGISTRY)
+    Arc::new(REGISTRY.clone())
 }
 
 /// Record metrics for a processed block.

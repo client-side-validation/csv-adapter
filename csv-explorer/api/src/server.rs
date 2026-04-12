@@ -4,8 +4,9 @@
 
 use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
-use async_graphql::Schema;
+use async_graphql::Request;
 use axum::{
+    extract::State,
     response::{Html, IntoResponse},
     routing::get,
     Router,
@@ -39,35 +40,19 @@ impl ApiServer {
     /// Start the API server.
     pub async fn start(self) -> Result<()> {
         let schema = create_schema();
+        let pool = self.pool.clone();
 
-        let graphql_handler = |state: SqlitePool| {
-            move |req: GraphQLRequest| {
-                let schema = schema.clone();
-                let pool = state.clone();
-                async move {
-                    let gql_ctx = GraphqlContext { pool };
-                    let response = schema.execute(req.into_inner()).data(gql_ctx).await;
-                    GraphQLResponse::from(response)
-                }
-            }
-        };
-
-        let rest_state = rest::handlers::AppState {
-            pool: self.pool.clone(),
-        };
-
+        // Merge REST API into main router
         let app = Router::new()
             // GraphQL endpoint
             .route(
                 "/graphql",
-                axum::routing::post(
-                    move |req: GraphQLRequest| graphql_handler(self.pool.clone())(req),
-                ),
+                axum::routing::post(graphql_handler),
             )
             // GraphQL Playground
             .route("/playground", get(graphql_playground))
-            // REST API
-            .nest("/api/v1", rest::routes::rest_routes(rest_state))
+            // REST API v1
+            .merge(rest::routes::api_v1_routes())
             // Prometheus metrics
             .route("/metrics", get(metrics_handler))
             // Health check
@@ -75,7 +60,8 @@ impl ApiServer {
             // Middleware
             .layer(CorsLayer::permissive())
             .layer(TraceLayer::new_for_http())
-            .layer(ServiceBuilder::new());
+            .layer(ServiceBuilder::new())
+            .with_state((schema, pool));
 
         let listener = tokio::net::TcpListener::bind(&self.config.bind())
             .await
@@ -93,6 +79,25 @@ impl ApiServer {
 /// Serve the GraphQL Playground HTML.
 async fn graphql_playground() -> impl IntoResponse {
     Html(playground_source(GraphQLPlaygroundConfig::new("/graphql")))
+}
+
+/// GraphQL request handler.
+async fn graphql_handler(
+    State((schema, pool)): State<(
+        async_graphql::Schema<
+            crate::graphql::schema::Query,
+            crate::graphql::schema::Mutation,
+            async_graphql::EmptySubscription,
+        >,
+        SqlitePool,
+    )>,
+    req: GraphQLRequest,
+) -> GraphQLResponse {
+    let gql_ctx = GraphqlContext { pool };
+    let inner_req = req.into_inner();
+    let request = Request::from(inner_req).data(gql_ctx);
+    let response = schema.execute(request).await;
+    GraphQLResponse::from(response)
 }
 
 /// Serve Prometheus metrics.

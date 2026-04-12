@@ -2,12 +2,12 @@
 
 use dioxus::prelude::*;
 
-use crate::routes;
+use crate::app::routes::Route;
 
 #[component]
 pub fn Wallet() -> Element {
-    let connected = use_signal(|| false);
-    let wallet_address = use_signal(|| String::new());
+    let mut connected = use_signal(|| false);
+    let mut wallet_address = use_signal(|| String::new());
 
     rsx! {
         div { class: "space-y-8 max-w-2xl mx-auto",
@@ -28,7 +28,7 @@ pub fn Wallet() -> Element {
                             connected.set(true);
                             wallet_address.set("bc1q...example".to_string());
                         },
-                        class: "px-8 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
+                        class: "px-8 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors",
                         "Connect Wallet"
                     }
                 }
@@ -44,7 +44,7 @@ pub fn Wallet() -> Element {
                                     connected.set(false);
                                     wallet_address.set(String::new());
                                 },
-                                class: "text-sm text-red-400 hover:text-red-300"
+                                class: "text-sm text-red-400 hover:text-red-300",
                                 "Disconnect"
                             }
                         }
@@ -61,7 +61,7 @@ pub fn Wallet() -> Element {
                     div {
                         div { class: "flex items-center justify-between mb-4",
                             h2 { class: "text-lg font-semibold", "Your Rights" }
-                            Link { to: routes::Route::RightsList {},
+                            Link { to: Route::RightsList {},
                                 span { class: "text-blue-400 hover:text-blue-300 text-sm", "View all →" }
                             }
                         }

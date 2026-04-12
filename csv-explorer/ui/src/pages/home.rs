@@ -1,23 +1,20 @@
 /// Home / landing page with stats, recent activity, and chain status.
 
 use dioxus::prelude::*;
+use csv_explorer_shared::ExplorerStats;
 
 use crate::hooks::use_api::ApiClient;
-use crate::routes;
+use crate::app::routes::Route;
 
 #[component]
 pub fn Home() -> Element {
-    let api = use_resource(|| async move { ApiClient::new() });
+    let mut stats: Signal<Option<ExplorerStats>> = use_signal(|| None);
 
-    let stats = use_resource(move || {
-        let api = api.clone();
-        async move {
-            if let Some(client) = api.value().flatten() {
-                client.get_stats().await.ok()
-            } else {
-                None
-            }
-        }
+    use_effect(move || {
+        spawn(async move {
+            let result = fetch_stats().await;
+            stats.set(result);
+        });
     });
 
     rsx! {
@@ -56,7 +53,7 @@ pub fn Home() -> Element {
             div {
                 div { class: "flex items-center justify-between mb-4",
                     h2 { class: "text-xl font-semibold", "Recent Activity" }
-                    Link { to: routes::Route::TransfersList {},
+                    Link { to: Route::TransfersList {},
                         span { class: "text-blue-400 hover:text-blue-300 text-sm", "View all →" }
                     }
                 }
@@ -151,7 +148,7 @@ fn ActivityRow(action: String, chain: String, id: String, time: String) -> Eleme
     }
 }
 
-async fn fetch_stats() -> Option<shared::ExplorerStats> {
+async fn fetch_stats() -> Option<ExplorerStats> {
     // In production, fetch from API
     None
 }
