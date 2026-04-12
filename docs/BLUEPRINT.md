@@ -1936,7 +1936,6 @@ Week 8: Documentation + example apps (marketplace, lending)
 - [ ] Cross-chain NFT app
 - [ ] Multi-sig wallet support
 - [ ] Cosmos adapter
-- [ ] Go SDK
 - [ ] ZK proof verification (Phase 1)
 - [ ] RGB asset import
 
@@ -1945,30 +1944,30 @@ Week 8: Documentation + example apps (marketplace, lending)
 ### Q3 2026 — Ecosystem
 
 **Developer Experience (Priority 1)**
-- [ ] VS Code extension (v1)
-- [ ] React component library
-- [ ] Production deployment guide
-- [ ] Advanced tutorial series
+- [x] VS Code extension (v1)
+- [x] React component library
+- [x] Production deployment guide
+- [x] CSV Explorer — multi-chain indexer + Dioxus UI
+- [ ] CSV Wallet browser extension
 
 **Core Features (Priority 2)**
-- [ ] Supply chain provenance app
-- [ ] Hardware wallet integration
-- [ ] Solana/Cosmos production readiness
 - [ ] Python SDK
 - [ ] Post-quantum signatures (Dilithium2)
 - [ ] AluVM integration
 
-**Success Criteria:** 100+ developers onboarded, 10+ production apps using CSV
+**Success Criteria:** Explorer live for all chains, Wallet extension released, 100+ developers
 
 ### Q4 2026 — Maturity
 
 **Developer Experience (Priority 1)**
+
 - [ ] Developer satisfaction survey (quarterly)
 - [ ] DX metrics dashboard
 - [ ] "You Asked, We Built" series
 - [ ] Developer advocacy program
 
 **Core Features (Priority 2)**
+
 - [ ] Privacy-preserving credentials
 - [ ] ZK selective disclosure
 - [ ] Polkadot adapter

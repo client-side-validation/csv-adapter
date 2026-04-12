@@ -1393,14 +1393,14 @@ Stage 5: Production (Month 1-3)
 
 | Week | Deliverable | Owner | Priority |
 |------|-------------|-------|----------|
-| 9 | Go SDK (core APIs) | SDK Team | 🟢 Medium |
-| 9 | React component library | Frontend Team | 🟡 High |
-| 10 | Production deployment guide | DX Team | 🟢 Medium |
-| 10 | Security best practices guide | Security Team | 🟡 High |
-| 11 | Advanced tutorial series | DX Team | 🟢 Medium |
-| 12 | DX metrics dashboard | DX Team | 🟢 Medium |
+| 9 | CSV Explorer — multi-chain indexer (Rust) | Core Team | 🔴 Critical |
+| 9 | CSV Explorer — GraphQL + REST API | Core Team | 🔴 Critical |
+| 10 | CSV Explorer — Dioxus UI (web + desktop) | UI Team | 🔴 Critical |
+| 10 | CSV Explorer — Wallet integration | Core Team | 🟡 High |
+| 11 | CSV Wallet browser extension | UI Team | 🟡 High |
+| 12 | Python SDK | SDK Team | 🟢 Medium |
 
-**Success Criteria:** 100+ developers onboarded, 10+ production apps using CSV
+**Success Criteria:** Explorer live for all chains, Wallet extension released, 100+ developers
 
 ---
 

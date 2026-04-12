@@ -1,0 +1,38 @@
+[workspace]
+members = ["indexer", "storage", "api", "ui", "shared"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
+axum = "0.7"
+async-graphql = { version = "7.0", features = ["dataloader"] }
+async-graphql-axum = "7.0"
+dioxus = { version = "0.5", features = ["fullstack", "router"] }
+dioxus-web = { version = "0.5" }
+dioxus-desktop = { version = "0.5" }
+csv-adapter-core = { path = "../csv-adapter-core" }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+thiserror = "1.0"
+hex = "0.4"
+reqwest = { version = "0.11", features = ["json"] }
+async-trait = "0.1"
+futures = "0.3"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+prometheus = "0.13"
+toml = "0.8"
+config = "0.14"
+clap = { version = "4.0", features = ["derive"] }
+anyhow = "1.0"
+lazy_static = "1.4"

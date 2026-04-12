@@ -1,0 +1,229 @@
+/// Repository for `TransferRecord` operations.
+
+use sqlx::SqlitePool;
+
+use shared::{Result, TransferFilter, TransferRecord, TransferStatus};
+
+/// Typed repository for the `transfers` table.
+#[derive(Clone)]
+pub struct TransfersRepository {
+    pool: SqlitePool,
+}
+
+impl TransfersRepository {
+    /// Create a new repository wrapping the given pool.
+    pub fn new(pool: SqlitePool) -> Self {
+        Self { pool }
+    }
+
+    /// Insert a new transfer record.
+    pub async fn insert(&self, transfer: &TransferRecord) -> Result<()> {
+        let mint_tx = transfer.mint_tx.as_deref();
+        let proof_ref = transfer.proof_ref.as_deref();
+        let completed_at = transfer.completed_at.map(|dt| dt.naive_utc());
+
+        sqlx::query(
+            r#"
+            INSERT INTO transfers (id, right_id, from_chain, to_chain, from_owner, to_owner,
+                                   lock_tx, mint_tx, proof_ref, status, created_at, completed_at,
+                                   duration_ms)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            ON CONFLICT(id) DO UPDATE SET
+                status = excluded.status,
+                mint_tx = excluded.mint_tx,
+                proof_ref = excluded.proof_ref,
+                completed_at = excluded.completed_at,
+                duration_ms = excluded.duration_ms,
+                to_owner = excluded.to_owner
+            "#,
+        )
+        .bind(&transfer.id)
+        .bind(&transfer.right_id)
+        .bind(&transfer.from_chain)
+        .bind(&transfer.to_chain)
+        .bind(&transfer.from_owner)
+        .bind(&transfer.to_owner)
+        .bind(&transfer.lock_tx)
+        .bind(mint_tx)
+        .bind(proof_ref)
+        .bind(transfer.status.to_string())
+        .bind(transfer.created_at.naive_utc())
+        .bind(completed_at)
+        .bind(transfer.duration_ms.map(|v| v as i64))
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Get a single transfer by ID.
+    pub async fn get(&self, id: &str) -> Result<Option<TransferRecord>> {
+        let row = sqlx::query(
+            "SELECT id, right_id, from_chain, to_chain, from_owner, to_owner, \
+             lock_tx, mint_tx, proof_ref, status, created_at, completed_at, duration_ms \
+             FROM transfers WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match row {
+            Some(row) => Ok(Some(row_to_transfer(&row)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// List transfers matching the given filter.
+    pub async fn list(&self, filter: TransferFilter) -> Result<Vec<TransferRecord>> {
+        let mut sql = String::from(
+            "SELECT id, right_id, from_chain, to_chain, from_owner, to_owner, \
+             lock_tx, mint_tx, proof_ref, status, created_at, completed_at, duration_ms \
+             FROM transfers WHERE 1=1",
+        );
+
+        if filter.right_id.is_some() {
+            sql.push_str(" AND right_id = ?");
+        }
+        if filter.from_chain.is_some() {
+            sql.push_str(" AND from_chain = ?");
+        }
+        if filter.to_chain.is_some() {
+            sql.push_str(" AND to_chain = ?");
+        }
+        if filter.status.is_some() {
+            sql.push_str(" AND status = ?");
+        }
+
+        sql.push_str(" ORDER BY created_at DESC");
+
+        if let Some(limit) = filter.limit {
+            sql.push_str(&format!(" LIMIT {}", limit));
+        }
+        if let Some(offset) = filter.offset {
+            sql.push_str(&format!(" OFFSET {}", offset));
+        }
+
+        let mut query = sqlx::query(&sql);
+        if let Some(ref right_id) = filter.right_id {
+            query = query.bind(right_id);
+        }
+        if let Some(ref from_chain) = filter.from_chain {
+            query = query.bind(from_chain);
+        }
+        if let Some(ref to_chain) = filter.to_chain {
+            query = query.bind(to_chain);
+        }
+        if let Some(status) = filter.status {
+            query = query.bind(status.to_string());
+        }
+
+        let rows = query.fetch_all(&self.pool).await?;
+        rows.iter().map(row_to_transfer).collect()
+    }
+
+    /// Update the status of a transfer.
+    pub async fn update_status(&self, id: &str, status: TransferStatus) -> Result<()> {
+        sqlx::query("UPDATE transfers SET status = $1 WHERE id = $2")
+            .bind(status.to_string())
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Count transfers matching the filter.
+    pub async fn count(&self, filter: TransferFilter) -> Result<u64> {
+        let mut sql = String::from("SELECT COUNT(*) FROM transfers WHERE 1=1");
+
+        if filter.right_id.is_some() {
+            sql.push_str(" AND right_id = ?");
+        }
+        if filter.from_chain.is_some() {
+            sql.push_str(" AND from_chain = ?");
+        }
+        if filter.to_chain.is_some() {
+            sql.push_str(" AND to_chain = ?");
+        }
+        if filter.status.is_some() {
+            sql.push_str(" AND status = ?");
+        }
+
+        let mut query = sqlx::query_scalar::<_, i64>(&sql);
+        if let Some(ref right_id) = filter.right_id {
+            query = query.bind(right_id);
+        }
+        if let Some(ref from_chain) = filter.from_chain {
+            query = query.bind(from_chain);
+        }
+        if let Some(ref to_chain) = filter.to_chain {
+            query = query.bind(to_chain);
+        }
+        if let Some(status) = filter.status {
+            query = query.bind(status.to_string());
+        }
+
+        let count = query.fetch_one(&self.pool).await?;
+        Ok(count as u64)
+    }
+
+    /// Get transfers for a specific right.
+    pub async fn by_right(&self, right_id: &str) -> Result<Vec<TransferRecord>> {
+        let rows = sqlx::query(
+            "SELECT id, right_id, from_chain, to_chain, from_owner, to_owner, \
+             lock_tx, mint_tx, proof_ref, status, created_at, completed_at, duration_ms \
+             FROM transfers WHERE right_id = ? ORDER BY created_at DESC",
+        )
+        .bind(right_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.iter().map(row_to_transfer).collect()
+    }
+
+    /// Get recent transfers.
+    pub async fn recent(&self, limit: usize) -> Result<Vec<TransferRecord>> {
+        let rows = sqlx::query(
+            "SELECT id, right_id, from_chain, to_chain, from_owner, to_owner, \
+             lock_tx, mint_tx, proof_ref, status, created_at, completed_at, duration_ms \
+             FROM transfers ORDER BY created_at DESC LIMIT ?",
+        )
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.iter().map(row_to_transfer).collect()
+    }
+}
+
+fn row_to_transfer(row: &sqlx::SqliteRow) -> Result<TransferRecord> {
+    let status_str: String = row.try_get("status")?;
+    let status = match status_str.as_str() {
+        "pending" => TransferStatus::Pending,
+        "in_progress" => TransferStatus::InProgress,
+        "completed" => TransferStatus::Completed,
+        "failed" => TransferStatus::Failed,
+        _ => TransferStatus::Pending,
+    };
+
+    Ok(TransferRecord {
+        id: row.try_get("id")?,
+        right_id: row.try_get("right_id")?,
+        from_chain: row.try_get("from_chain")?,
+        to_chain: row.try_get("to_chain")?,
+        from_owner: row.try_get("from_owner")?,
+        to_owner: row.try_get("to_owner")?,
+        lock_tx: row.try_get("lock_tx")?,
+        mint_tx: row.try_get::<Option<String>, _>("mint_tx")?,
+        proof_ref: row.try_get::<Option<String>, _>("proof_ref")?,
+        status,
+        created_at: row
+            .try_get::<chrono::NaiveDateTime, _>("created_at")?
+            .and_utc(),
+        completed_at: row
+            .try_get::<Option<chrono::NaiveDateTime>, _>("completed_at")?
+            .map(|dt| dt.and_utc()),
+        duration_ms: row
+            .try_get::<Option<i64>, _>("duration_ms")?
+            .map(|v| v as u64),
+    })
+}

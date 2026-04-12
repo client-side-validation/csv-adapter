@@ -1,0 +1,370 @@
+/// GraphQL type mappings and input types for the CSV Explorer API.
+
+use async_graphql::*;
+use chrono::{DateTime, Utc};
+use serde_json::Value as JsonValue;
+
+// ---------------------------------------------------------------------------
+// Scalar types
+// ---------------------------------------------------------------------------
+
+/// DateTime scalar for GraphQL.
+#[Scalar]
+impl ScalarType for DateTime<Utc> {
+    fn parse(value: Value) -> InputValueResult<Self> {
+        if let Value::String(s) = &value {
+            DateTime::parse_from_rfc3339(s)
+                .map(|dt| dt.with_timezone(&Utc))
+                .map_err(|e| InputValueError::custom(format!("Invalid DateTime: {}", e)))
+        } else {
+            Err(InputValueError::expected_type(value))
+        }
+    }
+
+    fn to_value(&self) -> Value {
+        Value::String(self.to_rfc3339())
+    }
+}
+
+/// JSON Value scalar.
+#[Scalar]
+impl ScalarType for JsonValue {
+    fn parse(value: Value) -> InputValueResult<Self> {
+        let json_str = match &value {
+            Value::String(s) => s.clone(),
+            _ => value.to_string(),
+        };
+        serde_json::from_str(&json_str).map_err(|e| InputValueError::custom(e.to_string()))
+    }
+
+    fn to_value(&self) -> Value {
+        Value::String(self.to_string())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GraphQL entity types
+// ---------------------------------------------------------------------------
+
+/// GraphQL Right type.
+#[derive(SimpleObject)]
+pub struct Right {
+    pub id: String,
+    pub chain: String,
+    pub seal_ref: String,
+    pub commitment: String,
+    pub owner: String,
+    pub created_at: DateTime<Utc>,
+    pub created_tx: String,
+    pub status: String,
+    pub metadata: Option<JsonValue>,
+    pub transfer_count: i64,
+    pub last_transfer_at: Option<DateTime<Utc>>,
+}
+
+impl From<shared::RightRecord> for Right {
+    fn from(r: shared::RightRecord) -> Self {
+        Self {
+            id: r.id,
+            chain: r.chain,
+            seal_ref: r.seal_ref,
+            commitment: r.commitment,
+            owner: r.owner,
+            created_at: r.created_at,
+            created_tx: r.created_tx,
+            status: r.status.to_string(),
+            metadata: r.metadata,
+            transfer_count: r.transfer_count as i64,
+            last_transfer_at: r.last_transfer_at,
+        }
+    }
+}
+
+/// GraphQL Transfer type.
+#[derive(SimpleObject)]
+pub struct Transfer {
+    pub id: String,
+    pub right_id: String,
+    pub from_chain: String,
+    pub to_chain: String,
+    pub from_owner: String,
+    pub to_owner: String,
+    pub lock_tx: String,
+    pub mint_tx: Option<String>,
+    pub proof_ref: Option<String>,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub duration_ms: Option<i64>,
+}
+
+impl From<shared::TransferRecord> for Transfer {
+    fn from(t: shared::TransferRecord) -> Self {
+        Self {
+            id: t.id,
+            right_id: t.right_id,
+            from_chain: t.from_chain,
+            to_chain: t.to_chain,
+            from_owner: t.from_owner,
+            to_owner: t.to_owner,
+            lock_tx: t.lock_tx,
+            mint_tx: t.mint_tx,
+            proof_ref: t.proof_ref,
+            status: t.status.to_string(),
+            created_at: t.created_at,
+            completed_at: t.completed_at,
+            duration_ms: t.duration_ms.map(|v| v as i64),
+        }
+    }
+}
+
+/// GraphQL Seal type.
+#[derive(SimpleObject)]
+pub struct Seal {
+    pub id: String,
+    pub chain: String,
+    pub seal_type: String,
+    pub seal_ref: String,
+    pub right_id: Option<String>,
+    pub status: String,
+    pub consumed_at: Option<DateTime<Utc>>,
+    pub consumed_tx: Option<String>,
+    pub block_height: i64,
+}
+
+impl From<shared::SealRecord> for Seal {
+    fn from(s: shared::SealRecord) -> Self {
+        Self {
+            id: s.id,
+            chain: s.chain,
+            seal_type: s.seal_type.to_string(),
+            seal_ref: s.seal_ref,
+            right_id: s.right_id,
+            status: s.status.to_string(),
+            consumed_at: s.consumed_at,
+            consumed_tx: s.consumed_tx,
+            block_height: s.block_height as i64,
+        }
+    }
+}
+
+/// GraphQL Contract type.
+#[derive(SimpleObject)]
+pub struct CsvContractGql {
+    pub id: String,
+    pub chain: String,
+    pub contract_type: String,
+    pub address: String,
+    pub deployed_tx: String,
+    pub deployed_at: DateTime<Utc>,
+    pub version: String,
+    pub status: String,
+}
+
+impl From<shared::CsvContract> for CsvContractGql {
+    fn from(c: shared::CsvContract) -> Self {
+        Self {
+            id: c.id,
+            chain: c.chain,
+            contract_type: c.contract_type.to_string(),
+            address: c.address,
+            deployed_tx: c.deployed_tx,
+            deployed_at: c.deployed_at,
+            version: c.version,
+            status: c.status.to_string(),
+        }
+    }
+}
+
+/// GraphQL ChainInfo type.
+#[derive(SimpleObject)]
+pub struct ChainInfoGql {
+    pub id: String,
+    pub name: String,
+    pub network: String,
+    pub status: String,
+    pub latest_block: i64,
+    pub latest_slot: Option<i64>,
+    pub rpc_url: String,
+    pub sync_lag: i64,
+}
+
+impl From<shared::ChainInfo> for ChainInfoGql {
+    fn from(c: shared::ChainInfo) -> Self {
+        Self {
+            id: c.id,
+            name: c.name,
+            network: c.network.to_string(),
+            status: c.status.to_string(),
+            latest_block: c.latest_block as i64,
+            latest_slot: c.latest_slot.map(|v| v as i64),
+            rpc_url: c.rpc_url,
+            sync_lag: c.sync_lag as i64,
+        }
+    }
+}
+
+/// GraphQL Stats type.
+#[derive(SimpleObject)]
+pub struct Stats {
+    pub total_rights: i64,
+    pub total_transfers: i64,
+    pub total_seals: i64,
+    pub total_contracts: i64,
+    pub transfer_success_rate: f64,
+    pub average_transfer_time_ms: Option<i64>,
+}
+
+impl From<shared::ExplorerStats> for Stats {
+    fn from(s: shared::ExplorerStats) -> Self {
+        Self {
+            total_rights: s.total_rights as i64,
+            total_transfers: s.total_transfers as i64,
+            total_seals: s.total_seals as i64,
+            total_contracts: s.total_contracts as i64,
+            transfer_success_rate: s.transfer_success_rate,
+            average_transfer_time_ms: s.average_transfer_time_ms.map(|v| v as i64),
+        }
+    }
+}
+
+/// Chain count type.
+#[derive(SimpleObject)]
+pub struct ChainCount {
+    pub chain: String,
+    pub count: i64,
+}
+
+/// Chain pair count type.
+#[derive(SimpleObject)]
+pub struct ChainPairCount {
+    pub from_chain: String,
+    pub to_chain: String,
+    pub count: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Pagination types
+// ---------------------------------------------------------------------------
+
+/// Connection for paginated Right results.
+#[derive(SimpleObject)]
+pub struct RightConnection {
+    pub edges: Vec<RightEdge>,
+    pub page_info: PageInfo,
+    pub total_count: i64,
+}
+
+#[derive(SimpleObject)]
+pub struct RightEdge {
+    pub node: Right,
+    pub cursor: String,
+}
+
+/// Connection for paginated Transfer results.
+#[derive(SimpleObject)]
+pub struct TransferConnection {
+    pub edges: Vec<TransferEdge>,
+    pub page_info: PageInfo,
+    pub total_count: i64,
+}
+
+#[derive(SimpleObject)]
+pub struct TransferEdge {
+    pub node: Transfer,
+    pub cursor: String,
+}
+
+/// Connection for paginated Seal results.
+#[derive(SimpleObject)]
+pub struct SealConnection {
+    pub edges: Vec<SealEdge>,
+    pub page_info: PageInfo,
+    pub total_count: i64,
+}
+
+#[derive(SimpleObject)]
+pub struct SealEdge {
+    pub node: Seal,
+    pub cursor: String,
+}
+
+/// Connection for paginated Contract results.
+#[derive(SimpleObject)]
+pub struct ContractConnection {
+    pub edges: Vec<ContractEdge>,
+    pub page_info: PageInfo,
+    pub total_count: i64,
+}
+
+#[derive(SimpleObject)]
+pub struct ContractEdge {
+    pub node: CsvContractGql,
+    pub cursor: String,
+}
+
+/// Standard pagination info.
+#[derive(SimpleObject)]
+pub struct PageInfo {
+    pub has_next_page: bool,
+    pub has_previous_page: bool,
+    pub start_cursor: Option<String>,
+    pub end_cursor: Option<String>,
+}
+
+impl PageInfo {
+    pub fn new(has_next_page: bool, has_previous_page: bool, start_cursor: Option<String>, end_cursor: Option<String>) -> Self {
+        Self {
+            has_next_page,
+            has_previous_page,
+            start_cursor,
+            end_cursor,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Input types
+// ---------------------------------------------------------------------------
+
+/// Input type for filtering rights.
+#[derive(InputObject)]
+pub struct RightFilterInput {
+    pub chain: Option<String>,
+    pub owner: Option<String>,
+    pub status: Option<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+/// Input type for filtering transfers.
+#[derive(InputObject)]
+pub struct TransferFilterInput {
+    pub right_id: Option<String>,
+    pub from_chain: Option<String>,
+    pub to_chain: Option<String>,
+    pub status: Option<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+/// Input type for filtering seals.
+#[derive(InputObject)]
+pub struct SealFilterInput {
+    pub chain: Option<String>,
+    pub seal_type: Option<String>,
+    pub status: Option<String>,
+    pub right_id: Option<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+/// Input type for filtering contracts.
+#[derive(InputObject)]
+pub struct ContractFilterInput {
+    pub chain: Option<String>,
+    pub contract_type: Option<String>,
+    pub status: Option<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
