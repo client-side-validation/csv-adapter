@@ -1,11 +1,9 @@
 //! Page components - styled to match csv-explorer design patterns.
 
 use dioxus::prelude::*;
-use dioxus_router::*;
 use std::rc::Rc;
-use std::collections::HashMap;
 use crate::routes::Route;
-use crate::context::{use_wallet_context, WalletContext, Network, generate_id, truncate_address, TrackedRight, RightStatus, TrackedTransfer, TransferStatus, SealRecord, DeployedContract, ProofRecord, TestResult, TestStatus, NotificationKind};
+use crate::context::{use_wallet_context, Network, generate_id, truncate_address, TrackedRight, RightStatus, TrackedTransfer, TransferStatus, SealRecord, DeployedContract, ProofRecord, TestResult, TestStatus, NotificationKind};
 use csv_adapter_core::Chain;
 
 pub mod wallet_page;
@@ -235,7 +233,92 @@ fn stat_card(label: &str, value: &str, icon: &str) -> Element {
 
 #[component]
 pub fn Welcome() -> Element {
-    rsx! { WalletPage {} }
+    let wallet_ctx = use_wallet_context();
+    let initialized = wallet_ctx.is_initialized();
+    let router = use_navigator();
+
+    // Auto-redirect if wallet already exists
+    use_effect(move || {
+        if initialized {
+            router.replace(Route::Dashboard {});
+        }
+    });
+
+    if initialized {
+        return rsx! {
+            div { class: "flex items-center justify-center min-h-[60vh]",
+                div { class: "text-center space-y-4",
+                    div { class: "animate-spin text-4xl", "\u{23F3}" }
+                    p { class: "text-gray-400", "Redirecting to Dashboard..." }
+                }
+            }
+        };
+    }
+
+    rsx! {
+        div { class: "space-y-8",
+            // Hero section
+            div { class: "text-center space-y-4",
+                div { class: "text-6xl mb-4", "\u{1F510}" }
+                h1 { class: "text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent",
+                    "CSV Wallet"
+                }
+                p { class: "text-gray-400 text-lg", "Multi-chain wallet for Client-Side Validation" }
+                p { class: "text-sm text-gray-500 max-w-md mx-auto",
+                    "Manage Rights, Proofs, Seals, and cross-chain transfers across Bitcoin, Ethereum, Sui, and Aptos."
+                }
+            }
+
+            // Feature cards
+            div { class: "grid grid-cols-2 gap-4",
+                div { class: "{card_class()} p-4 text-center",
+                    div { class: "text-2xl mb-2", "\u{1F48E}" }
+                    p { class: "text-sm font-medium", "Rights Management" }
+                    p { class: "text-xs text-gray-400 mt-1", "Create, transfer, and consume rights" }
+                }
+                div { class: "{card_class()} p-4 text-center",
+                    div { class: "text-2xl mb-2", "\u{21C4}" }
+                    p { class: "text-sm font-medium", "Cross-Chain" }
+                    p { class: "text-xs text-gray-400 mt-1", "Transfer between blockchains" }
+                }
+                div { class: "{card_class()} p-4 text-center",
+                    div { class: "text-2xl mb-2", "\u{1F4C4}" }
+                    p { class: "text-sm font-medium", "Proofs" }
+                    p { class: "text-xs text-gray-400 mt-1", "Generate and verify proofs" }
+                }
+                div { class: "{card_class()} p-4 text-center",
+                    div { class: "text-2xl mb-2", "\u{1F512}" }
+                    p { class: "text-sm font-medium", "Seals" }
+                    p { class: "text-xs text-gray-400 mt-1", "Create and verify seals" }
+                }
+            }
+
+            // Action buttons
+            div { class: "space-y-3",
+                Link {
+                    to: Route::CreateWallet {},
+                    class: "block w-full px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 font-medium transition-all duration-200 text-center shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30",
+                    "\u{2728} Create New Wallet"
+                }
+                Link {
+                    to: Route::ImportWallet {},
+                    class: "block w-full px-4 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 font-medium transition-all duration-200 text-center border border-gray-700 hover:border-gray-600",
+                    "\u{1F4E5} Import Existing Wallet"
+                }
+            }
+
+            // Supported chains
+            div { class: "{card_class()} p-4",
+                p { class: "text-xs text-gray-500 text-center mb-3", "Supported Chains" }
+                div { class: "flex justify-center gap-2 flex-wrap",
+                    span { class: "{chain_badge_class(&Chain::Bitcoin)}", "\u{1F7E0} Bitcoin" }
+                    span { class: "{chain_badge_class(&Chain::Ethereum)}", "\u{1F537} Ethereum" }
+                    span { class: "{chain_badge_class(&Chain::Sui)}", "\u{1F30A} Sui" }
+                    span { class: "{chain_badge_class(&Chain::Aptos)}", "\u{1F7E2} Aptos" }
+                }
+            }
+        }
+    }
 }
 
 #[component]
@@ -734,7 +817,7 @@ pub fn ShowRight(id: String) -> Element {
 
 #[component]
 pub fn TransferRight() -> Element {
-    let mut wallet_ctx = use_wallet_context();
+    let _wallet_ctx = use_wallet_context();
     let mut right_id = use_signal(|| String::new());
     let mut to_address = use_signal(|| String::new());
     let mut result = use_signal(|| Option::<String>::None);
@@ -969,7 +1052,6 @@ pub fn GenerateProof() -> Element {
 
 #[component]
 pub fn VerifyProof() -> Element {
-    let mut wallet_ctx = use_wallet_context();
     let mut selected_chain = use_signal(|| Chain::Bitcoin);
     let mut proof_input = use_signal(|| String::new());
     let mut result = use_signal(|| Option::<String>::None);
@@ -1934,7 +2016,6 @@ pub fn RunTests() -> Element {
 
 #[component]
 pub fn RunScenario() -> Element {
-    let mut wallet_ctx = use_wallet_context();
     let mut selected_scenario = use_signal(|| String::from("double_spend"));
     let mut result = use_signal(|| Option::<String>::None);
 
@@ -2340,28 +2421,57 @@ pub fn ListWallets() -> Element {
 // ===== Settings =====
 #[component]
 pub fn Settings() -> Element {
-    let mut wallet_ctx = use_wallet_context();
+    let wallet_ctx = use_wallet_context();
+    let mut show_lock_confirm = use_signal(|| false);
+    let mut show_clear_data = use_signal(|| false);
+    let is_initialized = wallet_ctx.is_initialized();
+    let has_wallet = wallet_ctx.wallet().is_some();
+
+    // Clone for closures
+    let mut ctx_lock = wallet_ctx.clone();
+    let mut ctx_clear = wallet_ctx.clone();
 
     rsx! {
-        div { class: "max-w-2xl space-y-6",
+        div { class: "max-w-2xl space-y-6 stagger-children",
             h1 { class: "text-2xl font-bold", "Settings" }
 
+            // Wallet section
             div { class: "{card_class()} overflow-hidden",
                 div { class: "{card_header_class()}",
                     h3 { class: "font-semibold text-sm", "Wallet" }
                 }
                 div { class: "p-6 space-y-4",
-                    button {
-                        onclick: move |_| {
-                            wallet_ctx.lock();
-                        },
-                        class: "{btn_secondary_class()}",
-                        "Lock Wallet"
+                    // Status
+                    div { class: "flex items-center justify-between",
+                        span { class: "text-sm text-gray-400", "Status" }
+                        div { class: "flex items-center gap-2",
+                            span { class: "w-2 h-2 rounded-full", class: if has_wallet { "bg-green-500 status-online" } else { "bg-gray-500" } }
+                            span { class: "text-sm", if has_wallet { "Unlocked" } else { "Locked" } }
+                        }
                     }
-                    p { class: "text-xs text-gray-500", "Locking the wallet clears it from memory." }
+
+                    div { class: "flex items-center justify-between",
+                        span { class: "text-sm text-gray-400", "Initialized" }
+                        span { class: "text-sm", if is_initialized { "Yes" } else { "No" } }
+                    }
+
+                    div { class: "flex gap-3 pt-2",
+                        button {
+                            onclick: move |_| show_lock_confirm.set(true),
+                            disabled: !has_wallet,
+                            class: "{btn_secondary_class()} disabled:opacity-50 disabled:cursor-not-allowed",
+                            "\u{1F512} Lock Wallet"
+                        }
+                        button {
+                            onclick: move |_| show_clear_data.set(true),
+                            class: "px-4 py-2 rounded-lg bg-red-900/30 hover:bg-red-900/50 border border-red-700/50 text-sm font-medium transition-colors text-red-300",
+                            "\u{1F5D1}\u{FE0F} Clear Data"
+                        }
+                    }
                 }
             }
 
+            // About
             div { class: "{card_class()} overflow-hidden",
                 div { class: "{card_header_class()}",
                     h3 { class: "font-semibold text-sm", "About" }
@@ -2378,6 +2488,75 @@ pub fn Settings() -> Element {
                     div { class: "flex justify-between",
                         span { class: "text-sm text-gray-400", "Framework" }
                         span { class: "text-sm font-mono", "Dioxus 0.7" }
+                    }
+                    div { class: "flex justify-between",
+                        span { class: "text-sm text-gray-400", "Storage" }
+                        span { class: "text-sm", "localStorage (persistent)" }
+                    }
+                }
+            }
+        }
+
+        // Lock confirmation modal
+        if *show_lock_confirm.read() {
+            div { class: "fixed inset-0 z-50 flex items-center justify-center bg-black/50 modal-backdrop",
+                div { class: "{card_class()} p-6 max-w-sm mx-4 modal-content",
+                    div { class: "flex items-center gap-2 mb-4",
+                        span { class: "text-yellow-400 text-xl", "\u{26A0}\u{FE0F}" }
+                        h3 { class: "font-semibold", "Lock Wallet?" }
+                    }
+                    p { class: "text-sm text-gray-400 mb-4",
+                        "This will remove the wallet from memory. Your rights, seals, and other data will remain saved, but you'll need to re-import your wallet to access them."
+                    }
+                    div { class: "flex gap-3",
+                        button {
+                            onclick: move |_| show_lock_confirm.set(false),
+                            class: "flex-1 {btn_secondary_class()}",
+                            "Cancel"
+                        }
+                        button {
+                            onclick: move |_| {
+                                ctx_lock.lock();
+                                show_lock_confirm.set(false);
+                            },
+                            class: "flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-sm font-medium transition-colors",
+                            "Lock"
+                        }
+                    }
+                }
+            }
+        }
+
+        // Clear data confirmation modal
+        if *show_clear_data.read() {
+            div { class: "fixed inset-0 z-50 flex items-center justify-center bg-black/50 modal-backdrop",
+                div { class: "{card_class()} p-6 max-w-sm mx-4 modal-content",
+                    div { class: "flex items-center gap-2 mb-4",
+                        span { class: "text-red-400 text-xl", "\u{26A0}\u{FE0F}" }
+                        h3 { class: "font-semibold text-red-300", "Clear All Data?" }
+                    }
+                    p { class: "text-sm text-gray-400 mb-4",
+                        "This will permanently delete all wallet data, rights, seals, transfers, and settings from localStorage. This action cannot be undone."
+                    }
+                    div { class: "flex gap-3",
+                        button {
+                            onclick: move |_| show_clear_data.set(false),
+                            class: "flex-1 {btn_secondary_class()}",
+                            "Cancel"
+                        }
+                        button {
+                            onclick: move |_| {
+                                // Clear all localStorage
+                                if let Ok(storage) = crate::storage::wallet_storage() {
+                                    let _ = storage.delete(crate::storage::WALLET_STATE_KEY);
+                                    let _ = storage.delete(crate::storage::WALLET_MNEMONIC_KEY);
+                                }
+                                ctx_clear.lock();
+                                show_clear_data.set(false);
+                            },
+                            class: "flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-sm font-medium transition-colors",
+                            "Clear All"
+                        }
                     }
                 }
             }

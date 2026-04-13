@@ -1,7 +1,6 @@
 //! Application routes.
 
 use dioxus::prelude::*;
-use dioxus_router::*;
 
 use crate::{Layout, AuthLayout};
 use crate::pages::*;

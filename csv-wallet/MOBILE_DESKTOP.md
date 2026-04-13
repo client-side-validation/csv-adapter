@@ -33,7 +33,7 @@ csv-wallet/
 {
   "build": {
     "beforeBuildCommand": "dx build --release",
-    "devPath": "http://localhost:8080",
+    "devPath": "http://localhost:8181",
     "distDir": "../target/dx/csv-wallet/release/web/public"
   },
   "package": {

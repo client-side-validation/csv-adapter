@@ -1,7 +1,6 @@
 /// Sidebar navigation component.
 
 use dioxus::prelude::*;
-use dioxus_router::*;
 use crate::routes::Route;
 
 /// Sidebar section helper.

@@ -1,7 +1,6 @@
 /// Reusable dropdown select component.
 
 use dioxus::prelude::*;
-use std::rc::Rc;
 
 /// Dropdown option button component.
 #[component]

@@ -6,5 +6,8 @@ default_platform = "web"
 title = "CSV Wallet"
 base_path = "/"
 
+[web.watcher]
+port = 8181
+
 [wasm]
 opt-level = 2

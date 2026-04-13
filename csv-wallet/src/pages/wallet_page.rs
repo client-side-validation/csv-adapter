@@ -3,7 +3,7 @@
 use dioxus::prelude::*;
 use csv_adapter_core::Chain;
 use std::collections::HashMap;
-use crate::context::{use_wallet_context, Network, truncate_address};
+use crate::context::{use_wallet_context, Network};
 use crate::routes::Route;
 use crate::components::{Dropdown, Card, StatCard, ChainDisplay, NetworkDisplay, all_chain_displays, all_network_displays};
 
@@ -39,8 +39,11 @@ pub fn WalletPage() -> Element {
     let mut selected_chain = use_signal(|| ChainDisplay(Chain::Bitcoin));
     let mut selected_network = use_signal(|| NetworkDisplay(Network::Test));
     let mut message = use_signal(|| Option::<String>::None);
+    let mut error = use_signal(|| Option::<String>::None);
     let mut mnemonic_result = use_signal(|| Option::<String>::None);
     let mut import_input = use_signal(|| String::new());
+    let mut importing = use_signal(|| false);
+    let mut generating = use_signal(|| false);
 
     let tabs = vec![
         WalletTab::Overview,
@@ -55,25 +58,40 @@ pub fn WalletPage() -> Element {
     let addresses: HashMap<Chain, String> = wallet_ctx.addresses().into_iter().collect();
     let has_wallet = !addresses.is_empty();
 
+    // Clone wallet context for use in closures
+    let mut ctx_generate = wallet_ctx.clone();
+    let mut ctx_import = wallet_ctx.clone();
+
     rsx! {
         div { class: "space-y-6",
             // Header
             div { class: "flex items-center justify-between",
                 h1 { class: "text-3xl font-bold text-gray-100", "Wallet Management" }
                 div { class: "flex items-center gap-2 text-sm text-gray-400",
-                    span { class: "w-2 h-2 rounded-full", class: if has_wallet { "bg-green-500" } else { "bg-yellow-500" } }
+                    span { class: "w-2 h-2 rounded-full", class: if has_wallet { "bg-green-500 status-online" } else { "bg-yellow-500" } }
                     if has_wallet { "Wallet Ready" } else { "No Wallet" }
+                }
+            }
+
+            // Error display
+            if let Some(err) = error.read().clone() {
+                div { class: "bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm text-red-300 flex items-center justify-between",
+                    span { "{err}" }
+                    button { onclick: move |_| error.set(None), class: "text-red-400 hover:text-red-200", "\u{2715}" }
                 }
             }
 
             // Message display
             if let Some(msg) = message.read().clone() {
-                div { class: "bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-sm text-blue-300", "{msg}" }
+                div { class: "bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 text-sm text-blue-300 flex items-center justify-between",
+                    span { "{msg}" }
+                    button { onclick: move |_| message.set(None), class: "text-blue-400 hover:text-blue-200", "\u{2715}" }
+                }
             }
 
             // Mnemonic display
             if let Some(mnemonic) = mnemonic_result.read().clone() {
-                div { class: "bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6 space-y-3",
+                div { class: "bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6 space-y-3 stagger-children",
                     div { class: "flex items-center gap-2",
                         span { class: "text-yellow-400", "\u{26A0}\u{FE0F}" }
                         p { class: "text-yellow-300 font-medium", "Save your recovery phrase!" }
@@ -98,7 +116,11 @@ pub fn WalletPage() -> Element {
                 div { class: "flex gap-1 overflow-x-auto",
                     for tab in tabs {
                         button {
-                            onclick: move |_| active_tab.set(tab),
+                            onclick: move |_| {
+                                active_tab.set(tab);
+                                error.set(None);
+                                message.set(None);
+                            },
                             class: "px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap",
                             class: if active_tab() == tab { "bg-blue-600 text-white" } else { "text-gray-400 hover:text-gray-200 hover:bg-gray-800" },
                             "{tab}"
@@ -118,23 +140,42 @@ pub fn WalletPage() -> Element {
                         selected_network: selected_network.read().clone(),
                         on_chain_change: move |cd: ChainDisplay| selected_chain.set(cd),
                         on_network_change: move |nd: NetworkDisplay| selected_network.set(nd),
-                        on_generate: move |mnemonic: String| {
-                            mnemonic_result.set(Some(mnemonic));
+                        generating: *generating.read(),
+                        on_generate: move || {
+                            generating.set(true);
+                            error.set(None);
+                            let mnemonic = ctx_generate.create_wallet();
+                            mnemonic_result.set(Some(mnemonic.clone()));
+                            generating.set(false);
                             message.set(Some("Wallet generated! Save the recovery phrase above.".to_string()));
                         },
                     }
                 },
                 WalletTab::Import => rsx! {
                     ImportTab {
-                        selected_chain: selected_chain.read().clone(),
-                        selected_network: selected_network.read().clone(),
-                        on_chain_change: move |cd: ChainDisplay| selected_chain.set(cd),
-                        on_network_change: move |nd: NetworkDisplay| selected_network.set(nd),
                         import_input: import_input.read().clone(),
-                        on_input_change: move |val: String| import_input.set(val),
-                        on_import: move |_| {
-                            message.set(Some("Wallet imported successfully!".to_string()));
+                        on_input_change: move |val: String| { import_input.set(val); error.set(None); },
+                        importing: *importing.read(),
+                        on_import: move || {
+                            let input = import_input.read().clone();
+                            if input.is_empty() {
+                                error.set(Some("Please enter a recovery phrase or private key.".to_string()));
+                                return;
+                            }
+                            importing.set(true);
+                            // Try as mnemonic first, then as private key
+                            let result = ctx_import.import_wallet(&input);
+                            if result.is_err() {
+                                let result2 = ctx_import.import_wallet_from_key(&input);
+                                if let Err(e) = result2 {
+                                    error.set(Some(format!("Failed to import: {e}")));
+                                    importing.set(false);
+                                    return;
+                                }
+                            }
+                            importing.set(false);
                             import_input.set(String::new());
+                            message.set(Some("Wallet imported successfully!".to_string()));
                         },
                     }
                 },
@@ -225,13 +266,14 @@ fn GenerateTab(
     selected_network: NetworkDisplay,
     on_chain_change: EventHandler<ChainDisplay>,
     on_network_change: EventHandler<NetworkDisplay>,
-    on_generate: EventHandler<String>,
+    generating: bool,
+    on_generate: EventHandler<()>,
 ) -> Element {
     rsx! {
         Card {
             title: "Generate New Wallet",
             children: rsx! {
-                div { class: "space-y-6",
+                div { class: "space-y-6 stagger-children",
                     div {
                         label { class: "block text-sm font-medium text-gray-300 mb-2", "Blockchain" }
                         Dropdown {
@@ -251,13 +293,17 @@ fn GenerateTab(
                     }
 
                     button {
-                        onclick: move |_| {
-                            // Simulate wallet generation
-                            let mnemonic = "abandon ability able about above absent absorb abstract absurd abuse access accident".to_string();
-                            on_generate.call(mnemonic);
-                        },
-                        class: "w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors text-white",
-                        "Generate Wallet"
+                        onclick: move |_| on_generate.call(()),
+                        disabled: generating,
+                        class: "w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-all duration-200 text-white btn-ripple disabled:opacity-50 disabled:cursor-not-allowed",
+                        if generating {
+                            span { class: "inline-flex items-center gap-2",
+                                span { class: "animate-spin", "\u{23F3}" }
+                                "Generating..."
+                            }
+                        } else {
+                            "Generate Wallet"
+                        }
                     }
 
                     div { class: "bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 text-sm text-gray-400",
@@ -272,57 +318,53 @@ fn GenerateTab(
 
 #[component]
 fn ImportTab(
-    selected_chain: ChainDisplay,
-    selected_network: NetworkDisplay,
-    on_chain_change: EventHandler<ChainDisplay>,
-    on_network_change: EventHandler<NetworkDisplay>,
     import_input: String,
     on_input_change: EventHandler<String>,
+    importing: bool,
     on_import: EventHandler<()>,
 ) -> Element {
     rsx! {
         Card {
             title: "Import Wallet",
             children: rsx! {
-                div { class: "space-y-6",
+                div { class: "space-y-6 stagger-children",
                     div {
-                        label { class: "block text-sm font-medium text-gray-300 mb-2", "Blockchain" }
-                        Dropdown {
-                            options: all_chain_displays(),
-                            selected: selected_chain,
-                            on_change: move |cd| on_chain_change.call(cd),
-                        }
-                    }
-
-                    div {
-                        label { class: "block text-sm font-medium text-gray-300 mb-2", "Network" }
-                        Dropdown {
-                            options: all_network_displays(),
-                            selected: selected_network,
-                            on_change: move |nd| on_network_change.call(nd),
-                        }
-                    }
-
-                    div {
-                        label { class: "block text-sm font-medium text-gray-300 mb-2", "Private Key or Mnemonic" }
+                        label { class: "block text-sm font-medium text-gray-300 mb-2", "Recovery Phrase or Private Key" }
                         textarea {
                             value: "{import_input}",
                             oninput: move |evt| on_input_change.call(evt.value()),
-                            placeholder: "Enter private key (hex) or mnemonic phrase...",
-                            class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-gray-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none",
+                            placeholder: "Enter 12/24 word mnemonic or hex-encoded private key...",
+                            class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-gray-100 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none input-focus",
                             rows: 4,
                         }
                     }
 
                     button {
                         onclick: move |_| on_import.call(()),
-                        class: "w-full px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors text-white",
-                        "Import Wallet"
+                        disabled: importing || import_input.is_empty(),
+                        class: "w-full px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-all duration-200 text-white btn-ripple disabled:opacity-50 disabled:cursor-not-allowed",
+                        if importing {
+                            span { class: "inline-flex items-center gap-2",
+                                span { class: "animate-spin", "\u{23F3}" }
+                                "Importing..."
+                            }
+                        } else {
+                            "Import Wallet"
+                        }
                     }
 
                     div { class: "bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 text-sm text-gray-400",
                         span { class: "text-yellow-400 font-medium", "\u{26A0}\u{FE0F} Warning: " }
                         "Never share your private key or mnemonic. Only import from trusted sources."
+                    }
+
+                    div { class: "bg-gray-800/50 rounded-lg p-3 border border-gray-700 space-y-2",
+                        p { class: "text-xs text-gray-400 font-medium", "Supported Formats" }
+                        div { class: "flex flex-wrap gap-1.5",
+                            span { class: "text-xs text-gray-500", "12 or 24 word BIP-39 mnemonic" }
+                            span { class: "text-xs text-gray-600", "•" }
+                            span { class: "text-xs text-gray-500", "Hex private key (64 chars for secp256k1/ed25519)" }
+                        }
                     }
                 }
             }
@@ -343,7 +385,7 @@ fn BalanceTab(
         Card {
             title: "Check Balance",
             children: rsx! {
-                div { class: "space-y-6",
+                div { class: "space-y-6 stagger-children",
                     div {
                         label { class: "block text-sm font-medium text-gray-300 mb-2", "Blockchain" }
                         Dropdown {
@@ -355,13 +397,13 @@ fn BalanceTab(
 
                     div {
                         label { class: "block text-sm font-medium text-gray-300 mb-2", "Address" }
-                        div { class: "bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 font-mono text-sm text-gray-200 break-all", "{addr}" }
+                        div { class: "bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 font-mono text-sm text-gray-200 break-all input-focus", "{addr}" }
                     }
 
-                    div { class: "bg-gray-800/50 rounded-lg p-4",
+                    div { class: "bg-gray-800/50 rounded-lg p-4 card-hover",
                         div { class: "flex items-center justify-between",
                             span { class: "text-gray-400", "Balance" }
-                            span { class: "text-2xl font-bold text-gray-100", "0.0000" }
+                            span { class: "text-2xl font-bold text-gray-100 count-up", "0.0000" }
                         }
                         div { class: "text-xs text-gray-500 mt-1", "Connect to RPC to fetch real balance" }
                     }
@@ -383,12 +425,13 @@ fn FundTab(
     let chain = selected_chain.0;
     let network = selected_network.0;
     let addr = addresses.get(&chain).cloned().unwrap_or_else(|| "Generate a wallet first".to_string());
+    let addr_for_closure = addr.clone();
 
     rsx! {
         Card {
             title: "Fund from Faucet",
             children: rsx! {
-                div { class: "space-y-6",
+                div { class: "space-y-6 stagger-children",
                     div {
                         label { class: "block text-sm font-medium text-gray-300 mb-2", "Blockchain" }
                         Dropdown {
@@ -409,16 +452,17 @@ fn FundTab(
 
                     div {
                         label { class: "block text-sm font-medium text-gray-300 mb-2", "Target Address" }
-                        div { class: "bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 font-mono text-sm text-gray-200 break-all", "{addr}" }
+                        div { class: "bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 font-mono text-sm text-gray-200 break-all input-focus", "{addr}" }
                     }
 
                     button {
                         onclick: move |_| {
-                            if addr != "Generate a wallet first" {
+                            if addr_for_closure != "Generate a wallet first" {
                                 on_fund.call(format!("Faucet request sent for {} on {}", chain, network));
                             }
                         },
-                        class: "w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition-colors text-white",
+                        disabled: addr == "Generate a wallet first",
+                        class: "w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition-all duration-200 text-white btn-ripple disabled:opacity-50 disabled:cursor-not-allowed",
                         "Request Test Tokens"
                     }
 

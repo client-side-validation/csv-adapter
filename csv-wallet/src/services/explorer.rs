@@ -12,7 +12,7 @@ pub struct ExplorerConfig {
 impl Default for ExplorerConfig {
     fn default() -> Self {
         Self {
-            base_url: "http://localhost:8080".to_string(),
+            base_url: "http://localhost:8181".to_string(),
         }
     }
 }

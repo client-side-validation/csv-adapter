@@ -111,7 +111,7 @@ All 8 major features have been implemented and the project compiles successfully
 - get_seals_by_owner() - List seals for address
 - get_transfers() - Transfer history
 - RightInfo, SealInfo, TransferInfo data structures
-- Default configuration pointing to localhost:8080
+- Default configuration pointing to localhost:8181
 
 **Status:** Explorer integration ready for connection.
 

@@ -3,7 +3,6 @@
 #![warn(missing_docs)]
 
 use dioxus::prelude::*;
-use dioxus_router::*;
 
 mod routes;
 mod context;
@@ -13,7 +12,7 @@ mod pages;
 mod components;
 
 use routes::Route;
-use context::{WalletProvider, use_wallet_context};
+use context::WalletProvider;
 use components::{Sidebar, Header};
 
 fn main() {
@@ -23,7 +22,12 @@ fn main() {
 
 #[component]
 fn App() -> Element {
-    rsx! { WalletProvider {} }
+    rsx! {
+        // Global stylesheet
+        document::Link { rel: "stylesheet", href: "/style.css" }
+
+        WalletProvider {}
+    }
 }
 
 // ===== Layout =====
@@ -45,9 +49,11 @@ pub fn Layout() -> Element {
                     },
                 }
 
-                // Page content
+                // Page content with fade-in transition
                 main { class: "flex-1 px-4 sm:px-6 lg:px-8 py-6 overflow-auto",
-                    Outlet::<Route> {}
+                    div { class: "page-enter",
+                        Outlet::<Route> {}
+                    }
                 }
             }
         }
@@ -68,7 +74,10 @@ pub fn AuthLayout() -> Element {
                         }
                         p { class: "mt-2 text-gray-400", "Multi-chain wallet for Client-Side Validation" }
                     }
-                    Outlet::<Route> {}
+                    // Page content with fade-in transition
+                    div { class: "page-enter",
+                        Outlet::<Route> {}
+                    }
                 }
             }
         }

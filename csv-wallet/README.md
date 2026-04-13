@@ -66,7 +66,7 @@ dx build --release
 dx serve
 ```
 
-Then open **http://localhost:8080** in your browser.
+Then open **http://localhost:8181** in your browser.
 
 ### Available Wallet Commands (matching csv-cli)
 
