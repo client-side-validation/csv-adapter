@@ -1,0 +1,44 @@
+[database]
+url = "sqlite://data/testnet.db"
+max_connections = 10
+
+[api]
+host = "0.0.0.0"
+port = 8081
+
+[ui]
+host = "0.0.0.0"
+port = 3001
+api_url = "http://localhost:8081"
+
+[indexer]
+concurrency = 4
+batch_size = 100
+poll_interval_ms = 5000
+
+[chains.bitcoin]
+enabled = true
+network = "testnet"
+rpc_url = "https://mempool.space/testnet/api"
+start_block = 2500000
+
+[chains.ethereum]
+enabled = true
+network = "testnet"
+rpc_url = "https://ethereum-sepolia-rpc.publicnode.com"
+start_block = 5000000
+
+[chains.sui]
+enabled = true
+network = "testnet"
+rpc_url = "https://fullnode.testnet.sui.io:443"
+
+[chains.aptos]
+enabled = true
+network = "testnet"
+rpc_url = "https://fullnode.testnet.aptoslabs.com/v1"
+
+[chains.solana]
+enabled = true
+network = "devnet"
+rpc_url = "https://api.devnet.solana.com"

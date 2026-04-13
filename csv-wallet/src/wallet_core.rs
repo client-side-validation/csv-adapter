@@ -1,7 +1,9 @@
-//! Core wallet functionality.
+//! Per-chain account management.
+//!
+//! Each account belongs to a specific chain and has its own private key.
+//! Multiple accounts per chain are supported.
 
 use csv_adapter_core::Chain;
-use bip32::Mnemonic;
 use rand::RngCore;
 use rand::rngs::OsRng;
 use secp256k1::{Secp256k1, SecretKey};
@@ -10,189 +12,235 @@ use sha3::Keccak256;
 use blake2::Blake2b;
 use sha2::Digest;
 use serde::{Serialize, Deserialize};
+use uuid::Uuid;
 
-/// Extended wallet with multi-chain support.
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ExtendedWallet {
-    /// Mnemonic phrase
-    pub mnemonic: String,
-    /// Seed bytes
-    #[serde(with = "seed_serde")]
-    pub seed: [u8; 64],
+/// A single blockchain account with its own private key and address.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+pub struct ChainAccount {
+    /// Unique account ID
+    pub id: String,
+    /// Blockchain this account belongs to
+    pub chain: Chain,
+    /// User-friendly account name
+    pub name: String,
+    /// Hex-encoded private key (32 or 64 bytes depending on curve)
+    pub private_key: String,
+    /// Derived address for display
+    pub address: String,
 }
 
-// Custom serde for [u8; 64]
-mod seed_serde {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    
-    pub fn serialize<S>(seed: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        seed.to_vec().serialize(serializer)
-    }
-    
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 64], D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let vec: Vec<u8> = Vec::deserialize(deserializer)?;
-        if vec.len() != 64 {
-            return Err(serde::de::Error::custom("Expected 64 bytes"));
-        }
-        let mut arr = [0u8; 64];
-        arr.copy_from_slice(&vec);
-        Ok(arr)
-    }
-}
-
-impl ExtendedWallet {
-    /// Generate a new wallet.
-    pub fn generate() -> Self {
-        let mut entropy = [0u8; 32];
-        OsRng.fill_bytes(&mut entropy);
-        let mnemonic = Mnemonic::from_entropy(entropy, bip32::Language::English);
-        let phrase = mnemonic.phrase().to_string();
-        let seed = mnemonic.to_seed("");
-        
-        let mut seed_bytes = [0u8; 64];
-        seed_bytes.copy_from_slice(seed.as_bytes());
-        
-        Self {
-            mnemonic: phrase,
-            seed: seed_bytes,
-        }
-    }
-
-    /// Create from mnemonic phrase.
-    pub fn from_mnemonic(phrase: &str) -> Result<Self, String> {
-        let mnemonic = Mnemonic::new(phrase, bip32::Language::English)
-            .map_err(|e| format!("Invalid mnemonic: {}", e))?;
-        let seed = mnemonic.to_seed("");
-
-        let mut seed_bytes = [0u8; 64];
-        seed_bytes.copy_from_slice(seed.as_bytes());
-
-        Ok(Self {
-            mnemonic: phrase.to_string(),
-            seed: seed_bytes,
-        })
-    }
-
-    /// Create from hex-encoded private key.
-    /// Supports secp256k1 (64 hex chars) or ed25519 (64 hex chars).
-    pub fn from_private_key(hex_key: &str) -> Result<Self, String> {
+impl ChainAccount {
+    /// Derive address from private key for a specific chain.
+    pub fn derive_address(chain: Chain, hex_key: &str) -> Result<String, String> {
         let hex_clean = hex_key.strip_prefix("0x").unwrap_or(hex_key);
         let bytes = hex::decode(hex_clean)
             .map_err(|e| format!("Invalid hex: {}", e))?;
 
-        let seed = if bytes.len() == 32 {
-            // 32-byte private key — use as seed directly
-            let mut seed = [0u8; 64];
-            // For secp256k1: use key as first 32 bytes, hash for remaining
-            use sha2::{Sha256, Digest};
-            seed[..32].copy_from_slice(&bytes);
-            let hash = Sha256::digest(&bytes);
-            seed[32..].copy_from_slice(&hash);
-            seed
-        } else if bytes.len() == 64 {
-            // 64-byte key — use as seed directly
-            let mut seed = [0u8; 64];
-            seed.copy_from_slice(&bytes);
-            seed
-        } else {
-            return Err(format!("Invalid key length: expected 32 or 64 bytes, got {}", bytes.len()));
-        };
+        match chain {
+            Chain::Bitcoin => Self::derive_bitcoin_address(&bytes),
+            Chain::Ethereum => Self::derive_ethereum_address(&bytes),
+            Chain::Sui => Self::derive_sui_address(&bytes),
+            Chain::Aptos => Self::derive_aptos_address(&bytes),
+        }
+    }
 
+    /// Create a new account from a private key.
+    pub fn from_private_key(chain: Chain, name: &str, hex_key: &str) -> Result<Self, String> {
+        let address = Self::derive_address(chain, hex_key)?;
         Ok(Self {
-            mnemonic: "[imported from private key]".to_string(),
-            seed,
+            id: Uuid::new_v4().to_string(),
+            chain,
+            name: name.to_string(),
+            private_key: hex_key.to_string(),
+            address,
         })
     }
 
-    /// Derive Bitcoin address.
-    fn derive_bitcoin_address(&self) -> String {
-        let mut key_bytes = [0u8; 32];
-        key_bytes.copy_from_slice(&self.seed[..32]);
-        
-        if let Ok(secret_key) = SecretKey::from_slice(&key_bytes) {
+    // ===== Address derivation per chain =====
+
+    fn derive_bitcoin_address(key_bytes: &[u8]) -> Result<String, String> {
+        let key = if key_bytes.len() == 32 {
+            key_bytes.to_vec()
+        } else if key_bytes.len() == 64 {
+            key_bytes[..32].to_vec()
+        } else {
+            return Err(format!("Invalid key length: {}", key_bytes.len()));
+        };
+
+        if let Ok(secret_key) = SecretKey::from_slice(&key) {
             let secp = Secp256k1::new();
             let pubkey = secret_key.public_key(&secp);
             let pubkey_bytes = pubkey.serialize();
-            format!("bc1q{}", hex::encode(&pubkey_bytes[1..21]))
+            Ok(format!("bc1q{}", hex::encode(&pubkey_bytes[1..21])))
         } else {
-            "Invalid key".to_string()
+            Err("Invalid secp256k1 key for Bitcoin".to_string())
         }
     }
 
-    /// Derive Ethereum address.
-    fn derive_ethereum_address(&self) -> String {
-        let mut key_bytes = [0u8; 32];
-        key_bytes.copy_from_slice(&self.seed[32..]);
-        
-        if let Ok(secret_key) = SecretKey::from_slice(&key_bytes) {
+    fn derive_ethereum_address(key_bytes: &[u8]) -> Result<String, String> {
+        let key = if key_bytes.len() == 32 {
+            key_bytes.to_vec()
+        } else if key_bytes.len() == 64 {
+            key_bytes[..32].to_vec()
+        } else {
+            return Err(format!("Invalid key length: {}", key_bytes.len()));
+        };
+
+        if let Ok(secret_key) = SecretKey::from_slice(&key) {
             let secp = Secp256k1::new();
             let public_key = secret_key.public_key(&secp);
             let pubkey_bytes = public_key.serialize_uncompressed();
-            
+
             let mut hasher = Keccak256::new();
             hasher.update(&pubkey_bytes[1..]);
             let hash = hasher.finalize();
-            
-            format!("0x{}", hex::encode(&hash[12..]))
+
+            Ok(format!("0x{}", hex::encode(&hash[12..])))
         } else {
-            "Invalid key".to_string()
+            Err("Invalid secp256k1 key for Ethereum".to_string())
         }
     }
 
-    /// Derive Sui address.
-    fn derive_sui_address(&self) -> String {
-        let mut key_bytes = [0u8; 32];
-        key_bytes.copy_from_slice(&self.seed[..32]);
-        
-        let signing_key = SigningKey::from_bytes(&key_bytes);
-        let verifying_key: VerifyingKey = signing_key.verifying_key();
-        
-        let mut hasher = Blake2b::new();
-        hasher.update(&[0x00]);
-        hasher.update(verifying_key.as_bytes());
-        let hash: [u8; 32] = hasher.finalize().into();
-        
-        format!("0x{}", hex::encode(&hash[..]))
+    fn derive_sui_address(key_bytes: &[u8]) -> Result<String, String> {
+        let key = if key_bytes.len() == 32 {
+            key_bytes.to_vec()
+        } else if key_bytes.len() == 64 {
+            key_bytes[..32].to_vec()
+        } else {
+            return Err(format!("Invalid key length: {}", key_bytes.len()));
+        };
+
+        if key.len() == 32 {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&key);
+            let signing_key = SigningKey::from_bytes(&arr);
+            let verifying_key: VerifyingKey = signing_key.verifying_key();
+
+            let mut hasher = Blake2b::new();
+            hasher.update(&[0x00]);
+            hasher.update(verifying_key.as_bytes());
+            let hash: [u8; 32] = hasher.finalize().into();
+
+            Ok(format!("0x{}", hex::encode(&hash[..])))
+        } else {
+            Err("Invalid ed25519 key for Sui".to_string())
+        }
     }
 
-    /// Derive Aptos address.
-    fn derive_aptos_address(&self) -> String {
-        let mut key_bytes = [0u8; 32];
-        key_bytes.copy_from_slice(&self.seed[32..]);
-        
-        let signing_key = SigningKey::from_bytes(&key_bytes);
-        let verifying_key: VerifyingKey = signing_key.verifying_key();
-        
-        let mut hasher = sha3::Sha3_256::new();
-        hasher.update(verifying_key.as_bytes());
-        hasher.update(&[0x00]);
-        let hash: [u8; 32] = hasher.finalize().into();
-        
-        format!("0x{}", hex::encode(&hash[..]))
+    fn derive_aptos_address(key_bytes: &[u8]) -> Result<String, String> {
+        let key = if key_bytes.len() == 32 {
+            key_bytes.to_vec()
+        } else if key_bytes.len() == 64 {
+            key_bytes[..32].to_vec()
+        } else {
+            return Err(format!("Invalid key length: {}", key_bytes.len()));
+        };
+
+        if key.len() == 32 {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&key);
+            let signing_key = SigningKey::from_bytes(&arr);
+            let verifying_key: VerifyingKey = signing_key.verifying_key();
+
+            let mut hasher = sha3::Sha3_256::new();
+            hasher.update(verifying_key.as_bytes());
+            hasher.update(&[0x00]);
+            let hash: [u8; 32] = hasher.finalize().into();
+
+            Ok(format!("0x{}", hex::encode(&hash[..])))
+        } else {
+            Err("Invalid ed25519 key for Aptos".to_string())
+        }
+    }
+}
+
+/// Complete wallet data — collection of per-chain accounts.
+#[derive(Clone, Serialize, Deserialize, Default)]
+pub struct WalletData {
+    /// All accounts (multiple per chain allowed)
+    pub accounts: Vec<ChainAccount>,
+    /// Last selected account ID
+    pub selected_account_id: Option<String>,
+}
+
+impl WalletData {
+    /// Add an account.
+    pub fn add_account(&mut self, account: ChainAccount) {
+        self.accounts.push(account);
     }
 
-    /// Get addresses for all chains.
-    pub fn all_addresses(&self) -> Vec<(Chain, String)> {
-        vec![
-            (Chain::Bitcoin, self.derive_bitcoin_address()),
-            (Chain::Ethereum, self.derive_ethereum_address()),
-            (Chain::Sui, self.derive_sui_address()),
-            (Chain::Aptos, self.derive_aptos_address()),
-        ]
+    /// Remove an account by ID.
+    pub fn remove_account(&mut self, id: &str) -> bool {
+        let len_before = self.accounts.len();
+        self.accounts.retain(|a| a.id != id);
+        self.accounts.len() < len_before
     }
 
-    /// Get address for specific chain.
-    pub fn address(&self, chain: Chain) -> String {
-        self.all_addresses()
-            .into_iter()
-            .find(|(c, _)| *c == chain)
-            .map(|(_, addr)| addr)
-            .unwrap_or_default()
+    /// Get accounts for a specific chain.
+    pub fn accounts_for_chain(&self, chain: Chain) -> Vec<&ChainAccount> {
+        self.accounts.iter().filter(|a| a.chain == chain).collect()
+    }
+
+    /// Get accounts count for a chain.
+    pub fn account_count_for_chain(&self, chain: Chain) -> usize {
+        self.accounts.iter().filter(|a| a.chain == chain).count()
+    }
+
+    /// Get account by ID.
+    pub fn get_account(&self, id: &str) -> Option<&ChainAccount> {
+        self.accounts.iter().find(|a| a.id == id)
+    }
+
+    /// Get mutable account by ID.
+    pub fn get_account_mut(&mut self, id: &str) -> Option<&mut ChainAccount> {
+        self.accounts.iter_mut().find(|a| a.id == id)
+    }
+
+    /// Get total account count.
+    pub fn total_accounts(&self) -> usize {
+        self.accounts.len()
+    }
+
+    /// Check if wallet has any accounts.
+    pub fn is_empty(&self) -> bool {
+        self.accounts.is_empty()
+    }
+
+    /// Select an account.
+    pub fn select_account(&mut self, id: String) {
+        self.selected_account_id = Some(id);
+    }
+
+    /// Clear selection.
+    pub fn clear_selection(&mut self) {
+        self.selected_account_id = None;
+    }
+
+    /// Export as JSON string.
+    pub fn to_json(&self) -> Result<String, String> {
+        serde_json::to_string_pretty(self)
+            .map_err(|e| format!("Failed to serialize: {}", e))
+    }
+
+    /// Import from JSON string.
+    pub fn from_json(json: &str) -> Result<Self, String> {
+        serde_json::from_str(json)
+            .map_err(|e| format!("Failed to parse JSON: {}", e))
+    }
+
+    /// Generate a random hex key for testing (32 bytes).
+    pub fn generate_test_key() -> String {
+        let mut bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut bytes);
+        hex::encode(bytes)
+    }
+}
+
+/// Helper: truncate address for display.
+pub fn truncate_address(addr: &str, chars: usize) -> String {
+    if addr.len() <= chars * 2 + 2 {
+        addr.to_string()
+    } else {
+        format!("{}...{}", &addr[..chars + 2], &addr[addr.len() - chars..])
     }
 }

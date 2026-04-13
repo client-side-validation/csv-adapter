@@ -2,10 +2,9 @@
 
 use dioxus::prelude::*;
 use csv_adapter_core::Chain;
-use crate::wallet_core::ExtendedWallet;
+use crate::wallet_core::{WalletData, ChainAccount};
 use crate::routes::Route;
 use crate::storage::{self, LocalStorageManager, PersistedState, PersistedRight, PersistedTransfer, PersistedSeal, PersistedProof, PersistedContract};
-use std::collections::HashMap;
 
 /// Network type.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -157,9 +156,7 @@ impl std::fmt::Display for TestStatus {
 /// Application state.
 #[derive(Clone)]
 pub struct AppState {
-    pub wallet: Option<ExtendedWallet>,
-    pub addresses: HashMap<Chain, String>,
-    pub initialized: bool,
+    pub wallet: WalletData,
     pub selected_chain: Chain,
     pub selected_network: Network,
     pub rights: Vec<TrackedRight>,
@@ -168,7 +165,6 @@ pub struct AppState {
     pub seals: Vec<SealRecord>,
     pub proofs: Vec<ProofRecord>,
     pub test_results: Vec<TestResult>,
-    pub pending_secret: Option<String>,
     pub notification: Option<Notification>,
 }
 
@@ -188,11 +184,8 @@ pub enum NotificationKind {
 
 impl Default for AppState {
     fn default() -> Self {
-        let addresses = HashMap::new();
         Self {
-            wallet: None,
-            addresses,
-            initialized: false,
+            wallet: WalletData::default(),
             selected_chain: Chain::Bitcoin,
             selected_network: Network::Test,
             rights: Vec::new(),
@@ -201,7 +194,6 @@ impl Default for AppState {
             seals: Vec::new(),
             proofs: Vec::new(),
             test_results: Vec::new(),
-            pending_secret: None,
             notification: None,
         }
     }
@@ -209,10 +201,9 @@ impl Default for AppState {
 
 impl PartialEq for AppState {
     fn eq(&self, other: &Self) -> bool {
-        self.initialized == other.initialized
-            && self.wallet.is_some() == other.wallet.is_some()
-            && self.selected_chain == other.selected_chain
+        self.selected_chain == other.selected_chain
             && self.selected_network == other.selected_network
+            && self.wallet.total_accounts() == other.wallet.total_accounts()
     }
 }
 
@@ -223,8 +214,15 @@ pub struct WalletContext {
     store: Option<LocalStorageManager>,
 }
 
+impl PartialEq for WalletContext {
+    fn eq(&self, _other: &Self) -> bool {
+        // Context is compared by reference identity, always equal for memoization
+        true
+    }
+}
+
 impl WalletContext {
-    /// Try to create context with localStorage; falls back to memory-only.
+    /// Create context with localStorage persistence.
     pub fn new(state: Signal<AppState>) -> Self {
         let store = storage::wallet_storage().ok();
         let mut ctx = Self { state, store };
@@ -236,10 +234,9 @@ impl WalletContext {
     fn load_persisted(&mut self) {
         let Some(store) = &self.store else { return };
 
+        // Load app state (rights, seals, etc.)
         if let Some(persisted) = store.try_load::<PersistedState>(storage::WALLET_STATE_KEY) {
             let mut s = self.state.write();
-
-            // Restore selection
             if let Ok(c) = persisted.selected_chain.parse::<Chain>() {
                 s.selected_chain = c;
             }
@@ -248,13 +245,9 @@ impl WalletContext {
                 "main" => Network::Main,
                 _ => Network::Test,
             };
-
-            // Restore rights
             s.rights = persisted.rights.into_iter().filter_map(|r| {
                 Some(TrackedRight {
-                    id: r.id,
-                    chain: r.chain.parse().ok()?,
-                    value: r.value,
+                    id: r.id, chain: r.chain.parse().ok()?, value: r.value,
                     status: match r.status.as_str() {
                         "Active" => RightStatus::Active,
                         "Transferred" => RightStatus::Transferred,
@@ -264,13 +257,10 @@ impl WalletContext {
                     owner: r.owner,
                 })
             }).collect();
-
             s.transfers = persisted.transfers.into_iter().filter_map(|t| {
                 Some(TrackedTransfer {
-                    id: t.id,
-                    from_chain: t.from_chain.parse().ok()?,
-                    to_chain: t.to_chain.parse().ok()?,
-                    right_id: t.right_id,
+                    id: t.id, from_chain: t.from_chain.parse().ok()?,
+                    to_chain: t.to_chain.parse().ok()?, right_id: t.right_id,
                     dest_owner: t.dest_owner,
                     status: match t.status.as_str() {
                         "Initiated" => TransferStatus::Initiated,
@@ -284,46 +274,30 @@ impl WalletContext {
                     created_at: t.created_at,
                 })
             }).collect();
-
             s.seals = persisted.seals.into_iter().filter_map(|s| {
                 Some(SealRecord {
-                    seal_ref: s.seal_ref,
-                    chain: s.chain.parse().ok()?,
-                    value: s.value,
-                    consumed: s.consumed,
-                    created_at: s.created_at,
+                    seal_ref: s.seal_ref, chain: s.chain.parse().ok()?,
+                    value: s.value, consumed: s.consumed, created_at: s.created_at,
                 })
             }).collect();
-
             s.proofs = persisted.proofs.into_iter().filter_map(|p| {
                 Some(ProofRecord {
-                    chain: p.chain.parse().ok()?,
-                    right_id: p.right_id,
-                    proof_type: p.proof_type,
-                    verified: p.verified,
+                    chain: p.chain.parse().ok()?, right_id: p.right_id,
+                    proof_type: p.proof_type, verified: p.verified,
                 })
             }).collect();
-
             s.contracts = persisted.contracts.into_iter().filter_map(|c| {
                 Some(DeployedContract {
-                    chain: c.chain.parse().ok()?,
-                    address: c.address,
-                    tx_hash: c.tx_hash,
-                    deployed_at: c.deployed_at,
+                    chain: c.chain.parse().ok()?, address: c.address,
+                    tx_hash: c.tx_hash, deployed_at: c.deployed_at,
                 })
             }).collect();
-
-            s.initialized = persisted.initialized;
         }
 
-        // Try to load wallet mnemonic from separate key (user previously created/imported)
-        if let Some(mnemonic) = store.try_load::<String>(storage::WALLET_MNEMONIC_KEY) {
-            if let Ok(wallet) = ExtendedWallet::from_mnemonic(&mnemonic) {
-                let addresses = wallet.all_addresses();
-                let mut s = self.state.write();
-                s.wallet = Some(wallet);
-                s.addresses = addresses.into_iter().collect();
-                // initialized already set from state above
+        // Load wallet data (per-chain accounts)
+        if let Some(wallet_json) = store.get_raw(storage::WALLET_MNEMONIC_KEY).ok().flatten() {
+            if let Ok(wallet) = WalletData::from_json(&wallet_json) {
+                self.state.write().wallet = wallet;
             }
         }
     }
@@ -333,132 +307,91 @@ impl WalletContext {
         let s = self.state.read();
 
         let persisted = PersistedState {
-            initialized: s.initialized,
+            initialized: !s.wallet.is_empty(),
             selected_chain: s.selected_chain.to_string(),
             selected_network: s.selected_network.to_string(),
-            rights: s.rights.iter().map(|r| PersistedRight {
-                id: r.id.clone(),
-                chain: r.chain.to_string(),
-                value: r.value,
-                status: r.status.to_string(),
-                owner: r.owner.clone(),
+            rights: s.rights.iter().map(|r| storage::PersistedRight {
+                id: r.id.clone(), chain: r.chain.to_string(), value: r.value,
+                status: r.status.to_string(), owner: r.owner.clone(),
             }).collect(),
-            transfers: s.transfers.iter().map(|t| PersistedTransfer {
-                id: t.id.clone(),
-                from_chain: t.from_chain.to_string(),
-                to_chain: t.to_chain.to_string(),
-                right_id: t.right_id.clone(),
-                dest_owner: t.dest_owner.clone(),
-                status: t.status.to_string(),
+            transfers: s.transfers.iter().map(|t| storage::PersistedTransfer {
+                id: t.id.clone(), from_chain: t.from_chain.to_string(),
+                to_chain: t.to_chain.to_string(), right_id: t.right_id.clone(),
+                dest_owner: t.dest_owner.clone(), status: t.status.to_string(),
                 created_at: t.created_at,
             }).collect(),
-            seals: s.seals.iter().map(|s| PersistedSeal {
-                seal_ref: s.seal_ref.clone(),
-                chain: s.chain.to_string(),
-                value: s.value,
-                consumed: s.consumed,
-                created_at: s.created_at,
+            seals: s.seals.iter().map(|s| storage::PersistedSeal {
+                seal_ref: s.seal_ref.clone(), chain: s.chain.to_string(),
+                value: s.value, consumed: s.consumed, created_at: s.created_at,
             }).collect(),
-            proofs: s.proofs.iter().map(|p| PersistedProof {
-                chain: p.chain.to_string(),
-                right_id: p.right_id.clone(),
-                proof_type: p.proof_type.clone(),
-                verified: p.verified,
+            proofs: s.proofs.iter().map(|p| storage::PersistedProof {
+                chain: p.chain.to_string(), right_id: p.right_id.clone(),
+                proof_type: p.proof_type.clone(), verified: p.verified,
             }).collect(),
-            contracts: s.contracts.iter().map(|c| PersistedContract {
-                chain: c.chain.to_string(),
-                address: c.address.clone(),
-                tx_hash: c.tx_hash.clone(),
-                deployed_at: c.deployed_at,
+            contracts: s.contracts.iter().map(|c| storage::PersistedContract {
+                chain: c.chain.to_string(), address: c.address.clone(),
+                tx_hash: c.tx_hash.clone(), deployed_at: c.deployed_at,
             }).collect(),
         };
-
         let _ = store.save(storage::WALLET_STATE_KEY, &persisted);
+
+        // Save wallet data as JSON
+        if let Ok(json) = s.wallet.to_json() {
+            let _ = store.save(storage::WALLET_MNEMONIC_KEY, &json);
+        }
     }
 
-    fn save_mnemonic(&self, mnemonic: &str) {
-        let Some(store) = &self.store else { return };
-        let _ = store.save(storage::WALLET_MNEMONIC_KEY, &mnemonic.to_string());
-    }
-
-    fn clear_mnemonic(&self) {
-        let Some(store) = &self.store else { return };
-        let _ = store.delete(storage::WALLET_MNEMONIC_KEY);
-    }
-
-    // ===== Wallet Management =====
-    pub fn create_wallet(&mut self) -> String {
-        let wallet = ExtendedWallet::generate();
-        let addresses = wallet.all_addresses();
-        let mnemonic = wallet.mnemonic.clone();
-        let mut s = self.state.write();
-        s.wallet = Some(wallet);
-        s.addresses = addresses.into_iter().collect();
-        s.initialized = true;
-        s.pending_secret = Some(mnemonic.clone());
-        drop(s);
+    // ===== Account Management =====
+    pub fn add_account(&mut self, account: ChainAccount) {
+        self.state.write().wallet.add_account(account);
         self.save_persisted();
-        self.save_mnemonic(&mnemonic);
-        mnemonic
     }
 
-    pub fn import_wallet(&mut self, mnemonic: &str) -> Result<(), String> {
-        let wallet = ExtendedWallet::from_mnemonic(mnemonic)?;
-        let addresses = wallet.all_addresses();
-        let mut s = self.state.write();
-        s.wallet = Some(wallet);
-        s.addresses = addresses.into_iter().collect();
-        s.initialized = true;
-        s.pending_secret = None;
-        drop(s);
-        self.save_persisted();
-        self.save_mnemonic(mnemonic);
-        Ok(())
+    pub fn remove_account(&mut self, id: &str) -> bool {
+        let removed = self.state.write().wallet.remove_account(id);
+        if removed { self.save_persisted(); }
+        removed
     }
 
-    pub fn import_wallet_from_key(&mut self, private_key: &str) -> Result<(), String> {
-        let wallet = ExtendedWallet::from_private_key(private_key)?;
-        let addresses = wallet.all_addresses();
-        let mut s = self.state.write();
-        s.wallet = Some(wallet);
-        s.addresses = addresses.into_iter().collect();
-        s.initialized = true;
-        s.pending_secret = None;
-        drop(s);
+    pub fn import_wallet_json(&mut self, json: &str) -> Result<(), String> {
+        let wallet = WalletData::from_json(json)?;
+        self.state.write().wallet = wallet;
         self.save_persisted();
         Ok(())
     }
 
-    pub fn lock(&mut self) {
-        let mut s = self.state.write();
-        s.wallet = None;
-        s.addresses.clear();
-        s.pending_secret = None;
-        drop(s);
-        self.clear_mnemonic();
-        // We keep other state (rights, seals, etc.) persisted
-    }
-
-    pub fn clear_pending_secret(&mut self) {
-        self.state.write().pending_secret = None;
+    pub fn export_wallet_json(&self) -> Result<String, String> {
+        self.state.read().wallet.to_json()
     }
 
     // ===== State Selectors =====
-    pub fn wallet(&self) -> Option<ExtendedWallet> {
+    pub fn wallet(&self) -> WalletData {
         self.state.read().wallet.clone()
     }
 
-    pub fn addresses(&self) -> Vec<(Chain, String)> {
-        let s = self.state.read();
-        s.addresses.iter().map(|(k, v)| (*k, v.clone())).collect()
+    pub fn accounts(&self) -> Vec<ChainAccount> {
+        self.state.read().wallet.accounts.clone()
+    }
+
+    pub fn accounts_for_chain(&self, chain: Chain) -> Vec<ChainAccount> {
+        self.state.read().wallet.accounts_for_chain(chain).into_iter().cloned().collect()
     }
 
     pub fn address_for_chain(&self, chain: Chain) -> Option<String> {
-        self.state.read().addresses.get(&chain).cloned()
+        self.state.read().wallet.accounts_for_chain(chain)
+            .first().map(|a| a.address.clone())
+    }
+
+    pub fn all_addresses(&self) -> Vec<(Chain, String)> {
+        let wallet = self.state.read().wallet.clone();
+        [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos]
+            .iter().filter_map(|&c| {
+                wallet.accounts_for_chain(c).first().map(|a| (c, a.address.clone()))
+            }).collect()
     }
 
     pub fn is_initialized(&self) -> bool {
-        self.state.read().initialized
+        !self.state.read().wallet.is_empty()
     }
 
     pub fn selected_chain(&self) -> Chain {
@@ -477,10 +410,6 @@ impl WalletContext {
     pub fn set_selected_network(&mut self, network: Network) {
         self.state.write().selected_network = network;
         self.save_persisted();
-    }
-
-    pub fn pending_secret(&self) -> Option<String> {
-        self.state.read().pending_secret.clone()
     }
 
     // ===== Rights =====
@@ -581,6 +510,12 @@ impl WalletContext {
 
     pub fn clear_notification(&mut self) {
         self.state.write().notification = None;
+    }
+
+    // ===== Lock/Clear =====
+    pub fn lock(&mut self) {
+        self.state.write().wallet = WalletData::default();
+        self.save_persisted();
     }
 }
 

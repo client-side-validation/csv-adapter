@@ -2,8 +2,10 @@
 
 use dioxus::prelude::*;
 use std::rc::Rc;
+use wasm_bindgen::prelude::*;
 use crate::routes::Route;
 use crate::context::{use_wallet_context, Network, generate_id, truncate_address, TrackedRight, RightStatus, TrackedTransfer, TransferStatus, SealRecord, DeployedContract, ProofRecord, TestResult, TestStatus, NotificationKind};
+use crate::wallet_core::ChainAccount;
 use csv_adapter_core::Chain;
 
 pub mod wallet_page;
@@ -233,7 +235,7 @@ fn stat_card(label: &str, value: &str, icon: &str) -> Element {
 #[component]
 pub fn Dashboard() -> Element {
     let wallet_ctx = use_wallet_context();
-    let addrs = wallet_ctx.addresses();
+    let accounts = wallet_ctx.accounts();
     let rights = wallet_ctx.rights();
     let transfers = wallet_ctx.transfers();
     let seals = wallet_ctx.seals();
@@ -242,36 +244,31 @@ pub fn Dashboard() -> Element {
     if !has_wallet {
         return rsx! {
             div { class: "flex items-center justify-center min-h-[calc(100vh-8rem)]",
-                // Backdrop
                 div { class: "fixed inset-0 bg-black/60 modal-backdrop" }
-                // Modal
-                div { class: "relative z-10 w-full max-w-md mx-4 modal-content",
+                div { class: "relative z-10 w-full max-w-lg mx-4 modal-content",
                     div { class: "{card_class()} p-8 space-y-6",
-                        // Brand
                         div { class: "text-center space-y-2",
                             div { class: "text-5xl mb-2 pulse-glow inline-block rounded-xl", "\u{1F510}" }
-                            h2 { class: "text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent",
-                                "CSV Wallet"
-                            }
-                            p { class: "text-gray-400 text-sm",
-                                "Manage Rights, Proofs, Seals, and cross-chain transfers."
+                            h2 { class: "text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent", "CSV Wallet" }
+                            p { class: "text-gray-400 text-sm", "Manage accounts per-chain. Add private keys individually." }
+                        }
+
+                        // Per-chain account cards
+                        div { class: "space-y-3",
+                            for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos] {
+                                AddAccountCard { chain }
                             }
                         }
 
-                        // Create wallet section
-                        CreateWalletModal {}
-
-                        // Divider
+                        // Divider + import JSON
                         div { class: "flex items-center gap-3",
                             div { class: "flex-1 h-px bg-gray-800" }
                             span { class: "text-xs text-gray-600", "or" }
                             div { class: "flex-1 h-px bg-gray-800" }
                         }
 
-                        // Import wallet section
-                        ImportWalletModal {}
+                        ImportJsonButton {}
 
-                        // Supported chains
                         div { class: "pt-2",
                             p { class: "text-xs text-gray-600 text-center mb-2", "Supported Chains" }
                             div { class: "flex justify-center gap-2 flex-wrap",
@@ -293,40 +290,27 @@ pub fn Dashboard() -> Element {
 
     rsx! {
         div { class: "space-y-6 stagger-children",
-            // Header
             div { class: "flex items-center justify-between",
                 div {
                     h1 { class: "text-2xl font-bold", "Dashboard" }
-                    p { class: "text-sm text-gray-400 mt-1", "Your wallet overview" }
+                    p { class: "text-sm text-gray-400 mt-1", "{accounts.len()} accounts across 4 chains" }
                 }
             }
 
-            // Stats row
             div { class: "grid grid-cols-2 lg:grid-cols-4 gap-4",
-                {stat_card("Addresses", &addrs.len().to_string(), "\u{1F4B3}")}
+                {stat_card("Accounts", &accounts.len().to_string(), "\u{1F4B3}")}
                 {stat_card("Active Rights", &active_rights.to_string(), "\u{1F48E}")}
                 {stat_card("Transfers", &completed_transfers.to_string(), "\u{21C4}")}
                 {stat_card("Available Seals", &available_seals.to_string(), "\u{1F512}")}
             }
 
-            // Address cards
-            div {
-                h2 { class: "text-lg font-semibold mb-3", "Your Addresses" }
-                div { class: "grid grid-cols-1 md:grid-cols-2 gap-4",
-                    for (chain, addr) in addrs {
-                        div { class: "{card_class()} p-5 card-hover",
-                            div { class: "flex items-center justify-between mb-3",
-                                span { class: "{chain_badge_class(&chain)}",
-                                    "{chain_icon_emoji(&chain)} {chain_name(&chain)}"
-                                }
-                            }
-                            p { class: "font-mono text-sm text-gray-300 break-all", "{addr}" }
-                        }
-                    }
+            // Per-chain account cards
+            div { class: "grid grid-cols-1 md:grid-cols-2 gap-4",
+                for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos] {
+                    DashboardChainCard { chain }
                 }
             }
 
-            // Quick actions
             div {
                 h2 { class: "text-lg font-semibold mb-3", "Quick Actions" }
                 div { class: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4",
@@ -348,171 +332,247 @@ pub fn Dashboard() -> Element {
     }
 }
 
-// ===== Create Wallet Modal Component =====
+// ===== Per-Chain Add Account Card =====
 #[component]
-fn CreateWalletModal() -> Element {
+fn AddAccountCard(chain: Chain) -> Element {
     let mut wallet_ctx = use_wallet_context();
-    let mut created = use_signal(|| false);
-    let mut mnemonic_display = use_signal(|| String::new());
+    let chain_accounts = wallet_ctx.accounts_for_chain(chain);
+    let mut show_form = use_signal(|| false);
+    let mut pk_input = use_signal(|| String::new());
+    let mut name_input = use_signal(|| String::new());
+    let mut error = use_signal(|| Option::<String>::None);
 
-    if *created.read() {
-        let addrs = wallet_ctx.addresses();
-        let mnemonic = mnemonic_display.read().clone();
+    if *show_form.read() {
         return rsx! {
-            div { class: "space-y-4",
-                div { class: "text-center",
-                    div { class: "text-green-400 text-3xl mb-2", "\u{2705}" }
-                    h3 { class: "text-lg font-semibold text-green-400", "Wallet Created" }
+            div { class: "{card_class()} p-4 space-y-3",
+                div { class: "flex items-center justify-between",
+                    span { class: "{chain_badge_class(&chain)}", "{chain_icon_emoji(&chain)} {chain_name(&chain)}" }
+                    button { onclick: move |_| { show_form.set(false); error.set(None); }, class: "text-gray-500 hover:text-gray-300", "\u{2715}" }
                 }
-
-                div { class: "bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4 space-y-2",
-                    div { class: "flex items-center gap-2",
-                        span { class: "text-yellow-400", "\u{26A0}\u{FE0F}" }
-                        p { class: "text-yellow-300 font-medium text-sm", "Save your recovery phrase!" }
-                    }
-                    div { class: "mt-2 bg-gray-800/50 rounded-lg p-3 border border-gray-700",
-                        p { class: "font-mono text-xs text-gray-200 break-all leading-relaxed", "{mnemonic}" }
-                    }
-                    button {
-                        onclick: move |_| { wallet_ctx.clear_pending_secret(); },
-                        class: "mt-2 text-xs px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 transition-colors",
-                        "Clear from Memory"
-                    }
+                input {
+                    value: "{name_input.read()}",
+                    oninput: move |evt| name_input.set(evt.value()),
+                    class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs input-focus",
+                    placeholder: "Account name (optional)"
                 }
-
-                div { class: "{card_class()} overflow-hidden",
-                    div { class: "divide-y divide-gray-800",
-                        for (chain, addr) in addrs {
-                            div { class: "p-3",
-                                div { class: "flex items-center justify-between",
-                                    span { class: "{chain_badge_class(&chain)} text-xs",
-                                        "{chain_icon_emoji(&chain)} {chain_name(&chain)}"
-                                    }
-                                }
-                                p { class: "font-mono text-xs mt-1 text-gray-300 break-all", "{addr}" }
+                input {
+                    value: "{pk_input.read()}",
+                    oninput: move |evt| { pk_input.set(evt.value()); error.set(None); },
+                    class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono input-focus",
+                    placeholder: "Private key (hex)..."
+                }
+                if let Some(e) = error.read().as_ref() {
+                    div { class: "text-xs text-red-400", "{e}" }
+                }
+                button {
+                    onclick: move |_| {
+                        let name = name_input.read().clone();
+                        let name = if name.is_empty() { format!("{:?} #{}", chain, chain_accounts.len() + 1) } else { name };
+                        match ChainAccount::from_private_key(chain, &name, &pk_input.read()) {
+                            Ok(account) => {
+                                wallet_ctx.add_account(account);
+                                show_form.set(false);
                             }
+                            Err(e) => error.set(Some(e)),
                         }
-                    }
+                    },
+                    class: "w-full px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-xs font-medium transition-colors btn-ripple",
+                    "Add Account"
                 }
-
-                p { class: "text-center text-sm text-green-400", "Wallet ready! Use the sidebar to navigate." }
             }
         };
     }
 
+    let count = chain_accounts.len();
     rsx! {
-        div { class: "space-y-3",
-            h3 { class: "text-center text-sm font-medium text-gray-300", "Create New Wallet" }
-            p { class: "text-xs text-gray-500 text-center", "Generate a new wallet with addresses on all chains." }
+        div { class: "{card_class()} p-4",
+            div { class: "flex items-center justify-between mb-3",
+                div { class: "flex items-center gap-2",
+                    span { class: "{chain_badge_class(&chain)}", "{chain_icon_emoji(&chain)} {chain_name(&chain)}" }
+                    span { class: "text-xs text-gray-500", "{count} account(s)" }
+                }
+            }
+
+            if count > 0 {
+                div { class: "space-y-1",
+                    for account in chain_accounts {
+                        div { class: "flex items-center justify-between text-xs",
+                            span { class: "font-mono text-gray-300 truncate", "{truncate_address(&account.address, 6)}" }
+                            span { class: "text-gray-500 ml-2", "{account.name}" }
+                        }
+                    }
+                }
+            } else {
+                p { class: "text-xs text-gray-600 mb-3", "No account yet" }
+            }
+
             button {
-                onclick: move |_| {
-                    let m = wallet_ctx.create_wallet();
-                    mnemonic_display.set(m);
-                    created.set(true);
-                },
-                class: "w-full px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 font-medium transition-all duration-200 btn-ripple shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30",
-                "\u{2728} Generate Wallet"
+                onclick: move |_| show_form.set(true),
+                class: "w-full px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-medium transition-colors",
+                if count > 0 { "+ Add Another Account" } else { "+ Add Account" }
             }
         }
     }
 }
 
-// ===== Import Wallet Modal Component =====
+// ===== Dashboard Chain Card (shows existing accounts) =====
 #[component]
-fn ImportWalletModal() -> Element {
+fn DashboardChainCard(chain: Chain) -> Element {
+    let wallet_ctx = use_wallet_context();
+    let chain_accounts = wallet_ctx.accounts_for_chain(chain);
+    let mut show_add = use_signal(|| false);
+
+    rsx! {
+        div { class: "{card_class()} p-5 card-hover",
+            div { class: "flex items-center justify-between mb-3",
+                span { class: "{chain_badge_class(&chain)}", "{chain_icon_emoji(&chain)} {chain_name(&chain)}" }
+                button {
+                    onclick: move |_| show_add.set(true),
+                    class: "text-xs text-blue-400 hover:text-blue-300",
+                    "+ Add"
+                }
+            }
+
+            if chain_accounts.is_empty() {
+                p { class: "text-sm text-gray-600", "No account added" }
+                p { class: "text-xs text-gray-500 mt-1", "Click '+ Add' to import a private key" }
+            } else {
+                div { class: "space-y-2",
+                    for account in chain_accounts {
+                        div { class: "flex items-center justify-between text-xs bg-gray-800/50 rounded p-2",
+                            span { class: "font-mono text-gray-300", "{truncate_address(&account.address, 8)}" }
+                            span { class: "text-gray-500", "{account.name}" }
+                        }
+                    }
+                }
+            }
+        }
+
+        if *show_add.read() {
+            AddAccountFormModal { chain, on_close: move || show_add.set(false) }
+        }
+    }
+}
+
+// ===== Add Account Form Modal =====
+#[component]
+fn AddAccountFormModal(chain: Chain, on_close: EventHandler<()>) -> Element {
     let mut wallet_ctx = use_wallet_context();
-    let mut import_mode = use_signal(|| ImportMode::Mnemonic);
-    let mut mnemonic = use_signal(|| String::new());
-    let mut private_key = use_signal(|| String::new());
+    let mut pk_input = use_signal(|| String::new());
+    let mut name_input = use_signal(|| String::new());
+    let mut error = use_signal(|| Option::<String>::None);
+
+    rsx! {
+        div { class: "fixed inset-0 z-50 flex items-center justify-center bg-black/50 modal-backdrop",
+            div { class: "{card_class()} p-6 max-w-md mx-4 modal-content space-y-4",
+                div { class: "flex items-center justify-between",
+                    h3 { class: "font-semibold", "Add Account" }
+                    button { onclick: move |_| on_close.call(()), class: "text-gray-500 hover:text-gray-300", "\u{2715}" }
+                }
+                span { class: "{chain_badge_class(&chain)}", "{chain_icon_emoji(&chain)} {chain_name(&chain)}" }
+
+                input {
+                    value: "{name_input.read()}",
+                    oninput: move |evt| name_input.set(evt.value()),
+                    class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs input-focus",
+                    placeholder: "Account name (optional)"
+                }
+                textarea {
+                    value: "{pk_input.read()}",
+                    oninput: move |evt| { pk_input.set(evt.value()); error.set(None); },
+                    class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs font-mono input-focus resize-none",
+                    rows: "2",
+                    placeholder: "Private key (hex)..."
+                }
+                if let Some(e) = error.read().as_ref() {
+                    div { class: "text-xs text-red-400 bg-red-900/20 p-2 rounded", "{e}" }
+                }
+                button {
+                    onclick: move |_| {
+                        let name = name_input.read().clone();
+                        let name = if name.is_empty() { format!("{:?}", chain) } else { name };
+                        match ChainAccount::from_private_key(chain, &name, &pk_input.read()) {
+                            Ok(account) => {
+                                wallet_ctx.add_account(account);
+                                on_close.call(());
+                            }
+                            Err(e) => error.set(Some(e)),
+                        }
+                    },
+                    class: "w-full px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium transition-colors btn-ripple",
+                    "Add Account"
+                }
+            }
+        }
+    }
+}
+
+// ===== Import JSON Button =====
+#[component]
+fn ImportJsonButton() -> Element {
+    let wallet_ctx = use_wallet_context();
     let mut error = use_signal(|| Option::<String>::None);
     let mut success = use_signal(|| false);
 
     if *success.read() {
         return rsx! {
-            div { class: "text-center space-y-3",
-                div { class: "text-green-400 text-3xl", "\u{2705}" }
-                p { class: "text-green-400 font-medium", "Wallet imported successfully!" }
-                p { class: "text-sm text-gray-400", "Your wallet is ready. Use the sidebar to navigate." }
+            div { class: "text-center space-y-2",
+                div { class: "text-green-400 text-2xl", "\u{2705}" }
+                p { class: "text-green-400 text-sm font-medium", "Wallet imported successfully!" }
             }
         };
     }
 
-    let mode = *import_mode.read();
-    let mnemonic_tab_class = if mode == ImportMode::Mnemonic {
-        "flex-1 px-3 py-2 rounded-md text-xs font-medium transition-colors bg-gray-700 text-white"
-    } else {
-        "flex-1 px-3 py-2 rounded-md text-xs font-medium transition-colors text-gray-400 hover:text-gray-300"
-    };
-    let pk_tab_class = if mode == ImportMode::PrivateKey {
-        "flex-1 px-3 py-2 rounded-md text-xs font-medium transition-colors bg-gray-700 text-white"
-    } else {
-        "flex-1 px-3 py-2 rounded-md text-xs font-medium transition-colors text-gray-400 hover:text-gray-300"
-    };
-
     rsx! {
         div { class: "space-y-3",
-            h3 { class: "text-center text-sm font-medium text-gray-300", "Import Existing Wallet" }
-
-            // Tab switcher
-            div { class: "flex gap-1 p-1 bg-gray-800 rounded-lg",
-                button {
-                    onclick: move |_| { import_mode.set(ImportMode::Mnemonic); error.set(None); },
-                    class: "{mnemonic_tab_class}",
-                    "Recovery Phrase"
-                }
-                button {
-                    onclick: move |_| { import_mode.set(ImportMode::PrivateKey); error.set(None); },
-                    class: "{pk_tab_class}",
-                    "Private Key"
-                }
-            }
-
-            if mode == ImportMode::Mnemonic {
-                textarea {
-                    value: "{mnemonic.read()}",
-                    oninput: move |evt| { mnemonic.set(evt.value()); error.set(None); },
-                    class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono input-focus",
-                    rows: "3",
-                    placeholder: "Enter your 12 or 24 word recovery phrase..."
-                }
-            }
-
-            if mode == ImportMode::PrivateKey {
-                input {
-                    value: "{private_key.read()}",
-                    oninput: move |evt| { private_key.set(evt.value()); error.set(None); },
-                    class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono input-focus",
-                    r#type: "text",
-                    placeholder: "0x... or hex-encoded key"
-                }
-            }
-
-            if let Some(e) = error.read().as_ref() {
-                div { class: "p-2 bg-red-900/30 border border-red-700/50 rounded-lg text-xs text-red-300", "{e}" }
-            }
-
-            button {
-                onclick: move |_| {
-                    let result = match *import_mode.read() {
-                        ImportMode::Mnemonic => wallet_ctx.import_wallet(&mnemonic.read()),
-                        ImportMode::PrivateKey => wallet_ctx.import_wallet_from_key(&private_key.read()),
-                    };
-                    match result {
-                        Ok(()) => success.set(true),
-                        Err(e) => error.set(Some(e)),
+            h3 { class: "text-center text-sm font-medium text-gray-300", "Import Wallet JSON" }
+            input {
+                r#type: "file",
+                accept: ".json",
+                class: "w-full text-xs text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-gray-800 file:text-gray-300 hover:file:bg-gray-700",
+                onchange: move |_evt| {
+                    // File reading handled via JS
+                    if let Some(window) = web_sys::window() {
+                        if let Some(document) = window.document() {
+                            if let Some(input) = document.get_element_by_id("json-import-input") {
+                                if let Some(input) = input.dyn_ref::<web_sys::HtmlInputElement>() {
+                                    if let Some(files) = input.files() {
+                                        if files.length() > 0 {
+                                            if let Some(file) = files.get(0) {
+                                                let reader = web_sys::FileReader::new().ok();
+                                                if let Some(reader) = reader {
+                                                    let mut ctx = wallet_ctx.clone();
+                                                    let onload = Closure::wrap(Box::new(move |e: web_sys::ProgressEvent| {
+                                                        if let Some(target) = e.target() {
+                                                            if let Some(reader) = target.dyn_ref::<web_sys::FileReader>() {
+                                                                if let Ok(text) = reader.result() {
+                                                                    let text = text.as_string().unwrap_or_default();
+                                                                    match ctx.import_wallet_json(&text) {
+                                                                        Ok(()) => success.set(true),
+                                                                        Err(e) => error.set(Some(e)),
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }) as Box<dyn FnMut(_)>);
+                                                    let _ = reader.set_onload(Some(onload.as_ref().unchecked_ref()));
+                                                    onload.forget();
+                                                    let _ = reader.read_as_text(&file);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 },
-                class: "w-full px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 font-medium transition-all duration-200 btn-ripple text-sm",
-                "\u{1F4E5} Import Wallet"
+            }
+            if let Some(e) = error.read().as_ref() {
+                div { class: "text-xs text-red-400 bg-red-900/20 p-2 rounded", "{e}" }
             }
         }
     }
-}
-
-#[derive(Clone, Copy, PartialEq)]
-enum ImportMode {
-    Mnemonic,
-    PrivateKey,
 }
 
 // ===== Rights Pages =====
@@ -2172,169 +2232,6 @@ pub fn ValidateCommitmentChain() -> Element {
     }
 }
 
-// ===== Wallet Pages =====
-#[component]
-pub fn GenerateWallet() -> Element {
-    let mut wallet_ctx = use_wallet_context();
-    let mut created = use_signal(|| false);
-    let mut mnemonic = use_signal(|| String::new());
-
-    if !*created.read() {
-        return rsx! {
-            div { class: "max-w-2xl {card_class()} p-8 space-y-6",
-                h2 { class: "text-lg font-semibold", "Generate New Wallet" }
-                p { class: "text-gray-400 text-sm", "This will create a new wallet with addresses on all supported chains." }
-                button {
-                    onclick: move |_| {
-                        let m = wallet_ctx.create_wallet();
-                        mnemonic.set(m);
-                        created.set(true);
-                    },
-                    class: "{btn_full_primary_class()}",
-                    "Generate Wallet"
-                }
-            }
-        };
-    }
-
-    let addrs = wallet_ctx.addresses();
-    rsx! {
-        div { class: "max-w-2xl space-y-6",
-            div { class: "bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4 space-y-2",
-                div { class: "flex items-center gap-2",
-                    span { class: "text-yellow-400", "\u{26A0}\u{FE0F}" }
-                    p { class: "text-yellow-300 font-medium", "Save your recovery phrase!" }
-                }
-                div { class: "mt-3 bg-gray-800/50 rounded-lg p-4 border border-gray-700",
-                    p { class: "font-mono text-sm text-gray-200 break-all leading-relaxed", "{mnemonic.read()}" }
-                }
-                button {
-                    onclick: move |_| { wallet_ctx.clear_pending_secret(); },
-                    class: "mt-2 {btn_secondary_class()}",
-                    "Clear from Memory"
-                }
-            }
-
-            div { class: "{card_class()} overflow-hidden",
-                div { class: "{card_header_class()}", h3 { class: "font-semibold text-sm", "Your Addresses" } }
-                div { class: "divide-y divide-gray-800",
-                    for (chain, addr) in addrs {
-                        div { class: "p-4 hover:bg-gray-800/50 transition-colors",
-                            span { class: "{chain_badge_class(&chain)}", "{chain_icon_emoji(&chain)} {chain_name(&chain)}" }
-                            p { class: "font-mono text-sm mt-2 text-gray-300 break-all", "{addr}" }
-                        }
-                    }
-                }
-            }
-
-            Link { to: Route::Dashboard {}, class: "block w-full px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium transition-colors text-center", "Go to Dashboard" }
-        }
-    }
-}
-
-#[component]
-pub fn ExportWallet() -> Element {
-    let wallet_ctx = use_wallet_context();
-    let mut show = use_signal(|| false);
-    let show_val = *show.read();
-    let addrs = wallet_ctx.addresses();
-
-    rsx! {
-        div { class: "max-w-2xl space-y-6",
-            h1 { class: "text-2xl font-bold", "Export Wallet" }
-
-            div { class: "bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4 space-y-2",
-                div { class: "flex items-center gap-2",
-                    span { class: "text-yellow-400", "\u{26A0}\u{FE0F}" }
-                    p { class: "text-yellow-300 font-medium", "Security Warning" }
-                }
-                p { class: "text-sm text-yellow-400/80", "Never share your recovery phrase with anyone." }
-            }
-
-            div { class: "{card_class()} p-6 space-y-4",
-                button {
-                    onclick: move |_| show.set(!show_val),
-                    class: "{btn_secondary_class()}",
-                    if show_val { "Hide Recovery Phrase" } else { "Show Recovery Phrase" }
-                }
-                if show_val {
-                    if let Some(w) = wallet_ctx.wallet() {
-                        div { class: "bg-gray-800 rounded-lg p-4 border border-gray-700",
-                            p { class: "font-mono text-sm text-gray-200 break-all leading-relaxed", "{w.mnemonic}" }
-                        }
-                    } else {
-                        p { class: "text-sm text-gray-400", "No wallet loaded." }
-                    }
-                }
-            }
-
-            // Export addresses
-            div { class: "{card_class()} overflow-hidden",
-                div { class: "{card_header_class()}", h3 { class: "font-semibold text-sm", "Addresses" } }
-                div { class: "divide-y divide-gray-800",
-                    for (chain, addr) in addrs {
-                        div { class: "p-4 flex items-center justify-between",
-                            div {
-                                span { class: "{chain_badge_class(&chain)} mb-1", "{chain_icon_emoji(&chain)} {chain_name(&chain)}" }
-                                p { class: "font-mono text-sm text-gray-300 break-all mt-1", "{addr}" }
-                            }
-                            button {
-                                onclick: move |_| {
-                                    // In browser: navigator.clipboard.writeText(addr)
-                                },
-                                class: "{btn_secondary_class()} whitespace-nowrap",
-                                "Copy"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-#[component]
-pub fn ListWallets() -> Element {
-    let wallet_ctx = use_wallet_context();
-    let addrs = wallet_ctx.addresses();
-
-    rsx! {
-        div { class: "max-w-2xl space-y-6",
-            h1 { class: "text-2xl font-bold", "List Wallets" }
-
-            if addrs.is_empty() {
-                {empty_state("\u{1F4B3}", "No wallet loaded", "Generate or import a wallet first.")}
-            } else {
-                div { class: "{table_class()}",
-                    div { class: "{card_header_class()}",
-                        h2 { class: "font-semibold text-sm", "Your Addresses" }
-                    }
-                    div { class: "overflow-x-auto",
-                        table { class: "w-full text-sm",
-                            thead {
-                                tr { class: "text-left text-gray-400 border-b border-gray-800",
-                                    th { class: "px-4 py-2 font-medium", "Chain" }
-                                    th { class: "px-4 py-2 font-medium", "Address" }
-                                    th { class: "px-4 py-2 font-medium", "Network" }
-                                }
-                            }
-                            tbody { class: "divide-y divide-gray-800",
-                                for (chain, addr) in addrs {
-                                    tr { class: "hover:bg-gray-800/50 transition-colors",
-                                        td { class: "px-4 py-3", span { class: "{chain_badge_class(&chain)}", "{chain_icon_emoji(&chain)} {chain_name(&chain)}" } }
-                                        td { class: "px-4 py-3 font-mono text-xs", "{addr}" }
-                                        td { class: "px-4 py-3 text-xs text-gray-400", "test" }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 // ===== Settings =====
 #[component]
 pub fn Settings() -> Element {
@@ -2342,7 +2239,7 @@ pub fn Settings() -> Element {
     let mut show_lock_confirm = use_signal(|| false);
     let mut show_clear_data = use_signal(|| false);
     let is_initialized = wallet_ctx.is_initialized();
-    let has_wallet = wallet_ctx.wallet().is_some();
+    let has_wallet = is_initialized;
 
     // Clone for closures
     let mut ctx_lock = wallet_ctx.clone();

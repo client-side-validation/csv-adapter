@@ -31,15 +31,14 @@ enum Commands {
     Desktop,
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let cli = Cli::parse();
 
     match cli.command {
         Commands::Serve => {
             println!("Starting CSV Explorer UI in web mode...");
             println!("Open http://localhost:3000 in your browser");
-            launch_web().await;
+            launch_web();
         }
         Commands::Desktop => {
             println!("Starting CSV Explorer UI in desktop mode...");
@@ -49,7 +48,7 @@ async fn main() {
 }
 
 #[cfg(feature = "web")]
-async fn launch_web() {
+fn launch_web() {
     let addr: std::net::SocketAddr = ([0, 0, 0, 0], 3000).into();
 
     println!("Starting server on {}", addr);

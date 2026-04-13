@@ -9,7 +9,7 @@
 //! - **Structured status**: All operations return machine-readable progress
 //! - **Fix suggestions**: Errors include actionable `FixAction` for autonomous resolution
 
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
 /// Agent-friendly transfer status with structured progress
@@ -212,7 +212,7 @@ impl ErrorSuggestion {
 /// Chain identifier for agent compatibility
 ///
 /// This enum is used across all agent-facing APIs to ensure consistency.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Chain {
     Bitcoin,
