@@ -181,16 +181,20 @@ fn handle_error(err: CsvError) {
 ## Key Concepts
 
 ### Right
+
 A **Right** is a verifiable, single-use digital claim. It exists in client state (not on any chain) and is anchored to a single-use seal on a specific chain.
 
 ### Seal
+
 A **Seal** is the on-chain mechanism that enforces a Right's single-use. Chain-specific and exists on one chain only:
+
 - **Bitcoin**: UTXO spend (L1 Structural)
 - **Sui**: Object deletion (L1 Structural)
 - **Aptos**: Resource destruction (L2 Type-Enforced)
 - **Ethereum**: Nullifier registration (L3 Cryptographic)
 
 ### Cross-Chain Transfer
+
 A Right doesn't "move" between chains. The source chain's seal is consumed, a proof is generated, and the destination chain verifies the proof locally. No bridges, no wrapped tokens, no cross-chain messaging.
 
 ---

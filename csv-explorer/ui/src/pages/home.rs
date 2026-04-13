@@ -1,19 +1,50 @@
 /// Home / landing page with stats, recent activity, and chain status.
 
 use dioxus::prelude::*;
-use csv_explorer_shared::ExplorerStats;
+use csv_explorer_shared::{ExplorerStats, RightRecord, TransferRecord, SealRecord};
 
 use crate::hooks::use_api::ApiClient;
 use crate::app::routes::Route;
+use crate::components::StatCard;
 
 #[component]
 pub fn Home() -> Element {
-    let mut stats: Signal<Option<ExplorerStats>> = use_signal(|| None);
+    let mut stats = use_signal(|| Option::<ExplorerStats>::None);
+    let mut recent_rights = use_signal(|| Vec::<RightRecord>::new());
+    let mut recent_transfers = use_signal(|| Vec::<TransferRecord>::new());
+    let mut recent_seals = use_signal(|| Vec::<SealRecord>::new());
+    let mut api_health = use_signal(|| "unknown".to_string());
 
     use_effect(move || {
         spawn(async move {
-            let result = fetch_stats().await;
-            stats.set(result);
+            let client = ApiClient::new();
+            
+            // Fetch stats
+            if let Ok(s) = client.get_stats().await {
+                stats.set(Some(s));
+            }
+            
+            // Fetch recent rights
+            if let Ok(rights) = client.get_rights(None, None, Some(5), Some(0)).await {
+                recent_rights.set(rights);
+            }
+            
+            // Fetch recent transfers
+            if let Ok(transfers) = client.get_transfers(None, None, None, None, Some(5), Some(0)).await {
+                recent_transfers.set(transfers);
+            }
+            
+            // Fetch recent seals
+            if let Ok(seals) = client.get_seals(None, None, Some(5), Some(0)).await {
+                recent_seals.set(seals);
+            }
+            
+            // Check API health
+            api_health.set(if client.health_check().await.unwrap_or(false) {
+                "connected".to_string()
+            } else {
+                "disconnected".to_string()
+            });
         });
     });
 
@@ -31,21 +62,41 @@ pub fn Home() -> Element {
 
             // Stats cards
             div { class: "grid grid-cols-1 md:grid-cols-4 gap-4",
-                StatCard { label: "Total Rights", value: stats.with(|s| s.as_ref().map(|s| s.total_rights.to_string()).unwrap_or_else(|| "...".to_string())), icon: "◆" }
-                StatCard { label: "Total Transfers", value: stats.with(|s| s.as_ref().map(|s| s.total_transfers.to_string()).unwrap_or_else(|| "...".to_string())), icon: "⇄" }
-                StatCard { label: "Active Seals", value: stats.with(|s| s.as_ref().map(|s| s.total_seals.to_string()).unwrap_or_else(|| "...".to_string())), icon: "🔒" }
-                StatCard { label: "Contracts", value: stats.with(|s| s.as_ref().map(|s| s.total_contracts.to_string()).unwrap_or_else(|| "...".to_string())), icon: "📄" }
+                StatCard { 
+                    label: "Total Rights", 
+                    value: stats.with(|s| s.as_ref().map(|s| {
+                        s.rights_by_chain.iter().map(|c| c.count).sum::<u64>().to_string()
+                    }).unwrap_or_else(|| "Loading...".to_string())), 
+                    icon: "◆" 
+                }
+                StatCard { 
+                    label: "Total Transfers", 
+                    value: stats.with(|s| s.as_ref().map(|s| {
+                        s.transfers_by_chain_pair.iter().map(|c| c.count).sum::<u64>().to_string()
+                    }).unwrap_or_else(|| "Loading...".to_string())), 
+                    icon: "⇄" 
+                }
+                StatCard { 
+                    label: "Active Seals", 
+                    value: stats.with(|s| s.as_ref().map(|s| s.total_seals.to_string()).unwrap_or_else(|| "Loading...".to_string())), 
+                    icon: "🔒" 
+                }
+                StatCard { 
+                    label: "Contracts", 
+                    value: stats.with(|s| s.as_ref().map(|s| s.total_contracts.to_string()).unwrap_or_else(|| "Loading...".to_string())), 
+                    icon: "📄" 
+                }
             }
 
             // Chain status cards
             div {
                 h2 { class: "text-xl font-semibold mb-4", "Chain Status" }
                 div { class: "grid grid-cols-1 md:grid-cols-5 gap-4",
-                    ChainStatusCard { chain: "Bitcoin", status: "synced", block: 840_000_u64, sync_lag: 0_u64 }
-                    ChainStatusCard { chain: "Ethereum", status: "synced", block: 19_500_000_u64, sync_lag: 2_u64 }
-                    ChainStatusCard { chain: "Sui", status: "syncing", block: 120_000_000_u64, sync_lag: 5_u64 }
-                    ChainStatusCard { chain: "Aptos", status: "synced", block: 95_000_000_u64, sync_lag: 1_u64 }
-                    ChainStatusCard { chain: "Solana", status: "synced", block: 250_000_000_u64, sync_lag: 0_u64 }
+                    ChainStatusCard { chain: "Bitcoin".to_string(), status: "Checking...".to_string(), block: 0, sync_lag: 0 }
+                    ChainStatusCard { chain: "Ethereum".to_string(), status: "Checking...".to_string(), block: 0, sync_lag: 0 }
+                    ChainStatusCard { chain: "Sui".to_string(), status: "Checking...".to_string(), block: 0, sync_lag: 0 }
+                    ChainStatusCard { chain: "Aptos".to_string(), status: "Checking...".to_string(), block: 0, sync_lag: 0 }
+                    ChainStatusCard { chain: "Solana".to_string(), status: "Checking...".to_string(), block: 0, sync_lag: 0 }
                 }
             }
 
@@ -58,13 +109,36 @@ pub fn Home() -> Element {
                     }
                 }
                 div { class: "bg-gray-900 rounded-xl border border-gray-800 overflow-hidden",
-                    // Recent activity rows would be populated from API
                     div { class: "divide-y divide-gray-800",
-                        ActivityRow { action: "Right Created", chain: "Bitcoin", id: "btc-right-a1b2c3...", time: "2 min ago" }
-                        ActivityRow { action: "Transfer Completed", chain: "Ethereum → Sui", id: "eth-xfer-d4e5f6...", time: "5 min ago" }
-                        ActivityRow { action: "Seal Consumed", chain: "Aptos", id: "aptos-seal-g7h8i9...", time: "12 min ago" }
-                        ActivityRow { action: "Right Created", chain: "Solana", id: "sol-right-j0k1l2...", time: "18 min ago" }
-                        ActivityRow { action: "Transfer In Progress", chain: "Sui → Aptos", id: "sui-xfer-m3n4o5...", time: "25 min ago" }
+                        for right in recent_rights.read().clone() {
+                            ActivityRow { 
+                                action: "Right Created".to_string(), 
+                                chain: right.chain.clone(), 
+                                id: right.id.clone(), 
+                                time: format!("{} ago", format_datetime(right.created_at)) 
+                            }
+                        }
+                        for transfer in recent_transfers.read().clone() {
+                            ActivityRow { 
+                                action: "Transfer".to_string(), 
+                                chain: format!("{} → {}", transfer.from_chain, transfer.to_chain), 
+                                id: transfer.id.clone(), 
+                                time: format!("{} ago", format_datetime(transfer.created_at)) 
+                            }
+                        }
+                        for seal in recent_seals.read().clone() {
+                            ActivityRow { 
+                                action: format!("Seal {:?}", seal.seal_type), 
+                                chain: seal.chain.clone(), 
+                                id: seal.id.clone(), 
+                                time: format!("Block {} ago", seal.block_height) 
+                            }
+                        }
+                        if recent_rights.read().is_empty() && recent_transfers.read().is_empty() && recent_seals.read().is_empty() {
+                            div { class: "px-6 py-12 text-center text-gray-500",
+                                "No recent activity. Start the indexer to begin syncing data."
+                            }
+                        }
                     }
                 }
             }
@@ -84,20 +158,32 @@ pub fn Home() -> Element {
                     }
                 }
             }
+            
+            // API status
+            div { class: "flex items-center justify-between text-sm",
+                span { class: "text-gray-500", "API Status" }
+                span { class: "flex items-center gap-2",
+                    span { class: "w-2 h-2 rounded-full", 
+                        class: if api_health() == "connected" { "bg-green-500" } else { "bg-red-500" }
+                    }
+                    "{api_health()}"
+                }
+            }
         }
     }
 }
 
-#[component]
-fn StatCard(label: String, value: String, icon: String) -> Element {
-    rsx! {
-        div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
-            div { class: "flex items-center justify-between mb-2",
-                span { class: "text-2xl", "{icon}" }
-            }
-            div { class: "text-3xl font-bold mb-1", "{value}" }
-            div { class: "text-gray-400 text-sm", "{label}" }
-        }
+fn format_datetime(dt: chrono::DateTime<chrono::Utc>) -> String {
+    let now = chrono::Utc::now();
+    let diff = (now - dt).num_seconds();
+    if diff < 60 {
+        format!("{}s", diff)
+    } else if diff < 3600 {
+        format!("{}m", diff / 60)
+    } else if diff < 86400 {
+        format!("{}h", diff / 3600)
+    } else {
+        format!("{}d", diff / 86400)
     }
 }
 
@@ -146,9 +232,4 @@ fn ActivityRow(action: String, chain: String, id: String, time: String) -> Eleme
             }
         }
     }
-}
-
-async fn fetch_stats() -> Option<ExplorerStats> {
-    // In production, fetch from API
-    None
 }

@@ -4,34 +4,61 @@ use dioxus::prelude::*;
 use csv_explorer_shared::SealRecord;
 
 use crate::app::routes::Route;
+use crate::hooks::use_api::ApiClient;
+use crate::components::ChainBadge;
 
 #[component]
 pub fn SealsList() -> Element {
-    let mut seals: Signal<Option<Vec<SealRecord>>> = use_signal(|| None);
+    let mut chain_filter = use_signal(|| String::new());
+    let mut type_filter = use_signal(|| String::new());
+    let mut status_filter = use_signal(|| String::new());
+    let mut page = use_signal(|| 1u64);
+    let mut seals = use_signal(|| Vec::<SealRecord>::new());
+    let mut loading = use_signal(|| false);
+
+    let limit = 20;
 
     use_effect(move || {
         spawn(async move {
-            let result = fetch_seals().await;
-            seals.set(result);
+            loading.set(true);
+            let client = ApiClient::new();
+            let chain_str = chain_filter.read().clone();
+            let type_str = type_filter.read().clone();
+            let status_str = status_filter.read().clone();
+            let chain = if chain_str.is_empty() { None } else { Some(chain_str.as_str()) };
+            let status = if status_str.is_empty() { None } else { Some(status_str.as_str()) };
+            let offset = ((*page.read() - 1) * limit as u64) as usize;
+            
+            if let Ok(records) = client.get_seals(chain, status, Some(limit), Some(offset)).await {
+                // Filter by type client-side if needed
+                let filtered = if type_str.is_empty() {
+                    records
+                } else {
+                    records.into_iter()
+                        .filter(|s| s.seal_type.to_string() == type_str)
+                        .collect()
+                };
+                seals.set(filtered);
+            }
+            loading.set(false);
         });
     });
 
     rsx! {
         div { class: "space-y-6",
             div { class: "flex items-center justify-between",
-                h1 { class: "text-2xl font-bold", "Seals" }
+                h1 { class: "text-2xl font-bold text-gray-100", "Seals" }
                 span { class: "text-gray-400 text-sm",
-                    {seals.with(|s| match s {
-                        Some(records) => format!("{} seals found", records.len()),
-                        None => "Loading...".to_string(),
-                    })}
+                    if loading() { "Loading..." } else { "{seals.read().len()} seals found" }
                 }
             }
 
             // Filters
             div { class: "bg-gray-900 rounded-xl border border-gray-800 p-4",
                 div { class: "flex flex-wrap gap-4",
-                    select { class: "bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm",
+                    select { 
+                        class: "bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm",
+                        onchange: move |evt| chain_filter.set(evt.value()),
                         option { value: "", "All Chains" }
                         option { value: "bitcoin", "Bitcoin" }
                         option { value: "ethereum", "Ethereum" }
@@ -39,7 +66,9 @@ pub fn SealsList() -> Element {
                         option { value: "aptos", "Aptos" }
                         option { value: "solana", "Solana" }
                     }
-                    select { class: "bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm",
+                    select { 
+                        class: "bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm",
+                        onchange: move |evt| type_filter.set(evt.value()),
                         option { value: "", "All Types" }
                         option { value: "utxo", "UTXO" }
                         option { value: "object", "Object" }
@@ -47,7 +76,9 @@ pub fn SealsList() -> Element {
                         option { value: "nullifier", "Nullifier" }
                         option { value: "account", "Account" }
                     }
-                    select { class: "bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm",
+                    select { 
+                        class: "bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm",
+                        onchange: move |evt| status_filter.set(evt.value()),
                         option { value: "", "All Statuses" }
                         option { value: "available", "Available" }
                         option { value: "consumed", "Consumed" }
@@ -69,22 +100,28 @@ pub fn SealsList() -> Element {
                         }
                     }
                     tbody { class: "divide-y divide-gray-800",
-                        if let Some(records) = seals.read().as_ref() {
-                            {records.iter().map(|seal| rsx! {
+                        if loading() {
+                            tr {
+                                td { colspan: 6, class: "px-6 py-12 text-center text-gray-500",
+                                    "Loading seals..."
+                                }
+                            }
+                        } else if seals.read().is_empty() {
+                            tr {
+                                td { colspan: 6, class: "px-6 py-12 text-center text-gray-500",
+                                    "No seals found. Start the indexer to begin syncing data."
+                                }
+                            }
+                        } else {
+                            for seal in seals.read().clone() {
                                 SealRow {
                                     key: "{seal.id}",
                                     id: seal.id.clone(),
                                     chain: seal.chain.clone(),
                                     seal_type: seal.seal_type.to_string(),
                                     status: seal.status.to_string(),
-                                    right_id: seal.right_id.clone().unwrap_or_else(|| "—".to_string()),
+                                    right_id: seal.right_id.clone(),
                                     block_height: seal.block_height,
-                                }
-                            })}
-                        } else {
-                            tr {
-                                td { colspan: 6, class: "px-6 py-12 text-center text-gray-500",
-                                    "Loading seals..."
                                 }
                             }
                         }
@@ -96,7 +133,7 @@ pub fn SealsList() -> Element {
 }
 
 #[component]
-fn SealRow(id: String, chain: String, seal_type: String, status: String, right_id: String, block_height: u64) -> Element {
+fn SealRow(id: String, chain: String, seal_type: String, status: String, right_id: Option<String>, block_height: u64) -> Element {
     rsx! {
         tr { class: "hover:bg-gray-800/50 transition-colors",
             td { class: "px-6 py-4",
@@ -106,7 +143,7 @@ fn SealRow(id: String, chain: String, seal_type: String, status: String, right_i
                 }
             }
             td { class: "px-6 py-4",
-                crate::components::chain_badge::ChainBadge { chain }
+                ChainBadge { chain }
             }
             td { class: "px-6 py-4",
                 span { class: "px-2 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-300",
@@ -117,24 +154,18 @@ fn SealRow(id: String, chain: String, seal_type: String, status: String, right_i
                 crate::components::status_badge::StatusBadge { status }
             }
             td { class: "px-6 py-4 font-mono text-sm text-gray-300",
-                {if right_id == "—" {
-                    rsx! { span { class: "text-gray-600", "—" } }
-                } else {
-                    rsx! {
-                        Link { to: Route::RightDetail { id: right_id.clone() },
-                            class: "text-blue-400 hover:text-blue-300",
-                            "{right_id}"
-                        }
+                if let Some(rid) = right_id {
+                    Link { to: Route::RightDetail { id: rid.clone() },
+                        class: "text-blue-400 hover:text-blue-300",
+                        "{rid}"
                     }
-                }}
+                } else {
+                    span { class: "text-gray-600", "—" }
+                }
             }
             td { class: "px-6 py-4 text-sm text-gray-400",
                 "{block_height}"
             }
         }
     }
-}
-
-async fn fetch_seals() -> Option<Vec<SealRecord>> {
-    None
 }

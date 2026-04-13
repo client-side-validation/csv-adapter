@@ -12,7 +12,7 @@ path = "src/main.rs"
 dioxus.workspace = true
 dioxus-web = { workspace = true, optional = true }
 dioxus-desktop = { workspace = true, optional = true }
-dioxus-router = "0.5"
+dioxus-router = "0.7"
 serde.workspace = true
 serde_json.workspace = true
 reqwest.workspace = true
@@ -23,6 +23,8 @@ toml.workspace = true
 thiserror = "1.0"
 tokio = { workspace = true, features = ["full"] }
 axum.workspace = true
+rand = "0.8"
+gloo-timers = { version = "0.3", features = ["futures"] }
 
 [features]
 default = ["web"]

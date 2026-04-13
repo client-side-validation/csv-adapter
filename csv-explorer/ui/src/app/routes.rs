@@ -1,7 +1,7 @@
 /// Routes module for the CSV Explorer UI.
 
 use dioxus::prelude::*;
-use dioxus_router::prelude::*;
+use dioxus_router::*;
 
 use crate::pages::{Home, RightsList, TransfersList, SealsList, Stats, Wallet, RightDetail, TransferDetail, SealDetail, ContractsList, Chains};
 

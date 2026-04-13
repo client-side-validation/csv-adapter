@@ -15,9 +15,9 @@ sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "chrono"
 axum = "0.8"
 async-graphql = { version = "7.0", features = ["dataloader"] }
 async-graphql-axum = "7.0"
-dioxus = { version = "0.5", features = ["fullstack", "router"] }
-dioxus-web = { version = "0.5" }
-dioxus-desktop = { version = "0.5" }
+dioxus = { version = "0.7", features = ["fullstack", "router", "server"] }
+dioxus-web = { version = "0.7" }
+dioxus-desktop = { version = "0.7" }
 csv-adapter-core = { path = "../csv-adapter-core" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

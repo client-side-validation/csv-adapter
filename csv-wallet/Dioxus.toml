@@ -1,0 +1,10 @@
+[application]
+name = "CSV Wallet"
+default_platform = "web"
+
+[web.app]
+title = "CSV Wallet"
+base_path = "/"
+
+[wasm]
+opt-level = 2

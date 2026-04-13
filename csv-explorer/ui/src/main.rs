@@ -51,20 +51,10 @@ async fn main() {
 #[cfg(feature = "web")]
 async fn launch_web() {
     let addr: std::net::SocketAddr = ([0, 0, 0, 0], 3000).into();
-    
+
     println!("Starting server on {}", addr);
-    
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    
-    dioxus::fullstack::axum::render::serve(
-        dioxus::fullstack::axum::ServeConfigBuilder::default()
-            .build()
-            .unwrap(),
-        app::App,
-    )
-    .listen(listener)
-    .await
-    .unwrap();
+
+    dioxus::launch(app::App);
 }
 
 #[cfg(not(feature = "web"))]

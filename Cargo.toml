@@ -8,6 +8,7 @@ members = [
     "csv-adapter-store",
     "csv-adapter",
     "csv-cli",
+    # "csv-wallet",  # Separate build due to web-sys version conflict with aptos-sdk
 ]
 resolver = "2"
 

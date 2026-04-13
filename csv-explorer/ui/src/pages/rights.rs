@@ -4,20 +4,35 @@ use dioxus::prelude::*;
 use csv_explorer_shared::RightRecord;
 
 use crate::app::routes::Route;
+use crate::hooks::use_api::ApiClient;
+use crate::components::ChainBadge;
 
 #[component]
 pub fn RightsList() -> Element {
-    let chain_filter = use_signal(|| String::new());
-    let status_filter = use_signal(|| String::new());
+    let mut chain_filter = use_signal(|| String::new());
+    let mut status_filter = use_signal(|| String::new());
     let mut search_query = use_signal(|| String::new());
     let mut page = use_signal(|| 1u64);
-    let mut rights: Signal<Option<Vec<RightRecord>>> = use_signal(|| None);
+    let mut rights = use_signal(|| Vec::<RightRecord>::new());
+    let mut loading = use_signal(|| false);
+
+    let limit = 20;
 
     // Fetch rights when component mounts or filters change
     use_effect(move || {
         spawn(async move {
-            let result = fetch_rights(&chain_filter.read(), &status_filter.read(), *page.read()).await;
-            rights.set(result);
+            loading.set(true);
+            let client = ApiClient::new();
+            let chain_str = chain_filter.read().clone();
+            let status_str = status_filter.read().clone();
+            let chain = if chain_str.is_empty() { None } else { Some(chain_str.as_str()) };
+            let status = if status_str.is_empty() { None } else { Some(status_str.as_str()) };
+            let offset = ((*page.read() - 1) * limit as u64) as usize;
+            
+            if let Ok(records) = client.get_rights(chain, status, Some(limit), Some(offset)).await {
+                rights.set(records);
+            }
+            loading.set(false);
         });
     });
 
@@ -25,12 +40,9 @@ pub fn RightsList() -> Element {
         div { class: "space-y-6",
             // Header
             div { class: "flex items-center justify-between",
-                h1 { class: "text-2xl font-bold", "Rights" }
+                h1 { class: "text-2xl font-bold text-gray-100", "Rights" }
                 span { class: "text-gray-400 text-sm",
-                    {rights.with(|r| match r {
-                        Some(records) => format!("{} rights found", records.len()),
-                        None => "Loading...".to_string(),
-                    })}
+                    if loading() { "Loading..." } else { "{rights.read().len()} rights found" }
                 }
             }
 
@@ -50,6 +62,7 @@ pub fn RightsList() -> Element {
                     // Chain filter
                     select {
                         class: "bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm",
+                        onchange: move |evt| chain_filter.set(evt.value()),
                         option { value: "", "All Chains" }
                         option { value: "bitcoin", "Bitcoin" }
                         option { value: "ethereum", "Ethereum" }
@@ -60,6 +73,7 @@ pub fn RightsList() -> Element {
                     // Status filter
                     select {
                         class: "bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm",
+                        onchange: move |evt| status_filter.set(evt.value()),
                         option { value: "", "All Statuses" }
                         option { value: "active", "Active" }
                         option { value: "spent", "Spent" }
@@ -82,22 +96,28 @@ pub fn RightsList() -> Element {
                         }
                     }
                     tbody { class: "divide-y divide-gray-800",
-                        if let Some(records) = rights.read().as_ref() {
-                            {records.iter().map(|right| rsx! {
+                        if loading() {
+                            tr {
+                                td { colspan: 6, class: "px-6 py-12 text-center text-gray-500",
+                                    "Loading rights..."
+                                }
+                            }
+                        } else if rights.read().is_empty() {
+                            tr {
+                                td { colspan: 6, class: "px-6 py-12 text-center text-gray-500",
+                                    "No rights found. Start the indexer to begin syncing data."
+                                }
+                            }
+                        } else {
+                            for right in rights.read().clone() {
                                 RightRow {
                                     key: "{right.id}",
                                     id: right.id.clone(),
                                     chain: right.chain.clone(),
                                     owner: right.owner.clone(),
                                     status: right.status.to_string(),
-                                    created_at: right.created_at.to_rfc3339(),
+                                    created_at: right.created_at,
                                     transfer_count: right.transfer_count,
-                                }
-                            })}
-                        } else {
-                            tr {
-                                td { colspan: 6, class: "px-6 py-12 text-center text-gray-500",
-                                    "Loading rights..."
                                 }
                             }
                         }
@@ -108,11 +128,11 @@ pub fn RightsList() -> Element {
             // Pagination
             div { class: "flex items-center justify-between",
                 button {
-                    onclick: move |_| { 
+                    onclick: move |_| {
                         let current_page = *page.read();
-                        if current_page > 1 { 
-                            page.set(current_page - 1); 
-                        } 
+                        if current_page > 1 {
+                            page.set(current_page - 1);
+                        }
                     },
                     disabled: *page.read() <= 1,
                     class: "px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors",
@@ -133,7 +153,7 @@ pub fn RightsList() -> Element {
 }
 
 #[component]
-fn RightRow(id: String, chain: String, owner: String, status: String, created_at: String, transfer_count: u64) -> Element {
+fn RightRow(id: String, chain: String, owner: String, status: String, created_at: chrono::DateTime<chrono::Utc>, transfer_count: u64) -> Element {
     rsx! {
         tr { class: "hover:bg-gray-800/50 transition-colors",
             td { class: "px-6 py-4",
@@ -144,7 +164,7 @@ fn RightRow(id: String, chain: String, owner: String, status: String, created_at
                 }
             }
             td { class: "px-6 py-4",
-                crate::components::chain_badge::ChainBadge { chain }
+                ChainBadge { chain }
             }
             td { class: "px-6 py-4 font-mono text-sm text-gray-300",
                 "{owner}"
@@ -153,7 +173,7 @@ fn RightRow(id: String, chain: String, owner: String, status: String, created_at
                 crate::components::status_badge::StatusBadge { status }
             }
             td { class: "px-6 py-4 text-sm text-gray-400",
-                "{created_at}"
+                "{format_datetime(created_at)}"
             }
             td { class: "px-6 py-4 text-sm text-gray-300",
                 "{transfer_count}"
@@ -162,7 +182,16 @@ fn RightRow(id: String, chain: String, owner: String, status: String, created_at
     }
 }
 
-async fn fetch_rights(_chain: &str, _status: &str, _page: u64) -> Option<Vec<RightRecord>> {
-    // In production, fetch from API
-    None
+fn format_datetime(dt: chrono::DateTime<chrono::Utc>) -> String {
+    let now = chrono::Utc::now();
+    let diff = (now - dt).num_seconds();
+    if diff < 60 {
+        format!("{}s ago", diff)
+    } else if diff < 3600 {
+        format!("{}m ago", diff / 60)
+    } else if diff < 86400 {
+        format!("{}h ago", diff / 3600)
+    } else {
+        format!("{}d ago", diff / 86400)
+    }
 }
