@@ -229,176 +229,197 @@ fn stat_card(label: &str, value: &str, icon: &str) -> Element {
     }
 }
 
-// ===== Auth Pages =====
-
+// ===== Dashboard =====
 #[component]
-pub fn Welcome() -> Element {
+pub fn Dashboard() -> Element {
     let wallet_ctx = use_wallet_context();
-    let initialized = wallet_ctx.is_initialized();
-    let router = use_navigator();
-
-    // Auto-redirect if wallet already exists
-    use_effect(move || {
-        if initialized {
-            router.replace(Route::Dashboard {});
-        }
-    });
-
-    if initialized {
-        return rsx! {
-            div { class: "flex items-center justify-center min-h-[60vh]",
-                div { class: "text-center space-y-4",
-                    div { class: "animate-spin text-4xl", "\u{23F3}" }
-                    p { class: "text-gray-400", "Redirecting to Dashboard..." }
-                }
-            }
-        };
-    }
-
-    rsx! {
-        div { class: "space-y-8",
-            // Hero section
-            div { class: "text-center space-y-4",
-                div { class: "text-6xl mb-4", "\u{1F510}" }
-                h1 { class: "text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent",
-                    "CSV Wallet"
-                }
-                p { class: "text-gray-400 text-lg", "Multi-chain wallet for Client-Side Validation" }
-                p { class: "text-sm text-gray-500 max-w-md mx-auto",
-                    "Manage Rights, Proofs, Seals, and cross-chain transfers across Bitcoin, Ethereum, Sui, and Aptos."
-                }
-            }
-
-            // Feature cards
-            div { class: "grid grid-cols-2 gap-4",
-                div { class: "{card_class()} p-4 text-center",
-                    div { class: "text-2xl mb-2", "\u{1F48E}" }
-                    p { class: "text-sm font-medium", "Rights Management" }
-                    p { class: "text-xs text-gray-400 mt-1", "Create, transfer, and consume rights" }
-                }
-                div { class: "{card_class()} p-4 text-center",
-                    div { class: "text-2xl mb-2", "\u{21C4}" }
-                    p { class: "text-sm font-medium", "Cross-Chain" }
-                    p { class: "text-xs text-gray-400 mt-1", "Transfer between blockchains" }
-                }
-                div { class: "{card_class()} p-4 text-center",
-                    div { class: "text-2xl mb-2", "\u{1F4C4}" }
-                    p { class: "text-sm font-medium", "Proofs" }
-                    p { class: "text-xs text-gray-400 mt-1", "Generate and verify proofs" }
-                }
-                div { class: "{card_class()} p-4 text-center",
-                    div { class: "text-2xl mb-2", "\u{1F512}" }
-                    p { class: "text-sm font-medium", "Seals" }
-                    p { class: "text-xs text-gray-400 mt-1", "Create and verify seals" }
-                }
-            }
-
-            // Action buttons
-            div { class: "space-y-3",
-                Link {
-                    to: Route::CreateWallet {},
-                    class: "block w-full px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 font-medium transition-all duration-200 text-center shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30",
-                    "\u{2728} Create New Wallet"
-                }
-                Link {
-                    to: Route::ImportWallet {},
-                    class: "block w-full px-4 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 font-medium transition-all duration-200 text-center border border-gray-700 hover:border-gray-600",
-                    "\u{1F4E5} Import Existing Wallet"
-                }
-            }
-
-            // Supported chains
-            div { class: "{card_class()} p-4",
-                p { class: "text-xs text-gray-500 text-center mb-3", "Supported Chains" }
-                div { class: "flex justify-center gap-2 flex-wrap",
-                    span { class: "{chain_badge_class(&Chain::Bitcoin)}", "\u{1F7E0} Bitcoin" }
-                    span { class: "{chain_badge_class(&Chain::Ethereum)}", "\u{1F537} Ethereum" }
-                    span { class: "{chain_badge_class(&Chain::Sui)}", "\u{1F30A} Sui" }
-                    span { class: "{chain_badge_class(&Chain::Aptos)}", "\u{1F7E2} Aptos" }
-                }
-            }
-        }
-    }
-}
-
-#[component]
-pub fn CreateWallet() -> Element {
-    let mut wallet_ctx = use_wallet_context();
-    let mut created = use_signal(|| false);
-    let mut mnemonic_display = use_signal(|| String::new());
-
-    if !*created.read() {
-        return rsx! {
-            div { class: "{card_class()} p-8 space-y-6",
-                h2 { class: "text-lg font-semibold", "Create New Wallet" }
-                p { class: "text-gray-400 text-sm",
-                    "This will generate a new 12-word recovery phrase. Make sure to save it in a secure location."
-                }
-                button {
-                    onclick: move |_| {
-                        let m = wallet_ctx.create_wallet();
-                        mnemonic_display.set(m);
-                        created.set(true);
-                    },
-                    class: "{btn_full_primary_class()}",
-                    "Generate Wallet"
-                }
-                Link { to: Route::Welcome {}, class: "block text-sm text-gray-400 hover:text-gray-300 text-center transition-colors", "\u{2190} Back" }
-            }
-        };
-    }
-
     let addrs = wallet_ctx.addresses();
-    let mnemonic = mnemonic_display.read().clone();
-    rsx! {
-        div { class: "space-y-6",
-            h2 { class: "text-lg font-semibold", "Wallet Created Successfully" }
+    let rights = wallet_ctx.rights();
+    let transfers = wallet_ctx.transfers();
+    let seals = wallet_ctx.seals();
+    let has_wallet = wallet_ctx.is_initialized();
 
-            div { class: "bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4 space-y-2",
-                div { class: "flex items-center gap-2",
-                    span { class: "text-yellow-400", "\u{26A0}\u{FE0F}" }
-                    p { class: "text-yellow-300 font-medium", "Save your recovery phrase!" }
+    if !has_wallet {
+        return rsx! {
+            div { class: "flex items-center justify-center min-h-[calc(100vh-8rem)]",
+                // Backdrop
+                div { class: "fixed inset-0 bg-black/60 modal-backdrop" }
+                // Modal
+                div { class: "relative z-10 w-full max-w-md mx-4 modal-content",
+                    div { class: "{card_class()} p-8 space-y-6",
+                        // Brand
+                        div { class: "text-center space-y-2",
+                            div { class: "text-5xl mb-2 pulse-glow inline-block rounded-xl", "\u{1F510}" }
+                            h2 { class: "text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent",
+                                "CSV Wallet"
+                            }
+                            p { class: "text-gray-400 text-sm",
+                                "Manage Rights, Proofs, Seals, and cross-chain transfers."
+                            }
+                        }
+
+                        // Create wallet section
+                        CreateWalletModal {}
+
+                        // Divider
+                        div { class: "flex items-center gap-3",
+                            div { class: "flex-1 h-px bg-gray-800" }
+                            span { class: "text-xs text-gray-600", "or" }
+                            div { class: "flex-1 h-px bg-gray-800" }
+                        }
+
+                        // Import wallet section
+                        ImportWalletModal {}
+
+                        // Supported chains
+                        div { class: "pt-2",
+                            p { class: "text-xs text-gray-600 text-center mb-2", "Supported Chains" }
+                            div { class: "flex justify-center gap-2 flex-wrap",
+                                span { class: "{chain_badge_class(&Chain::Bitcoin)}", "\u{1F7E0} Bitcoin" }
+                                span { class: "{chain_badge_class(&Chain::Ethereum)}", "\u{1F537} Ethereum" }
+                                span { class: "{chain_badge_class(&Chain::Sui)}", "\u{1F30A} Sui" }
+                                span { class: "{chain_badge_class(&Chain::Aptos)}", "\u{1F7E2} Aptos" }
+                            }
+                        }
+                    }
                 }
-                p { class: "text-sm text-yellow-400/80", "Write it down and store it securely." }
-                div { class: "mt-3 bg-gray-800/50 rounded-lg p-4 border border-gray-700",
-                    p { class: "font-mono text-sm text-gray-200 break-all leading-relaxed", "{mnemonic}" }
-                }
-                button {
-                    onclick: move |_| { wallet_ctx.clear_pending_secret(); },
-                    class: "mt-2 {btn_secondary_class()}",
-                    "Clear from Memory"
+            }
+        };
+    }
+
+    let active_rights = rights.iter().filter(|r| r.status == RightStatus::Active).count();
+    let completed_transfers = transfers.iter().filter(|t| t.status == TransferStatus::Completed).count();
+    let available_seals = seals.iter().filter(|s| !s.consumed).count();
+
+    rsx! {
+        div { class: "space-y-6 stagger-children",
+            // Header
+            div { class: "flex items-center justify-between",
+                div {
+                    h1 { class: "text-2xl font-bold", "Dashboard" }
+                    p { class: "text-sm text-gray-400 mt-1", "Your wallet overview" }
                 }
             }
 
-            div { class: "{card_class()} overflow-hidden",
-                div { class: "{card_header_class()}",
-                    h3 { class: "font-semibold text-sm", "Your Addresses" }
-                }
-                div { class: "divide-y divide-gray-800",
+            // Stats row
+            div { class: "grid grid-cols-2 lg:grid-cols-4 gap-4",
+                {stat_card("Addresses", &addrs.len().to_string(), "\u{1F4B3}")}
+                {stat_card("Active Rights", &active_rights.to_string(), "\u{1F48E}")}
+                {stat_card("Transfers", &completed_transfers.to_string(), "\u{21C4}")}
+                {stat_card("Available Seals", &available_seals.to_string(), "\u{1F512}")}
+            }
+
+            // Address cards
+            div {
+                h2 { class: "text-lg font-semibold mb-3", "Your Addresses" }
+                div { class: "grid grid-cols-1 md:grid-cols-2 gap-4",
                     for (chain, addr) in addrs {
-                        div { class: "p-4 hover:bg-gray-800/50 transition-colors",
-                            div { class: "flex items-center justify-between",
+                        div { class: "{card_class()} p-5 card-hover",
+                            div { class: "flex items-center justify-between mb-3",
                                 span { class: "{chain_badge_class(&chain)}",
                                     "{chain_icon_emoji(&chain)} {chain_name(&chain)}"
                                 }
                             }
-                            p { class: "font-mono text-sm mt-2 text-gray-300 break-all", "{addr}" }
+                            p { class: "font-mono text-sm text-gray-300 break-all", "{addr}" }
                         }
                     }
                 }
             }
 
-            Link {
-                to: Route::Dashboard {},
-                class: "block w-full px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium transition-colors text-center",
-                "Go to Dashboard"
+            // Quick actions
+            div {
+                h2 { class: "text-lg font-semibold mb-3", "Quick Actions" }
+                div { class: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4",
+                    Link { to: Route::CreateRight {}, class: "{card_class()} p-5 card-hover block",
+                        div { class: "flex items-center gap-3", span { class: "text-2xl", "\u{1F48E}" }, div { h3 { class: "font-semibold text-sm", "Create Right" } p { class: "text-xs text-gray-400", "Create a new Right" } } }
+                    }
+                    Link { to: Route::CrossChainTransfer {}, class: "{card_class()} p-5 card-hover block",
+                        div { class: "flex items-center gap-3", span { class: "text-2xl", "\u{21C4}" }, div { h3 { class: "font-semibold text-sm", "Cross-Chain" } p { class: "text-xs text-gray-400", "Transfer between chains" } } }
+                    }
+                    Link { to: Route::GenerateProof {}, class: "{card_class()} p-5 card-hover block",
+                        div { class: "flex items-center gap-3", span { class: "text-2xl", "\u{1F4C4}" }, div { h3 { class: "font-semibold text-sm", "Generate Proof" } p { class: "text-xs text-gray-400", "Create inclusion proof" } } }
+                    }
+                    Link { to: Route::CreateSeal {}, class: "{card_class()} p-5 card-hover block",
+                        div { class: "flex items-center gap-3", span { class: "text-2xl", "\u{1F512}" }, div { h3 { class: "font-semibold text-sm", "Create Seal" } p { class: "text-xs text-gray-400", "Create a new seal" } } }
+                    }
+                }
             }
         }
     }
 }
 
+// ===== Create Wallet Modal Component =====
 #[component]
-pub fn ImportWallet() -> Element {
+fn CreateWalletModal() -> Element {
+    let mut wallet_ctx = use_wallet_context();
+    let mut created = use_signal(|| false);
+    let mut mnemonic_display = use_signal(|| String::new());
+
+    if *created.read() {
+        let addrs = wallet_ctx.addresses();
+        let mnemonic = mnemonic_display.read().clone();
+        return rsx! {
+            div { class: "space-y-4",
+                div { class: "text-center",
+                    div { class: "text-green-400 text-3xl mb-2", "\u{2705}" }
+                    h3 { class: "text-lg font-semibold text-green-400", "Wallet Created" }
+                }
+
+                div { class: "bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4 space-y-2",
+                    div { class: "flex items-center gap-2",
+                        span { class: "text-yellow-400", "\u{26A0}\u{FE0F}" }
+                        p { class: "text-yellow-300 font-medium text-sm", "Save your recovery phrase!" }
+                    }
+                    div { class: "mt-2 bg-gray-800/50 rounded-lg p-3 border border-gray-700",
+                        p { class: "font-mono text-xs text-gray-200 break-all leading-relaxed", "{mnemonic}" }
+                    }
+                    button {
+                        onclick: move |_| { wallet_ctx.clear_pending_secret(); },
+                        class: "mt-2 text-xs px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 transition-colors",
+                        "Clear from Memory"
+                    }
+                }
+
+                div { class: "{card_class()} overflow-hidden",
+                    div { class: "divide-y divide-gray-800",
+                        for (chain, addr) in addrs {
+                            div { class: "p-3",
+                                div { class: "flex items-center justify-between",
+                                    span { class: "{chain_badge_class(&chain)} text-xs",
+                                        "{chain_icon_emoji(&chain)} {chain_name(&chain)}"
+                                    }
+                                }
+                                p { class: "font-mono text-xs mt-1 text-gray-300 break-all", "{addr}" }
+                            }
+                        }
+                    }
+                }
+
+                p { class: "text-center text-sm text-green-400", "Wallet ready! Use the sidebar to navigate." }
+            }
+        };
+    }
+
+    rsx! {
+        div { class: "space-y-3",
+            h3 { class: "text-center text-sm font-medium text-gray-300", "Create New Wallet" }
+            p { class: "text-xs text-gray-500 text-center", "Generate a new wallet with addresses on all chains." }
+            button {
+                onclick: move |_| {
+                    let m = wallet_ctx.create_wallet();
+                    mnemonic_display.set(m);
+                    created.set(true);
+                },
+                class: "w-full px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 font-medium transition-all duration-200 btn-ripple shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30",
+                "\u{2728} Generate Wallet"
+            }
+        }
+    }
+}
+
+// ===== Import Wallet Modal Component =====
+#[component]
+fn ImportWalletModal() -> Element {
     let mut wallet_ctx = use_wallet_context();
     let mut import_mode = use_signal(|| ImportMode::Mnemonic);
     let mut mnemonic = use_signal(|| String::new());
@@ -408,35 +429,32 @@ pub fn ImportWallet() -> Element {
 
     if *success.read() {
         return rsx! {
-            div { class: "{card_class()} p-8 space-y-4 text-center",
-                div { class: "text-green-400 text-4xl", "\u{2705}" }
-                p { class: "text-green-400 text-lg font-medium", "Wallet imported successfully!" }
-                Link {
-                    to: Route::Dashboard {},
-                    class: "block w-full px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium transition-colors text-center",
-                    "Go to Dashboard"
-                }
+            div { class: "text-center space-y-3",
+                div { class: "text-green-400 text-3xl", "\u{2705}" }
+                p { class: "text-green-400 font-medium", "Wallet imported successfully!" }
+                p { class: "text-sm text-gray-400", "Your wallet is ready. Use the sidebar to navigate." }
             }
         };
     }
 
     let mode = *import_mode.read();
     let mnemonic_tab_class = if mode == ImportMode::Mnemonic {
-        "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors bg-gray-700 text-white"
+        "flex-1 px-3 py-2 rounded-md text-xs font-medium transition-colors bg-gray-700 text-white"
     } else {
-        "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors text-gray-400 hover:text-gray-300"
+        "flex-1 px-3 py-2 rounded-md text-xs font-medium transition-colors text-gray-400 hover:text-gray-300"
     };
     let pk_tab_class = if mode == ImportMode::PrivateKey {
-        "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors bg-gray-700 text-white"
+        "flex-1 px-3 py-2 rounded-md text-xs font-medium transition-colors bg-gray-700 text-white"
     } else {
-        "flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors text-gray-400 hover:text-gray-300"
+        "flex-1 px-3 py-2 rounded-md text-xs font-medium transition-colors text-gray-400 hover:text-gray-300"
     };
 
     rsx! {
-        div { class: "{card_class()} p-8 space-y-6",
-            h2 { class: "text-lg font-semibold", "Import Wallet" }
+        div { class: "space-y-3",
+            h3 { class: "text-center text-sm font-medium text-gray-300", "Import Existing Wallet" }
 
-            div { class: "flex gap-2 p-1 bg-gray-800 rounded-lg",
+            // Tab switcher
+            div { class: "flex gap-1 p-1 bg-gray-800 rounded-lg",
                 button {
                     onclick: move |_| { import_mode.set(ImportMode::Mnemonic); error.set(None); },
                     class: "{mnemonic_tab_class}",
@@ -450,42 +468,27 @@ pub fn ImportWallet() -> Element {
             }
 
             if mode == ImportMode::Mnemonic {
-                div { class: "space-y-2",
-                    label { class: "{label_class()}", "Recovery Phrase" }
-                    textarea {
-                        value: "{mnemonic.read()}",
-                        oninput: move |evt| { mnemonic.set(evt.value()); error.set(None); },
-                        class: "{input_class()} font-mono",
-                        rows: "4",
-                        placeholder: "Enter your 12 or 24 word recovery phrase..."
-                    }
+                textarea {
+                    value: "{mnemonic.read()}",
+                    oninput: move |evt| { mnemonic.set(evt.value()); error.set(None); },
+                    class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono input-focus",
+                    rows: "3",
+                    placeholder: "Enter your 12 or 24 word recovery phrase..."
                 }
             }
 
             if mode == ImportMode::PrivateKey {
-                div { class: "space-y-2",
-                    label { class: "{label_class()}", "Private Key (Hex)" }
-                    input {
-                        value: "{private_key.read()}",
-                        oninput: move |evt| { private_key.set(evt.value()); error.set(None); },
-                        class: "{input_class()} font-mono",
-                        r#type: "text",
-                        placeholder: "0x... or hex-encoded key"
-                    }
-                    div { class: "bg-gray-800/50 rounded-lg p-3 border border-gray-700 space-y-2 mt-3",
-                        p { class: "text-xs text-gray-400 font-medium", "Chain Compatibility" }
-                        div { class: "flex flex-wrap gap-1.5",
-                            span { class: "{chain_badge_class(&Chain::Bitcoin)}", "\u{1F7E0} Bitcoin (secp256k1)" }
-                            span { class: "{chain_badge_class(&Chain::Ethereum)}", "\u{1F537} Ethereum (secp256k1)" }
-                            span { class: "{chain_badge_class(&Chain::Sui)}", "\u{1F30A} Sui (ed25519)" }
-                            span { class: "{chain_badge_class(&Chain::Aptos)}", "\u{1F7E2} Aptos (ed25519)" }
-                        }
-                    }
+                input {
+                    value: "{private_key.read()}",
+                    oninput: move |evt| { private_key.set(evt.value()); error.set(None); },
+                    class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono input-focus",
+                    r#type: "text",
+                    placeholder: "0x... or hex-encoded key"
                 }
             }
 
             if let Some(e) = error.read().as_ref() {
-                div { class: "p-3 bg-red-900/30 border border-red-700/50 rounded-lg text-sm text-red-300", "{e}" }
+                div { class: "p-2 bg-red-900/30 border border-red-700/50 rounded-lg text-xs text-red-300", "{e}" }
             }
 
             button {
@@ -499,11 +502,9 @@ pub fn ImportWallet() -> Element {
                         Err(e) => error.set(Some(e)),
                     }
                 },
-                class: "{btn_full_primary_class()}",
-                "Import Wallet"
+                class: "w-full px-4 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 font-medium transition-all duration-200 btn-ripple text-sm",
+                "\u{1F4E5} Import Wallet"
             }
-
-            Link { to: Route::Welcome {}, class: "block text-sm text-gray-400 hover:text-gray-300 text-center transition-colors", "\u{2190} Back" }
         }
     }
 }
@@ -512,80 +513,6 @@ pub fn ImportWallet() -> Element {
 enum ImportMode {
     Mnemonic,
     PrivateKey,
-}
-
-// ===== Dashboard =====
-#[component]
-pub fn Dashboard() -> Element {
-    let wallet_ctx = use_wallet_context();
-    let addrs = wallet_ctx.addresses();
-    let rights = wallet_ctx.rights();
-    let transfers = wallet_ctx.transfers();
-    let seals = wallet_ctx.seals();
-
-    if !wallet_ctx.is_initialized() {
-        return rsx! {
-            div { class: "space-y-6",
-                h1 { class: "text-2xl font-bold", "Dashboard" }
-                div { class: "{card_class()} p-8 text-center",
-                    p { class: "text-gray-400",
-                        "No wallet loaded. "
-                        Link { to: Route::Welcome {}, class: "text-blue-400 hover:text-blue-300 transition-colors", "Create or import" }
-                        " a wallet."
-                    }
-                }
-            }
-        };
-    }
-
-    let active_rights = rights.iter().filter(|r| r.status == RightStatus::Active).count();
-    let completed_transfers = transfers.iter().filter(|t| t.status == TransferStatus::Completed).count();
-    let consumed_seals = seals.iter().filter(|s| s.consumed).count();
-
-    rsx! {
-        div { class: "space-y-6",
-            h1 { class: "text-2xl font-bold", "Dashboard" }
-
-            // Stats row
-            div { class: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4",
-                {stat_card("Addresses", &addrs.len().to_string(), "\u{1F4B3}")}
-                {stat_card("Active Rights", &active_rights.to_string(), "\u{1F48E}")}
-                {stat_card("Transfers", &completed_transfers.to_string(), "\u{21C4}")}
-                {stat_card("Consumed Seals", &consumed_seals.to_string(), "\u{1F512}")}
-            }
-
-            // Address cards
-            div { class: "grid grid-cols-1 md:grid-cols-2 gap-4",
-                for (chain, addr) in addrs {
-                    div { class: "{card_class()} p-5 hover:bg-gray-800/50 transition-colors",
-                        div { class: "flex items-center justify-between mb-3",
-                            span { class: "{chain_badge_class(&chain)}",
-                                "{chain_icon_emoji(&chain)} {chain_name(&chain)}"
-                            }
-                        }
-                        p { class: "font-mono text-sm text-gray-300 break-all", "{addr}" }
-                    }
-                }
-            }
-
-            // Quick actions
-            h2 { class: "text-lg font-semibold", "Quick Actions" }
-            div { class: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4",
-                Link { to: Route::CreateRight {}, class: "{card_class()} p-5 hover:bg-gray-800/50 transition-colors block",
-                    div { class: "flex items-center gap-3", span { class: "text-2xl", "\u{1F48E}" }, div { h3 { class: "font-semibold text-sm", "Create Right" } p { class: "text-xs text-gray-400", "Create a new Right" } } }
-                }
-                Link { to: Route::CrossChainTransfer {}, class: "{card_class()} p-5 hover:bg-gray-800/50 transition-colors block",
-                    div { class: "flex items-center gap-3", span { class: "text-2xl", "\u{21C4}" }, div { h3 { class: "font-semibold text-sm", "Cross-Chain" } p { class: "text-xs text-gray-400", "Transfer between chains" } } }
-                }
-                Link { to: Route::GenerateProof {}, class: "{card_class()} p-5 hover:bg-gray-800/50 transition-colors block",
-                    div { class: "flex items-center gap-3", span { class: "text-2xl", "\u{1F4C4}" }, div { h3 { class: "font-semibold text-sm", "Generate Proof" } p { class: "text-xs text-gray-400", "Create inclusion proof" } } }
-                }
-                Link { to: Route::CreateSeal {}, class: "{card_class()} p-5 hover:bg-gray-800/50 transition-colors block",
-                    div { class: "flex items-center gap-3", span { class: "text-2xl", "\u{1F512}" }, div { h3 { class: "font-semibold text-sm", "Create Seal" } p { class: "text-xs text-gray-400", "Create a new seal" } } }
-                }
-            }
-        }
-    }
 }
 
 // ===== Rights Pages =====
@@ -2301,16 +2228,6 @@ pub fn GenerateWallet() -> Element {
             }
 
             Link { to: Route::Dashboard {}, class: "block w-full px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium transition-colors text-center", "Go to Dashboard" }
-        }
-    }
-}
-
-#[component]
-pub fn ImportWalletPage() -> Element {
-    // Reuse the Import component from auth pages
-    rsx! {
-        div { class: "max-w-2xl",
-            ImportWallet {}
         }
     }
 }

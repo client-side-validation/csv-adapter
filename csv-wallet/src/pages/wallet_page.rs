@@ -247,11 +247,8 @@ fn OverviewTab(has_wallet: bool, address_count: usize) -> Element {
                     } else {
                         div { class: "text-center py-8 space-y-4",
                             div { class: "text-6xl", "\u{1F510}" }
-                            p { class: "text-gray-400", "No wallet detected. Generate or import a wallet to get started." }
-                            div { class: "flex justify-center gap-4",
-                                Link { to: Route::GenerateWallet {}, class: "px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors", "Generate Wallet" }
-                                Link { to: Route::ImportWalletPage {}, class: "px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg font-medium transition-colors", "Import Wallet" }
-                            }
+                            p { class: "text-gray-400", "No wallet detected. Go to the Dashboard to create or import a wallet." }
+                            Link { to: Route::Dashboard {}, class: "inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors", "Go to Dashboard" }
                         }
                     }
                 }

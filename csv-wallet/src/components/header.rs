@@ -81,9 +81,9 @@ pub fn Header(
                             }
                         }
 
-                        // Export / Settings links
+                        // Wallet / Settings links
                         div { class: "flex items-center gap-1",
-                            Link { to: Route::ExportWallet {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Export Wallet", "\u{1F4E4}" }
+                            Link { to: Route::WalletPage {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Wallet", "\u{1F510}" }
                             Link { to: Route::Settings {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Settings", "\u{2699}\u{FE0F}" }
                         }
                     }

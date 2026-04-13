@@ -59,27 +59,3 @@ pub fn Layout() -> Element {
         }
     }
 }
-
-// ===== Auth Layout =====
-#[component]
-pub fn AuthLayout() -> Element {
-    rsx! {
-        div { class: "min-h-screen bg-gray-950 text-gray-100",
-            div { class: "absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950" }
-            div { class: "relative flex items-center justify-center min-h-screen p-4",
-                div { class: "w-full max-w-lg",
-                    div { class: "text-center mb-8",
-                        h1 { class: "text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent",
-                            "\u{1F510} CSV Wallet"
-                        }
-                        p { class: "mt-2 text-gray-400", "Multi-chain wallet for Client-Side Validation" }
-                    }
-                    // Page content with fade-in transition
-                    div { class: "page-enter",
-                        Outlet::<Route> {}
-                    }
-                }
-            }
-        }
-    }
-}

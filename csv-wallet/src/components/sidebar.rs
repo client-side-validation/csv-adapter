@@ -92,15 +92,8 @@ pub fn Sidebar(sidebar_open: bool) -> Element {
 
                     div { class: "border-t border-gray-800 my-3" }
 
-                    {sidebar_section("Wallet", rsx! {
+                    {sidebar_section("Wallet & Settings", rsx! {
                         {sidebar_link(Route::WalletPage {}, "\u{1F510}", "Wallet")}
-                        {sidebar_link(Route::GenerateWallet {}, "\u{2795}", "Generate")}
-                        {sidebar_link(Route::ImportWalletPage {}, "\u{1F4E5}", "Import")}
-                        {sidebar_link(Route::ExportWallet {}, "\u{1F4E4}", "Export")}
-                        {sidebar_link(Route::ListWallets {}, "\u{1F4CB}", "List")}
-                    })}
-
-                    {sidebar_section("", rsx! {
                         {sidebar_link(Route::Settings {}, "\u{2699}\u{FE0F}", "Settings")}
                     })}
                 }

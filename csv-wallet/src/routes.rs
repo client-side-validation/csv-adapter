@@ -2,24 +2,14 @@
 
 use dioxus::prelude::*;
 
-use crate::{Layout, AuthLayout};
+use crate::Layout;
 use crate::pages::*;
 
 #[derive(Routable, PartialEq, Clone, Debug)]
 pub enum Route {
-    // Auth layout: wallet setup pages
-    #[layout(AuthLayout)]
-        #[route("/")]
-        Welcome {},
-        #[route("/create")]
-        CreateWallet {},
-        #[route("/import")]
-        ImportWallet {},
-
-    // Main layout: all functional pages
     #[layout(Layout)]
-        // Overview
-        #[route("/dashboard")]
+        // Main entry — Dashboard (shows wallet or create/import modal)
+        #[route("/")]
         Dashboard {},
 
         // Rights
@@ -92,17 +82,9 @@ pub enum Route {
         #[route("/validate/commitment-chain")]
         ValidateCommitmentChain {},
 
-        // Wallet
+        // Wallet management sub-page
         #[route("/wallet")]
         WalletPage {},
-        #[route("/wallet/generate")]
-        GenerateWallet {},
-        #[route("/wallet/import")]
-        ImportWalletPage {},
-        #[route("/wallet/export")]
-        ExportWallet {},
-        #[route("/wallet/list")]
-        ListWallets {},
 
         // Settings
         #[route("/settings")]
