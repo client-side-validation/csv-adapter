@@ -7,7 +7,7 @@ use async_graphql::*;
 use sqlx::SqlitePool;
 
 use csv_explorer_storage::repositories::{
-    ContractsRepository, RightsRepository, SealsRepository, StatsRepository, TransfersRepository,
+    AdvancedProofRepository, ContractsRepository, RightsRepository, SealsRepository, StatsRepository, TransfersRepository,
 };
 
 use super::types::*;
@@ -309,6 +309,66 @@ impl Query {
         let repo = SealsRepository::new(gql_ctx.pool.clone());
         let records = repo.by_right(&right_id).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         Ok(records.into_iter().map(Seal::from).collect())
+    }
+
+    // -----------------------------------------------------------------------
+    // Advanced commitment and proof queries
+    // -----------------------------------------------------------------------
+
+    /// Get enhanced rights with commitment scheme and proof metadata.
+    async fn enhanced_rights(
+        &self,
+        ctx: &Context<'_>,
+        scheme: Option<String>,
+        proof_type: Option<String>,
+        limit: Option<i32>,
+        offset: Option<i32>,
+    ) -> Result<Vec<EnhancedRight>> {
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
+        let repo = AdvancedProofRepository::new(gql_ctx.pool.clone());
+
+        let filter = csv_explorer_shared::RightProofFilter {
+            chain: None,
+            owner: None,
+            commitment_scheme: scheme.as_deref().and_then(|s| csv_explorer_shared::CommitmentScheme::from_str(s)),
+            inclusion_proof_type: proof_type.as_deref().and_then(|s| csv_explorer_shared::InclusionProofType::from_str(s)),
+            limit: limit.map(|v| v as usize),
+            offset: offset.map(|v| v as usize),
+        };
+
+        let records = repo.query_enhanced_rights(filter).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
+        Ok(records.into_iter().map(EnhancedRight::from).collect())
+    }
+
+    /// Get enhanced seals with proof metadata.
+    async fn enhanced_seals(
+        &self,
+        ctx: &Context<'_>,
+        limit: Option<i32>,
+        offset: Option<i32>,
+    ) -> Result<Vec<EnhancedSeal>> {
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
+        let repo = AdvancedProofRepository::new(gql_ctx.pool.clone());
+
+        let filter = csv_explorer_shared::SealProofFilter {
+            chain: None,
+            seal_type: None,
+            seal_proof_type: None,
+            seal_proof_verified: None,
+            limit: limit.map(|v| v as usize),
+            offset: offset.map(|v| v as usize),
+        };
+
+        let records = repo.query_enhanced_seals(filter).await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
+        Ok(records.into_iter().map(EnhancedSeal::from).collect())
+    }
+
+    /// Get proof statistics across all indexed data.
+    async fn proof_statistics(&self, ctx: &Context<'_>) -> Result<ProofStatisticsGql> {
+        let gql_ctx = ctx.data::<GraphqlContext>().map_err(|e| ServerError::new(format!("{:?}", e), None))?;
+        let repo = AdvancedProofRepository::new(gql_ctx.pool.clone());
+        let stats = repo.get_proof_statistics().await.map_err(|e| ServerError::new(format!("{:?}", e), None))?;
+        Ok(ProofStatisticsGql::from(stats))
     }
 }
 

@@ -375,3 +375,175 @@ pub struct ContractFilterInput {
     pub limit: Option<i32>,
     pub offset: Option<i32>,
 }
+
+// ---------------------------------------------------------------------------
+// Advanced commitment and proof types
+// ---------------------------------------------------------------------------
+
+/// GraphQL EnhancedRight type with commitment metadata.
+#[derive(SimpleObject)]
+pub struct EnhancedRight {
+    pub id: String,
+    pub chain: String,
+    pub seal_ref: String,
+    pub commitment: String,
+    pub owner: String,
+    pub created_at: DateTimeScalar,
+    pub created_tx: String,
+    pub status: String,
+    pub commitment_scheme: String,
+    pub commitment_version: i32,
+    pub protocol_id: String,
+    pub mpc_root: Option<String>,
+    pub domain_separator: Option<String>,
+    pub inclusion_proof_type: String,
+    pub finality_proof_type: String,
+    pub proof_size_bytes: Option<i64>,
+    pub confirmations: Option<i64>,
+}
+
+impl From<csv_explorer_shared::EnhancedRightRecord> for EnhancedRight {
+    fn from(r: csv_explorer_shared::EnhancedRightRecord) -> Self {
+        Self {
+            id: r.id,
+            chain: r.chain,
+            seal_ref: r.seal_ref,
+            commitment: r.commitment,
+            owner: r.owner,
+            created_at: DateTimeScalar(r.created_at),
+            created_tx: r.created_tx,
+            status: r.status,
+            commitment_scheme: format!("{:?}", r.commitment_scheme),
+            commitment_version: r.commitment_version as i32,
+            protocol_id: r.protocol_id,
+            mpc_root: r.mpc_root,
+            domain_separator: r.domain_separator,
+            inclusion_proof_type: format!("{:?}", r.inclusion_proof_type),
+            finality_proof_type: format!("{:?}", r.finality_proof_type),
+            proof_size_bytes: r.proof_size_bytes.map(|v| v as i64),
+            confirmations: r.confirmations.map(|v| v as i64),
+        }
+    }
+}
+
+/// GraphQL EnhancedSeal type with proof metadata.
+#[derive(SimpleObject)]
+pub struct EnhancedSeal {
+    pub id: String,
+    pub chain: String,
+    pub seal_type: String,
+    pub seal_ref: String,
+    pub right_id: Option<String>,
+    pub status: String,
+    pub consumed_at: Option<DateTimeScalar>,
+    pub consumed_tx: Option<String>,
+    pub block_height: i64,
+    pub seal_proof_type: String,
+    pub seal_proof_verified: Option<bool>,
+}
+
+impl From<csv_explorer_shared::EnhancedSealRecord> for EnhancedSeal {
+    fn from(s: csv_explorer_shared::EnhancedSealRecord) -> Self {
+        Self {
+            id: s.id,
+            chain: s.chain,
+            seal_type: s.seal_type,
+            seal_ref: s.seal_ref,
+            right_id: s.right_id,
+            status: s.status,
+            consumed_at: s.consumed_at.map(DateTimeScalar),
+            consumed_tx: s.consumed_tx,
+            block_height: s.block_height as i64,
+            seal_proof_type: s.seal_proof_type,
+            seal_proof_verified: s.seal_proof_verified,
+        }
+    }
+}
+
+/// GraphQL ProofStatistics type.
+#[derive(SimpleObject)]
+pub struct ProofStatisticsGql {
+    pub total_rights: i64,
+    pub total_seals: i64,
+    pub rights_by_commitment_scheme: Vec<SchemeCountGql>,
+    pub rights_by_inclusion_proof: Vec<InclusionProofCountGql>,
+    pub rights_by_finality_proof: Vec<FinalityProofCountGql>,
+    pub seals_by_proof_type: Vec<SealProofCountGql>,
+}
+
+impl From<csv_explorer_shared::ProofStatistics> for ProofStatisticsGql {
+    fn from(s: csv_explorer_shared::ProofStatistics) -> Self {
+        Self {
+            total_rights: s.total_rights as i64,
+            total_seals: s.total_seals as i64,
+            rights_by_commitment_scheme: s.rights_by_commitment_scheme.into_iter().map(|c| c.into()).collect(),
+            rights_by_inclusion_proof: s.rights_by_inclusion_proof.into_iter().map(|c| c.into()).collect(),
+            rights_by_finality_proof: s.rights_by_finality_proof.into_iter().map(|c| c.into()).collect(),
+            seals_by_proof_type: s.seals_by_proof_type.into_iter().map(|c| c.into()).collect(),
+        }
+    }
+}
+
+/// Count of rights by commitment scheme.
+#[derive(SimpleObject)]
+pub struct SchemeCountGql {
+    pub scheme: String,
+    pub count: i64,
+}
+
+impl From<csv_explorer_shared::SchemeCount> for SchemeCountGql {
+    fn from(c: csv_explorer_shared::SchemeCount) -> Self {
+        Self {
+            scheme: format!("{:?}", c.scheme),
+            count: c.count as i64,
+        }
+    }
+}
+
+/// Count of rights by inclusion proof type.
+#[derive(SimpleObject)]
+pub struct InclusionProofCountGql {
+    pub proof_type: String,
+    pub count: i64,
+}
+
+impl From<csv_explorer_shared::InclusionProofCount> for InclusionProofCountGql {
+    fn from(c: csv_explorer_shared::InclusionProofCount) -> Self {
+        Self {
+            proof_type: format!("{:?}", c.proof_type),
+            count: c.count as i64,
+        }
+    }
+}
+
+/// Count of rights by finality proof type.
+#[derive(SimpleObject)]
+pub struct FinalityProofCountGql {
+    pub proof_type: String,
+    pub count: i64,
+}
+
+impl From<csv_explorer_shared::FinalityProofCount> for FinalityProofCountGql {
+    fn from(c: csv_explorer_shared::FinalityProofCount) -> Self {
+        Self {
+            proof_type: format!("{:?}", c.proof_type),
+            count: c.count as i64,
+        }
+    }
+}
+
+/// Count of seals by proof type.
+#[derive(SimpleObject)]
+pub struct SealProofCountGql {
+    pub proof_type: String,
+    pub count: i64,
+}
+
+impl From<csv_explorer_shared::SealProofCount> for SealProofCountGql {
+    fn from(c: csv_explorer_shared::SealProofCount) -> Self {
+        Self {
+            proof_type: c.proof_type,
+            count: c.count as i64,
+        }
+    }
+}

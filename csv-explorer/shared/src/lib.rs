@@ -4,9 +4,11 @@
 /// storage, API, and UI crates.
 
 pub mod types;
+pub mod advanced_types;
 
 // Re-export commonly used types at the crate root for convenience.
 pub use types::*;
+pub use advanced_types::*;
 
 // Server-only modules
 #[cfg(not(target_arch = "wasm32"))]

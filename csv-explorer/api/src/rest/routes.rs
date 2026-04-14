@@ -40,6 +40,18 @@ pub fn rest_routes() -> Router<AppState> {
         .route("/wallet/address/{address}/seals", get(handlers::get_address_seals))
         .route("/wallet/address/{address}/transfers", get(handlers::get_address_transfers))
         .route("/wallet/priority/status", get(handlers::get_priority_indexing_status))
+        // Enhanced rights with commitment metadata
+        .route("/rights/enhanced", get(handlers::list_enhanced_rights))
+        .route("/rights/enhanced/{id}", get(handlers::get_enhanced_right))
+        // Enhanced seals with proof metadata
+        .route("/seals/enhanced", get(handlers::list_enhanced_seals))
+        .route("/seals/enhanced/{id}", get(handlers::get_enhanced_seal))
+        // Proof statistics
+        .route("/proofs/statistics", get(handlers::get_proof_statistics))
+        // Filter by commitment scheme
+        .route("/rights/by-scheme/{scheme}", get(handlers::get_rights_by_scheme))
+        // Filter by proof type
+        .route("/rights/by-proof/{proof_type}", get(handlers::get_rights_by_proof_type))
 }
 
 /// Build the full API v1 router with prefix.

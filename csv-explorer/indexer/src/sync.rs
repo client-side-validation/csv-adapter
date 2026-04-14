@@ -13,7 +13,7 @@ use super::chain_indexer::ChainIndexer;
 use csv_explorer_shared::{ChainConfig, ChainInfo, ChainStatus, ExplorerError, IndexerStatus};
 
 use csv_explorer_storage::repositories::{
-    ContractsRepository, RightsRepository, SealsRepository, SyncRepository, TransfersRepository,
+    AdvancedProofRepository, ContractsRepository, RightsRepository, SealsRepository, SyncRepository, TransfersRepository,
 };
 use sqlx::SqlitePool;
 
@@ -26,6 +26,7 @@ pub struct SyncCoordinator {
     seals_repo: SealsRepository,
     transfers_repo: TransfersRepository,
     contracts_repo: ContractsRepository,
+    advanced_repo: AdvancedProofRepository,
     concurrency: usize,
     batch_size: u64,
     poll_interval_ms: u64,
@@ -74,7 +75,8 @@ impl SyncCoordinator {
             rights_repo: RightsRepository::new(pool.clone()),
             seals_repo: SealsRepository::new(pool.clone()),
             transfers_repo: TransfersRepository::new(pool.clone()),
-            contracts_repo: ContractsRepository::new(pool),
+            contracts_repo: ContractsRepository::new(pool.clone()),
+            advanced_repo: AdvancedProofRepository::new(pool),
             concurrency,
             batch_size,
             poll_interval_ms,
@@ -136,6 +138,7 @@ impl SyncCoordinator {
                     &self.seals_repo,
                     &self.transfers_repo,
                     &self.contracts_repo,
+                    &self.advanced_repo,
                     self.batch_size,
                     &self.chain_states,
                 ).await {
@@ -201,6 +204,7 @@ impl SyncCoordinator {
             &self.seals_repo,
             &self.transfers_repo,
             &self.contracts_repo,
+            &self.advanced_repo,
             self.batch_size,
             &self.chain_states,
         )
@@ -231,6 +235,7 @@ async fn sync_chain(
     seals_repo: &SealsRepository,
     transfers_repo: &TransfersRepository,
     contracts_repo: &ContractsRepository,
+    advanced_repo: &AdvancedProofRepository,
     batch_size: u64,
     _chain_states: &Arc<RwLock<Vec<ChainSyncState>>>,
 ) -> Result<(), ExplorerError> {
@@ -370,6 +375,84 @@ async fn sync_chain(
                     }
                     Err(e) => {
                         tracing::warn!(chain = chain_id, block = current, error = %e, "Failed to index contracts");
+                    }
+                }
+
+                // Index and store enhanced rights with commitment metadata
+                match indexer.index_enhanced_rights(current).await {
+                    Ok(enhanced_rights) => {
+                        for right in &enhanced_rights {
+                            if let Err(e) = advanced_repo.insert_enhanced_right(right).await {
+                                tracing::warn!(
+                                    chain = chain_id,
+                                    block = current,
+                                    right_id = %right.id,
+                                    error = %e,
+                                    "Failed to insert enhanced right"
+                                );
+                            }
+                        }
+                        tracing::trace!(
+                            chain = chain_id,
+                            block = current,
+                            enhanced_rights = enhanced_rights.len(),
+                            "Indexed and stored enhanced rights"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!(chain = chain_id, block = current, error = %e, "Failed to index enhanced rights");
+                    }
+                }
+
+                // Index and store enhanced seals with proof metadata
+                match indexer.index_enhanced_seals(current).await {
+                    Ok(enhanced_seals) => {
+                        for seal in &enhanced_seals {
+                            if let Err(e) = advanced_repo.insert_enhanced_seal(seal).await {
+                                tracing::warn!(
+                                    chain = chain_id,
+                                    block = current,
+                                    seal_id = %seal.id,
+                                    error = %e,
+                                    "Failed to insert enhanced seal"
+                                );
+                            }
+                        }
+                        tracing::trace!(
+                            chain = chain_id,
+                            block = current,
+                            enhanced_seals = enhanced_seals.len(),
+                            "Indexed and stored enhanced seals"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!(chain = chain_id, block = current, error = %e, "Failed to index enhanced seals");
+                    }
+                }
+
+                // Index and store enhanced transfers with cross-chain proof data
+                match indexer.index_enhanced_transfers(current).await {
+                    Ok(enhanced_transfers) => {
+                        for transfer in &enhanced_transfers {
+                            if let Err(e) = advanced_repo.insert_enhanced_transfer(transfer).await {
+                                tracing::warn!(
+                                    chain = chain_id,
+                                    block = current,
+                                    transfer_id = %transfer.id,
+                                    error = %e,
+                                    "Failed to insert enhanced transfer"
+                                );
+                            }
+                        }
+                        tracing::trace!(
+                            chain = chain_id,
+                            block = current,
+                            enhanced_transfers = enhanced_transfers.len(),
+                            "Indexed and stored enhanced transfers"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!(chain = chain_id, block = current, error = %e, "Failed to index enhanced transfers");
                     }
                 }
 

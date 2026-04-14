@@ -629,3 +629,212 @@ fn not_found(message: &str) -> (StatusCode, Json<ErrorResponse>) {
         }),
     )
 }
+
+// ---------------------------------------------------------------------------
+// Enhanced rights and proof metadata handlers
+// ---------------------------------------------------------------------------
+
+/// Query parameters for listing enhanced rights.
+#[derive(Deserialize)]
+pub struct EnhancedRightsQuery {
+    pub chain: Option<String>,
+    pub owner: Option<String>,
+    pub commitment_scheme: Option<String>,
+    pub inclusion_proof_type: Option<String>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+/// GET /api/v1/rights/enhanced
+pub async fn list_enhanced_rights(
+    Query(query): Query<EnhancedRightsQuery>,
+    State((_, pool)): State<AppState>,
+) -> Result<Json<ApiResponse<Vec<csv_explorer_shared::EnhancedRightRecord>>>, (StatusCode, Json<ErrorResponse>)> {
+    use csv_explorer_shared::RightProofFilter;
+    use csv_explorer_storage::repositories::AdvancedProofRepository;
+
+    let repo = AdvancedProofRepository::new(pool);
+
+    let filter = RightProofFilter {
+        chain: query.chain,
+        owner: query.owner,
+        commitment_scheme: query.commitment_scheme.as_deref().and_then(|s| csv_explorer_shared::CommitmentScheme::from_str(s)),
+        inclusion_proof_type: query.inclusion_proof_type.as_deref().and_then(|s| csv_explorer_shared::InclusionProofType::from_str(s)),
+        limit: query.limit,
+        offset: query.offset,
+    };
+
+    let records = repo
+        .query_enhanced_rights(filter)
+        .await
+        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+
+    Ok(Json(ApiResponse::from(records)))
+}
+
+/// GET /api/v1/rights/enhanced/:id
+pub async fn get_enhanced_right(
+    Path(id): Path<String>,
+    State((_, pool)): State<AppState>,
+) -> Result<Json<ApiResponse<csv_explorer_shared::EnhancedRightRecord>>, (StatusCode, Json<ErrorResponse>)> {
+    use csv_explorer_shared::RightProofFilter;
+    use csv_explorer_storage::repositories::AdvancedProofRepository;
+
+    let repo = AdvancedProofRepository::new(pool);
+
+    let filter = RightProofFilter {
+        chain: None,
+        owner: None,
+        commitment_scheme: None,
+        inclusion_proof_type: None,
+        limit: Some(1),
+        offset: Some(0),
+    };
+
+    let records = repo
+        .query_enhanced_rights(filter)
+        .await
+        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+
+    let record = records.into_iter().find(|r| r.id == id);
+
+    match record {
+        Some(r) => Ok(Json(ApiResponse::from(r))),
+        None => Err(not_found(&format!("Enhanced right {} not found", id))),
+    }
+}
+
+/// GET /api/v1/seals/enhanced
+pub async fn list_enhanced_seals(
+    Query(query): Query<crate::rest::handlers::ListSealsQuery>,
+    State((_, pool)): State<AppState>,
+) -> Result<Json<ApiResponse<Vec<csv_explorer_shared::EnhancedSealRecord>>>, (StatusCode, Json<ErrorResponse>)> {
+    use csv_explorer_shared::SealProofFilter;
+    use csv_explorer_storage::repositories::AdvancedProofRepository;
+
+    let repo = AdvancedProofRepository::new(pool);
+
+    let filter = SealProofFilter {
+        chain: query.chain,
+        seal_type: query.seal_type,
+        seal_proof_type: None,
+        seal_proof_verified: None,
+        limit: query.limit,
+        offset: query.offset,
+    };
+
+    let records = repo
+        .query_enhanced_seals(filter)
+        .await
+        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+
+    Ok(Json(ApiResponse::from(records)))
+}
+
+/// GET /api/v1/seals/enhanced/:id
+pub async fn get_enhanced_seal(
+    Path(id): Path<String>,
+    State((_, pool)): State<AppState>,
+) -> Result<Json<ApiResponse<csv_explorer_shared::EnhancedSealRecord>>, (StatusCode, Json<ErrorResponse>)> {
+    use csv_explorer_shared::SealProofFilter;
+    use csv_explorer_storage::repositories::AdvancedProofRepository;
+
+    let repo = AdvancedProofRepository::new(pool);
+
+    let filter = SealProofFilter {
+        chain: None,
+        seal_type: None,
+        seal_proof_type: None,
+        seal_proof_verified: None,
+        limit: Some(1),
+        offset: Some(0),
+    };
+
+    let records = repo
+        .query_enhanced_seals(filter)
+        .await
+        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+
+    let record = records.into_iter().find(|r| r.id == id);
+
+    match record {
+        Some(r) => Ok(Json(ApiResponse::from(r))),
+        None => Err(not_found(&format!("Enhanced seal {} not found", id))),
+    }
+}
+
+/// GET /api/v1/proofs/statistics
+pub async fn get_proof_statistics(
+    State((_, pool)): State<AppState>,
+) -> Result<Json<ApiResponse<csv_explorer_shared::ProofStatistics>>, (StatusCode, Json<ErrorResponse>)> {
+    use csv_explorer_storage::repositories::AdvancedProofRepository;
+
+    let repo = AdvancedProofRepository::new(pool);
+
+    let stats = repo
+        .get_proof_statistics()
+        .await
+        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+
+    Ok(Json(ApiResponse::from(stats)))
+}
+
+/// GET /api/v1/rights/by-scheme/:scheme
+pub async fn get_rights_by_scheme(
+    Path(scheme): Path<String>,
+    State((_, pool)): State<AppState>,
+) -> Result<Json<ApiResponse<Vec<csv_explorer_shared::EnhancedRightRecord>>>, (StatusCode, Json<ErrorResponse>)> {
+    use csv_explorer_shared::{CommitmentScheme, RightProofFilter};
+    use csv_explorer_storage::repositories::AdvancedProofRepository;
+
+    let commitment_scheme = CommitmentScheme::from_str(&scheme)
+        .ok_or_else(|| not_found(&format!("Unknown commitment scheme: {}", scheme)))?;
+
+    let repo = AdvancedProofRepository::new(pool);
+
+    let filter = RightProofFilter {
+        chain: None,
+        owner: None,
+        commitment_scheme: Some(commitment_scheme),
+        inclusion_proof_type: None,
+        limit: Some(100),
+        offset: Some(0),
+    };
+
+    let records = repo
+        .query_enhanced_rights(filter)
+        .await
+        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+
+    Ok(Json(ApiResponse::from(records)))
+}
+
+/// GET /api/v1/rights/by-proof/:proof_type
+pub async fn get_rights_by_proof_type(
+    Path(proof_type): Path<String>,
+    State((_, pool)): State<AppState>,
+) -> Result<Json<ApiResponse<Vec<csv_explorer_shared::EnhancedRightRecord>>>, (StatusCode, Json<ErrorResponse>)> {
+    use csv_explorer_shared::{InclusionProofType, RightProofFilter};
+    use csv_explorer_storage::repositories::AdvancedProofRepository;
+
+    let inclusion_proof_type = InclusionProofType::from_str(&proof_type)
+        .ok_or_else(|| not_found(&format!("Unknown inclusion proof type: {}", proof_type)))?;
+
+    let repo = AdvancedProofRepository::new(pool);
+
+    let filter = RightProofFilter {
+        chain: None,
+        owner: None,
+        commitment_scheme: None,
+        inclusion_proof_type: Some(inclusion_proof_type),
+        limit: Some(100),
+        offset: Some(0),
+    };
+
+    let records = repo
+        .query_enhanced_rights(filter)
+        .await
+        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+
+    Ok(Json(ApiResponse::from(records)))
+}

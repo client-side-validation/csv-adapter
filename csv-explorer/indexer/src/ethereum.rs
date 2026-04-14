@@ -14,8 +14,9 @@ use std::collections::HashMap;
 
 use super::chain_indexer::{AddressIndexingResult, ChainIndexer, ChainResult};
 use csv_explorer_shared::{
-    ChainConfig, ContractStatus, ContractType, CsvContract, ExplorerError, RightRecord,
-    SealRecord, SealStatus, SealType, TransferRecord,
+    ChainConfig, CommitmentScheme, ContractStatus, ContractType, CsvContract, EnhancedRightRecord,
+    EnhancedSealRecord, EnhancedTransferRecord, ExplorerError, FinalityProofType, InclusionProofType,
+    Network, PriorityLevel, RightRecord, SealRecord, SealStatus, SealType, TransferRecord,
 };
 
 /// Ethereum-specific indexer.
@@ -352,5 +353,177 @@ impl EthereumIndexer {
             completed_at: None,
             duration_ms: None,
         })
+    }
+
+    // -----------------------------------------------------------------------
+    // Advanced commitment and proof indexing methods
+    // -----------------------------------------------------------------------
+
+    async fn index_enhanced_rights(&self, block: u64) -> ChainResult<Vec<EnhancedRightRecord>> {
+        let block_data = self.fetch_block(block).await?;
+        let mut rights = Vec::new();
+
+        for tx in &block_data.transactions {
+            if let Some(logs) = &tx.logs {
+                for log in logs {
+                    if log.topics.first().map(|s| s.as_str()) == Some(RIGHT_CREATED_SIG) {
+                        if let Some(right) = self.parse_right_from_log(log, &tx.hash) {
+                            let enhanced = EnhancedRightRecord {
+                                id: right.id.clone(),
+                                chain: right.chain.clone(),
+                                seal_ref: right.seal_ref.clone(),
+                                commitment: right.commitment.clone(),
+                                owner: right.owner.clone(),
+                                created_at: right.created_at,
+                                created_tx: right.created_tx.clone(),
+                                status: right.status.to_string(),
+                                metadata: right.metadata,
+                                transfer_count: right.transfer_count,
+                                last_transfer_at: right.last_transfer_at,
+                                commitment_scheme: CommitmentScheme::KZG,
+                                commitment_version: 2,
+                                protocol_id: "csv-eth".to_string(),
+                                mpc_root: None,
+                                domain_separator: Some("ethereum-mainnet".to_string()),
+                                inclusion_proof_type: InclusionProofType::MerklePatricia,
+                                finality_proof_type: FinalityProofType::FinalizedBlock,
+                                proof_size_bytes: Some(log.data.len() as u64),
+                                confirmations: None,
+                            };
+                            rights.push(enhanced);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(rights)
+    }
+
+    async fn index_enhanced_seals(&self, block: u64) -> ChainResult<Vec<EnhancedSealRecord>> {
+        let block_data = self.fetch_block(block).await?;
+        let mut seals = Vec::new();
+
+        for tx in &block_data.transactions {
+            if let Some(logs) = &tx.logs {
+                for log in logs {
+                    if log.topics.first().map(|s| s.as_str()) == Some(SEAL_CONSUMED_SIG) {
+                        let seal = EnhancedSealRecord {
+                            id: format!("eth-seal-{}", log.transaction_hash),
+                            chain: "ethereum".to_string(),
+                            seal_type: "nullifier".to_string(),
+                            seal_ref: log.data.clone(),
+                            right_id: None,
+                            status: "consumed".to_string(),
+                            consumed_at: Some(chrono::Utc::now()),
+                            consumed_tx: Some(log.transaction_hash.clone()),
+                            block_height: block,
+                            seal_proof_type: "merkle_patricia".to_string(),
+                            seal_proof_verified: None,
+                        };
+                        seals.push(seal);
+                    }
+                }
+            }
+        }
+
+        Ok(seals)
+    }
+
+    async fn index_enhanced_transfers(&self, block: u64) -> ChainResult<Vec<EnhancedTransferRecord>> {
+        let block_data = self.fetch_block(block).await?;
+        let mut transfers = Vec::new();
+
+        for tx in &block_data.transactions {
+            if let Some(logs) = &tx.logs {
+                for log in logs {
+                    if log.topics.first().map(|s| s.as_str()) == Some(CROSS_CHAIN_TRANSFER_SIG) {
+                        if let Some(transfer) = self.parse_transfer_from_log(log, &tx.hash) {
+                            let enhanced = EnhancedTransferRecord {
+                                id: transfer.id.clone(),
+                                right_id: transfer.right_id.clone(),
+                                from_chain: transfer.from_chain.clone(),
+                                to_chain: transfer.to_chain.clone(),
+                                from_owner: transfer.from_owner.clone(),
+                                to_owner: transfer.to_owner.clone(),
+                                lock_tx: transfer.lock_tx.clone(),
+                                mint_tx: transfer.mint_tx.clone(),
+                                proof_ref: transfer.proof_ref.clone(),
+                                status: transfer.status.to_string(),
+                                created_at: transfer.created_at,
+                                completed_at: transfer.completed_at,
+                                duration_ms: transfer.duration_ms,
+                                cross_chain_proof_type: Some("merkle_patricia".to_string()),
+                                bridge_contract: Some(log.address.clone()),
+                                bridge_proof_verified: None,
+                            };
+                            transfers.push(enhanced);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(transfers)
+    }
+
+    fn detect_commitment_scheme(&self, _data: &[u8]) -> Option<CommitmentScheme> {
+        // Ethereum CSV uses KZG commitments (PLONK-style)
+        Some(CommitmentScheme::KZG)
+    }
+
+    fn detect_inclusion_proof_type(&self) -> InclusionProofType {
+        InclusionProofType::MerklePatricia
+    }
+
+    fn detect_finality_proof_type(&self) -> FinalityProofType {
+        FinalityProofType::FinalizedBlock
+    }
+
+    // -----------------------------------------------------------------------
+    // Address-based indexing methods (for priority indexing)
+    // -----------------------------------------------------------------------
+
+    async fn index_rights_by_address(&self, _address: &str) -> ChainResult<Vec<RightRecord>> {
+        Ok(Vec::new())
+    }
+
+    async fn index_seals_by_address(&self, _address: &str) -> ChainResult<Vec<SealRecord>> {
+        Ok(Vec::new())
+    }
+
+    async fn index_transfers_by_address(&self, _address: &str) -> ChainResult<Vec<TransferRecord>> {
+        Ok(Vec::new())
+    }
+
+    async fn index_addresses_with_priority(
+        &self,
+        addresses: &[String],
+        _priority: PriorityLevel,
+        _network: Network,
+    ) -> ChainResult<AddressIndexingResult> {
+        let mut result = AddressIndexingResult {
+            addresses_processed: 0,
+            rights_indexed: 0,
+            seals_indexed: 0,
+            transfers_indexed: 0,
+            contracts_indexed: 0,
+            errors: Vec::new(),
+        };
+
+        for address in addresses {
+            if let Ok(rights) = self.index_rights_by_address(address).await {
+                result.rights_indexed += rights.len() as u64;
+                result.addresses_processed += 1;
+            }
+            if let Ok(seals) = self.index_seals_by_address(address).await {
+                result.seals_indexed += seals.len() as u64;
+            }
+            if let Ok(transfers) = self.index_transfers_by_address(address).await {
+                result.transfers_indexed += transfers.len() as u64;
+            }
+        }
+
+        Ok(result)
     }
 }

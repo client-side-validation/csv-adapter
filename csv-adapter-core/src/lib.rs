@@ -33,6 +33,9 @@ pub mod right;
 pub mod seal;
 pub mod tagged_hash;
 
+// Advanced commitment types
+pub mod advanced_commitments;
+
 // Agent-friendly types (AI agent support)
 pub mod agent_types;
 
@@ -84,6 +87,7 @@ pub mod rgb_compat;
 pub mod tapret_verify;
 
 // Re-exports: core
+pub use advanced_commitments::{CommitmentScheme, EnhancedCommitment, FinalityProofType, InclusionProofType, ProofMetadata};
 pub use agent_types::{Chain, ErrorSuggestion, FixAction, TransferStatus};
 pub use commitment::Commitment;
 pub use hardening::{

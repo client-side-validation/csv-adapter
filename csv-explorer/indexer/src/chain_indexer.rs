@@ -5,7 +5,11 @@
 
 use async_trait::async_trait;
 
-use csv_explorer_shared::{CsvContract, ExplorerError, Network, PriorityLevel, RightRecord, SealRecord, TransferRecord};
+use csv_explorer_shared::{
+    CommitmentScheme, CsvContract, EnhancedInclusionProof, EnhancedRightRecord,
+    EnhancedSealRecord, EnhancedTransferRecord, ExplorerError, FinalityProofType,
+    InclusionProofType, Network, PriorityLevel, RightRecord, SealRecord, TransferRecord,
+};
 
 /// Result type alias for chain indexer operations.
 pub type ChainResult<T> = std::result::Result<T, ExplorerError>;
@@ -60,6 +64,28 @@ pub trait ChainIndexer: Send + Sync {
     }
 
     // -----------------------------------------------------------------------
+    // Advanced commitment and proof indexing methods
+    // -----------------------------------------------------------------------
+
+    /// Index rights with enhanced commitment metadata.
+    async fn index_enhanced_rights(
+        &self,
+        block: u64,
+    ) -> ChainResult<Vec<EnhancedRightRecord>>;
+
+    /// Index seals with enhanced proof metadata.
+    async fn index_enhanced_seals(
+        &self,
+        block: u64,
+    ) -> ChainResult<Vec<EnhancedSealRecord>>;
+
+    /// Index transfers with cross-chain proof metadata.
+    async fn index_enhanced_transfers(
+        &self,
+        block: u64,
+    ) -> ChainResult<Vec<EnhancedTransferRecord>>;
+
+    // -----------------------------------------------------------------------
     // Priority address-based indexing methods
     // -----------------------------------------------------------------------
 
@@ -80,6 +106,16 @@ pub trait ChainIndexer: Send + Sync {
         priority: PriorityLevel,
         network: Network,
     ) -> ChainResult<AddressIndexingResult>;
+
+    /// Detect commitment scheme from transaction/block data.
+    /// Returns the detected scheme or None if unable to detect.
+    fn detect_commitment_scheme(&self, data: &[u8]) -> Option<CommitmentScheme>;
+
+    /// Detect inclusion proof type from transaction/block data.
+    fn detect_inclusion_proof_type(&self) -> InclusionProofType;
+
+    /// Detect finality proof type for this chain.
+    fn detect_finality_proof_type(&self) -> FinalityProofType;
 }
 
 /// Result of processing a single block.
