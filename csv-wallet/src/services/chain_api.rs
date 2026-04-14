@@ -243,8 +243,9 @@ impl ChainApi {
             .and_then(|v| v.as_str())
             .ok_or_else(|| ChainApiError::ApiError("Missing result in response".to_string()))?;
 
-        // Parse hex balance (in wei) to f64 (in ETH)
-        let balance_wei = u64::from_str_radix(balance_hex.trim_start_matches("0x"), 16)
+        // Parse hex balance (in wei) to f64 (in ETH).
+        // Use u128 to avoid overflow for balances > 18.4 ETH.
+        let balance_wei = u128::from_str_radix(balance_hex.trim_start_matches("0x"), 16)
             .map_err(|e| ChainApiError::ApiError(format!("Invalid hex balance: {}", e)))?;
 
         Ok(balance_wei as f64 / 1e18)

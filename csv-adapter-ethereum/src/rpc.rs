@@ -50,9 +50,13 @@ pub trait EthereumRpc: Send + Sync {
         tx_bytes: Vec<u8>,
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>>;
 
-    /// Downcast to `Any` for feature-gated real implementations
-    fn as_any(&self) -> &dyn std::any::Any {
-        unimplemented!("as_any() must be implemented by concrete types")
+    /// Downcast to `Any` for feature-gated real implementations.
+    /// Default returns self; concrete types may override for explicit downcasting.
+    fn as_any(&self) -> &dyn std::any::Any
+    where
+        Self: Sized + 'static,
+    {
+        self
     }
 }
 

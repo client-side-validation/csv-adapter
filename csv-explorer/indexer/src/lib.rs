@@ -71,6 +71,7 @@ impl Indexer {
         let coordinator = SyncCoordinator::new(
             indexers,
             pool.clone(),
+            config.chains.clone(),
             config.indexer.concurrency,
             config.indexer.batch_size,
             config.indexer.poll_interval_ms,

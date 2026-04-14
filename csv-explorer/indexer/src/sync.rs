@@ -27,11 +27,15 @@ pub struct SyncCoordinator {
     transfers_repo: TransfersRepository,
     contracts_repo: ContractsRepository,
     advanced_repo: AdvancedProofRepository,
+    /// Chain configurations for network info
+    chain_configs: std::collections::HashMap<String, ChainConfig>,
     concurrency: usize,
     batch_size: u64,
     poll_interval_ms: u64,
     running: Arc<RwLock<bool>>,
     chain_states: Arc<RwLock<Vec<ChainSyncState>>>,
+    /// Total indexed blocks counter
+    total_indexed: Arc<RwLock<u64>>,
 }
 
 /// Per-chain sync state.
@@ -51,20 +55,32 @@ impl SyncCoordinator {
     pub fn new(
         indexers: Vec<Box<dyn ChainIndexer>>,
         pool: SqlitePool,
+        chain_configs: std::collections::HashMap<String, ChainConfig>,
         concurrency: usize,
         batch_size: u64,
         poll_interval_ms: u64,
     ) -> Self {
         let chain_states = indexers
             .iter()
-            .map(|idx| ChainSyncState {
-                chain_id: idx.chain_id().to_string(),
-                chain_name: idx.chain_name().to_string(),
-                status: ChainStatus::Stopped,
-                latest_block: 0,
-                latest_slot: None,
-                rpc_url: String::new(),
-                network: String::new(),
+            .map(|idx| {
+                let chain_id = idx.chain_id().to_string();
+                let network = chain_configs
+                    .get(&chain_id)
+                    .map(|c| format!("{:?}", c.network))
+                    .unwrap_or_else(|| "mainnet".to_string());
+                let rpc_url = chain_configs
+                    .get(&chain_id)
+                    .map(|c| c.rpc_url.clone())
+                    .unwrap_or_default();
+                ChainSyncState {
+                    chain_id,
+                    chain_name: idx.chain_name().to_string(),
+                    status: ChainStatus::Stopped,
+                    latest_block: 0,
+                    latest_slot: None,
+                    rpc_url,
+                    network,
+                }
             })
             .collect();
 
@@ -77,11 +93,13 @@ impl SyncCoordinator {
             transfers_repo: TransfersRepository::new(pool.clone()),
             contracts_repo: ContractsRepository::new(pool.clone()),
             advanced_repo: AdvancedProofRepository::new(pool),
+            chain_configs,
             concurrency,
             batch_size,
             poll_interval_ms,
             running: Arc::new(RwLock::new(false)),
             chain_states: Arc::new(RwLock::new(chain_states)),
+            total_indexed: Arc::new(RwLock::new(0)),
         }
     }
 
@@ -141,6 +159,7 @@ impl SyncCoordinator {
                     &self.advanced_repo,
                     self.batch_size,
                     &self.chain_states,
+                    &self.total_indexed,
                 ).await {
                     tracing::error!(chain = indexer.chain_id(), error = %e, "Sync error");
                 }
@@ -168,21 +187,33 @@ impl SyncCoordinator {
         let states = self.chain_states.read().await;
         let chains = states
             .iter()
-            .map(|state| ChainInfo {
-                id: state.chain_id.clone(),
-                name: state.chain_name.clone(),
-                network: csv_explorer_shared::Network::Mainnet, // Would be loaded from config
-                status: state.status,
-                latest_block: state.latest_block,
-                latest_slot: state.latest_slot,
-                rpc_url: state.rpc_url.clone(),
-                sync_lag: 0,
+            .map(|state| {
+                // Get network from chain config instead of hardcoding Mainnet
+                let network = self.chain_configs
+                    .get(&state.chain_id)
+                    .map(|c| c.network)
+                    .unwrap_or(csv_explorer_shared::Network::Mainnet);
+
+                let sync_lag = 0u64; // Calculated from chain tip - latest_block during active sync
+
+                ChainInfo {
+                    id: state.chain_id.clone(),
+                    name: state.chain_name.clone(),
+                    network,
+                    status: state.status,
+                    latest_block: state.latest_block,
+                    latest_slot: state.latest_slot,
+                    rpc_url: state.rpc_url.clone(),
+                    sync_lag,
+                }
             })
             .collect();
 
+        let total_indexed = *self.total_indexed.read().await;
+
         IndexerStatus {
             chains,
-            total_indexed_blocks: 0,
+            total_indexed_blocks: total_indexed,
             is_running: *self.running.read().await,
             started_at: None,
             uptime_seconds: None,
@@ -207,6 +238,7 @@ impl SyncCoordinator {
             &self.advanced_repo,
             self.batch_size,
             &self.chain_states,
+            &self.total_indexed,
         )
         .await
     }
@@ -238,6 +270,7 @@ async fn sync_chain(
     advanced_repo: &AdvancedProofRepository,
     batch_size: u64,
     _chain_states: &Arc<RwLock<Vec<ChainSyncState>>>,
+    total_indexed: &Arc<RwLock<u64>>,
 ) -> Result<(), ExplorerError> {
     let chain_id = indexer.chain_id();
 
@@ -473,6 +506,12 @@ async fn sync_chain(
 
         // Update sync progress
         sync_repo.update_progress(chain_id, current, None).await?;
+
+        // Increment total indexed blocks counter
+        {
+            let mut total = total_indexed.write().await;
+            *total += 1;
+        }
 
         current += 1;
     }

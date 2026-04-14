@@ -152,7 +152,7 @@ class CrossChainRegistry extends EventEmitter {
         chain: fromChain,
         fromOwner,
         toOwner,
-        txHash: sourceTXHash,
+        txHash: sourceTxHash,
         timestamp: Date.now()
       });
       this.emit('right:transferred', right);
