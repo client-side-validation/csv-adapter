@@ -1,363 +1,131 @@
-# CSV Adapter — End-to-End Testnet User Manual
+# End-to-End Testnet Manual
 
-This guide walks you through the complete end-to-end test of the CSV Adapter across all four supported chains: **Bitcoin**, **Ethereum**, **Sui**, and **Aptos**. It covers wallet generation, funding, contract deployment, and validation testing.
+Related docs: [Developer Guide](DEVELOPER_GUIDE.md), [Implementation Status](CROSS_CHAIN_IMPLEMENTATION.md), [Testnet E2E Report](TESTNET_E2E_REPORT.md)
+
+> The operational steps below are preserved as a manual runbook. Use this together with the developer guide, not as the primary architecture or roadmap document.
 
 ---
 
 ## Prerequisites
 
-| Tool | Version | Install |
-|------|---------|---------|
-| Rust | 1.80+ | `rustup install stable` |
-| Foundry (forge) | latest | `curl -L https://foundry.paradigm.xyz \| bash && foundryup` |
-| Sui CLI | 1.69+ | `cargo install --locked --git https://github.com/MystenLabs/sui.git --bin sui` |
-| Aptos CLI | 9.1+ | `cargo install --git https://github.com/aptos-labs/aptos-core.git aptos` |
-
----
+```bash
+cargo build -p csv-cli --release
+foundryup
+sui --version
+aptos --version
+```
 
 ## Step 1: Build the CLI
 
 ```bash
-cargo build --release -p csv-cli
+cargo build -p csv-cli --release
+./target/release/csv --help
 ```
-
-Verify:
-
-```bash
-./target/release/csv --version
-```
-
----
 
 ## Step 2: Generate Wallets
-
-Generate one wallet per chain. **Save every private key and address** — they cannot be recovered.
 
 ### Bitcoin (Signet)
 
 ```bash
-./target/release/csv wallet generate bitcoin
+csv wallet generate --chain bitcoin --network signet
 ```
 
 ### Ethereum (Sepolia)
 
 ```bash
-./target/release/csv wallet generate ethereum
+csv wallet generate --chain ethereum --network sepolia
 ```
 
 ### Sui (Testnet)
 
 ```bash
-./target/release/csv wallet generate sui
+csv wallet generate --chain sui --network testnet
 ```
 
 ### Aptos (Testnet)
 
 ```bash
-./target/release/csv wallet generate aptos
+csv wallet generate --chain aptos --network testnet
 ```
 
 ### Verify all wallets
 
 ```bash
-./target/release/csv wallet list
+csv wallet list
 ```
-
----
 
 ## Step 3: Fund Wallets
 
-Use the addresses from Step 2 to request testnet tokens.
-
 ### Bitcoin Signet
 
-Visit: <https://mempool.space/signet/faucet> or <https://signet.bc-2.jp>
+Use a Signet faucet and confirm the generated address received funds.
 
 ### Ethereum Sepolia
 
-Visit: <https://sepoliafaucet.com> or any Sepolia faucet.
+Use a Sepolia faucet for the generated wallet address.
 
 ### Sui Testnet
 
 ```bash
-./target/release/csv wallet fund sui
+csv wallet fund --chain sui
 ```
-
-Or use the web UI: <https://faucet.sui.io/>
 
 ### Aptos Testnet
 
 ```bash
-./target/release/csv wallet fund aptos
+csv wallet fund --chain aptos
 ```
 
-Or use the web UI: <https://aptos.dev/network/faucet>
-
-### Verify Balances
+### Verify balances
 
 ```bash
-./target/release/csv wallet balance bitcoin
-./target/release/csv wallet balance ethereum
-./target/release/csv wallet balance sui
-./target/release/csv wallet balance aptos
+csv wallet balance --chain bitcoin
+csv wallet balance --chain ethereum
+csv wallet balance --chain sui
+csv wallet balance --chain aptos
 ```
 
----
+## Step 4: Deploy Contracts
 
-## Step 4: Import Wallets into Chain CLIs
+### Ethereum
 
-The `csv-cli` manages addresses independently. Chain-specific CLIs need their own wallet import.
-
-### Ethereum — no import needed
-
-Foundry uses the `--private-key` flag or `DEPLOYER_KEY` env var directly.
+```bash
+csv contract deploy --chain ethereum --network sepolia
+```
 
 ### Sui
 
-Convert the hex private key to Sui's Bech32 format, then import:
-
 ```bash
-# Convert hex → Bech32
-sui keytool convert <hex-private-key>
-
-# Import
-sui keytool import "suiprivkey1..." ed25519
-
-# Switch to the imported address
-sui client switch --address <sui-address>
-
-# Ensure testnet environment
-sui client switch --env testnet
+csv contract deploy --chain sui --network testnet
 ```
 
 ### Aptos
 
 ```bash
-aptos init --network testnet --private-key 0x<hex-private-key> --assume-yes
+csv contract deploy --chain aptos --network testnet
 ```
 
-### Bitcoin
+## Step 5: Run cross-chain flows
+
+Example:
 
 ```bash
-./target/release/csv wallet import bitcoin <hex-seed>
+csv cross-chain transfer --from bitcoin --to sui --right-id 0x...
 ```
 
-The seed is 64 bytes (128 hex chars) generated during wallet creation.
-
----
-
-## Step 5: Deploy Contracts
-
-### Bitcoin Signet
-
-Bitcoin Signet uses **real on-chain UTXOs** via the mempool.space public REST API (no local node needed).
+## Step 6: Run the test command set
 
 ```bash
-cargo run -p csv-adapter-bitcoin --example signet_real_tx_demo --features signet-rest
+csv test run-all
 ```
-
-This performs the complete Bitcoin flow:
-
-1. **Scans** your funded address for UTXOs via mempool.space API
-2. **Creates a seal** from a real UTXO
-3. **Builds and signs** a Taproot commitment transaction with Schnorr signatures
-4. **Broadcasts** the transaction to the Signet network
-5. **Waits for confirmation** on-chain
-6. **Verifies inclusion** and finality
-7. **Tests replay prevention** (seal cannot be reused)
-
-You can monitor your transaction at: `https://mempool.space/signet/tx/<txid>`
-
-### Ethereum (Sepolia)
-
-```bash
-./target/release/csv contract deploy ethereum
-```
-
-This runs `forge script script/Deploy.s.sol --broadcast` internally. It deploys:
-
-| Contract | Description |
-|----------|-------------|
-| `CSVLock` | Locks Rights, registers nullifiers, supports refunds |
-| `CSVMint` | Verifies proofs and mints Rights |
-
-**Manual deployment** (if needed):
-
-```bash
-cd csv-adapter-ethereum/contracts
-DEPLOYER_KEY="0x<your-private-key>" ~/.foundry/bin/forge script script/Deploy.s.sol \
-  --rpc-url https://ethereum-sepolia-rpc.publicnode.com \
-  --broadcast
-```
-
-### Sui (Testnet)
-
-```bash
-./target/release/csv contract deploy sui
-```
-
-This publishes the Move package and creates the shared `LockRegistry`.
-
-**Manual deployment:**
-
-```bash
-# Publish package
-sui client publish csv-adapter-sui/contracts --gas-budget 500000000 --json
-
-# Note the packageId from output, then create registry:
-sui client call \
-  --package <package-id> \
-  --module csv_seal \
-  --function create_registry \
-  --gas-budget 10000000
-```
-
-### Aptos (Testnet)
-
-```bash
-./target/release/csv contract deploy aptos
-```
-
-**Manual deployment:**
-
-```bash
-# Compile
-aptos move compile --package-dir csv-adapter-aptos/contracts
-
-# Publish
-aptos move publish \
-  --package-dir csv-adapter-aptos/contracts \
-  --profile default \
-  --assume-yes
-
-# Initialize registry
-aptos move run \
-  --function-id "<account>::csv_seal::init_registry" \
-  --profile default \
-  --assume-yes
-```
-
-### Verify Deployments
-
-```bash
-./target/release/csv contract status ethereum
-./target/release/csv contract status sui
-./target/release/csv contract status aptos
-./target/release/csv contract list
-```
-
----
-
-## Step 6: Run End-to-End Tests
-
-### All Chain Pairs
-
-```bash
-./target/release/csv test run --all
-```
-
-This runs 4 cross-chain transfer tests:
-
-| # | Source → Dest | Status |
-|---|--------------|--------|
-| 1 | Bitcoin → Sui | ✅ |
-| 2 | Bitcoin → Ethereum | ✅ |
-| 3 | Sui → Aptos | ✅ |
-| 4 | Ethereum → Sui | ✅ |
-
-### Single Chain Pair
-
-```bash
-./target/release/csv test run -p ethereum:sui
-```
-
-### Specific Scenario
-
-```bash
-./target/release/csv test scenario double_spend
-./target/release/csv test scenario invalid_proof
-./target/release/csv test scenario ownership_transfer
-```
-
-### View Results
-
-```bash
-./target/release/csv test results
-```
-
----
-
-## Step 7: Validate On-Chain State
-
-### Ethereum — Verify Contract Code
-
-```bash
-curl -s --data '{
-  "jsonrpc":"2.0",
-  "method":"eth_getCode",
-  "params":["0x906734c85644152fAA9EAE4Ce6179C5C5E3D866c","latest"],
-  "id":1
-}' https://ethereum-sepolia-rpc.publicnode.com
-```
-
-The result should be non-empty bytecode (`"0x60806040..."`).
-
-### Sui — Verify Package
-
-```bash
-sui client object 0xa972ca52e0c69118471a755aee0efd89993649b6d1f32a4fc9e186c1458694c2
-```
-
-Should show `objType: package`, `owner: Immutable`.
-
-### Bitcoin — Verify Commitment Transaction
-
-```bash
-curl -s "https://mempool.space/signet/api/tx/<your-txid>/status"
-```
-
-Should show `"confirmed": true` with block height.
-
-### Aptos — Verify Account Resources
-
-```bash
-curl -s "https://fullnode.testnet.aptoslabs.com/v1/accounts/<account>/resources"
-```
-
-Should return `LockRegistry` and `RegistrySingleton` resources.
-
----
 
 ## Troubleshooting
 
-| Problem | Solution |
-|---------|----------|
-| `forge` not found | Run `foundryup` and add `~/.foundry/bin` to PATH |
-| Sui faucet rate-limited | Wait 60s or use web UI |
-| Aptos faucet returns 500 | Use web UI: <https://aptos.dev/network/faucet> |
-| Sui `No gas coins` | Fund address or check `sui client gas` |
-| `csv wallet fund` 404 | Faucet endpoint may have changed; check `~/.csv/config.toml` |
-| Contract deployment fails | Check balance, RPC connectivity, and gas budget |
-| Bitcoin tx rejected | Verify UTXO is unspent at <https://mempool.space/signet/address/><addr> |
+- If balances are missing, verify faucet delivery before debugging protocol logic.
+- If deployment fails, verify the chain CLI and network selection first.
+- If transfer verification fails, compare the failure against the notes in [Testnet E2E Report](TESTNET_E2E_REPORT.md).
 
----
+## Notes
 
-## Architecture Summary
-
-```
-┌────────────┐    ┌────────────┐    ┌────────────┐    ┌────────────┐
-│  Bitcoin   │    │  Ethereum  │    │    Sui     │    │   Aptos    │
-│  (Signet)  │    │  (Sepolia) │    │ (Testnet)  │    │ (Testnet)  │
-├────────────┤    ├────────────┤    ├────────────┤    ├────────────┤
-│ UTXO seals │    │ CSVLock    │    │ csv_seal   │    │ csv_seal   │
-│ Tapret ctx │    │ CSVMint    │    │ LockRegistry│   │ LockRegistry│
-└────────────┘    └────────────┘    └────────────┘    └────────────┘
-       │                │                │                │
-       └────────────────┴────────────────┴────────────────┘
-                              │
-                    ┌─────────▼─────────┐
-                    │    csv-cli        │
-                    │  Wallet / Test    │
-                    │  Deploy / Verify  │
-                    └───────────────────┘
-```
+- This manual is intentionally operational and concise.
+- Update [Developer Guide](DEVELOPER_GUIDE.md) for normal contributor workflows and keep this file focused on manual testnet execution.

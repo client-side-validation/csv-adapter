@@ -7,7 +7,7 @@ EXPLORER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_FILE="$EXPLORER_DIR/.pids"
 
 # Default network
-NETWORK="${NETWORK:-mainnet}"
+NETWORK="${NETWORK:-testnet}"
 
 # Network-specific configuration
 case "$NETWORK" in

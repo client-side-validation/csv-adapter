@@ -35,6 +35,9 @@ enum Commands {
     Sync {
         /// Chain ID to sync (e.g., bitcoin, ethereum)
         chain: String,
+        /// Optional: block number to start from (overrides config start_block)
+        #[arg(short, long)]
+        from_block: Option<u64>,
     },
     /// Reindex from a specific block
     Reindex {
@@ -79,7 +82,7 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Start => run_start(&indexer).await,
         Commands::Status => run_status(&indexer).await,
-        Commands::Sync { chain } => run_sync(&indexer, &chain).await,
+        Commands::Sync { chain, from_block } => run_sync(&indexer, &chain, from_block).await,
         Commands::Reindex { chain, from_block } => {
             run_reindex(&indexer, &chain, from_block).await
         }
@@ -127,10 +130,16 @@ async fn run_status(indexer: &Indexer) -> Result<()> {
     Ok(())
 }
 
-async fn run_sync(indexer: &Indexer, chain: &str) -> Result<()> {
-    tracing::info!(chain = %chain, "Forcing sync");
-    indexer.sync_chain(chain).await?;
-    println!("Sync completed for chain: {}", chain);
+async fn run_sync(indexer: &Indexer, chain: &str, from_block: Option<u64>) -> Result<()> {
+    if let Some(block) = from_block {
+        tracing::info!(chain = %chain, from_block = block, "Forcing sync from specific block");
+        indexer.sync_chain_from_block(chain, block).await?;
+        println!("Sync completed for chain: {} from block {}", chain, block);
+    } else {
+        tracing::info!(chain = %chain, "Forcing sync");
+        indexer.sync_chain(chain).await?;
+        println!("Sync completed for chain: {}", chain);
+    }
     Ok(())
 }
 

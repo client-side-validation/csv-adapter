@@ -1,16 +1,45 @@
-# CSV Adapter — Client-Side Validation via Universal Seal Primitive
+# CSV Adapter
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)]()
-[![Tests](https://img.shields.io/badge/tests-630%20passing-brightgreen)]()
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)]()
+Client-side validation for cross-chain rights built around a universal seal model.
 
-**CSV Adapter** is a **client-side validation system** built on the **Universal Seal Primitive (USP)**. Rights are anchored to single-use seals on any chain. To transfer a Right, the seal is consumed on-chain and the new owner verifies the consumption proof locally—no bridges, no minting, no cross-chain messaging.
+CSV Adapter treats a blockchain as the place where single-use is enforced, not where full application state lives. A `Right` stays in client state, while a chain-specific `Seal` is consumed on Bitcoin, Sui, Aptos, or Ethereum and later proven to another client with inclusion and finality evidence.
 
-> We are not building a bridge. We are building a validation system where each chain enforces single-use at its strongest available guarantee, and clients verify everything else.
+## What the codebase contains
 
----
+The repository is a multi-package project with a Rust workspace at its core and several adjacent tools:
 
-## Quick Start
+| Area | Purpose |
+|------|---------|
+| `csv-adapter-core` | Protocol types, proofs, validation logic, state machine, and the `AnchorLayer` trait |
+| `csv-adapter-*` | Chain adapters for Bitcoin, Ethereum, Sui, and Aptos |
+| `csv-adapter` | Unified Rust meta-crate and client API |
+| `csv-cli` | Command-line entry point for wallets, rights, proofs, and cross-chain flows |
+| `csv-wallet` | Wallet UI and supporting services |
+| `typescript-sdk` | TypeScript SDK package |
+| `csv-mcp-server` | MCP server for agent-oriented workflows |
+| `csv-local-dev` | Local chain simulator and developer environment |
+| `csv-explorer` | Explorer, API, indexer, and storage stack |
+
+## Core idea
+
+CSV is not a bridge. It is a verification model.
+
+1. A right is anchored to a chain-specific seal.
+2. The seal is consumed on the source chain.
+3. The sender produces a proof bundle from source-chain data.
+4. The receiver verifies the proof locally or through a destination-chain verifier.
+5. The right is accepted because the proof is valid, not because a bridge attested to it.
+
+This lets the system preserve each chain's native single-use guarantee:
+
+| Chain | Seal mechanism | Enforcement strength |
+|-------|----------------|----------------------|
+| Bitcoin | UTXO spend | Structural |
+| Sui | Object deletion | Structural |
+| Aptos | Resource destruction | Type-enforced |
+| Ethereum | Nullifier registration | Contract-enforced |
+
+## Quick start
 
 ```bash
 git clone https://github.com/zorvan/csv-adapter.git
@@ -19,164 +48,60 @@ cargo build --workspace
 cargo test --workspace
 ```
 
-### CLI
+Build the CLI:
 
 ```bash
-# Build CLI
 cargo build -p csv-cli --release
-
-# Generate wallet
-csv wallet generate bitcoin test
-
-# Check balance
-csv wallet balance bitcoin
-
-# Create a Right on Bitcoin
-csv right create --chain bitcoin --value 100000
-
-# Transfer cross-chain to Sui
-csv cross-chain transfer --from bitcoin --to sui --right-id 0x...
-
-# Verify the proof
-csv proof verify-cross-chain --source bitcoin --dest sui --proof proof.json
+./target/release/csv --help
 ```
 
-Full CLI guide: [CLI Documentation](docs/DEVELOPER_GUIDE.md)
-
-### Code
+Example Rust entry point:
 
 ```rust
-use csv_adapter_bitcoin::BitcoinAnchorLayer;
-use csv_adapter_core::{Hash, AnchorLayer};
+use csv_adapter::prelude::*;
 
-// Create a Right anchored to a Bitcoin UTXO
-let adapter = BitcoinAnchorLayer::signet()?;
-let seal = adapter.create_seal(Some(100_000))?;
-let commitment = Hash::new([0xAB; 32]);
+let client = CsvClient::builder()
+    .with_chain(Chain::Bitcoin)
+    .with_store_backend(StoreBackend::InMemory)
+    .build()?;
 
-// Publish commitment (anchors Right to chain)
-let anchor = adapter.publish(commitment, seal)?;
-
-// To transfer: spend the UTXO, give the receiver the proof
-// Receiver verifies locally, no destination chain needed
+let rights = client.rights();
+let transfers = client.transfers();
+let proofs = client.proofs();
 ```
-
----
-
-## How It Works
-
-### Philosophy
-
-Client-Side Validation flips the blockchain paradigm: validation is pushed to the edges. Only contract participants verify state transitions. The blockchain provides commitment anchoring and single-use enforcement, not global validation.
-
-**The USP insight:** different chains enforce single-use at different levels. Bitcoin does it structurally (UTXOs). Sui does it structurally (Objects). Aptos does it via type system (Move resources). Ethereum does it cryptographically (nullifier contracts). Rather than pretending these are equivalent, we model the degradation explicitly and let each chain enforce at its strongest available guarantee.
-
-**Cross-chain portability:** a Right doesn't "move" between chains. It exists in the client's state, anchored to whichever chain's seal enforced its single-use. Any client can verify any seal's consumption proof. The Right is portable because the proof is verifiable, not because a bridge transferred anything.
-
-Full specification: [docs/Blueprint.md](docs/Blueprint.md)
-
-
-### The Right Is Portable. The Seal Is Not
-
-```
-Alice owns Right A, anchored to Bitcoin UTXO X
-
-Transfer to Bob:
-1. Alice spends UTXO X          ← Bitcoin enforces single-use (structural)
-2. Alice sends Bob: txid + Merkle proof
-3. Bob's client verifies:
-   ✓ UTXO X was spent           (chain-enforced)
-   ✓ Merkle proof is valid      (client-verified)
-   ✓ Right A's owner is now Bob (state transition)
-```
-
-**No destination chain.** No "minting" on another chain. No bridge tokens. Bob's client verified everything locally.
-
-### Cross-Chain Portability
-
-A Right created on Bitcoin can be verified by a client that only knows about Ethereum. The client doesn't care which chain enforced the seal—it verifies the proof and accepts the state transition.
-
-**This is the USP:** the `Right` type is chain-agnostic. Each chain maps its native primitive (UTXO, Object, Resource, Nullifier) to the same `Right`. Clients verify proofs uniformly regardless of which chain enforced the seal.
-
----
-
-## Supported Chains
-
-| Chain | Level | Mechanism | Status |
-|-------|-------|-----------|--------|
-| **Bitcoin** | L1 Structural | UTXO spend | ✅ Complete |
-| **Sui** | L1 Structural | Object deletion | ✅ Complete |
-| **Aptos** | L2 Type-Enforced | Resource destruction | ✅ Complete |
-| **Ethereum** | L3 Cryptographic | Nullifier registration | ✅ Complete |
-
----
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Architecture](docs/ARCHITECTURE.md) | System architecture and design |
-| [Developer Guide](docs/DEVELOPER_GUIDE.md) | How to build on CSV |
-| [Blueprint](docs/BLUEPRINT.md) | Full specification and roadmap |
-| [Cross-Chain Spec](docs/CROSS_CHAIN_SPEC.md) | Cross-chain protocol specification |
-| [Cross-Chain Implementation](docs/CROSS_CHAIN_IMPLEMENTATION.md) | Implementation details |
-| [E2E Testnet Manual](docs/E2E_TESTNET_MANUAL.md) | End-to-end testing guide |
-| [Testnet Report](docs/TESTNET_E2E_REPORT.md) | Testnet results |
-| [Audit Report](docs/Audit/csv-adapter-audit-report-10-april-2026.html) | Security audit findings |
+Start with [Documentation Hub](docs/INDEX.md).
 
----
+| Document | Purpose |
+|----------|---------|
+| [Architecture](docs/ARCHITECTURE.md) | Current system model, invariants, and package boundaries |
+| [Cross-Chain Spec](docs/CROSS_CHAIN_SPEC.md) | Protocol semantics and proof model |
+| [Developer Guide](docs/DEVELOPER_GUIDE.md) | Build, test, extend, and operate the repo |
+| [Implementation Status](docs/CROSS_CHAIN_IMPLEMENTATION.md) | What is implemented now and where gaps remain |
+| [Blueprint](docs/BLUEPRINT.md) | Product and engineering roadmap |
+| [Explorer and Wallet Indexing](docs/EXPLORER_WALLET_INDEXING.md) | Explorer indexing and wallet integration design |
+| [AluVM Note](docs/ALUVM.md) | Experimental design note for future VM integration |
+| [E2E Manual](docs/E2E_TESTNET_MANUAL.md) | Testnet walkthrough |
+| [E2E Report](docs/TESTNET_E2E_REPORT.md) | Recorded test outcomes |
 
-## Key Concepts
+## Codebase analysis
 
-### Right
-A **Right** is the core portable primitive. It represents a transferrable claim that can be exercised at most once. Exists in **client state**, not on any chain.
+From `repomix-output.xml` and the live source tree, the repo is strongest where it has a clear center:
 
-### Seal
-A **Seal** is the on-chain mechanism that enforces a Right's single-use. Chain-specific and exists on one chain only.
+- `csv-adapter-core` is the architectural anchor. Its exported modules and the `AnchorLayer` trait provide a coherent protocol boundary for every chain adapter.
+- The Rust packages are relatively well factored: protocol in `core`, per-chain enforcement in adapters, and user operations in `csv-cli` and `csv-adapter`.
+- The broader repo has grown into a product ecosystem, not just a Rust library. The explorer, wallet, TypeScript SDK, MCP server, and local-dev tooling matter and should be reflected in top-level docs.
 
-### Client-Side Validation (CSV)
-The client does the verification, not the blockchain. The chain only records commitments and enforces single-use of seals.
+The main weakness was documentation drift:
 
----
+- README and docs mixed shipped behavior with aspirational roadmap material.
+- Several files duplicated the same DX and agent-planning content with slightly different claims.
+- Some links pointed to files that are no longer present in this checkout.
 
-## Test Results
-
-```
-630 tests passing across all crates
-
-  csv-adapter-core:        296
-  csv-adapter-bitcoin:      99
-  csv-adapter-ethereum:     57
-  csv-adapter-sui:          48
-  csv-adapter-aptos:        10
-  csv-adapter-store:         3
-  Integration tests:        10
-  Signature integration:     8
-```
-
-Run all tests:
-
-```bash
-cargo test --workspace
-```
-
----
-
-## Project Structure
-
-```
-csv-adapter/
-├── csv-adapter-core/          # Right type, AnchorLayer trait, cross-chain registry
-├── csv-adapter-bitcoin/       # L1 Structural: UTXO seals, Tapret anchoring
-├── csv-adapter-ethereum/      # L3 Cryptographic: nullifier registry, MPT proofs
-├── csv-adapter-sui/           # L1 Structural: object seals, checkpoint finality
-├── csv-adapter-aptos/         # L2 Type-Enforced: resource seals, HotStuff finality
-├── csv-adapter-store/         # SQLite persistence
-└── csv-cli/                   # Command-line interface
-```
-
----
+This cleanup turns the docs into a smaller canonical set so future updates have one obvious place to land.
 
 ## License
 
-MIT or Apache-2.0 — choose the license that best fits your use case.
+MIT or Apache-2.0.

@@ -149,6 +149,8 @@ impl SyncCoordinator {
 
             // Sync each chain
             for indexer in &self.indexers {
+                let chain_id = indexer.chain_id();
+                let chain_config = self.chain_configs.get(chain_id);
                 if let Err(e) = sync_chain(
                     indexer.as_ref(),
                     &self.sync_repo,
@@ -160,6 +162,7 @@ impl SyncCoordinator {
                     self.batch_size,
                     &self.chain_states,
                     &self.total_indexed,
+                    chain_config,
                 ).await {
                     tracing::error!(chain = indexer.chain_id(), error = %e, "Sync error");
                 }
@@ -222,11 +225,34 @@ impl SyncCoordinator {
 
     /// Force sync a specific chain.
     pub async fn sync_chain(&self, chain_id: &str) -> Result<(), ExplorerError> {
+        self.sync_chain_from(chain_id, None).await
+    }
+
+    /// Force sync a specific chain from a specific block (overrides config).
+    pub async fn sync_chain_from_block(&self, chain_id: &str, from_block: u64) -> Result<(), ExplorerError> {
+        self.sync_chain_from(chain_id, Some(from_block)).await
+    }
+
+    /// Internal: sync a specific chain with optional override start block.
+    async fn sync_chain_from(&self, chain_id: &str, override_start_block: Option<u64>) -> Result<(), ExplorerError> {
         let indexer = self
             .indexers
             .iter()
             .find(|idx| idx.chain_id() == chain_id)
             .ok_or_else(|| ExplorerError::Internal(format!("Chain {} not found", chain_id)))?;
+
+        let chain_config = self.chain_configs.get(chain_id);
+
+        // If override_start_block is provided, use it instead of config
+        let effective_config = if override_start_block.is_some() {
+            // Create a temporary config with the override start_block
+            chain_config.cloned().map(|mut c| {
+                c.start_block = override_start_block;
+                c
+            })
+        } else {
+            chain_config.cloned()
+        };
 
         sync_chain(
             indexer.as_ref(),
@@ -239,6 +265,7 @@ impl SyncCoordinator {
             self.batch_size,
             &self.chain_states,
             &self.total_indexed,
+            effective_config.as_ref(),
         )
         .await
     }
@@ -269,16 +296,36 @@ async fn sync_chain(
     contracts_repo: &ContractsRepository,
     advanced_repo: &AdvancedProofRepository,
     batch_size: u64,
-    _chain_states: &Arc<RwLock<Vec<ChainSyncState>>>,
+    chain_configs: &Arc<RwLock<Vec<ChainSyncState>>>,
     total_indexed: &Arc<RwLock<u64>>,
+    chain_config: Option<&ChainConfig>,
 ) -> Result<(), ExplorerError> {
     let chain_id = indexer.chain_id();
 
-    // Get last synced block
-    let from_block = sync_repo
+    // Get last synced block from database
+    let db_block = sync_repo
         .get_latest_block(chain_id)
-        .await?
-        .unwrap_or(0);
+        .await?;
+
+    // Determine starting block:
+    // 1. If database has data, use the last synced block
+    // 2. Otherwise, use start_block from chain config if provided
+    // 3. Fall back to 0 (genesis) if neither is available
+    let from_block = if let Some(block) = db_block {
+        tracing::info!(chain = chain_id, block, "Resuming sync from database");
+        block
+    } else if let Some(config) = chain_config {
+        if let Some(start) = config.start_block {
+            tracing::info!(chain = chain_id, start_block = start, "Starting initial sync from configured start_block");
+            start
+        } else {
+            tracing::warn!(chain = chain_id, "No start_block configured, syncing from genesis (block 0)");
+            0
+        }
+    } else {
+        tracing::warn!(chain = chain_id, "No chain config provided, syncing from genesis (block 0)");
+        0
+    };
 
     // Get chain tip
     let tip = match indexer.get_chain_tip().await {

@@ -332,6 +332,7 @@ impl Query {
             owner: None,
             commitment_scheme: scheme.as_deref().and_then(|s| csv_explorer_shared::CommitmentScheme::from_str(s)),
             inclusion_proof_type: proof_type.as_deref().and_then(|s| csv_explorer_shared::InclusionProofType::from_str(s)),
+            finality_proof_type: None,
             limit: limit.map(|v| v as usize),
             offset: offset.map(|v| v as usize),
         };

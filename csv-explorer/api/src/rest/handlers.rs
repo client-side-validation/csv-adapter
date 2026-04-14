@@ -97,11 +97,11 @@ pub async fn list_rights(
 
     let total = repo.count(filter.clone())
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     let data = repo.list(filter)
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     Ok(Json(ApiResponse::from(PaginatedResponse {
         data,
@@ -120,7 +120,7 @@ pub async fn get_right(
 
     let right = repo.get(&id)
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     match right {
         Some(r) => Ok(Json(ApiResponse::from(r))),
@@ -170,11 +170,11 @@ pub async fn list_transfers(
 
     let total = repo.count(filter.clone())
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     let data = repo.list(filter)
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     Ok(Json(ApiResponse::from(PaginatedResponse {
         data,
@@ -193,7 +193,7 @@ pub async fn get_transfer(
 
     let transfer = repo.get(&id)
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     match transfer {
         Some(t) => Ok(Json(ApiResponse::from(t))),
@@ -248,11 +248,11 @@ pub async fn list_seals(
 
     let total = repo.count(filter.clone())
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     let data = repo.list(filter)
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     Ok(Json(ApiResponse::from(PaginatedResponse {
         data,
@@ -271,7 +271,7 @@ pub async fn get_seal(
 
     let seal = repo.get(&id)
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     match seal {
         Some(s) => Ok(Json(ApiResponse::from(s))),
@@ -291,7 +291,7 @@ pub async fn get_stats(
 
     let stats = repo.get_stats()
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     Ok(Json(ApiResponse::from(stats)))
 }
@@ -324,8 +324,8 @@ pub struct RegisterWalletAddressRequest {
 
 /// POST /api/v1/wallet/addresses
 pub async fn register_wallet_address(
-    Json(request): Json<RegisterWalletAddressRequest>,
     State((_, pool)): State<AppState>,
+    Json(request): Json<RegisterWalletAddressRequest>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, (StatusCode, Json<ErrorResponse>)> {
     use csv_explorer_shared::{Network, PriorityLevel};
 
@@ -357,11 +357,11 @@ pub async fn register_wallet_address(
 
     // Register the address in the priority repository
     let priority_repo = csv_explorer_storage::repositories::PriorityAddressRepository::new(pool);
-    
+
     priority_repo
         .register_address(&request.address, &request.chain, network, priority, &request.wallet_id)
         .await
-        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+        .map_err(internal_error)?;
 
     Ok(Json(ApiResponse::from(serde_json::json!({
         "message": "Address registered for priority indexing",
@@ -383,8 +383,8 @@ pub struct UnregisterWalletAddressRequest {
 
 /// DELETE /api/v1/wallet/addresses
 pub async fn unregister_wallet_address(
-    Json(request): Json<UnregisterWalletAddressRequest>,
     State((_, pool)): State<AppState>,
+    Json(request): Json<UnregisterWalletAddressRequest>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, (StatusCode, Json<ErrorResponse>)> {
     use csv_explorer_shared::Network;
 
@@ -402,11 +402,11 @@ pub async fn unregister_wallet_address(
     };
 
     let priority_repo = csv_explorer_storage::repositories::PriorityAddressRepository::new(pool);
-    
+
     let removed = priority_repo
         .unregister_address(&request.address, &request.chain, network, &request.wallet_id)
         .await
-        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+        .map_err(internal_error)?;
 
     if !removed {
         return Err(not_found("Address not found or already unregistered"));
@@ -429,7 +429,7 @@ pub async fn get_wallet_addresses(
     let addresses = priority_repo
         .get_addresses_by_wallet(&wallet_id)
         .await
-        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+        .map_err(internal_error)?;
 
     Ok(Json(ApiResponse::from(addresses)))
 }
@@ -453,7 +453,7 @@ pub async fn get_address_data(
     let rights = rights_repo
         .list(rights_filter)
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     // Get seals for this address
     let seals_repo = SealsRepository::new(pool.clone());
@@ -469,7 +469,7 @@ pub async fn get_address_data(
     let seals = seals_repo
         .list(seals_filter)
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     // Get transfers for this address
     let transfers_repo = TransfersRepository::new(pool.clone());
@@ -484,7 +484,7 @@ pub async fn get_address_data(
     let transfers = transfers_repo
         .list(transfers_filter)
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     // Filter transfers where this address is involved
     let filtered_transfers: Vec<_> = transfers.into_iter()
@@ -522,7 +522,7 @@ pub async fn get_address_rights(
     let rights = repo
         .list(filter)
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     Ok(Json(ApiResponse::from(rights)))
 }
@@ -546,7 +546,7 @@ pub async fn get_address_seals(
     let seals = repo
         .list(filter)
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     Ok(Json(ApiResponse::from(seals)))
 }
@@ -570,7 +570,7 @@ pub async fn get_address_transfers(
     let transfers = repo
         .list(filter)
         .await
-        .map_err(|e| server_error(&e))?;
+        .map_err(explorer_error)?;
 
     // Filter transfers where this address is involved
     let filtered_transfers: Vec<_> = transfers.into_iter()
@@ -589,7 +589,7 @@ pub async fn get_priority_indexing_status(
     let status = priority_repo
         .get_priority_indexing_status()
         .await
-        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+        .map_err(internal_error)?;
 
     Ok(Json(ApiResponse::from(status)))
 }
@@ -630,6 +630,14 @@ fn not_found(message: &str) -> (StatusCode, Json<ErrorResponse>) {
     )
 }
 
+fn internal_error(e: sqlx::Error) -> (StatusCode, Json<ErrorResponse>) {
+    server_error(&ExplorerError::Internal(e.to_string()))
+}
+
+fn explorer_error(e: ExplorerError) -> (StatusCode, Json<ErrorResponse>) {
+    server_error(&e)
+}
+
 // ---------------------------------------------------------------------------
 // Enhanced rights and proof metadata handlers
 // ---------------------------------------------------------------------------
@@ -660,6 +668,7 @@ pub async fn list_enhanced_rights(
         owner: query.owner,
         commitment_scheme: query.commitment_scheme.as_deref().and_then(|s| csv_explorer_shared::CommitmentScheme::from_str(s)),
         inclusion_proof_type: query.inclusion_proof_type.as_deref().and_then(|s| csv_explorer_shared::InclusionProofType::from_str(s)),
+        finality_proof_type: None,
         limit: query.limit,
         offset: query.offset,
     };
@@ -667,7 +676,7 @@ pub async fn list_enhanced_rights(
     let records = repo
         .query_enhanced_rights(filter)
         .await
-        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+        .map_err(internal_error)?;
 
     Ok(Json(ApiResponse::from(records)))
 }
@@ -687,6 +696,7 @@ pub async fn get_enhanced_right(
         owner: None,
         commitment_scheme: None,
         inclusion_proof_type: None,
+        finality_proof_type: None,
         limit: Some(1),
         offset: Some(0),
     };
@@ -694,7 +704,7 @@ pub async fn get_enhanced_right(
     let records = repo
         .query_enhanced_rights(filter)
         .await
-        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+        .map_err(internal_error)?;
 
     let record = records.into_iter().find(|r| r.id == id);
 
@@ -726,7 +736,7 @@ pub async fn list_enhanced_seals(
     let records = repo
         .query_enhanced_seals(filter)
         .await
-        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+        .map_err(internal_error)?;
 
     Ok(Json(ApiResponse::from(records)))
 }
@@ -753,7 +763,7 @@ pub async fn get_enhanced_seal(
     let records = repo
         .query_enhanced_seals(filter)
         .await
-        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+        .map_err(internal_error)?;
 
     let record = records.into_iter().find(|r| r.id == id);
 
@@ -774,7 +784,7 @@ pub async fn get_proof_statistics(
     let stats = repo
         .get_proof_statistics()
         .await
-        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+        .map_err(internal_error)?;
 
     Ok(Json(ApiResponse::from(stats)))
 }
@@ -797,6 +807,7 @@ pub async fn get_rights_by_scheme(
         owner: None,
         commitment_scheme: Some(commitment_scheme),
         inclusion_proof_type: None,
+        finality_proof_type: None,
         limit: Some(100),
         offset: Some(0),
     };
@@ -804,7 +815,7 @@ pub async fn get_rights_by_scheme(
     let records = repo
         .query_enhanced_rights(filter)
         .await
-        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+        .map_err(internal_error)?;
 
     Ok(Json(ApiResponse::from(records)))
 }
@@ -827,6 +838,7 @@ pub async fn get_rights_by_proof_type(
         owner: None,
         commitment_scheme: None,
         inclusion_proof_type: Some(inclusion_proof_type),
+        finality_proof_type: None,
         limit: Some(100),
         offset: Some(0),
     };
@@ -834,7 +846,7 @@ pub async fn get_rights_by_proof_type(
     let records = repo
         .query_enhanced_rights(filter)
         .await
-        .map_err(|e| server_error(&ExplorerError::Internal(e.to_string())))?;
+        .map_err(internal_error)?;
 
     Ok(Json(ApiResponse::from(records)))
 }

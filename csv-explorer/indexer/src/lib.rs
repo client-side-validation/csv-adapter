@@ -184,6 +184,11 @@ impl Indexer {
         self.coordinator.sync_chain(chain).await
     }
 
+    /// Force sync a specific chain from a specific block (overrides config).
+    pub async fn sync_chain_from_block(&self, chain: &str, from_block: u64) -> Result<()> {
+        self.coordinator.sync_chain_from_block(chain, from_block).await
+    }
+
     /// Reindex a chain from a specific block.
     pub async fn reindex_from(&self, chain: &str, from_block: u64) -> Result<()> {
         self.coordinator.reindex_from(chain, from_block).await

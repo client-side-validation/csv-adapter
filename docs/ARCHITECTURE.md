@@ -1,259 +1,164 @@
-# CSV Architecture
+# Architecture
 
-> Client-Side Validation for Cross-Chain Rights
-> Version: 0.1.0 · Status: Core complete, 4 chains supported
+Related docs: [Documentation Hub](INDEX.md), [Cross-Chain Specification](CROSS_CHAIN_SPEC.md), [Developer Guide](DEVELOPER_GUIDE.md), [Blueprint](BLUEPRINT.md)
 
----
+## System summary
 
-## 1. The Core Idea
+CSV Adapter is a client-side validation system for transferable rights. The codebase is built around one central architectural decision:
 
-CSV replaces the traditional blockchain consensus model with **client-side validation**. Instead of every node re-executing every transaction, clients independently verify the full history of a Right before accepting it.
+- the chain enforces single-use
+- the client verifies history and proof validity
+- the protocol keeps the right portable by keeping it off-chain
 
-### Why This Matters
+The repository implements that model through a Rust core, per-chain adapters, CLI orchestration, and a growing set of ecosystem tools.
 
-| Traditional | CSV |
-|-------------|-----|
-| Every node validates every transaction | Only the receiving client validates |
-| State is on-chain | State is off-chain, anchored on-chain |
-| Single-use enforced by consensus | Single-use enforced by the base layer |
-| Privacy: all data is public | Privacy: only commitments are public |
-| Cross-chain: trusted bridges | Cross-chain: cryptographic proofs |
+## Architectural layers
 
-### The Seal Primitive
+```text
+Applications and tools
+  csv-cli | csv-wallet | csv-explorer | typescript-sdk | csv-mcp-server
 
-Every chain enforces **single-use** through its native mechanism:
+Unified API surface
+  csv-adapter
 
-| Chain | Mechanism | Guarantee |
-|-------|-----------|-----------|
-| **Bitcoin** | UTXO spending | Strongest — structural impossibility |
-| **Sui** | Object deletion | Strong — object cannot exist after deletion |
-| **Aptos** | Resource destruction | Strong — Move VM enforces linear types |
-| **Ethereum** | Nullifier registration | Contract-enforced — requires honest contract |
+Protocol core
+  csv-adapter-core
+    Right | Commitment | ProofBundle | AnchorLayer | validator | cross_chain
 
----
+Chain adapters
+  csv-adapter-bitcoin
+  csv-adapter-ethereum
+  csv-adapter-sui
+  csv-adapter-aptos
 
-## 2. Architecture Overview
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                      Application Layer                           │
-│  NFTs · Credentials · Gaming Assets · Supply Chain · DeFi        │
-├──────────────────────────────────────────────────────────────────┤
-│                    Cross-Chain Protocol Layer                     │
-│  ┌─────────────┐  ┌──────────────────┐  ┌─────────────────────┐ │
-│  │ LockProvider│→ │TransferVerifier  │→ │   MintProvider      │ │
-│  │ (source)    │  │ (proof validation)│  │  (destination)      │ │
-│  └─────────────┘  └──────────────────┘  └─────────────────────┘ │
-├──────────────────────────────────────────────────────────────────┤
-│                       Core Types (csv-adapter-core)              │
-│  Right · Commitment · SealRef · AnchorRef · ProofBundle · Hash   │
-│  AnchorLayer (trait) · SignatureScheme · CrossChainSealRegistry  │
-├──────────────────────────────────────────────────────────────────┤
-│                    Chain Adapter Layer                           │
-│  ┌──────────┐  ┌──────────┐  ┌─────────┐  ┌─────────┐          │
-│  │ Bitcoin  │  │ Ethereum │  │  Sui    │  │ Aptos   │          │
-│  │ UTXO     │  │ Nullifier│  │ Object  │  │Resource │          │
-│  │ Tapret   │  │ MPT      │  │ Checkpt │  │ Ledger  │          │
-│  └──────────┘  └──────────┘  └─────────┘  └─────────┘          │
-├──────────────────────────────────────────────────────────────────┤
-│                      Transport Layer                             │
-│  mempool.space API · Ethereum JSON-RPC · Sui JSON-RPC ·          │
-│  Aptos REST API                                                  │
-└──────────────────────────────────────────────────────────────────┘
+Storage and supporting infrastructure
+  csv-adapter-store | csv-local-dev | external RPC providers
 ```
 
----
+## The core protocol boundary
 
-## 3. The AnchorLayer Trait
+The clearest boundary in the code is the `AnchorLayer` trait in `csv-adapter-core/src/traits.rs`. It defines the lifecycle every adapter must provide:
 
-Every chain adapter implements the same trait. This is the contract between the core protocol and the chain-specific implementation.
+- create a seal
+- publish a commitment
+- produce inclusion evidence
+- produce finality evidence
+- enforce seal consumption
+- build a proof bundle
+- handle rollbacks and chain-specific replay isolation
 
-```rust
-pub trait AnchorLayer {
-    type SealRef;          // What identifies a consumed seal on this chain
-    type AnchorRef;        // What identifies a published anchor
-    type InclusionProof;   // How to prove a tx was included in a block
-    type FinalityProof;    // How to prove the block is final
+That trait is the key reason the multi-chain design stays coherent. The adapters differ in proof formats and transport details, but they conform to one protocol contract.
 
-    /// Publish a commitment to the chain (broadcast a transaction)
-    fn publish(&self, commitment: Hash, seal: Self::SealRef) -> Result<Self::AnchorRef>;
+## Core data model
 
-    /// Verify that an anchor was included in a block
-    fn verify_inclusion(&self, anchor: Self::AnchorRef) -> Result<Self::InclusionProof>;
+The main stable protocol surface is re-exported from `csv-adapter-core/src/lib.rs`:
 
-    /// Verify that the block containing the anchor is finalized
-    fn verify_finality(&self, anchor: Self::AnchorRef) -> Result<Self::FinalityProof>;
+| Type | Role |
+|------|------|
+| `Right` | Portable client-side state object |
+| `Commitment` | Hash-linked state transition anchor |
+| `SealRef` | Chain-specific single-use reference |
+| `AnchorRef` | Reference to published anchor data |
+| `InclusionProof` | Evidence that an anchor is in chain history |
+| `FinalityProof` | Evidence that the anchor is sufficiently final |
+| `ProofBundle` | Portable verification package |
+| `AnchorLayer` | Adapter interface for all supported chains |
 
-    /// Mark a seal as consumed (prevents replay)
-    fn enforce_seal(&self, seal: Self::SealRef) -> Result<()>;
+The core crate also contains broader protocol machinery such as commitment chains, consignments, DAG segments, validators, registry logic, and experimental modules for VM, MPC, and RGB compatibility.
 
-    /// Create a new seal (e.g., derive a new UTXO reference)
-    fn create_seal(&self, value: Option<u64>) -> Result<Self::SealRef>;
+## Chain model
 
-    /// Compute the commitment hash for a state transition
-    fn hash_commitment(...) -> Hash;
+CSV intentionally does not flatten every chain into the same trust profile. Instead it records what each chain is actually good at.
 
-    /// Build a complete proof bundle for cross-chain transfer
-    fn build_proof_bundle(&self, anchor: Self::AnchorRef, dag: DAGSegment) -> Result<ProofBundle>;
+| Chain | Seal model | Verification artifacts |
+|-------|------------|------------------------|
+| Bitcoin | UTXO spend | transaction data, Merkle branch, block confirmations |
+| Sui | Object deletion or mutation | transaction effects, checkpoint contents, certification |
+| Aptos | Move resource destruction | transaction proof, ledger info, event stream |
+| Ethereum | Nullifier registration | logs, receipts, MPT-style evidence, confirmations |
 
-    /// Handle chain reorganizations
-    fn rollback(&self, anchor: Self::AnchorRef) -> Result<()>;
+That graded-enforcement model is one of the strongest architectural choices in the repo. It avoids pretending all chains offer the same primitive.
 
-    /// Domain separator for chain-specific isolation
-    fn domain_separator(&self) -> [u8; 32];
+## Transfer flow
 
-    /// Signature scheme used by this chain
-    fn signature_scheme(&self) -> SignatureScheme;
-}
-```
+At a high level, a cross-chain transfer looks like this:
 
----
+1. Create or identify the current right and its active seal.
+2. Consume the seal on the source chain.
+3. Collect inclusion and finality data from the source chain.
+4. Build a portable proof bundle.
+5. Verify the proof bundle on the receiving side.
+6. Re-anchor or mint a destination-side representation when the destination model requires it.
 
-## 4. Data Flow: Cross-Chain Transfer
+The CLI expresses this through source-side lock providers, a universal verification step, and destination-side mint providers. The protocol meaning is described in more detail in [Cross-Chain Specification](CROSS_CHAIN_SPEC.md).
 
-### Step-by-Step
+## Repository structure
 
-```
-Source Chain (e.g., Bitcoin)           Destination Chain (e.g., Sui)
-───────────────────────────           ───────────────────────────────
+### Rust workspace
 
-1. Create Right
-   right_id = H(commitment || salt)
-   commitment = H(state, rules)
+The root Cargo workspace currently includes:
 
-2. Lock Right
-   ┌─ Spend UTXO (seal consumed) ─┐
-   │   tx = build_commitment_tx()  │
-   │   tx includes Tapret output   │
-   │   broadcast to mempool        │
-   └───────────────────────────────┘
-           ↓
-3. Generate Proof
-   ┌─ Merkle proof (tx in block) ─┐
-   │   Checkpoint proof (block    │
-   │   certified by validators)   │
-   └──────────────────────────────┘
-           ↓
-4. Transfer Proof ───────────────→
-                                    5. Verify Proof
-                                    ┌─ Verify Merkle inclusion ─┐
-                                    │   Verify checkpoint cert  │
-                                    │   Verify seal not spent   │
-                                    └───────────────────────────┘
-                                           ↓
-                                    6. Mint Right
-                                    ┌─ Create new Right with     ┐
-                                    │   same commitment           │
-                                    │   New owner on dest chain   │
-                                    └─────────────────────────────┘
-```
+- `csv-adapter-core`
+- `csv-adapter-bitcoin`
+- `csv-adapter-ethereum`
+- `csv-adapter-sui`
+- `csv-adapter-aptos`
+- `csv-adapter-store`
+- `csv-adapter`
+- `csv-cli`
+- `csv-wallet`
 
-### What Each Chain Contributes
+### Adjacent packages
 
-| Step | Bitcoin | Ethereum | Sui | Aptos |
-|------|---------|----------|-----|-------|
-| **Seal** | UTXO txid:vout | Nullifier hash | Object ID | Resource address |
-| **Lock** | Spend UTXO via Tapret | Call `lockRight()` | Delete RightObject | Destroy RightResource |
-| **Proof** | Merkle branch + block header | MPT receipt proof | Checkpoint certification | LedgerInfo + signatures |
-| **Finality** | 6 confirmations | 15 confirmations | Certified checkpoint | HotStuff consensus |
-| **Mint** | N/A (source only) | `mintRight()` verifies proof | `mint_right()` creates object | `mint_right()` creates resource |
+The repo also contains adjacent packages that are not part of the root Rust workspace but are important to the product story:
 
----
+- `typescript-sdk`
+- `csv-mcp-server`
+- `csv-local-dev`
+- `csv-explorer`
+- `csv-tutorial`
+- `csv-vscode`
+- `create-csv-app`
 
-## 5. Commitment Chain
+One of the previous documentation problems was that top-level docs described only the Rust workspace and underrepresented these adjacent packages.
 
-A **commitment chain** is a linked sequence of commitments that represents the full history of a Right. Each commitment references the hash of the previous one.
+## Security and trust model
 
-```
-Genesis → State A → State B → State C (current)
-   ↓         ↓         ↓         ↓
-  H(0)     H(A)      H(B)      H(C)
-```
+The security posture follows directly from the architecture:
 
-Clients validate a Right by:
-1. Fetching the full commitment chain from the issuer
-2. Verifying each link: `commitment[i].previous_commitment == hash(commitment[i-1])`
-3. Verifying the latest commitment is anchored on-chain
-4. Verifying the seal was consumed
+| Concern | Primary control |
+|---------|-----------------|
+| Seal replay | Base-layer single-use semantics plus registry checks |
+| Fraudulent inclusion claims | Cryptographic proof verification |
+| Weak finality assumptions | Chain-specific finality rules |
+| Reorg handling | Adapter rollback hooks |
+| Data availability | Client-side storage and proof transport discipline |
+| RPC dishonesty | Verification against returned proof data, ideally across multiple providers |
 
-This means the blockchain only needs to store **anchors** (minimal data), while the full state history is maintained off-chain and validated by clients.
+The system is strongest when the proof bundle is treated as the portable artifact of record, not the RPC response that helped build it.
 
----
+## Architectural assessment
 
-## 6. Crate Structure
+### Strengths
 
-| Crate | Purpose | Stability |
-|-------|---------|-----------|
-| **csv-adapter-core** | Core types, traits, validation | 🟢 Stable |
-| **csv-adapter-bitcoin** | Bitcoin Signet adapter (UTXO + Tapret) | 🟢 Stable |
-| **csv-adapter-ethereum** | Ethereum Sepolia adapter (CSVLock + CSVMint) | 🟢 Stable |
-| **csv-adapter-sui** | Sui Testnet adapter (Object model) | 🟢 Stable |
-| **csv-adapter-aptos** | Aptos Testnet adapter (Resource model) | 🟡 Maturing |
-| **csv-adapter-store** | Persistent seal registry storage | 🟢 Stable |
-| **csv-cli** | Command-line interface for all operations | 🟡 Maturing |
+- Strong protocol center in `csv-adapter-core`
+- Clean adapter boundary via `AnchorLayer`
+- Clear chain-specific modeling instead of false abstraction
+- Broad ecosystem surface already present in the repo
 
-### Dependency Graph
+### Current pressure points
 
-```
-csv-cli
-├── csv-adapter-core (core types + AnchorLayer trait)
-├── csv-adapter-bitcoin ─┐
-├── csv-adapter-ethereum ├─→ csv-adapter-core
-├── csv-adapter-sui ─────┤
-├── csv-adapter-aptos ───┤
-└── csv-adapter-store ───┘
-```
+- Documentation had drifted away from the real package layout
+- Some docs mixed implemented behavior with future-state ideas
+- Operational tooling and ecosystem packages need consistent top-level framing
 
----
+## What this means for contributors
 
-## 7. Security Model
+When you change the system, the primary places to keep aligned are:
 
-### Trust Assumptions
+1. `csv-adapter-core` API surface and invariants
+2. the per-chain adapter that implements the invariant
+3. `csv-cli` or higher-level clients that expose the behavior
+4. the canonical docs in this folder
 
-| Component | Trust Model | Why |
-|-----------|-------------|-----|
-| **Base layer** | Trustless | Bitcoin/Sui/Ethereum/Aptos consensus |
-| **Seal consumption** | Trustless | Enforced by base layer rules |
-| **Proof generation** | Trustless | Cryptographic verification |
-| **Proof verification** | Trustless | On-chain verification at mint time |
-| **Data availability** | Semi-trusted | Clients must fetch full state history |
-| **RPC endpoints** | Semi-trusted | Multiple endpoints can be verified |
-
-### Attack Vectors and Mitigations
-
-| Attack | Mitigation |
-|--------|-----------|
-| Double-spend on source chain | Impossible — base layer enforces single-use |
-| Double-spend on destination chain | Impossible — contract checks `mintedRights[rightId]` |
-| Fraudulent proof | Verified on-chain at mint time (Merkle/checkpoint verification) |
-| Chain reorg on source | Rollback mechanism in AnchorLayer trait |
-| RPC endpoint lies | Cross-check with multiple endpoints |
-| Front-running | Nullifier construction includes user secret |
-
----
-
-## 8. Performance Characteristics
-
-| Metric | Value | Notes |
-|--------|-------|-------|
-| **Proof size** | 200-500 bytes | Merkle branch + checkpoint data |
-| **Verification gas (ETH)** | ~100k | MPT proof verification |
-| **Lock → Mint latency** | ~15-25s (Sui↔Sui) | Without Bitcoin confirmations |
-| **Lock → Mint latency (BTC source)** | ~60min | Dominated by Bitcoin 6-conf wait |
-| **Throughput** | Unlimited parallel | Each Right is independent |
-| **Cost per transfer** | $0.01-0.50 | Gas only, no bridge fees |
-
----
-
-## 9. Future Work
-
-See [BLUEPRINT.md](./BLUEPRINT.md) for the full development roadmap including:
-- Browser Extension Wallet
-- DeFi Applications (lending, DEX, insurance)
-- Fraud Proofs
-- MPC Wallet
-- ZK-STARK Support
-- React-Based UI
-- New chain adapters (Solana, Cosmos, Polkadot)
-- RGB Protocol compatibility
-- SDK development (TypeScript, Go, Python)
+If a change is architectural, update this document first or alongside the code.

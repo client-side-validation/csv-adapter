@@ -32,13 +32,16 @@ start_block = 19000000
 enabled = true
 network = "mainnet"
 rpc_url = "https://fullnode.mainnet.sui.io:443"
+start_block = 50000000
 
 [chains.aptos]
 enabled = true
 network = "mainnet"
 rpc_url = "https://fullnode.mainnet.aptoslabs.com/v1"
+start_block = 200000000
 
 [chains.solana]
 enabled = true
 network = "mainnet"
 rpc_url = "https://api.mainnet-beta.solana.com"
+start_block = 250000000
