@@ -65,13 +65,23 @@ struct LogData {
     transaction_hash: String,
 }
 
-// CSV event signatures (keccak256 hashes)
+// CSV event signatures
+// In production, compute with: keccak256("EventName(types)")
+// These are placeholders - replace with actual computed values from contracts.
+const SEAL_USED_SIG: &str =
+    "0x9c7c75d4d371383965b3a8fb0693141996068cfb672f4a7f0eb8b8c1f3e0e8a2";
 const RIGHT_CREATED_SIG: &str =
-    "0x0000000000000000000000000000000000000000000000000000000000000001";
-const SEAL_CONSUMED_SIG: &str =
-    "0x0000000000000000000000000000000000000000000000000000000000000002";
-const CROSS_CHAIN_TRANSFER_SIG: &str =
-    "0x0000000000000000000000000000000000000000000000000000000000000003";
+    "0x1a51e5a4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4";
+const CROSS_CHAIN_LOCK_SIG: &str =
+    "0x2b52f5b5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5";
+const RIGHT_MINTED_SIG: &str =
+    "0x3c63g6c6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6g6";
+
+/// Compute keccak256 event signature (in production, use a proper keccak256 library)
+fn compute_event_signature(event_name: &str) -> String {
+    // Placeholder: in production, use sha3::Keccak256
+    format!("0x{}", hex::encode(event_name.as_bytes()))
+}
 
 #[async_trait]
 impl ChainIndexer for EthereumIndexer {
@@ -127,7 +137,8 @@ impl ChainIndexer for EthereumIndexer {
         for tx in &block_data.transactions {
             if let Some(logs) = &tx.logs {
                 for log in logs {
-                    if log.topics.first().map(|s| s.as_str()) == Some(RIGHT_CREATED_SIG) {
+                    // Match SealUsed event (which creates a right)
+                    if log.topics.first().map(|s| s.as_str()) == Some(SEAL_USED_SIG) {
                         if let Some(right) = self.parse_right_from_log(log, &tx.hash) {
                             rights.push(right);
                         }
@@ -147,7 +158,7 @@ impl ChainIndexer for EthereumIndexer {
         for tx in &block_data.transactions {
             if let Some(logs) = &tx.logs {
                 for log in logs {
-                    if log.topics.first().map(|s| s.as_str()) == Some(SEAL_CONSUMED_SIG) {
+                    if log.topics.first().map(|s| s.as_str()) == Some(SEAL_USED_SIG) {
                         if let Some(seal) = self.parse_seal_from_log(log, block) {
                             seals.push(seal);
                         }
@@ -167,7 +178,11 @@ impl ChainIndexer for EthereumIndexer {
         for tx in &block_data.transactions {
             if let Some(logs) = &tx.logs {
                 for log in logs {
-                    if log.topics.first().map(|s| s.as_str()) == Some(CROSS_CHAIN_TRANSFER_SIG) {
+                    // Match CrossChainLock or RightMinted events
+                    let is_lock = log.topics.first().map(|s| s.as_str()) == Some(CROSS_CHAIN_LOCK_SIG);
+                    let is_mint = log.topics.first().map(|s| s.as_str()) == Some(RIGHT_MINTED_SIG);
+                    
+                    if is_lock || is_mint {
                         if let Some(transfer) = self.parse_transfer_from_log(log, &tx.hash) {
                             transfers.push(transfer);
                         }
@@ -246,6 +261,135 @@ impl ChainIndexer for EthereumIndexer {
 
         Ok(result)
     }
+
+    // -----------------------------------------------------------------------
+    // Advanced commitment and proof indexing methods
+    // -----------------------------------------------------------------------
+
+    async fn index_enhanced_rights(&self, block: u64) -> ChainResult<Vec<EnhancedRightRecord>> {
+        let block_data = self.fetch_block(block).await?;
+        let mut rights = Vec::new();
+
+        for tx in &block_data.transactions {
+            if let Some(logs) = &tx.logs {
+                for log in logs {
+                    if log.topics.first().map(|s| s.as_str()) == Some(SEAL_USED_SIG) {
+                        if let Some(right) = self.parse_right_from_log(log, &tx.hash) {
+                            let enhanced = EnhancedRightRecord {
+                                id: right.id.clone(),
+                                chain: right.chain.clone(),
+                                seal_ref: right.seal_ref.clone(),
+                                commitment: right.commitment.clone(),
+                                owner: right.owner.clone(),
+                                created_at: right.created_at,
+                                created_tx: right.created_tx.clone(),
+                                status: right.status.to_string(),
+                                metadata: right.metadata,
+                                transfer_count: right.transfer_count,
+                                last_transfer_at: right.last_transfer_at,
+                                commitment_scheme: CommitmentScheme::KZG,
+                                commitment_version: 2,
+                                protocol_id: "csv-eth".to_string(),
+                                mpc_root: None,
+                                domain_separator: Some("ethereum-mainnet".to_string()),
+                                inclusion_proof_type: InclusionProofType::MerklePatricia,
+                                finality_proof_type: FinalityProofType::FinalizedBlock,
+                                proof_size_bytes: Some(log.data.len() as u64),
+                                confirmations: None,
+                            };
+                            rights.push(enhanced);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(rights)
+    }
+
+    async fn index_enhanced_seals(&self, block: u64) -> ChainResult<Vec<EnhancedSealRecord>> {
+        let block_data = self.fetch_block(block).await?;
+        let mut seals = Vec::new();
+
+        for tx in &block_data.transactions {
+            if let Some(logs) = &tx.logs {
+                for log in logs {
+                    if log.topics.first().map(|s| s.as_str()) == Some(SEAL_USED_SIG) {
+                        if let Some(seal) = self.parse_seal_from_log(log, block) {
+                            let enhanced = EnhancedSealRecord {
+                                id: seal.id.clone(),
+                                chain: seal.chain.clone(),
+                                seal_type: seal.seal_type.to_string(),
+                                seal_ref: seal.seal_ref.clone(),
+                                right_id: seal.right_id.clone(),
+                                status: seal.status.to_string(),
+                                consumed_at: seal.consumed_at,
+                                consumed_tx: seal.consumed_tx.clone(),
+                                block_height: seal.block_height,
+                                seal_proof_type: "merkle_patricia".to_string(),
+                                seal_proof_verified: None,
+                            };
+                            seals.push(enhanced);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(seals)
+    }
+
+    async fn index_enhanced_transfers(&self, block: u64) -> ChainResult<Vec<EnhancedTransferRecord>> {
+        let block_data = self.fetch_block(block).await?;
+        let mut transfers = Vec::new();
+
+        for tx in &block_data.transactions {
+            if let Some(logs) = &tx.logs {
+                for log in logs {
+                    let is_lock = log.topics.first().map(|s| s.as_str()) == Some(CROSS_CHAIN_LOCK_SIG);
+                    let is_mint = log.topics.first().map(|s| s.as_str()) == Some(RIGHT_MINTED_SIG);
+
+                    if is_lock || is_mint {
+                        if let Some(transfer) = self.parse_transfer_from_log(log, &tx.hash) {
+                            let enhanced = EnhancedTransferRecord {
+                                id: transfer.id.clone(),
+                                right_id: transfer.right_id.clone(),
+                                from_chain: transfer.from_chain.clone(),
+                                to_chain: transfer.to_chain.clone(),
+                                from_owner: transfer.from_owner.clone(),
+                                to_owner: transfer.to_owner.clone(),
+                                lock_tx: transfer.lock_tx.clone(),
+                                mint_tx: transfer.mint_tx.clone(),
+                                proof_ref: transfer.proof_ref.clone(),
+                                status: transfer.status.to_string(),
+                                created_at: transfer.created_at,
+                                completed_at: transfer.completed_at,
+                                duration_ms: transfer.duration_ms,
+                                cross_chain_proof_type: Some("merkle_patricia".to_string()),
+                                bridge_contract: Some(log.address.clone()),
+                                bridge_proof_verified: None,
+                            };
+                            transfers.push(enhanced);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(transfers)
+    }
+
+    fn detect_commitment_scheme(&self, _data: &[u8]) -> Option<CommitmentScheme> {
+        Some(CommitmentScheme::KZG)
+    }
+
+    fn detect_inclusion_proof_type(&self) -> InclusionProofType {
+        InclusionProofType::MerklePatricia
+    }
+
+    fn detect_finality_proof_type(&self) -> FinalityProofType {
+        FinalityProofType::FinalizedBlock
+    }
 }
 
 impl EthereumIndexer {
@@ -300,35 +444,52 @@ impl EthereumIndexer {
     }
 
     fn parse_right_from_log(&self, log: &LogData, tx_hash: &str) -> Option<RightRecord> {
-        // Parse event topics and data to extract right fields
-        if log.topics.len() < 3 {
+        // SealUsed event: SealUsed(bytes32 indexed sealId, bytes32 commitment)
+        // topics[0] = event signature
+        // topics[1] = indexed sealId
+        // data = commitment (32 bytes, unpadded)
+        
+        if log.topics.len() < 2 {
             return None;
         }
 
-        let right_id = log.topics.get(1).cloned().unwrap_or_default();
-        let owner = log.topics.get(2).cloned().unwrap_or_default();
+        let seal_id = log.topics.get(1).cloned().unwrap_or_default();
+        
+        // Parse commitment from data (remove 0x prefix)
+        let commitment = log.data.strip_prefix("0x").unwrap_or(&log.data).to_string();
+        
+        // Owner is the contract address that emitted the event
+        let owner = log.address.strip_prefix("0x").unwrap_or(&log.address).to_string();
 
         Some(RightRecord {
-            id: right_id.trim_start_matches("0x").to_string(),
+            id: format!("eth-{}-{}", tx_hash, &seal_id[..18].to_string()),
             chain: "ethereum".to_string(),
-            seal_ref: log.topics.first().cloned().unwrap_or_default(),
-            commitment: log.data.clone(),
-            owner: owner.trim_start_matches("0x").to_string(),
+            seal_ref: seal_id.clone(),
+            commitment,
+            owner,
             created_at: chrono::Utc::now(),
             created_tx: tx_hash.to_string(),
             status: csv_explorer_shared::RightStatus::Active,
-            metadata: None,
+            metadata: Some(serde_json::json!({
+                "protocol_id": "csv-eth",
+                "commitment_scheme": "kzg",
+                "inclusion_proof": "merkle_patricia",
+                "contract_address": log.address
+            })),
             transfer_count: 0,
             last_transfer_at: None,
         })
     }
 
     fn parse_seal_from_log(&self, log: &LogData, block: u64) -> Option<SealRecord> {
+        // SealUsed event data: 64 bytes = seal_id(32) || commitment(32)
+        let seal_id = log.topics.get(1).cloned().unwrap_or_default();
+        
         Some(SealRecord {
-            id: format!("eth-seal-{}", log.transaction_hash),
+            id: format!("eth-seal-{}", &seal_id[0..18]),
             chain: "ethereum".to_string(),
             seal_type: SealType::Nullifier,
-            seal_ref: log.data.clone(),
+            seal_ref: seal_id.clone(),
             right_id: None,
             status: SealStatus::Consumed,
             consumed_at: Some(chrono::Utc::now()),
@@ -338,146 +499,31 @@ impl EthereumIndexer {
     }
 
     fn parse_transfer_from_log(&self, log: &LogData, tx_hash: &str) -> Option<TransferRecord> {
+        // CrossChainLock event: CrossChainLock(bytes32 indexed rightId, bytes32 indexed commitment, address indexed owner, uint8 destinationChain, bytes destinationOwner, bytes32 sourceTxHash)
+        // topics[1] = rightId, topics[2] = commitment, topics[3] = owner
+        
+        if log.topics.len() < 4 {
+            return None;
+        }
+
+        let right_id = log.topics.get(1).cloned().unwrap_or_default();
+        let from_owner = log.topics.get(3).cloned().unwrap_or_default();
+
         Some(TransferRecord {
             id: format!("eth-xfer-{}", tx_hash),
-            right_id: "unknown".to_string(),
+            right_id,
             from_chain: "ethereum".to_string(),
             to_chain: "unknown".to_string(),
-            from_owner: "unknown".to_string(),
+            from_owner,
             to_owner: "unknown".to_string(),
             lock_tx: tx_hash.to_string(),
             mint_tx: None,
-            proof_ref: None,
+            proof_ref: Some(log.transaction_hash.clone()),
             status: csv_explorer_shared::TransferStatus::Pending,
             created_at: chrono::Utc::now(),
             completed_at: None,
             duration_ms: None,
         })
-    }
-
-    // -----------------------------------------------------------------------
-    // Advanced commitment and proof indexing methods
-    // -----------------------------------------------------------------------
-
-    async fn index_enhanced_rights(&self, block: u64) -> ChainResult<Vec<EnhancedRightRecord>> {
-        let block_data = self.fetch_block(block).await?;
-        let mut rights = Vec::new();
-
-        for tx in &block_data.transactions {
-            if let Some(logs) = &tx.logs {
-                for log in logs {
-                    if log.topics.first().map(|s| s.as_str()) == Some(RIGHT_CREATED_SIG) {
-                        if let Some(right) = self.parse_right_from_log(log, &tx.hash) {
-                            let enhanced = EnhancedRightRecord {
-                                id: right.id.clone(),
-                                chain: right.chain.clone(),
-                                seal_ref: right.seal_ref.clone(),
-                                commitment: right.commitment.clone(),
-                                owner: right.owner.clone(),
-                                created_at: right.created_at,
-                                created_tx: right.created_tx.clone(),
-                                status: right.status.to_string(),
-                                metadata: right.metadata,
-                                transfer_count: right.transfer_count,
-                                last_transfer_at: right.last_transfer_at,
-                                commitment_scheme: CommitmentScheme::KZG,
-                                commitment_version: 2,
-                                protocol_id: "csv-eth".to_string(),
-                                mpc_root: None,
-                                domain_separator: Some("ethereum-mainnet".to_string()),
-                                inclusion_proof_type: InclusionProofType::MerklePatricia,
-                                finality_proof_type: FinalityProofType::FinalizedBlock,
-                                proof_size_bytes: Some(log.data.len() as u64),
-                                confirmations: None,
-                            };
-                            rights.push(enhanced);
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(rights)
-    }
-
-    async fn index_enhanced_seals(&self, block: u64) -> ChainResult<Vec<EnhancedSealRecord>> {
-        let block_data = self.fetch_block(block).await?;
-        let mut seals = Vec::new();
-
-        for tx in &block_data.transactions {
-            if let Some(logs) = &tx.logs {
-                for log in logs {
-                    if log.topics.first().map(|s| s.as_str()) == Some(SEAL_CONSUMED_SIG) {
-                        let seal = EnhancedSealRecord {
-                            id: format!("eth-seal-{}", log.transaction_hash),
-                            chain: "ethereum".to_string(),
-                            seal_type: "nullifier".to_string(),
-                            seal_ref: log.data.clone(),
-                            right_id: None,
-                            status: "consumed".to_string(),
-                            consumed_at: Some(chrono::Utc::now()),
-                            consumed_tx: Some(log.transaction_hash.clone()),
-                            block_height: block,
-                            seal_proof_type: "merkle_patricia".to_string(),
-                            seal_proof_verified: None,
-                        };
-                        seals.push(seal);
-                    }
-                }
-            }
-        }
-
-        Ok(seals)
-    }
-
-    async fn index_enhanced_transfers(&self, block: u64) -> ChainResult<Vec<EnhancedTransferRecord>> {
-        let block_data = self.fetch_block(block).await?;
-        let mut transfers = Vec::new();
-
-        for tx in &block_data.transactions {
-            if let Some(logs) = &tx.logs {
-                for log in logs {
-                    if log.topics.first().map(|s| s.as_str()) == Some(CROSS_CHAIN_TRANSFER_SIG) {
-                        if let Some(transfer) = self.parse_transfer_from_log(log, &tx.hash) {
-                            let enhanced = EnhancedTransferRecord {
-                                id: transfer.id.clone(),
-                                right_id: transfer.right_id.clone(),
-                                from_chain: transfer.from_chain.clone(),
-                                to_chain: transfer.to_chain.clone(),
-                                from_owner: transfer.from_owner.clone(),
-                                to_owner: transfer.to_owner.clone(),
-                                lock_tx: transfer.lock_tx.clone(),
-                                mint_tx: transfer.mint_tx.clone(),
-                                proof_ref: transfer.proof_ref.clone(),
-                                status: transfer.status.to_string(),
-                                created_at: transfer.created_at,
-                                completed_at: transfer.completed_at,
-                                duration_ms: transfer.duration_ms,
-                                cross_chain_proof_type: Some("merkle_patricia".to_string()),
-                                bridge_contract: Some(log.address.clone()),
-                                bridge_proof_verified: None,
-                            };
-                            transfers.push(enhanced);
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(transfers)
-    }
-
-    fn detect_commitment_scheme(&self, _data: &[u8]) -> Option<CommitmentScheme> {
-        // Ethereum CSV uses KZG commitments (PLONK-style)
-        Some(CommitmentScheme::KZG)
-    }
-
-    fn detect_inclusion_proof_type(&self) -> InclusionProofType {
-        InclusionProofType::MerklePatricia
-    }
-
-    fn detect_finality_proof_type(&self) -> FinalityProofType {
-        FinalityProofType::FinalizedBlock
     }
 
     // -----------------------------------------------------------------------

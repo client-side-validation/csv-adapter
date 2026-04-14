@@ -366,7 +366,7 @@ impl AdvancedProofRepository {
                 created_at: row.get("created_at"),
                 created_tx: row.get("created_tx"),
                 status: row.get("status"),
-                metadata: row.try_get::<Option<String>, _>("metadata").ok().and_then(|s| serde_json::from_str(&s).ok()),
+                metadata: row.try_get::<Option<String>, _>("metadata").ok().flatten().and_then(|s| serde_json::from_str(&s).ok()),
                 transfer_count: row.get::<i64, _>("transfer_count") as u64,
                 last_transfer_at: row.get("last_transfer_at"),
                 commitment_scheme: CommitmentScheme::from_str(&row.get::<String, _>("commitment_scheme")).unwrap_or_default(),

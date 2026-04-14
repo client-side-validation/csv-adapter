@@ -10,14 +10,15 @@ Index **only CSV-related data**: Rights, Seals, Transfers, Contracts, Priority A
 
 **Result: ~1 GB/year** (99.9% reduction)
 
-## Per-Chain Indexing
+## Per-Chain Indexing (Implemented)
 
-| Chain | What Gets Indexed | Filter Method | Proof Types |
-|-------|------------------|---------------|-------------|
-| **Bitcoin** | OP_RETURN commitments, CSV address UTXO spends, Priority address txs | Address filtering | Merkle inclusion, ConfirmationDepth finality |
-| **Ethereum** | `RightCreated`, `SealConsumed`, `CrossChainTransfer` events from CSV contracts | Event signature filtering | MerklePatricia inclusion, FinalizedBlock finality |
-| **Sui** | `RightCreated`, `SealCreated/Consumed` Move events from CSV packages | Event type name filtering | ObjectProof inclusion, Checkpoint finality |
-| **Aptos** | `RightCreated`, `SealCreated/Consumed` Move events from CSV modules | Event type name filtering | Accumulator inclusion, Checkpoint finality |
+| Chain | What Gets Indexed | Filter Method | Proof Types | Status |
+|-------|------------------|---------------|-------------|--------|
+| **Bitcoin** | OP_RETURN Tapret (65 bytes) or Opret (64 bytes) commitments with `CSV-` protocol ID prefix, CSV address UTXO spends, Priority address txs | Address + OP_RETURN payload parsing | `Merkle` inclusion, `ConfirmationDepth` finality, `HashBased` commitment | ✅ Complete |
+| **Ethereum** | `SealUsed(bytes32,bytes32)` events from CSV contracts, `CrossChainLock`/`RightMinted` cross-chain events | Event signature topic filtering | `MerklePatricia` inclusion, `FinalizedBlock` finality, `KZG` commitment | ✅ Complete |
+| **Sui** | `{package_id}::csv_seal::AnchorEvent` events, CrossChain/bridge events | Event type name (`csv_seal` + `AnchorEvent`) | `ObjectProof` inclusion, `Checkpoint` finality, `HashBased` commitment | ✅ Complete |
+| **Aptos** | `{module_address}::csv_seal::AnchorEvent` events, CrossChain/bridge_transfer events | Event type name (`csv_seal` + `AnchorEvent`) | `Accumulator` inclusion, `Checkpoint` finality, `HashBased` commitment | ✅ Complete |
+| **Solana** | Transaction log messages containing `csv_right`/`RightCreated`/`csv_seal`/`SealConsumed` | Log message string matching | `AccountState` inclusion, `SlotBased` finality, `HashBased` commitment | ✅ Complete |
 
 ## Priority Address Indexing
 

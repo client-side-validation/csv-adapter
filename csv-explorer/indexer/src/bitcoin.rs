@@ -367,26 +367,64 @@ impl BitcoinIndexer {
         vout: &VoutInfo,
         block: u64,
     ) -> Option<RightRecord> {
-        // In a real implementation, this would parse the OP_RETURN data
-        // to extract commitment hash, right_id, owner, etc.
-        let _ = (vout, block);
-        // Placeholder: real parsing logic would go here
-        if vout.scriptpubkey_type.as_deref() == Some("op_return") {
-            Some(RightRecord {
-                id: format!("btc-right-{}", tx.txid),
-                chain: "bitcoin".to_string(),
-                seal_ref: format!("{}:0", tx.txid),
-                commitment: "pending_parse".to_string(),
-                owner: "unknown".to_string(),
-                created_at: chrono::Utc::now(),
-                created_tx: tx.txid.clone(),
-                status: csv_explorer_shared::RightStatus::Active,
-                metadata: None,
-                transfer_count: 0,
-                last_transfer_at: None,
-            })
-        } else {
-            None
+        // CSV commitment patterns in OP_RETURN:
+        // Tapret: OP_RETURN <65 bytes> = protocol_id(32) || nonce(1) || commitment(32)
+        // Opret:  OP_RETURN <64 bytes> = protocol_id(32) || commitment(32)
+        
+        let script_hex = vout.scriptpubkey.as_ref()?;
+        
+        // Extract OP_RETURN payload (skip "6a" OP_RETURN opcode)
+        let payload_hex = script_hex.strip_prefix("6a")?;
+        let payload = hex::decode(payload_hex).ok()?;
+        
+        // Check for CSV commitment patterns (64 or 65 bytes)
+        if payload.len() != 64 && payload.len() != 65 {
+            return None;
         }
+        
+        // Extract protocol_id (first 32 bytes)
+        let protocol_id = &payload[0..32];
+        
+        // Check if this is a known CSV protocol ID
+        // CSV protocol IDs start with "CSV-" prefix
+        if &protocol_id[0..4] != b"CSV-" {
+            return None;
+        }
+        
+        // Extract commitment hash (last 32 bytes, or bytes 33-64 for 65-byte with nonce)
+        let commitment_hash = if payload.len() == 65 {
+            // Tapret with nonce: protocol_id(32) || nonce(1) || commitment(32)
+            &payload[33..65]
+        } else {
+            // Opret: protocol_id(32) || commitment(32)
+            &payload[32..64]
+        };
+        
+        // Derive owner from the input (seal UTXO spender)
+        let owner = tx.vin.first()
+            .and_then(|vin| vin.txid.as_ref())
+            .map(|txid| format!("btc-{}", &txid[..8]))
+            .unwrap_or_else(|| "unknown".to_string());
+        
+        let protocol_str = String::from_utf8_lossy(protocol_id).trim_end_matches('\0').to_string();
+        let commitment_hex = hex::encode(commitment_hash);
+        
+        Some(RightRecord {
+            id: format!("btc-{}-{}", tx.txid, commitment_hex[..16].to_string()),
+            chain: "bitcoin".to_string(),
+            seal_ref: format!("{}:0", tx.txid),
+            commitment: commitment_hex,
+            owner,
+            created_at: chrono::Utc::now(),
+            created_tx: tx.txid.clone(),
+            status: csv_explorer_shared::RightStatus::Active,
+            metadata: Some(serde_json::json!({
+                "protocol_id": protocol_str,
+                "commitment_scheme": "hash_based",
+                "inclusion_proof": "merkle"
+            })),
+            transfer_count: 0,
+            last_transfer_at: None,
+        })
     }
 }

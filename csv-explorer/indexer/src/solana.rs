@@ -236,6 +236,108 @@ impl ChainIndexer for SolanaIndexer {
 
         Ok(result)
     }
+
+    // -----------------------------------------------------------------------
+    // Advanced commitment and proof indexing methods
+    // -----------------------------------------------------------------------
+
+    async fn index_enhanced_rights(&self, block: u64) -> ChainResult<Vec<EnhancedRightRecord>> {
+        let txns = self.get_transactions_for_slot(block).await?;
+        let mut rights = Vec::new();
+
+        for txn in &txns {
+            if let Some(meta) = &txn.meta {
+                if let Some(logs) = meta.get("logMessages").and_then(|v| v.as_array()) {
+                    for log in logs {
+                        if let Some(log_str) = log.as_str() {
+                            if log_str.contains("csv_right") || log_str.contains("RightCreated") {
+                                if let Some(right) = self.parse_right_from_log(txn, log_str) {
+                                    let enhanced = EnhancedRightRecord {
+                                        id: right.id.clone(),
+                                        chain: right.chain.clone(),
+                                        seal_ref: right.seal_ref.clone(),
+                                        commitment: right.commitment.clone(),
+                                        owner: right.owner.clone(),
+                                        created_at: right.created_at,
+                                        created_tx: right.created_tx.clone(),
+                                        status: right.status.to_string(),
+                                        metadata: right.metadata,
+                                        transfer_count: right.transfer_count,
+                                        last_transfer_at: right.last_transfer_at,
+                                        commitment_scheme: CommitmentScheme::HashBased,
+                                        commitment_version: 2,
+                                        protocol_id: "csv-sol".to_string(),
+                                        mpc_root: None,
+                                        domain_separator: Some("solana-mainnet".to_string()),
+                                        inclusion_proof_type: InclusionProofType::AccountState,
+                                        finality_proof_type: FinalityProofType::SlotBased,
+                                        proof_size_bytes: Some(log_str.len() as u64),
+                                        confirmations: None,
+                                    };
+                                    rights.push(enhanced);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(rights)
+    }
+
+    async fn index_enhanced_seals(&self, block: u64) -> ChainResult<Vec<EnhancedSealRecord>> {
+        let txns = self.get_transactions_for_slot(block).await?;
+        let mut seals = Vec::new();
+
+        for txn in &txns {
+            if let Some(meta) = &txn.meta {
+                if let Some(logs) = meta.get("logMessages").and_then(|v| v.as_array()) {
+                    for log in logs {
+                        if let Some(log_str) = log.as_str() {
+                            if log_str.contains("csv_seal") || log_str.contains("SealConsumed") {
+                                if let Some(seal) = self.parse_seal_from_log(txn, block) {
+                                    let enhanced = EnhancedSealRecord {
+                                        id: seal.id.clone(),
+                                        chain: seal.chain.clone(),
+                                        seal_type: seal.seal_type.to_string(),
+                                        seal_ref: seal.seal_ref.clone(),
+                                        right_id: seal.right_id.clone(),
+                                        status: seal.status.to_string(),
+                                        consumed_at: seal.consumed_at,
+                                        consumed_tx: seal.consumed_tx.clone(),
+                                        block_height: seal.block_height,
+                                        seal_proof_type: "account_state".to_string(),
+                                        seal_proof_verified: None,
+                                    };
+                                    seals.push(enhanced);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(seals)
+    }
+
+    async fn index_enhanced_transfers(&self, block: u64) -> ChainResult<Vec<EnhancedTransferRecord>> {
+        // Cross-chain transfers on Solana would be handled through bridge programs
+        Ok(Vec::new())
+    }
+
+    fn detect_commitment_scheme(&self, _data: &[u8]) -> Option<CommitmentScheme> {
+        Some(CommitmentScheme::HashBased)
+    }
+
+    fn detect_inclusion_proof_type(&self) -> InclusionProofType {
+        InclusionProofType::AccountState
+    }
+
+    fn detect_finality_proof_type(&self) -> FinalityProofType {
+        FinalityProofType::SlotBased
+    }
 }
 
 impl SolanaIndexer {
@@ -337,109 +439,6 @@ impl SolanaIndexer {
             completed_at: None,
             duration_ms: None,
         })
-    }
-
-    // -----------------------------------------------------------------------
-    // Advanced commitment and proof indexing methods
-    // -----------------------------------------------------------------------
-
-    async fn index_enhanced_rights(&self, block: u64) -> ChainResult<Vec<EnhancedRightRecord>> {
-        // On Solana, rights are tracked through account state and transaction logs
-        let txns = self.get_transactions_for_slot(block).await?;
-        let mut rights = Vec::new();
-
-        for txn in &txns {
-            if let Some(meta) = &txn.meta {
-                if let Some(logs) = meta.get("logMessages").and_then(|v| v.as_array()) {
-                    for log in logs {
-                        if let Some(log_str) = log.as_str() {
-                            if log_str.contains("csv_right") || log_str.contains("RightCreated") {
-                                if let Some(right) = self.parse_right_from_log(txn, log_str) {
-                                    let enhanced = EnhancedRightRecord {
-                                        id: right.id.clone(),
-                                        chain: right.chain.clone(),
-                                        seal_ref: right.seal_ref.clone(),
-                                        commitment: right.commitment.clone(),
-                                        owner: right.owner.clone(),
-                                        created_at: right.created_at,
-                                        created_tx: right.created_tx.clone(),
-                                        status: right.status.to_string(),
-                                        metadata: right.metadata,
-                                        transfer_count: right.transfer_count,
-                                        last_transfer_at: right.last_transfer_at,
-                                        commitment_scheme: CommitmentScheme::HashBased,
-                                        commitment_version: 2,
-                                        protocol_id: "csv-sol".to_string(),
-                                        mpc_root: None,
-                                        domain_separator: Some("solana-mainnet".to_string()),
-                                        inclusion_proof_type: InclusionProofType::AccountState,
-                                        finality_proof_type: FinalityProofType::SlotBased,
-                                        proof_size_bytes: Some(log_str.len() as u64),
-                                        confirmations: None,
-                                    };
-                                    rights.push(enhanced);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(rights)
-    }
-
-    async fn index_enhanced_seals(&self, block: u64) -> ChainResult<Vec<EnhancedSealRecord>> {
-        let txns = self.get_transactions_for_slot(block).await?;
-        let mut seals = Vec::new();
-
-        for txn in &txns {
-            if let Some(meta) = &txn.meta {
-                if let Some(logs) = meta.get("logMessages").and_then(|v| v.as_array()) {
-                    for log in logs {
-                        if let Some(log_str) = log.as_str() {
-                            if log_str.contains("csv_seal") || log_str.contains("SealConsumed") {
-                                if let Some(seal) = self.parse_seal_from_log(txn, block) {
-                                    let enhanced = EnhancedSealRecord {
-                                        id: seal.id.clone(),
-                                        chain: seal.chain.clone(),
-                                        seal_type: seal.seal_type.to_string(),
-                                        seal_ref: seal.seal_ref.clone(),
-                                        right_id: seal.right_id.clone(),
-                                        status: seal.status.to_string(),
-                                        consumed_at: seal.consumed_at,
-                                        consumed_tx: seal.consumed_tx.clone(),
-                                        block_height: seal.block_height,
-                                        seal_proof_type: "account_state".to_string(),
-                                        seal_proof_verified: None,
-                                    };
-                                    seals.push(enhanced);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(seals)
-    }
-
-    async fn index_enhanced_transfers(&self, block: u64) -> ChainResult<Vec<EnhancedTransferRecord>> {
-        // Cross-chain transfers on Solana would be handled through bridge programs
-        Ok(Vec::new())
-    }
-
-    fn detect_commitment_scheme(&self, _data: &[u8]) -> Option<CommitmentScheme> {
-        Some(CommitmentScheme::HashBased)
-    }
-
-    fn detect_inclusion_proof_type(&self) -> InclusionProofType {
-        InclusionProofType::AccountState
-    }
-
-    fn detect_finality_proof_type(&self) -> FinalityProofType {
-        FinalityProofType::SlotBased
     }
 
     // -----------------------------------------------------------------------
