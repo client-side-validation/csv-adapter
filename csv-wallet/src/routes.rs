@@ -82,6 +82,14 @@ pub enum Route {
         #[route("/validate/commitment-chain")]
         ValidateCommitmentChain {},
 
+        // NFT Gallery
+        #[route("/nfts")]
+        NftGallery {},
+        #[route("/nfts/collections")]
+        NftCollections {},
+        #[route("/nfts/:id")]
+        NftDetail { id: String },
+
         // Wallet management sub-page
         #[route("/wallet")]
         WalletPage {},

@@ -125,6 +125,60 @@ pub struct ProofRecord {
     pub verified: bool,
 }
 
+/// An NFT (Non-Fungible Token) record.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NftRecord {
+    pub id: String,
+    pub chain: Chain,
+    pub collection_id: Option<String>,
+    pub name: String,
+    pub symbol: Option<String>,
+    pub description: Option<String>,
+    pub owner: String,
+    pub token_id: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+    pub image_url: Option<String>,
+    pub external_url: Option<String>,
+    pub created_at: u64,
+    pub status: NftStatus,
+}
+
+/// NFT status.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NftStatus {
+    Owned,
+    Transferred,
+    Burned,
+    Listed,
+}
+
+impl std::fmt::Display for NftStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NftStatus::Owned => write!(f, "Owned"),
+            NftStatus::Transferred => write!(f, "Transferred"),
+            NftStatus::Burned => write!(f, "Burned"),
+            NftStatus::Listed => write!(f, "Listed"),
+        }
+    }
+}
+
+/// NFT collection information.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NftCollection {
+    pub id: String,
+    pub chain: Chain,
+    pub name: String,
+    pub symbol: String,
+    pub description: Option<String>,
+    pub image_url: Option<String>,
+    pub external_url: Option<String>,
+    pub total_supply: u64,
+    pub owner_count: u64,
+    pub floor_price: Option<f64>,
+    pub created_at: u64,
+}
+
 /// A test result.
 #[derive(Clone, Debug)]
 pub struct TestResult {
@@ -165,6 +219,8 @@ pub struct AppState {
     pub seals: Vec<SealRecord>,
     pub proofs: Vec<ProofRecord>,
     pub test_results: Vec<TestResult>,
+    pub nfts: Vec<NftRecord>,
+    pub nft_collections: Vec<NftCollection>,
     pub notification: Option<Notification>,
 }
 
@@ -194,6 +250,8 @@ impl Default for AppState {
             seals: Vec::new(),
             proofs: Vec::new(),
             test_results: Vec::new(),
+            nfts: Vec::new(),
+            nft_collections: Vec::new(),
             notification: None,
         }
     }
@@ -204,6 +262,8 @@ impl PartialEq for AppState {
         self.selected_chain == other.selected_chain
             && self.selected_network == other.selected_network
             && self.wallet.total_accounts() == other.wallet.total_accounts()
+            && self.nfts.len() == other.nfts.len()
+            && self.nft_collections.len() == other.nft_collections.len()
     }
 }
 

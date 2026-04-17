@@ -369,202 +369,122 @@ async fn sync_chain(
     tracing::debug!(chain = chain_id, from = current, to = end, "Syncing chain");
 
     while current <= end {
+        // Process block and get all data in one call
         match indexer.process_block(current).await {
-            Ok(result) => {
-                // Index and store rights
-                match indexer.index_rights(current).await {
-                    Ok(rights) => {
-                        for right in &rights {
-                            if let Err(e) = rights_repo.insert(right).await {
-                                tracing::warn!(
-                                    chain = chain_id,
-                                    block = current,
-                                    right_id = %right.id,
-                                    error = %e,
-                                    "Failed to insert right"
-                                );
-                            }
-                        }
-                        tracing::trace!(
+            Ok(block_result) => {
+                // Now get the actual data to store
+                let rights = indexer.index_rights(current).await?;
+                let seals = indexer.index_seals(current).await?;
+                let transfers = indexer.index_transfers(current).await?;
+                let contracts = indexer.index_contracts(current).await?;
+                let enhanced_rights = indexer.index_enhanced_rights(current).await?;
+                let enhanced_seals = indexer.index_enhanced_seals(current).await?;
+                let enhanced_transfers = indexer.index_enhanced_transfers(current).await?;
+
+                // Store rights
+                for right in &rights {
+                    if let Err(e) = rights_repo.insert(right).await {
+                        tracing::warn!(
                             chain = chain_id,
                             block = current,
-                            rights = rights.len(),
-                            "Indexed and stored rights"
+                            right_id = %right.id,
+                            error = %e,
+                            "Failed to insert right"
                         );
-                    }
-                    Err(e) => {
-                        tracing::warn!(chain = chain_id, block = current, error = %e, "Failed to index rights");
                     }
                 }
 
-                // Index and store seals
-                match indexer.index_seals(current).await {
-                    Ok(seals) => {
-                        for seal in &seals {
-                            if let Err(e) = seals_repo.insert(seal).await {
-                                tracing::warn!(
-                                    chain = chain_id,
-                                    block = current,
-                                    seal_id = %seal.id,
-                                    error = %e,
-                                    "Failed to insert seal"
-                                );
-                            }
-                        }
-                        tracing::trace!(
+                // Store seals
+                for seal in &seals {
+                    if let Err(e) = seals_repo.insert(seal).await {
+                        tracing::warn!(
                             chain = chain_id,
                             block = current,
-                            seals = seals.len(),
-                            "Indexed and stored seals"
+                            seal_id = %seal.id,
+                            error = %e,
+                            "Failed to insert seal"
                         );
-                    }
-                    Err(e) => {
-                        tracing::warn!(chain = chain_id, block = current, error = %e, "Failed to index seals");
                     }
                 }
 
-                // Index and store transfers
-                match indexer.index_transfers(current).await {
-                    Ok(transfers) => {
-                        for transfer in &transfers {
-                            if let Err(e) = transfers_repo.insert(transfer).await {
-                                tracing::warn!(
-                                    chain = chain_id,
-                                    block = current,
-                                    transfer_id = %transfer.id,
-                                    error = %e,
-                                    "Failed to insert transfer"
-                                );
-                            }
-                        }
-                        tracing::trace!(
+                // Store transfers
+                for transfer in &transfers {
+                    if let Err(e) = transfers_repo.insert(transfer).await {
+                        tracing::warn!(
                             chain = chain_id,
                             block = current,
-                            transfers = transfers.len(),
-                            "Indexed and stored transfers"
+                            transfer_id = %transfer.id,
+                            error = %e,
+                            "Failed to insert transfer"
                         );
-                    }
-                    Err(e) => {
-                        tracing::warn!(chain = chain_id, block = current, error = %e, "Failed to index transfers");
                     }
                 }
 
-                // Index and store contracts
-                match indexer.index_contracts(current).await {
-                    Ok(contracts) => {
-                        for contract in &contracts {
-                            if let Err(e) = contracts_repo.insert(contract).await {
-                                tracing::warn!(
-                                    chain = chain_id,
-                                    block = current,
-                                    contract_id = %contract.id,
-                                    error = %e,
-                                    "Failed to insert contract"
-                                );
-                            }
-                        }
-                        tracing::trace!(
+                // Store contracts
+                for contract in &contracts {
+                    if let Err(e) = contracts_repo.insert(contract).await {
+                        tracing::warn!(
                             chain = chain_id,
                             block = current,
-                            contracts = contracts.len(),
-                            "Indexed and stored contracts"
+                            contract_id = %contract.id,
+                            error = %e,
+                            "Failed to insert contract"
                         );
-                    }
-                    Err(e) => {
-                        tracing::warn!(chain = chain_id, block = current, error = %e, "Failed to index contracts");
                     }
                 }
 
-                // Index and store enhanced rights with commitment metadata
-                match indexer.index_enhanced_rights(current).await {
-                    Ok(enhanced_rights) => {
-                        for right in &enhanced_rights {
-                            if let Err(e) = advanced_repo.insert_enhanced_right(right).await {
-                                tracing::warn!(
-                                    chain = chain_id,
-                                    block = current,
-                                    right_id = %right.id,
-                                    error = %e,
-                                    "Failed to insert enhanced right"
-                                );
-                            }
-                        }
-                        tracing::trace!(
+                // Store enhanced rights
+                for right in &enhanced_rights {
+                    if let Err(e) = advanced_repo.insert_enhanced_right(right).await {
+                        tracing::warn!(
                             chain = chain_id,
                             block = current,
-                            enhanced_rights = enhanced_rights.len(),
-                            "Indexed and stored enhanced rights"
+                            right_id = %right.id,
+                            error = %e,
+                            "Failed to insert enhanced right"
                         );
-                    }
-                    Err(e) => {
-                        tracing::warn!(chain = chain_id, block = current, error = %e, "Failed to index enhanced rights");
                     }
                 }
 
-                // Index and store enhanced seals with proof metadata
-                match indexer.index_enhanced_seals(current).await {
-                    Ok(enhanced_seals) => {
-                        for seal in &enhanced_seals {
-                            if let Err(e) = advanced_repo.insert_enhanced_seal(seal).await {
-                                tracing::warn!(
-                                    chain = chain_id,
-                                    block = current,
-                                    seal_id = %seal.id,
-                                    error = %e,
-                                    "Failed to insert enhanced seal"
-                                );
-                            }
-                        }
-                        tracing::trace!(
+                // Store enhanced seals
+                for seal in &enhanced_seals {
+                    if let Err(e) = advanced_repo.insert_enhanced_seal(seal).await {
+                        tracing::warn!(
                             chain = chain_id,
                             block = current,
-                            enhanced_seals = enhanced_seals.len(),
-                            "Indexed and stored enhanced seals"
+                            seal_id = %seal.id,
+                            error = %e,
+                            "Failed to insert enhanced seal"
                         );
-                    }
-                    Err(e) => {
-                        tracing::warn!(chain = chain_id, block = current, error = %e, "Failed to index enhanced seals");
                     }
                 }
 
-                // Index and store enhanced transfers with cross-chain proof data
-                match indexer.index_enhanced_transfers(current).await {
-                    Ok(enhanced_transfers) => {
-                        for transfer in &enhanced_transfers {
-                            if let Err(e) = advanced_repo.insert_enhanced_transfer(transfer).await {
-                                tracing::warn!(
-                                    chain = chain_id,
-                                    block = current,
-                                    transfer_id = %transfer.id,
-                                    error = %e,
-                                    "Failed to insert enhanced transfer"
-                                );
-                            }
-                        }
-                        tracing::trace!(
+                // Store enhanced transfers
+                for transfer in &enhanced_transfers {
+                    if let Err(e) = advanced_repo.insert_enhanced_transfer(transfer).await {
+                        tracing::warn!(
                             chain = chain_id,
                             block = current,
-                            enhanced_transfers = enhanced_transfers.len(),
-                            "Indexed and stored enhanced transfers"
+                            transfer_id = %transfer.id,
+                            error = %e,
+                            "Failed to insert enhanced transfer"
                         );
-                    }
-                    Err(e) => {
-                        tracing::warn!(chain = chain_id, block = current, error = %e, "Failed to index enhanced transfers");
                     }
                 }
 
-                tracing::trace!(
+                tracing::debug!(
                     chain = chain_id,
                     block = current,
-                    rights = result.rights_count,
-                    seals = result.seals_count,
-                    transfers = result.transfers_count,
-                    contracts = result.contracts_count,
-                    "Processed block"
+                    rights = rights.len(),
+                    seals = seals.len(),
+                    transfers = transfers.len(),
+                    contracts = contracts.len(),
+                    "Processed and stored block data"
                 );
             }
             Err(e) => {
                 tracing::warn!(chain = chain_id, block = current, error = %e, "Failed to process block");
+                // Continue to next block even if current block fails
             }
         }
 
