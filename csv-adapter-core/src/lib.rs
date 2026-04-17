@@ -97,12 +97,19 @@ pub mod traits;
 pub mod monitor;
 pub mod store;
 
-// Client-side validation (Sprint 2) - 🔒 STABLE
-pub mod client;
+// Client-side validation (Sprint 2)// Cross-chain transfer
+pub mod cross_chain;
 pub mod commitment_chain;
 pub mod seal_registry;
 pub mod state_store;
 pub mod validator;
+
+// Chain adapter system for dynamic chain support
+pub mod chain_adapter;
+pub mod chain_config;
+pub mod chain_registry;
+pub mod chain_system;
+pub mod adapters;
 
 // Cross-chain transfer (Sprint 4 - NORTH STAR) - 🔒 STABLE
 pub mod cross_chain;
