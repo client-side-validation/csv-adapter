@@ -9,6 +9,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { CsvErrorBuilder, ErrorCode } from "../types/errors.js";
 
 const ChainEnum = z.enum(["bitcoin", "ethereum", "sui", "aptos"]);
 
@@ -47,17 +48,17 @@ export function registerRightTools(server: McpServer) {
           ],
         };
       } catch (error: any) {
+        const csvError = CsvErrorBuilder.build(
+          ErrorCode.TRANSFER_FAILED,
+          `Failed to create Right: ${error.message}`,
+          { chain, error: error.name }
+        );
+        
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify({
-                success: false,
-                error_code: "CSV_RIGHT_CREATE_FAILED",
-                error_message: error.message,
-                suggested_fix: "Check wallet balance and RPC connection",
-                docs_url: "https://docs.csv.dev/errors/right-create",
-              }, null, 2),
+              text: JSON.stringify(csvError, null, 2),
             },
           ],
           isError: true,
@@ -101,17 +102,17 @@ export function registerRightTools(server: McpServer) {
           ],
         };
       } catch (error: any) {
+        const csvError = CsvErrorBuilder.build(
+          ErrorCode.RIGHT_NOT_FOUND,
+          `Right ${right_id} not found`,
+          { right_id, error: error.name }
+        );
+        
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify({
-                success: false,
-                error_code: "CSV_RIGHT_NOT_FOUND",
-                error_message: `Right ${right_id} not found`,
-                suggested_fix: "Right may exist in client state. Query history endpoint.",
-                docs_url: "https://docs.csv.dev/errors/right-not-found",
-              }, null, 2),
+              text: JSON.stringify(csvError, null, 2),
             },
           ],
           isError: true,
@@ -159,17 +160,17 @@ export function registerRightTools(server: McpServer) {
           ],
         };
       } catch (error: any) {
+        const csvError = CsvErrorBuilder.build(
+          ErrorCode.WALLET_NOT_CONNECTED,
+          `Failed to list Rights: ${error.message}`,
+          { chain, status, error: error.name }
+        );
+        
         return {
           content: [
             {
               type: "text",
-              text: JSON.stringify({
-                success: false,
-                error_code: "CSV_RIGHT_LIST_FAILED",
-                error_message: error.message,
-                suggested_fix: "Check wallet connection and try again",
-                docs_url: "https://docs.csv.dev/errors/right-list",
-              }, null, 2),
+              text: JSON.stringify(csvError, null, 2),
             },
           ],
           isError: true,

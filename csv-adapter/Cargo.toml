@@ -82,5 +82,25 @@ rand = "0.8"
 tempfile = "3"
 csv-adapter-store = { version = "0.2.0", path = "../csv-adapter-store" }
 
+[[example]]
+name = "subscriptions"
+path = "../examples/subscriptions.rs"
+required-features = ["all-chains", "tokio"]
+
+[[example]]
+name = "performance"
+path = "../examples/performance.rs"
+required-features = ["all-chains", "tokio"]
+
+[[example]]
+name = "gaming"
+path = "../examples/gaming.rs"
+required-features = ["all-chains", "tokio"]
+
+[[example]]
+name = "parallel_verification"
+path = "../examples/parallel_verification.rs"
+required-features = ["all-chains", "tokio"]
+
 [lints]
 workspace = true

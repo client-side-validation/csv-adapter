@@ -9,6 +9,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { CsvErrorBuilder, ErrorCode } from "../types/errors.js";
 
 /** Base URL for the CSV Explorer API (overridable via env). */
 const EXPLORER_BASE_URL = process.env.CSV_EXPLORER_URL || "http://localhost:8181/api/v1";

@@ -95,6 +95,7 @@ pub mod traits;
 
 // Cross-cutting (Phase 10) - 🟡 BETA
 pub mod monitor;
+pub mod performance;
 pub mod store;
 
 // Client-side validation (Sprint 2)// Cross-chain transfer
