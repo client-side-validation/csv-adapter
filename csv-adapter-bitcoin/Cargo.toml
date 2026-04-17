@@ -1,6 +1,6 @@
 [package]
 name = "csv-adapter-bitcoin"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "Bitcoin adapter for CSV (Client-Side Validation) with UTXO seals and SPV proofs"
 license = "MIT OR Apache-2.0"
@@ -19,8 +19,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-csv-adapter-core = { version = "0.1", path = "../csv-adapter-core" }
-csv-adapter-store = { version = "0.1", path = "../csv-adapter-store", optional = true }
+csv-adapter-core = { version = "0.2.0", path = "../csv-adapter-core" }
+csv-adapter-store = { version = "0.2.0", path = "../csv-adapter-store", optional = true }
 bitcoin = { version = "0.30", features = ["serde", "rand", "bitcoinconsensus"] }
 bitcoin_hashes = "0.12"
 bitcoincore-rpc = { version = "0.17", optional = true }

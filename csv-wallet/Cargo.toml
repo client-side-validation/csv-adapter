@@ -1,6 +1,6 @@
 [package]
 name = "csv-wallet"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Standalone multi-chain wallet for CSV Adapter with Dioxus UI"
 license = "MIT OR Apache-2.0"
@@ -17,6 +17,7 @@ path = "src/main.rs"
 [dependencies]
 # Core CSV Adapter types
 csv-adapter-core = { path = "../csv-adapter-core" }
+csv-adapter-solana = { path = "../csv-adapter-solana", optional = true }
 
 # Dioxus 0.7
 dioxus = { version = "0.7", features = ["web", "router"] }
@@ -59,3 +60,7 @@ serde-wasm-bindgen = "0.6"
 
 # HTTP for wasm
 reqwest = { version = "0.12.12", features = ["json"] }
+
+[features]
+default = []
+solana = ["dep:csv-adapter-solana"]

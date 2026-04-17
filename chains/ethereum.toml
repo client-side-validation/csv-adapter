@@ -1,0 +1,33 @@
+# Ethereum Chain Configuration
+
+chain_id = "ethereum"
+chain_name = "Ethereum"
+default_network = "mainnet"
+rpc_endpoints = [
+    "https://eth-mainnet.alchemyapi.io/v2/demo",
+    "https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161",
+    "https://ethereum.publicnode.com"
+]
+program_id = "0x1234567890123456789012345678901234567890"
+block_explorer_urls = [
+    "https://etherscan.io",
+    "https://blockscout.com/eth/mainnet",
+    "https://www.oklink.com/eth"
+]
+
+[custom_settings]
+supports_nfts = true
+supports_smart_contracts = true
+account_model = "Account"
+confirmation_blocks = 12
+max_batch_size = 100
+supported_networks = ["mainnet", "sepolia", "goerli"]
+
+# Ethereum-specific settings
+[custom_settings.ethereum]
+gas_limit = 21000
+max_gas_price = 100000000000  # 100 Gwei
+default_gas_price = 20000000000  # 20 Gwei
+chain_id = 1
+eip1559_enabled = true
+base_fee_multiplier = 1.2

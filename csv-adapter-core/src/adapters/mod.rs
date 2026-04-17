@@ -22,6 +22,9 @@ pub mod sui;
 #[cfg(feature = "aptos")]
 pub mod aptos;
 
+// New scalable adapters
+pub mod bitcoin_adapter;
+
 // Re-export adapters
 #[cfg(feature = "bitcoin")]
 pub use bitcoin::BitcoinAdapter;
@@ -40,3 +43,6 @@ pub use aptos::AptosAdapter;
 
 #[cfg(test)]
 pub use mock::MockAdapter;
+
+// Re-export new scalable adapters
+pub use bitcoin_adapter::BitcoinAdapter as ScalableBitcoinAdapter;

@@ -1,0 +1,35 @@
+# Aptos Chain Configuration
+
+chain_id = "aptos"
+chain_name = "Aptos"
+default_network = "mainnet"
+rpc_endpoints = [
+    "https://fullnode.mainnet.aptoslabs.com",
+    "https://aptos-mainnet.pontem.network",
+    "https://fullnode.mainnet.aptos.com"
+]
+program_id = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+block_explorer_urls = [
+    "https://explorer.aptoslabs.com",
+    "https://aptoscan.com",
+    "https://explorer.aptos.com"
+]
+
+[custom_settings]
+supports_nfts = true
+supports_smart_contracts = true
+account_model = "Account"
+confirmation_blocks = 8
+max_batch_size = 100
+supported_networks = ["mainnet", "testnet", "devnet"]
+
+# Aptos-specific settings
+[custom_settings.aptos]
+max_gas_amount = 1000000
+default_gas_amount = 200000
+gas_unit_price = 100
+max_transaction_size_bytes = 32768
+transaction_timeout_seconds = 300
+max_gas_per_transaction = 1000000000
+max_gas_per_module = 100000000
+max_gas_per_function = 1000000

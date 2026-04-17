@@ -109,6 +109,7 @@ pub mod chain_adapter;
 pub mod chain_config;
 pub mod chain_registry;
 pub mod chain_system;
+pub mod chain_discovery;
 pub mod adapters;
 
 // Cross-chain transfer (Sprint 4 - NORTH STAR) - 🔒 STABLE

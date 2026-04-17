@@ -1,6 +1,6 @@
 [package]
 name = "csv-adapter-ethereum"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "Ethereum adapter for CSV (Client-Side Validation) with storage slot seals and light-client proofs"
 license = "MIT OR Apache-2.0"
@@ -19,8 +19,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-csv-adapter-core = { version = "0.1", path = "../csv-adapter-core" }
-csv-adapter-store = { version = "0.1", path = "../csv-adapter-store", optional = true }
+csv-adapter-core = { version = "0.2.0", path = "../csv-adapter-core" }
+csv-adapter-store = { version = "0.2.0", path = "../csv-adapter-store", optional = true }
 serde = { version = ">=1.0, <1.0.228", features = ["derive"] }
 thiserror = "1.0"
 hex = "0.4"

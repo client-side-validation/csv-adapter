@@ -1,6 +1,6 @@
 [package]
 name = "csv-adapter"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Unified meta-crate for CSV (Client-Side Validation) adapters — single entry point for all CSV operations"
 license = "MIT OR Apache-2.0"
@@ -20,16 +20,17 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 # Core — always included
-csv-adapter-core = { version = "0.1", path = "../csv-adapter-core" }
+csv-adapter-core = { version = "0.2.0", path = "../csv-adapter-core" }
 
 # Chain adapters — optional, enabled via feature flags
-csv-adapter-bitcoin = { version = "0.1", path = "../csv-adapter-bitcoin", optional = true }
-csv-adapter-ethereum = { version = "0.1", path = "../csv-adapter-ethereum", optional = true }
-csv-adapter-sui = { version = "0.1", path = "../csv-adapter-sui", optional = true }
-csv-adapter-aptos = { version = "0.1", path = "../csv-adapter-aptos", optional = true }
+csv-adapter-bitcoin = { version = "0.2.0", path = "../csv-adapter-bitcoin", optional = true }
+csv-adapter-ethereum = { version = "0.2.0", path = "../csv-adapter-ethereum", optional = true }
+csv-adapter-sui = { version = "0.2.0", path = "../csv-adapter-sui", optional = true }
+csv-adapter-aptos = { version = "0.2.0", path = "../csv-adapter-aptos", optional = true }
+csv-adapter-solana = { version = "0.2.0", path = "../csv-adapter-solana", optional = true }
 
 # Persistence
-csv-adapter-store = { version = "0.1", path = "../csv-adapter-store", optional = true }
+csv-adapter-store = { version = "0.2.0", path = "../csv-adapter-store", optional = true }
 
 # Async runtime
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "sync", "time"], optional = true }
@@ -59,7 +60,8 @@ bitcoin = ["dep:csv-adapter-bitcoin", "dep:bitcoin", "dep:bip32"]
 ethereum = ["dep:csv-adapter-ethereum"]
 sui = ["dep:csv-adapter-sui"]
 aptos = ["dep:csv-adapter-aptos"]
-all-chains = ["bitcoin", "ethereum", "sui", "aptos"]
+solana = ["dep:csv-adapter-solana"]
+all-chains = ["bitcoin", "ethereum", "sui", "aptos", "solana"]
 
 # Runtime features
 tokio = ["dep:tokio"]
@@ -75,13 +77,13 @@ wallet = ["dep:ed25519-dalek", "dep:bip32"]
 # Experimental features
 experimental = []
 
-# Placeholder for future chain support
-solana = []
+# Solana chain support
+solana = ["dep:csv-adapter-solana"]
 
 [dev-dependencies]
 rand = "0.8"
 tempfile = "3"
-csv-adapter-store = { version = "0.1", path = "../csv-adapter-store" }
+csv-adapter-store = { version = "0.2.0", path = "../csv-adapter-store" }
 
 [lints]
 workspace = true

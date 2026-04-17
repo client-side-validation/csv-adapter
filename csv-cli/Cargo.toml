@@ -1,6 +1,6 @@
 [package]
 name = "csv-cli"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "CLI tool for CSV Adapter — cross-chain Rights, proofs, wallets, and end-to-end testing"
 license = "MIT OR Apache-2.0"
@@ -19,12 +19,13 @@ name = "csv"
 path = "src/main.rs"
 
 [dependencies]
-csv-adapter-core = { version = "0.1", path = "../csv-adapter-core" }
-csv-adapter-bitcoin = { version = "0.1", path = "../csv-adapter-bitcoin", features = ["signet-rest"] }
-csv-adapter-ethereum = { version = "0.1", path = "../csv-adapter-ethereum" }
-csv-adapter-sui = { version = "0.1", path = "../csv-adapter-sui" }
-csv-adapter-aptos = { version = "0.1", path = "../csv-adapter-aptos" }
-csv-adapter-store = { version = "0.1", path = "../csv-adapter-store" }
+csv-adapter-core = { version = "0.2.0", path = "../csv-adapter-core" }
+csv-adapter-bitcoin = { version = "0.2.0", path = "../csv-adapter-bitcoin", features = ["signet-rest"] }
+csv-adapter-ethereum = { version = "0.2.0", path = "../csv-adapter-ethereum" }
+csv-adapter-sui = { version = "0.2.0", path = "../csv-adapter-sui" }
+csv-adapter-aptos = { version = "0.2.0", path = "../csv-adapter-aptos" }
+csv-adapter-solana = { version = "0.2.0", path = "../csv-adapter-solana" }
+csv-adapter-store = { version = "0.2.0", path = "../csv-adapter-store" }
 
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -63,4 +64,5 @@ rpc = [
     "csv-adapter-ethereum/rpc",
     "csv-adapter-sui/rpc",
     "csv-adapter-aptos/rpc",
+    "csv-adapter-solana/rpc",
 ]

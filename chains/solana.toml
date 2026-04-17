@@ -1,0 +1,35 @@
+# Solana Chain Configuration
+
+chain_id = "solana"
+chain_name = "Solana"
+default_network = "mainnet"
+rpc_endpoints = [
+    "https://api.mainnet-beta.solana.com",
+    "https://solana-api.projectserum.com",
+    "https://rpc.ankr.com/solana"
+]
+program_id = "CsvProgramSolana11111111111111111111111111111"
+block_explorer_urls = [
+    "https://explorer.solana.com",
+    "https://solscan.io",
+    "https://solanabeach.io"
+]
+
+[custom_settings]
+supports_nfts = true
+supports_smart_contracts = true
+account_model = "Account"
+confirmation_blocks = 32
+max_batch_size = 200
+supported_networks = ["mainnet", "devnet", "testnet"]
+
+# Solana-specific settings
+[custom_settings.solana]
+max_compute_units = 1400000
+default_compute_units = 200000
+lamports_per_signature = 5000
+min_balance_for_rent_exemption = 890880
+slot_duration_ms = 400
+max_signatures_per_block = 65536
+commitment_level = "confirmed"
+preflight_commitment = "confirmed"

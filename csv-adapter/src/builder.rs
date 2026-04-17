@@ -88,6 +88,7 @@ impl ClientBuilder {
             .with_chain(Chain::Ethereum)
             .with_chain(Chain::Sui)
             .with_chain(Chain::Aptos)
+            .with_chain(Chain::Solana)
     }
 
     /// Attach a wallet to the client.

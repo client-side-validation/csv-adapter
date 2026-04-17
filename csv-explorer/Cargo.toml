@@ -3,7 +3,7 @@ members = ["indexer", "storage", "api", "ui", "shared"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
@@ -19,6 +19,7 @@ dioxus = { version = "0.7", features = ["fullstack", "router", "server"] }
 dioxus-web = { version = "0.7" }
 dioxus-desktop = { version = "0.7" }
 csv-adapter-core = { path = "../csv-adapter-core" }
+csv-adapter-solana = { path = "../csv-adapter-solana" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono = { version = "0.4", features = ["serde"] }

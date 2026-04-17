@@ -32,6 +32,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use csv_adapter_core::Chain;
+use csv_adapter_core::chain_system::ChainRegistry;
 use tokio::sync::broadcast;
 
 use crate::builder::ClientBuilder;
@@ -40,6 +41,7 @@ use crate::errors::CsvError;
 use crate::events::EventStream;
 use crate::proofs::ProofManager;
 use crate::rights::RightsManager;
+use crate::scalable_builder_v2::ScalableClientBuilder;
 use crate::transfers::TransferManager;
 use crate::wallet::Wallet;
 use crate::wallet::WalletManager;
@@ -56,7 +58,7 @@ pub enum StoreHandle {
 /// The unified CSV client.
 ///
 /// This is the main entry point for all CSV operations. Construct it
-/// using [`CsvClient::builder()`] and access the various managers for
+/// using [`CsvClient::builder()`] or [`CsvClient::scalable_builder()`] and access the various managers for
 /// rights, transfers, proofs, and wallet operations.
 ///
 /// # Thread Safety
@@ -74,6 +76,8 @@ pub struct CsvClient {
     pub(crate) config: Config,
     /// Event broadcast channel sender.
     pub(crate) event_tx: broadcast::Sender<crate::events::Event>,
+    /// Chain registry for dynamic chain management.
+    pub(crate) chain_registry: Option<ChainRegistry>,
 }
 
 impl CsvClient {
@@ -92,6 +96,31 @@ impl CsvClient {
     /// ```
     pub fn builder() -> ClientBuilder {
         ClientBuilder::new()
+    }
+
+    /// Create a new [`ScalableClientBuilder`] for constructing a `CsvClient` with dynamic chain support.
+    ///
+    /// This builder supports dynamic chain loading from configuration files and chain registries,
+    /// enabling support for unlimited chains without code changes.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use csv_adapter::prelude::*;
+    ///
+    /// let registry = ChainRegistry::new();
+    /// registry.register_chain("bitcoin".to_string(), "Bitcoin".to_string());
+    /// registry.register_chain("ethereum".to_string(), "Ethereum".to_string());
+    ///
+    /// let client = CsvClient::scalable_builder()
+    ///     .with_chain_registry(registry)
+    ///     .with_chain("bitcoin")
+    ///     .with_chain("ethereum")
+    ///     .build()?;
+    /// # Ok::<_, csv_adapter::CsvError>(())
+    /// ```
+    pub fn scalable_builder() -> ScalableClientBuilder {
+        ScalableClientBuilder::new()
     }
 
     /// Get a [`RightsManager`] for creating, querying, and managing Rights.
@@ -168,6 +197,7 @@ impl CsvClient {
             store: Arc::clone(&self.store),
             config: self.config.clone(),
             event_tx: self.event_tx.clone(),
+            chain_registry: self.chain_registry.clone(),
         }
     }
 }
@@ -186,6 +216,8 @@ pub(crate) struct ClientRef {
     #[allow(dead_code)]
     pub(crate) config: Config,
     pub(crate) event_tx: broadcast::Sender<crate::events::Event>,
+    #[allow(dead_code)]
+    pub(crate) chain_registry: Option<ChainRegistry>,
 }
 
 impl ClientRef {
