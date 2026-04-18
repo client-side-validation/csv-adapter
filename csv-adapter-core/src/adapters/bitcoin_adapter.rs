@@ -3,6 +3,7 @@
 use super::super::chain_system::ChainInfo;
 
 /// Bitcoin chain adapter for the new scalable system
+#[allow(dead_code)]
 pub struct BitcoinAdapter {
     chain_id: &'static str,
     chain_name: &'static str,
@@ -41,8 +42,11 @@ impl BitcoinAdapter {
 /// Bitcoin network configuration
 #[derive(Debug, Clone)]
 pub enum BitcoinNetworkConfig {
+    /// Bitcoin main network
     Mainnet,
+    /// Bitcoin test network
     Testnet,
+    /// Bitcoin regression test network
     Regtest,
 }
 

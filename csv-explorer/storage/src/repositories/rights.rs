@@ -80,13 +80,13 @@ impl RightsRepository {
         );
         let mut records = Vec::new();
 
-        if let Some(ref chain) = filter.chain {
+        if filter.chain.is_some() {
             sql.push_str(" AND chain = ?");
         }
-        if let Some(ref owner) = filter.owner {
+        if filter.owner.is_some() {
             sql.push_str(" AND owner = ?");
         }
-        if let Some(status) = filter.status {
+        if filter.status.is_some() {
             sql.push_str(" AND status = ?");
         }
 

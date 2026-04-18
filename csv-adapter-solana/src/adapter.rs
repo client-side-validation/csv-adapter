@@ -9,16 +9,15 @@ use csv_adapter_core::{Hash, Result, proof::ProofBundle, dag::DAGSegment, signat
 use solana_sdk::{
     pubkey::Pubkey, 
     signature::Signature,
-    hash::Hash as SolanaHash,
 };
 use sha2::{Digest, Sha256};
 
 use crate::config::SolanaConfig;
 use crate::error::{SolanaError, SolanaResult};
-use crate::rpc::{SolanaRpc, MockSolanaRpc};
+use crate::rpc::SolanaRpc;
 use crate::types::{
     SolanaAnchorRef, SolanaSealRef, SolanaInclusionProof, SolanaFinalityProof,
-    ConfirmationStatus, AccountChange, SealStatus, SealAccount,
+    ConfirmationStatus, AccountChange,
 };
 use crate::wallet::ProgramWallet;
 
@@ -85,7 +84,7 @@ impl SolanaAnchorLayer {
 
     /// Derive seal PDA from right ID and owner
     fn derive_seal_pda(&self, right_id: &Hash, owner: &Pubkey) -> Pubkey {
-        let seeds = [
+        let _seeds = [
             b"csv-seal",
             right_id.as_slice(),
             owner.as_ref(),
@@ -161,7 +160,7 @@ impl AnchorLayer for SolanaAnchorLayer {
         };
         
         // Create the seal account via RPC
-        let rpc = self.check_rpc()?;
+        let _rpc = self.check_rpc()?;
         
         // In production, this would send a transaction to create the PDA
         // For now, we track it locally
@@ -186,9 +185,9 @@ impl AnchorLayer for SolanaAnchorLayer {
     }
 
     /// Publish a commitment to the seal account
-    fn publish(&self, hash: Hash, seal_ref: Self::SealRef) -> Result<Self::AnchorRef> {
-        let rpc = self.check_rpc()?;
-        let wallet = self.wallet.as_ref()
+    fn publish(&self, hash: Hash, _seal_ref: Self::SealRef) -> Result<Self::AnchorRef> {
+        let _rpc = self.check_rpc()?;
+        let _wallet = self.wallet.as_ref()
             .ok_or_else(|| SolanaError::Wallet("No wallet configured".to_string()))?;
         
         // In production, this would:
@@ -221,7 +220,7 @@ impl AnchorLayer for SolanaAnchorLayer {
 
     /// Verify inclusion by checking the transaction is in a block
     fn verify_inclusion(&self, anchor_ref: Self::AnchorRef) -> Result<Self::InclusionProof> {
-        let rpc = self.check_rpc()?;
+        let _rpc = self.check_rpc()?;
         
         // In production, this would:
         // 1. Fetch the transaction from RPC
@@ -251,7 +250,7 @@ impl AnchorLayer for SolanaAnchorLayer {
 
     /// Verify finality by checking block depth
     fn verify_finality(&self, anchor_ref: Self::AnchorRef) -> Result<Self::FinalityProof> {
-        let rpc = self.check_rpc()?;
+        let _rpc = self.check_rpc()?;
         
         // Solana has deterministic finality after ~32 slots (12-16 seconds)
         // For devnet/testnet, we use shorter confirmation
@@ -260,7 +259,7 @@ impl AnchorLayer for SolanaAnchorLayer {
         let confirmation_depth = current_slot.saturating_sub(anchor_ref.slot);
         
         // Solana requires 32 slots for finality
-        let is_finalized = confirmation_depth >= 32;
+        let _is_finalized = confirmation_depth >= 32;
         
         let mut block_hash = [0u8; 32];
         block_hash.copy_from_slice(&anchor_ref.signature.as_ref()[..32]);
@@ -280,8 +279,8 @@ impl AnchorLayer for SolanaAnchorLayer {
 
     /// Enforce seal by closing the account (consuming it)
     fn enforce_seal(&self, seal_ref: Self::SealRef) -> Result<()> {
-        let rpc = self.check_rpc()?;
-        let wallet = self.wallet.as_ref()
+        let _rpc = self.check_rpc()?;
+        let _wallet = self.wallet.as_ref()
             .ok_or_else(|| SolanaError::Wallet("No wallet configured".to_string()))?;
         
         // Find the seal account to consume
@@ -388,7 +387,7 @@ impl AnchorLayer for SolanaAnchorLayer {
         // But we still need to handle them
         
         // Check if the slot is still valid
-        let rpc = self.check_rpc()?;
+        let _rpc = self.check_rpc()?;
         
         // In production, this would:
         // 1. Query the slot to see if it's still in the canonical chain

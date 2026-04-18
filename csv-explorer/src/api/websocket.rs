@@ -7,7 +7,6 @@ use std::sync::Arc;
 use futures::{SinkExt, StreamExt};
 use tokio::sync::RwLock;
 use warp::ws::WebSocket;
-use crate::indexing::events::IndexingEvent;
 use crate::indexing::IndexingManager;
 
 /// WebSocket connection manager

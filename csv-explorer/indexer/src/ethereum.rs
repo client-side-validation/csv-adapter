@@ -78,6 +78,7 @@ struct JsonRpcResponse {
 
 /// Minimal block shape (transactions included as hashes only — we fetch logs separately)
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct BlockData {
     number: String,
     transactions: Vec<TxRef>,
@@ -85,11 +86,13 @@ struct BlockData {
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
+#[allow(dead_code)]
 enum TxRef {
     Hash(String),
     Full { hash: String },
 }
 
+#[allow(dead_code)]
 impl TxRef {
     fn hash(&self) -> &str {
         match self {
@@ -101,6 +104,7 @@ impl TxRef {
 
 /// Log returned by eth_getLogs
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 struct LogData {
     address: String,
     topics: Vec<String>,

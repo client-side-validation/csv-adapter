@@ -28,6 +28,7 @@ pub struct SuiIndexer {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct CheckpointData {
     sequence_number: String,
     transactions: Vec<TxnData>,
@@ -41,6 +42,7 @@ struct TxnData {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct EventData {
     package_id: String,
     transaction_module: String,
@@ -387,13 +389,7 @@ impl SuiIndexer {
             self.config.rpc_url.clone()
         };
 
-          let client = if let Some(ref manager) = self.rpc_manager {
-            manager.get_client("sui")
-        } else {
-            Some(Client::new())
-        };
-
-       let client = if let Some(ref manager) = self.rpc_manager {
+        let client = if let Some(ref manager) = self.rpc_manager {
             manager.get_client("sui").unwrap_or_else(Client::new)
         } else {
             Client::new()

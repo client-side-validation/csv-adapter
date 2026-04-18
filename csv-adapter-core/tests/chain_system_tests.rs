@@ -1,13 +1,11 @@
 //! Integration tests for the dynamic chain system.
 
-use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
 use tempfile::TempDir;
 
-use csv_adapter_core::chain_config::{ChainConfig, ChainConfigLoader};
+use csv_adapter_core::chain_config::ChainConfigLoader;
 use csv_adapter_core::chain_discovery::ChainDiscovery;
-use csv_adapter_core::chain_system::ChainRegistry;
+use csv_adapter_core::chain_system::SimpleChainRegistry;
 
 /// Test chain configuration loading
 #[test]
@@ -57,7 +55,7 @@ supported_networks = ["testnet", "mainnet"]
 /// Test chain registry functionality
 #[test]
 fn test_chain_registry() {
-    let mut registry = ChainRegistry::new();
+    let mut registry = SimpleChainRegistry::new();
     
     // Register chains
     registry.register_chain("bitcoin".to_string(), "Bitcoin".to_string());
@@ -205,7 +203,7 @@ chain_id = "invalid-chain"
 /// Test chain capability detection
 #[test]
 fn test_chain_capability_detection() {
-    let mut registry = ChainRegistry::new();
+    let mut registry = SimpleChainRegistry::new();
     
     // Register chains with different capabilities
     registry.register_chain("utxo-chain".to_string(), "UTHO Chain".to_string());

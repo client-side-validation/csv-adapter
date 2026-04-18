@@ -29,7 +29,6 @@ pub struct SyncCoordinator {
     advanced_repo: AdvancedProofRepository,
     /// Chain configurations for network info
     chain_configs: std::collections::HashMap<String, ChainConfig>,
-    concurrency: usize,
     batch_size: u64,
     poll_interval_ms: u64,
     running: Arc<RwLock<bool>>,
@@ -40,6 +39,7 @@ pub struct SyncCoordinator {
 
 /// Per-chain sync state.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct ChainSyncState {
     chain_id: String,
     chain_name: String,
@@ -56,7 +56,7 @@ impl SyncCoordinator {
         indexers: Vec<Box<dyn ChainIndexer>>,
         pool: SqlitePool,
         chain_configs: std::collections::HashMap<String, ChainConfig>,
-        concurrency: usize,
+        _concurrency: usize,
         batch_size: u64,
         poll_interval_ms: u64,
     ) -> Self {
@@ -94,7 +94,6 @@ impl SyncCoordinator {
             contracts_repo: ContractsRepository::new(pool.clone()),
             advanced_repo: AdvancedProofRepository::new(pool),
             chain_configs,
-            concurrency,
             batch_size,
             poll_interval_ms,
             running: Arc::new(RwLock::new(false)),
@@ -310,7 +309,7 @@ async fn sync_chain(
     contracts_repo: &ContractsRepository,
     advanced_repo: &AdvancedProofRepository,
     batch_size: u64,
-    chain_configs: &Arc<RwLock<Vec<ChainSyncState>>>,
+    _chain_configs: &Arc<RwLock<Vec<ChainSyncState>>>,
     total_indexed: &Arc<RwLock<u64>>,
     chain_config: Option<&ChainConfig>,
 ) -> Result<(), ExplorerError> {
@@ -371,7 +370,7 @@ async fn sync_chain(
     while current <= end {
         // Process block and get all data in one call
         match indexer.process_block(current).await {
-            Ok(block_result) => {
+            Ok(_block_result) => {
                 // Now get the actual data to store
                 let rights = indexer.index_rights(current).await?;
                 let seals = indexer.index_seals(current).await?;

@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 
 use csv_explorer_shared::{
-    CommitmentScheme, CsvContract, EnhancedInclusionProof, EnhancedRightRecord, EnhancedSealRecord,
+    CommitmentScheme, CsvContract, EnhancedRightRecord, EnhancedSealRecord,
     EnhancedTransferRecord, ExplorerError, FinalityProofType, InclusionProofType, Network,
     PriorityLevel, RightRecord, SealRecord, TransferRecord,
 };

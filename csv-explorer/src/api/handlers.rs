@@ -5,12 +5,10 @@
 use std::sync::Arc;
 use warp::{Rejection, Reply};
 use chrono::{DateTime, Utc};
-use crate::indexing::{IndexingManager, RightsQuery, TransferQuery, IndexingMetrics};
+use crate::indexing::{IndexingManager, RightsQuery, TransferQuery};
 use crate::api::{ApiResponse, RightsSearchRequest, TransfersSearchRequest, RightsResponse, TransfersResponse};
-use csv_adapter_core::{Hash, TransferStatus};
-use futures::{SinkExt};
-use tokio::sync::mpsc;
-use warp::ws::{Message, WebSocket};
+use csv_adapter_core::Hash;
+use futures::SinkExt;
 
 /// Handle getting rights by owner
 pub async fn get_rights_by_owner(

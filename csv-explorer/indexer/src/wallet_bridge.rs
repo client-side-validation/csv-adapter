@@ -7,17 +7,16 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
 
 use csv_explorer_shared::{
-    ExplorerError, IndexingActivity, Network, PriorityAddress, PriorityIndexingStatus,
+    ExplorerError, Network, PriorityAddress, PriorityIndexingStatus,
     PriorityLevel, Result, RightRecord, SealRecord, TransferRecord,
 };
 
-use crate::chain_indexer::{AddressIndexingResult, ChainIndexer};
+use crate::chain_indexer::ChainIndexer;
 use csv_explorer_storage::repositories::PriorityAddressRepository;
 
 /// Configuration for the wallet-indexer bridge.
@@ -47,7 +46,8 @@ impl Default for WalletIndexerBridgeConfig {
 /// Bridge service connecting wallet to indexer.
 #[derive(Clone)]
 pub struct WalletIndexerBridge {
-    pool: SqlitePool,
+    /// Database pool (retained for future use)
+    _pool: SqlitePool,
     priority_repo: Arc<PriorityAddressRepository>,
     indexers: Vec<Arc<dyn ChainIndexer>>,
     config: Arc<WalletIndexerBridgeConfig>,
@@ -64,7 +64,7 @@ impl WalletIndexerBridge {
         let priority_repo = PriorityAddressRepository::new(pool.clone());
 
         Self {
-            pool,
+            _pool: pool,
             priority_repo: Arc::new(priority_repo),
             indexers,
             config: Arc::new(config),

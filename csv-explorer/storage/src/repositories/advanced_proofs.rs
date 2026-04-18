@@ -2,7 +2,6 @@
 ///
 /// Handles storage and querying of commitment schemes, proof types,
 /// and enhanced right/seal records with metadata.
-use chrono::{DateTime, Utc};
 use csv_explorer_shared::{
     CommitmentScheme, EnhancedInclusionProof, EnhancedRightRecord, EnhancedSealRecord,
     EnhancedTransferRecord, FinalityProofCount, FinalityProofType, InclusionProofCount,

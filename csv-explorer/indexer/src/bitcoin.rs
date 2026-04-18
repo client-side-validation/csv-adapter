@@ -16,8 +16,8 @@ use super::chain_indexer::{AddressIndexingResult, ChainIndexer, ChainResult};
 use super::rpc_manager::RpcManager;
 use csv_explorer_shared::{
     ChainConfig, CommitmentScheme, CsvContract, EnhancedRightRecord, EnhancedSealRecord,
-    EnhancedTransferRecord, ExplorerError, FinalityProofType, InclusionProofType, Network,
-    PriorityLevel, RightRecord, SealRecord, SealStatus, SealType, TransferRecord,
+    EnhancedTransferRecord, FinalityProofType, InclusionProofType, Network, PriorityLevel,
+    RightRecord, SealRecord, SealStatus, SealType, TransferRecord,
 };
 
 /// Bitcoin-specific indexer.
@@ -41,6 +41,7 @@ struct MempoolTx {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct VoutInfo {
     scriptpubkey: Option<String>,
     scriptpubkey_type: Option<String>,
@@ -61,6 +62,7 @@ struct PrevOut {
 }
 
 // Internal block representation
+#[allow(dead_code)]
 struct BlockInfo {
     height: u64,
     tx: Vec<MempoolTx>,
@@ -260,9 +262,10 @@ impl ChainIndexer for BitcoinIndexer {
     async fn index_addresses_with_priority(
         &self,
         addresses: &[String],
-        _priority: PriorityLevel,
-        _network: Network,
+        priority: PriorityLevel,
+        network: Network,
     ) -> ChainResult<AddressIndexingResult> {
+        let (_priority, _network) = (priority, network);
         let mut result = AddressIndexingResult {
             addresses_processed: 0,
             rights_indexed: 0,

@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use chrono::{DateTime, Utc};
 
-use csv_adapter_core::{Hash, Right, TransferStatus};
+use csv_adapter_core::{Hash, TransferStatus};
 use crate::indexing::events::IndexingEvent;
 use crate::indexing::processor::EventProcessor;
 use crate::indexing::storage::IndexStorage;
@@ -47,7 +47,7 @@ impl IndexingManager {
         let processor = Arc::new(EventProcessor::new(storage.clone()));
         let event_buffer = Arc::new(RwLock::new(Vec::new()));
 
-        let mut synchronizers = HashMap::new();
+        let synchronizers = HashMap::new();
         let chains = vec!["bitcoin", "ethereum", "sui", "aptos", "solana"];
 
         // ChainSynchronizer (alias for SyncCoordinator) requires complex initialization.

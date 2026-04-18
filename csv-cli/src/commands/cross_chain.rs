@@ -29,6 +29,7 @@ struct JsonRpcError {
 
 /// Bitcoin REST API block height response
 #[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
 struct BitcoinBlockHeight {
     height: u64,
 }

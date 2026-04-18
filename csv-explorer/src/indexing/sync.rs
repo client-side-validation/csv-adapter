@@ -49,6 +49,7 @@ struct ChainSyncState {
     latest_block: u64,
     latest_slot: Option<u64>,
     rpc_url: String,
+    #[allow(dead_code)]
     network: String,
 }
 

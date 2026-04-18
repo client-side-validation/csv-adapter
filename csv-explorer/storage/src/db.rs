@@ -6,7 +6,7 @@ use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::SqlitePool;
 use std::time::Duration;
 
-use csv_explorer_shared::{ExplorerError, Result};
+use csv_explorer_shared::Result;
 
 /// The raw SQL schema to apply on first run.
 const SCHEMA_SQL: &str = include_str!("schema.sql");

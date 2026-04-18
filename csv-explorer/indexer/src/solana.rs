@@ -39,6 +39,7 @@ struct SolanaRpcResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct TransactionInfo {
     slot: Option<u64>,
     transaction: Option<serde_json::Value>,

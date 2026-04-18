@@ -99,6 +99,7 @@ pub mod performance;
 pub mod store;
 
 // Client-side validation (Sprint 2)// Cross-chain transfer
+pub mod client;
 pub mod cross_chain;
 pub mod commitment_chain;
 pub mod seal_registry;
@@ -149,6 +150,7 @@ pub use error::{AdapterError, Result};
 pub use traits::AnchorLayer;
 
 // Cross-chain transfer
+pub use client::{ValidationClient, ValidationResult};
 pub use cross_chain::{CrossChainLockEvent, CrossChainRegistry, CrossChainRegistryEntry};
 
 // ===========================================================================

@@ -233,7 +233,7 @@ mod tests {
     
     #[test]
     fn test_chain_registry() {
-        let mut registry = ChainRegistry::new();
+        let registry = ChainRegistry::new();
         assert_eq!(registry.supported_chains().len(), 0);
         
         // Test registration would go here

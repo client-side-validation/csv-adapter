@@ -12,20 +12,22 @@ use super::chain_indexer::{AddressIndexingResult, ChainIndexer, ChainResult};
 use super::rpc_manager::RpcManager;
 use csv_explorer_shared::{
     ChainConfig, CommitmentScheme, ContractStatus, ContractType, CsvContract, EnhancedRightRecord,
-    EnhancedSealRecord, EnhancedTransferRecord, ExplorerError, FinalityProofType,
-    InclusionProofType, Network, PriorityLevel, RightRecord, SealRecord, SealStatus, SealType,
+    EnhancedSealRecord, EnhancedTransferRecord, FinalityProofType,
+    InclusionProofType, RightRecord, SealRecord, SealStatus, SealType,
     TransferRecord,
 };
 
 /// Aptos-specific indexer.
 pub struct AptosIndexer {
     config: ChainConfig,
-    http_client: Client,
+    /// HTTP client for making API requests (retained for future use)
+    _http_client: Client,
     /// RPC manager for handling multiple RPC endpoints
     rpc_manager: Option<RpcManager>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct LedgerInfo {
     block_height: String,
     ledger_version: String,
@@ -33,11 +35,13 @@ struct LedgerInfo {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct BlockTransactions {
     transactions: Vec<AptosTxn>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AptosTxn {
     hash: String,
     version: String,
@@ -46,6 +50,7 @@ struct AptosTxn {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AptosEvent {
     guid: Option<serde_json::Value>,
     sequence_number: String,
@@ -372,7 +377,7 @@ impl AptosIndexer {
     pub fn new(config: ChainConfig, rpc_manager: RpcManager) -> Self {
         Self {
             config,
-            http_client: Client::new(),
+            _http_client: Client::new(),
             rpc_manager: Some(rpc_manager),
         }
     }

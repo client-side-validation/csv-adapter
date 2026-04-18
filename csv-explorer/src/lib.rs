@@ -8,7 +8,6 @@ pub mod api;
 pub mod dashboard;
 
 use std::sync::Arc;
-use std::time::Instant;
 use chrono::{DateTime, Utc};
 use indexing::IndexingManager;
 use api::ExplorerApi;

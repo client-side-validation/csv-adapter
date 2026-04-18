@@ -18,7 +18,7 @@ pub use rpc_manager::{load_rpc_config, AuthType, RpcConfig, RpcEndpoint, RpcMana
 pub use sync::SyncCoordinator;
 pub use wallet_bridge::{WalletIndexerBridge, WalletIndexerBridgeConfig};
 
-use csv_explorer_shared::{ChainConfig, ExplorerConfig, ExplorerError, Result};
+use csv_explorer_shared::{ExplorerConfig, Result};
 use sqlx::SqlitePool;
 
 /// The main indexer that wraps all chain indexers.

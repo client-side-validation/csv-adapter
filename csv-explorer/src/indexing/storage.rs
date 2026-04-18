@@ -4,9 +4,10 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 use chrono::{DateTime, Utc};
-use csv_adapter_core::{Hash, Chain, TransferStatus};
+use csv_adapter_core::{Hash, Chain};
+#[cfg(test)]
+use csv_adapter_core::TransferStatus;
 use crate::indexing::{IndexedRight, IndexedTransfer, RightsQuery, TransferQuery};
 
 /// Index storage interface

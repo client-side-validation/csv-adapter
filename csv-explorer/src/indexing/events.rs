@@ -3,7 +3,9 @@
 //! Defines the event types that drive the indexing pipeline
 //! and provides utilities for event handling.
 
-use csv_adapter_core::{Hash, Right, Chain};
+use csv_adapter_core::{Hash, Chain};
+#[cfg(test)]
+use csv_adapter_core::TransferStatus;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 

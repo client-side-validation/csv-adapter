@@ -4,13 +4,10 @@
 //! and real-time transfer monitoring.
 
 use std::sync::Arc;
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 use warp::{Filter, Reply};
-use std::net::SocketAddr;
 use tokio_tungstenite::WebSocketStream;
-use crate::indexing::{IndexingManager, RightsQuery, TransferQuery, IndexedRight, IndexedTransfer, IndexingMetrics};
+use crate::indexing::{IndexingManager, IndexedRight, IndexedTransfer, IndexingMetrics};
 
 pub mod handlers;
 pub mod websocket;
@@ -355,7 +352,7 @@ mod tests {
         assert!(success_response.data.is_some());
         assert!(success_response.error.is_none());
         
-        let error_response = ApiResponse::error("test error".to_string());
+        let error_response: ApiResponse<String> = ApiResponse::error("test error".to_string());
         assert!(!error_response.success);
         assert!(error_response.data.is_none());
         assert!(error_response.error.is_some());

@@ -86,6 +86,7 @@ pub struct MockRpcClient {
 }
 
 impl MockRpcClient {
+    /// Create a new mock RPC client.
     pub fn new() -> Self {
         Self {
             transactions: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
@@ -114,7 +115,6 @@ impl RpcClient for MockRpcClient {
                     return Ok(tx.clone());
                 }
             }
-        }
         }
         Err(ChainError::RpcError("Transaction not found".to_string()))
     }
@@ -146,6 +146,7 @@ pub struct MockWallet {
 }
 
 impl MockWallet {
+    /// Create a new mock wallet.
     pub fn new() -> Self {
         Self {
             address: "mock_address_12345".to_string(),
