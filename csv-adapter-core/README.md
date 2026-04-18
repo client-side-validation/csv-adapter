@@ -18,6 +18,8 @@ This crate provides the foundational types and traits for the CSV protocol, a cl
 - **[`SealRef`]** / **[`AnchorRef`]** — References to consumed seals and published anchors
 - **[`InclusionProof`]** / **[`FinalityProof`]** / **[`ProofBundle`]** — Cryptographic proofs
 - **[`AnchorLayer`]** — The core trait each blockchain adapter implements
+- **[`ChainAdapter`]** — Scalable chain adapter trait for dynamic registration
+- **[`AdapterFactory`]** — Factory for creating chain adapters dynamically
 - **[`SignatureScheme`]** — Supported signing algorithms (secp256k1, Ed25519)
 
 [`Right`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/struct.Right.html
@@ -110,6 +112,41 @@ let is_valid = verify_signatures(&signatures, &public_keys, SignatureScheme::Sec
 
 The core crate defines the **Universal Seal Primitive** — a chain-agnostic abstraction for single-use enforcement:
 
+### Scalable Chain Adapter System
+
+The new scalable architecture uses a **plugin-based registry pattern** for dynamic chain support:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    csv-adapter-core                           │
+│                                                               │
+│   ChainAdapter ─────── Trait for all chain adapters          │
+│   ├─ chain_id() ─────── Returns chain identifier             │
+│   ├─ capabilities() ─── Returns ChainCapabilities            │
+│   ├─ create_client() ── Creates RPC client                   │
+│   └─ create_wallet() ── Creates wallet interface            │
+│                                                               │
+│   AdapterFactory ────── Dynamic adapter registry              │
+│   ├─ register() ─────── Register new chain adapter           │
+│   ├─ create_adapter() ─ Create adapter by chain ID         │
+│   └─ supported_chains() ─ List all registered chains         │
+│                                                               │
+│   ChainRegistry ─────── Store adapter instances               │
+│   ChainCapabilities ─── Chain metadata (account model, etc)   │
+└──────────────┬───────────────────────────────┬──────────────┘
+               │                               │
+    ┌──────────┴──────────┐          ┌──────────┴──────────┐
+    │  Built-in Adapters  │          │  Custom Adapters    │
+    │  • BitcoinAdapter   │          │  • YourChainAdapter │
+    │  • EthereumAdapter  │          │  (dynamically       │
+    │  • SolanaAdapter    │          │   registered)       │
+    │  • SuiAdapter       │          │                     │
+    │  • AptosAdapter     │          │                     │
+    └─────────────────────┘          └─────────────────────┘
+```
+
+### Legacy AnchorLayer System
+
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                    csv-adapter-core                           │
@@ -136,6 +173,67 @@ Each chain adapter implements `AnchorLayer` using its native single-use mechanis
 | Sui | L1 Structural | Object deletion | Native single-use |
 | Aptos | L2 Type-Enforced | Resource destruction | Language-level scarcity |
 | Ethereum | L3 Cryptographic | Nullifier registration | Cryptographic single-use |
+| Solana | L1 Structural | Account-based with program-derived addresses | Native single-use |
+
+## Scalable Architecture Usage
+
+### Using the Adapter Factory
+
+```rust
+use csv_adapter_core::{AdapterFactory, ChainAdapter, ChainCapabilities};
+
+// Create factory with all built-in adapters
+let factory = AdapterFactory::new();
+
+// Get supported chains
+let chains = factory.supported_chains();
+// Returns: ["bitcoin", "ethereum", "solana", "sui", "aptos"]
+
+// Create adapter by chain ID
+if let Some(adapter) = factory.create_adapter("solana") {
+    println!("Chain: {}", adapter.chain_name());
+    println!("Capabilities: {:?}", adapter.capabilities());
+}
+```
+
+### Registering Custom Adapters
+
+```rust
+use csv_adapter_core::{AdapterFactory, ChainAdapter};
+
+// Create your custom adapter
+pub struct MyChainAdapter;
+impl ChainAdapter for MyChainAdapter {
+    fn chain_id(&self) -> &'static str { "mychain" }
+    fn chain_name(&self) -> &'static str { "My Chain" }
+    fn capabilities(&self) -> ChainCapabilities { /* ... */ }
+    // ... implement other methods
+}
+
+// Register with factory
+let mut factory = AdapterFactory::new();
+factory.register("mychain", Arc::new(|| Box::new(MyChainAdapter)));
+
+// Now available everywhere
+let adapter = factory.create_adapter("mychain");
+```
+
+### Using the Chain Registry
+
+```rust
+use csv_adapter_core::ChainRegistry;
+
+// Create registry and register adapters
+let mut registry = ChainRegistry::new();
+registry.register(Box::new(SolanaAdapter::new()));
+
+// Get adapter and query capabilities
+if let Some(adapter) = registry.get("solana") {
+    let caps = adapter.capabilities();
+    assert!(caps.supports_smart_contracts);
+    assert!(caps.account_model == AccountModel::Account);
+}
+```
 
 ## Examples
 
@@ -143,12 +241,14 @@ See the [`examples/`](examples/) directory for usage patterns:
 
 - **`basic_right`** — Creating, transferring, and verifying Rights
 - **`commitment_chain`** — Building and validating commitment chains
+- **`complete_scalable_demo`** — Using the new scalable architecture
 
 Run examples with:
 
 ```bash
 cargo run --example basic_right
 cargo run --example commitment_chain
+cargo run --example complete_scalable_demo
 ```
 
 ## License

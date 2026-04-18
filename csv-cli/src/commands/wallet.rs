@@ -645,6 +645,41 @@ fn cmd_balance(
                 output::kv("Balance (Octas)", &balance_oct.to_string());
             }
         }
+        Chain::Solana => {
+            let chain_config = config.chain(&chain)?;
+            let rpc_req = serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "getBalance",
+                "params": [addr],
+                "id": 1
+            });
+
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()?;
+
+            let resp = client
+                .post(&chain_config.rpc_url)
+                .json(&rpc_req)
+                .send()
+                .map_err(|e| anyhow::anyhow!("Failed to connect to Solana RPC: {}", e))?
+                .json::<serde_json::Value>()
+                .map_err(|e| anyhow::anyhow!("Failed to parse RPC response: {}", e))?;
+
+            if let Some(error) = resp.get("error") {
+                output::error(&format!("RPC error: {}", error));
+            } else if let Some(result) = resp.get("result") {
+                if let Some(value) = result.get("value").and_then(|v| v.as_u64()) {
+                    let balance_sol = value as f64 / 1e9;
+                    output::kv("Balance (SOL)", &format!("{:.9}", balance_sol));
+                    output::kv("Balance (lamports)", &value.to_string());
+                } else {
+                    output::warning("No balance found");
+                }
+            } else {
+                output::error("Unexpected RPC response format");
+            }
+        }
     }
 
     Ok(())
@@ -713,6 +748,22 @@ fn cmd_fund(chain: Chain, address: Option<String>, config: &Config, state: &Stat
                 output::error(&format!("Faucet request failed: {}", resp.status()));
             }
         }
+        Chain::Solana => {
+            output::progress(1, 3, "Requesting SOL from devnet faucet...");
+            let url = format!("{}/?address={}", faucet.url.trim_end_matches('/'), addr);
+            let resp = reqwest::blocking::Client::new()
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .send()?;
+
+            if resp.status().is_success() {
+                output::progress(2, 3, "Transaction submitted");
+                output::progress(3, 3, "Waiting for confirmation...");
+                output::success("SOL faucet request submitted successfully");
+            } else {
+                output::error(&format!("Faucet request failed: {}", resp.status()));
+            }
+        }
     }
 
     Ok(())
@@ -749,6 +800,42 @@ fn cmd_import(chain: Chain, secret: String, _config: &Config, state: &mut State)
 
     // Properly derive address from private key based on chain
     let address = match chain {
+        Chain::Solana => {
+            use ed25519_dalek::SigningKey;
+
+            let secret_bytes = if let Some(stripped) = secret.strip_prefix("0x") {
+                hex::decode(stripped).map_err(|e| anyhow::anyhow!("Invalid hex: {}", e))?
+            } else if secret.len() == 88 && secret.chars().all(|c| c.is_alphanumeric()) {
+                // Assume base58-encoded private key (Solana format)
+                bs58::decode(&secret)
+                    .into_vec()
+                    .map_err(|e| anyhow::anyhow!("Invalid base58: {}", e))?
+            } else {
+                hex::decode(&secret).map_err(|e| anyhow::anyhow!("Invalid hex: {}", e))?
+            };
+
+            // Solana private key is 64 bytes (seed + public key) or 32 bytes (seed only)
+            let seed: [u8; 32] = if secret_bytes.len() == 64 {
+                let mut s = [0u8; 32];
+                s.copy_from_slice(&secret_bytes[0..32]);
+                s
+            } else if secret_bytes.len() == 32 {
+                let mut s = [0u8; 32];
+                s.copy_from_slice(&secret_bytes);
+                s
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Invalid Solana private key length: {} bytes (expected 32 or 64)",
+                    secret_bytes.len()
+                ));
+            };
+
+            let signing_key = SigningKey::from_bytes(&seed);
+            let verifying_key = signing_key.verifying_key();
+
+            // Solana address: base58-encoded public key (32 bytes)
+            bs58::encode(verifying_key.as_bytes()).into_string()
+        }
         Chain::Aptos => {
             use ed25519_dalek::SigningKey;
             use sha3::{Digest, Sha3_256};

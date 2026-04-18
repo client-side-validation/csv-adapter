@@ -145,10 +145,10 @@ mod tests {
     #[test]
     fn test_supported_chains() {
         let chains = supported_chains();
-        assert!(chains.contains(&"bitcoin"));
-        assert!(chains.contains(&"ethereum"));
-        assert!(chains.contains(&"solana"));
-        assert!(chains.contains(&"sui"));
-        assert!(chains.contains(&"aptos"));
+        assert!(chains.iter().any(|c| c == "bitcoin"));
+        assert!(chains.iter().any(|c| c == "ethereum"));
+        assert!(chains.iter().any(|c| c == "solana"));
+        assert!(chains.iter().any(|c| c == "sui"));
+        assert!(chains.iter().any(|c| c == "aptos"));
     }
 }

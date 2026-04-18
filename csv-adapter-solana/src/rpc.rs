@@ -1,4 +1,5 @@
 //! RPC client for Solana adapter
+use tokio::time::Duration;
 
 use solana_sdk::{
     pubkey::Pubkey,
@@ -6,9 +7,6 @@ use solana_sdk::{
     transaction::Transaction,
     account::Account,
 };
-
-
-use tokio::time::Duration;
 
 use crate::error::{SolanaError, SolanaResult};
 use crate::types::{AccountChange, ConfirmationStatus};

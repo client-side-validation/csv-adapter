@@ -173,13 +173,14 @@ Start with [Documentation Hub](docs/INDEX.md).
 
 | Document | Purpose |
 |----------|---------|
-| [Architecture](docs/ARCHITECTURE.md) | Current system model, invariants, and package boundaries |
+| [Architecture](docs/ARCHITECTURE.md) | System model, invariants, and package boundaries |
+| [Scalable Chain Architecture](docs/SCALABLE_CHAIN_ARCHITECTURE.md) | Plugin-based multi-chain adapter system |
 | [Cross-Chain Spec](docs/CROSS_CHAIN_SPEC.md) | Protocol semantics and proof model |
 | [Developer Guide](docs/DEVELOPER_GUIDE.md) | Build, test, extend, and operate the repo |
-| [Implementation Status](docs/CROSS_CHAIN_IMPLEMENTATION.md) | What is implemented now and where gaps remain |
+| [Implementation Status](docs/CROSS_CHAIN_IMPLEMENTATION.md) | Current implementation status |
 | [Blueprint](docs/BLUEPRINT.md) | Product and engineering roadmap |
-| [Explorer and Wallet Indexing](docs/EXPLORER_WALLET_INDEXING.md) | Explorer indexing and wallet integration design |
-| [AluVM Note](docs/ALUVM.md) | Experimental design note for future VM integration |
+| [Explorer and Wallet Indexing](docs/EXPLORER_WALLET_INDEXING.md) | Explorer indexing and wallet integration |
+| [AluVM Note](docs/ALUVM.md) | Experimental VM integration design |
 | [E2E Manual](docs/E2E_TESTNET_MANUAL.md) | Testnet walkthrough |
 | [E2E Report](docs/TESTNET_E2E_REPORT.md) | Recorded test outcomes |
 

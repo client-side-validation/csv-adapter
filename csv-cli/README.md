@@ -35,18 +35,21 @@ csv wallet generate bitcoin test
 csv wallet generate ethereum
 csv wallet generate sui test
 csv wallet generate aptos test
+csv wallet generate solana  # Solana wallet (devnet)
 
 # 2. Fund wallets from testnet faucets
 csv wallet fund bitcoin
 csv wallet fund ethereum
 csv wallet fund sui
 csv wallet fund aptos
+csv wallet fund solana
 
 # 3. Check balances
 csv wallet balance bitcoin
 csv wallet balance ethereum
 csv wallet balance sui
 csv wallet balance aptos
+csv wallet balance solana
 
 # 4. Deploy contracts (not needed for Bitcoin — UTXO-native)
 csv contract deploy --chain sui
@@ -74,11 +77,19 @@ csv proof verify-cross-chain --source bitcoin --dest sui --proof proof.json
 csv chain list
 ```
 
+The CLI now uses a **plugin-based scalable architecture** supporting 5+ chains:
+- Bitcoin (UTXO-based)
+- Ethereum (Account-based with smart contracts)
+- Solana (High-performance, account-based)
+- Sui (Object-based)
+- Aptos (Resource-based)
+
 **Check chain status and connectivity:**
 
 ```bash
 csv chain status bitcoin
 csv chain status ethereum
+csv chain status solana
 csv chain status sui
 csv chain status aptos
 ```
@@ -130,6 +141,9 @@ csv wallet generate sui test
 
 # Aptos (Ed25519)
 csv wallet generate aptos test
+
+# Solana (Ed25519, base58 addresses)
+csv wallet generate solana
 ```
 
 **Check balance:**
@@ -138,6 +152,7 @@ csv wallet generate aptos test
 csv wallet balance bitcoin
 csv wallet balance --address tb1p7xr... bitcoin
 csv wallet balance ethereum
+csv wallet balance solana
 csv wallet balance sui
 csv wallet balance aptos
 ```
@@ -147,6 +162,7 @@ csv wallet balance aptos
 ```bash
 csv wallet fund bitcoin    # Uses Signet faucet
 csv wallet fund ethereum   # Uses Sepolia faucet
+csv wallet fund solana     # Uses Solana Devnet faucet
 csv wallet fund sui        # Uses Sui Testnet faucet
 csv wallet fund aptos      # Uses Aptos Testnet faucet
 ```
@@ -471,6 +487,7 @@ The CLI persists state to `~/.csv/data/state.json`:
   "addresses": {
     "bitcoin": "tb1p7xr...",
     "ethereum": "0x1234...",
+    "solana": "HN7cAB...",
     "sui": "0x5678...",
     "aptos": "0x9abc..."
   },
