@@ -289,8 +289,8 @@ impl SyncCoordinator {
         // Reset sync progress for this chain
         self.sync_repo.reset(chain_id).await?;
 
-        // Then sync from the specified block
-        self.sync_chain(chain_id).await
+        // Then sync from the specified block (pass the from_block override)
+        self.sync_chain_from_block(chain_id, from_block).await
     }
 
     /// Reset sync progress for all chains.
@@ -319,11 +319,14 @@ async fn sync_chain(
     // Get last synced block from database
     let db_block = sync_repo.get_latest_block(chain_id).await?;
 
-    // Determine starting block:
-    // 1. If database has data, use the last synced block
-    // 2. Otherwise, use start_block from chain config if provided
+    // Determine starting block - DATABASE TAKES PRIORITY:
+    // 1. If database has data, always use the last synced block (resumes from where we left off)
+    // 2. Otherwise, use start_block from chain config if provided (initial sync)
     // 3. Fall back to 0 (genesis) if neither is available
-    let from_block = if let Some(config) = chain_config {
+    let from_block = if let Some(block) = db_block {
+        tracing::info!(chain = chain_id, block, "Resuming sync from database");
+        block
+    } else if let Some(config) = chain_config {
         if let Some(start) = config.start_block {
             tracing::info!(
                 chain = chain_id,
@@ -331,9 +334,6 @@ async fn sync_chain(
                 "Starting initial sync from configured start_block"
             );
             start
-        } else if let Some(block) = db_block {
-            tracing::info!(chain = chain_id, block, "Resuming sync from database");
-            block
         } else {
             tracing::warn!(
                 chain = chain_id,

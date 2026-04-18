@@ -108,9 +108,9 @@ pub mod validator;
 // Chain adapter system for dynamic chain support
 pub mod chain_config;
 pub mod chain_system;
-// pub mod chain_adapter;  // Temporarily disabled due to dyn compatibility issues
-// pub mod chain_discovery;  // Temporarily disabled due to dyn compatibility issues
-// pub mod adapters;  // Temporarily disabled due to dyn compatibility issues
+pub mod chain_adapter;
+pub mod chain_discovery;
+pub mod adapters;
 
 // RGB protocol compatibility (Sprint 5) - 🧪 EXPERIMENTAL
 #[cfg(feature = "experimental")]
@@ -183,6 +183,16 @@ pub use transition::Transition;
 // Cross-cutting (Phase 10)
 pub use monitor::{PendingPublication, PublicationTracker, ReorgEvent, ReorgMonitor};
 pub use store::{AnchorRecord, InMemorySealStore, SealRecord, SealStore, StoreError};
+
+// Chain adapter system (Beta API)
+pub use chain_adapter::{
+    ChainAdapter, ChainAdapterExt, ChainError, ChainRegistry, ChainResult, RpcClient, Wallet,
+};
+pub use chain_config::{
+    ChainCapabilities, ChainConfig, ChainConfigLoader, AccountModel,
+};
+pub use chain_discovery::ChainDiscovery;
+pub use chain_system::{ChainInfo, SimpleChainRegistry};
 
 // ===========================================================================
 // Re-exports: Experimental API (feature-gated, may change)

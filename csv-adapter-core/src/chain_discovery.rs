@@ -4,12 +4,12 @@ use std::path::Path;
 use std::collections::HashMap;
 
 use super::chain_config::{ChainConfig, ChainConfigLoader};
-use super::chain_system::ChainRegistry;
+use super::chain_system::SimpleChainRegistry;
 
 /// Chain discovery system for automatic chain loading
 pub struct ChainDiscovery {
     config_loader: ChainConfigLoader,
-    registry: ChainRegistry,
+    registry: SimpleChainRegistry,
 }
 
 impl ChainDiscovery {
@@ -17,7 +17,7 @@ impl ChainDiscovery {
     pub fn new() -> Self {
         Self {
             config_loader: ChainConfigLoader::new(),
-            registry: ChainRegistry::new(),
+            registry: SimpleChainRegistry::new(),
         }
     }
     
@@ -41,12 +41,12 @@ impl ChainDiscovery {
     }
     
     /// Get the chain registry
-    pub fn registry(&self) -> &ChainRegistry {
+    pub fn registry(&self) -> &SimpleChainRegistry {
         &self.registry
     }
     
     /// Get the chain registry (mutable)
-    pub fn registry_mut(&mut self) -> &mut ChainRegistry {
+    pub fn registry_mut(&mut self) -> &mut SimpleChainRegistry {
         &mut self.registry
     }
     

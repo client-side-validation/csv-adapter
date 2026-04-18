@@ -2,9 +2,11 @@
 
 use std::collections::HashMap;
 
-/// Chain adapter registry for dynamic chain management
+/// Simplified chain registry for basic chain information
+/// 
+/// Note: For full adapter storage with trait objects, use `ChainRegistry` from `chain_adapter`.
 #[derive(Clone)]
-pub struct ChainRegistry {
+pub struct SimpleChainRegistry {
     adapters: HashMap<String, ChainInfo>,
 }
 
@@ -21,7 +23,7 @@ pub struct ChainInfo {
     pub supports_smart_contracts: bool,
 }
 
-impl ChainRegistry {
+impl SimpleChainRegistry {
     /// Create new registry
     pub fn new() -> Self {
         Self {
@@ -60,7 +62,7 @@ impl ChainRegistry {
     }
 }
 
-impl Default for ChainRegistry {
+impl Default for SimpleChainRegistry {
     fn default() -> Self {
         Self::new()
     }

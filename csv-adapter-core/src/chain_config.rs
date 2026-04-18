@@ -4,6 +4,40 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
+/// Chain-specific capabilities and features
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChainCapabilities {
+    /// Whether this chain supports NFTs
+    pub supports_nfts: bool,
+    /// Whether this chain supports smart contracts
+    pub supports_smart_contracts: bool,
+    /// Account model used by this chain
+    pub account_model: AccountModel,
+    /// Number of blocks needed for finality
+    pub confirmation_blocks: u64,
+    /// Maximum batch size for operations
+    pub max_batch_size: usize,
+    /// Supported networks for this chain
+    pub supported_networks: Vec<String>,
+    /// Whether chain supports cross-chain transfers
+    pub supports_cross_chain: bool,
+    /// Chain-specific features
+    pub custom_features: HashMap<String, serde_json::Value>,
+}
+
+/// Account model types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AccountModel {
+    /// UTXO-based model (Bitcoin-like)
+    UTXO,
+    /// Account-based model (Ethereum-like)
+    Account,
+    /// Object-based model (Sui-like)
+    Object,
+    /// Hybrid model (mixed approaches)
+    Hybrid,
+}
+
 /// Chain-specific configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainConfig {
@@ -19,6 +53,8 @@ pub struct ChainConfig {
     pub program_id: Option<String>,
     /// Block explorer URLs
     pub block_explorer_urls: Vec<String>,
+    /// Chain capabilities
+    pub capabilities: ChainCapabilities,
     /// Chain-specific settings
     pub custom_settings: HashMap<String, serde_json::Value>,
 }
@@ -87,6 +123,16 @@ mod tests {
             rpc_endpoints: vec!["https://test-rpc.example.com".to_string()],
             program_id: Some("TestProgram11111111111111111111111111111".to_string()),
             block_explorer_urls: vec!["https://test-explorer.example.com".to_string()],
+            capabilities: ChainCapabilities {
+                supports_nfts: true,
+                supports_smart_contracts: true,
+                account_model: AccountModel::Account,
+                confirmation_blocks: 12,
+                max_batch_size: 100,
+                supported_networks: vec!["mainnet".to_string(), "testnet".to_string()],
+                supports_cross_chain: true,
+                custom_features: HashMap::new(),
+            },
             custom_settings: HashMap::new(),
         };
         

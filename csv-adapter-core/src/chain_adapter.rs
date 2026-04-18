@@ -6,61 +6,10 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::Chain;
+use crate::chain_config::{ChainConfig, ChainCapabilities, AccountModel};
 
-/// Chain-specific capabilities and features
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChainCapabilities {
-    /// Whether this chain supports NFTs
-    pub supports_nfts: bool,
-    /// Whether this chain supports smart contracts
-    pub supports_smart_contracts: bool,
-    /// Account model used by this chain
-    pub account_model: AccountModel,
-    /// Number of blocks needed for finality
-    pub confirmation_blocks: u64,
-    /// Maximum batch size for operations
-    pub max_batch_size: usize,
-    /// Supported networks for this chain
-    pub supported_networks: Vec<String>,
-    /// Whether chain supports cross-chain transfers
-    pub supports_cross_chain: bool,
-    /// Chain-specific features
-    pub custom_features: HashMap<String, serde_json::Value>,
-}
-
-/// Account model types
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AccountModel {
-    /// UTXO-based model (Bitcoin-like)
-    UTXO,
-    /// Account-based model (Ethereum-like)
-    Account,
-    /// Object-based model (Sui-like)
-    Object,
-    /// Hybrid model (mixed approaches)
-    Hybrid,
-}
-
-/// Chain-specific configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChainConfig {
-    /// Unique identifier for this chain
-    pub chain_id: String,
-    /// Human-readable name for this chain
-    pub chain_name: String,
-    /// Default network to use
-    pub default_network: String,
-    /// List of RPC endpoints
-    pub rpc_endpoints: Vec<String>,
-    /// CSV program ID for this chain
-    pub program_id: Option<String>,
-    /// Block explorer URLs
-    pub block_explorer_urls: Vec<String>,
-    /// Chain capabilities
-    pub capabilities: ChainCapabilities,
-    /// Chain-specific settings
-    pub custom_settings: HashMap<String, serde_json::Value>,
-}
+// Re-export from chain_config for convenience
+pub use crate::chain_config::{ChainConfig, ChainCapabilities, AccountModel};
 
 /// Chain-specific error types
 #[derive(Debug, Error)]
@@ -123,6 +72,19 @@ pub trait ChainAdapter: Send + Sync {
     /// Get default network for this chain
     fn default_network(&self) -> &'static str;
 }
+
+/// Helper trait for object-safe chain adapter operations
+pub trait ChainAdapterExt: ChainAdapter {
+    /// Box the adapter for storage in registry
+    fn boxed(self) -> Box<dyn ChainAdapter>
+    where
+        Self: Sized + 'static,
+    {
+        Box::new(self)
+    }
+}
+
+impl<T: ChainAdapter + 'static> ChainAdapterExt for T {}
 
 /// Standard interface for chain RPC clients
 #[async_trait]
@@ -193,8 +155,8 @@ impl ChainRegistry {
     }
     
     /// Get adapter by chain ID
-    pub fn get_adapter(&self, chain_id: &str) -> Option<&dyn ChainAdapter>> {
-        self.adapters.get(chain_id)
+    pub fn get_adapter(&self, chain_id: &str) -> Option<&(dyn ChainAdapter)> {
+        self.adapters.get(chain_id).map(|b| b.as_ref())
     }
     
     /// Get all supported chain IDs
