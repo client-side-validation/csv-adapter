@@ -92,13 +92,21 @@ pub struct FaucetConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Chain configurations
+    #[serde(default)]
     pub chains: HashMap<Chain, ChainConfig>,
     /// Wallet configurations (per chain)
+    #[serde(default)]
     pub wallets: HashMap<Chain, WalletConfig>,
     /// Faucet configurations
+    #[serde(default)]
     pub faucets: HashMap<Chain, FaucetConfig>,
     /// Data directory for state persistence
+    #[serde(default = "default_data_dir")]
     pub data_dir: String,
+}
+
+fn default_data_dir() -> String {
+    "~/.csv/data".to_string()
 }
 
 impl Default for Config {
@@ -269,4 +277,250 @@ fn expand_path(path: &str) -> String {
         }
     }
     path.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_default_config() {
+        let config = Config::default();
+        assert!(!config.chains.is_empty(), "Default config should have chains");
+        assert!(config.wallets.is_empty(), "Default config should have empty wallets");
+        assert!(!config.faucets.is_empty(), "Default config should have faucets");
+        assert_eq!(config.data_dir, "~/.csv/data");
+    }
+
+    #[test]
+    fn test_config_with_missing_chains_field() {
+        // This was the original bug - config with only wallet section
+        let toml_content = r#"
+[wallet]
+mnemonic = "word1 word2 word3"
+network = "dev"
+
+[wallet.bitcoin]
+address = "bcrt1test"
+"#;
+        let config: Result<Config, _> = toml::from_str(toml_content);
+        assert!(config.is_ok(), "Should parse config without chains field: {:?}", config.err());
+        
+        let config = config.unwrap();
+        assert!(config.chains.is_empty(), "Chains should be empty when not specified");
+        assert!(config.wallets.is_empty(), "Wallets HashMap not populated from [wallet]");
+    }
+
+    #[test]
+    fn test_config_with_empty_file() {
+        let toml_content = "";
+        let config: Result<Config, _> = toml::from_str(toml_content);
+        assert!(config.is_ok(), "Should parse empty config: {:?}", config.err());
+        
+        let config = config.unwrap();
+        assert!(config.chains.is_empty());
+        assert!(config.wallets.is_empty());
+        assert!(config.faucets.is_empty());
+        assert_eq!(config.data_dir, "~/.csv/data");
+    }
+
+    #[test]
+    fn test_config_with_partial_chains() {
+        let toml_content = r#"
+[chains.bitcoin]
+rpc_url = "https://bitcoin.example.com"
+network = "test"
+finality_depth = 6
+
+[chains.ethereum]
+rpc_url = "https://ethereum.example.com"
+network = "main"
+finality_depth = 12
+chain_id = 1
+"#;
+        let config: Result<Config, _> = toml::from_str(toml_content);
+        assert!(config.is_ok(), "Should parse config with partial chains: {:?}", config.err());
+        
+        let config = config.unwrap();
+        assert_eq!(config.chains.len(), 2);
+        assert!(config.chains.contains_key(&Chain::Bitcoin));
+        assert!(config.chains.contains_key(&Chain::Ethereum));
+    }
+
+    #[test]
+    fn test_config_with_wallets() {
+        let toml_content = r#"
+[wallets.bitcoin]
+mnemonic = "word1 word2"
+derivation_path = "m/84'/0'/0'/0/0"
+
+[wallets.ethereum]
+private_key = "0xabc123"
+"#;
+        let config: Result<Config, _> = toml::from_str(toml_content);
+        assert!(config.is_ok(), "Should parse config with wallets: {:?}", config.err());
+        
+        let config = config.unwrap();
+        assert_eq!(config.wallets.len(), 2);
+        assert!(config.wallets.contains_key(&Chain::Bitcoin));
+        assert!(config.wallets.contains_key(&Chain::Ethereum));
+    }
+
+    #[test]
+    fn test_config_roundtrip_serialization() {
+        let original = Config::default();
+        let toml_str = toml::to_string_pretty(&original).expect("Should serialize");
+        let deserialized: Config = toml::from_str(&toml_str).expect("Should deserialize");
+        
+        assert_eq!(original.chains.len(), deserialized.chains.len());
+        assert_eq!(original.faucets.len(), deserialized.faucets.len());
+        assert_eq!(original.data_dir, deserialized.data_dir);
+    }
+
+    #[test]
+    fn test_config_load_creates_default_when_missing() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("nonexistent_config.toml");
+        
+        let config = Config::load(Some(config_path.to_str().unwrap()));
+        assert!(config.is_ok(), "Should create default config when file missing: {:?}", config.err());
+        
+        // Verify file was created
+        assert!(config_path.exists(), "Config file should be created");
+    }
+
+    #[test]
+    fn test_config_load_from_existing_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let config_path = temp_dir.path().join("test_config.toml");
+        
+        // Create a config file with valid structure
+        // data_dir must be at top level, not inside any table
+        let toml_content = r#"data_dir = "/custom/data/dir"
+
+[chains.bitcoin]
+rpc_url = "https://custom.bitcoin.com"
+network = "test"
+finality_depth = 3
+"#;
+        let mut file = std::fs::File::create(&config_path).unwrap();
+        file.write_all(toml_content.as_bytes()).unwrap();
+        drop(file);
+        
+        // Test direct TOML parsing first
+        let parsed: Result<Config, _> = toml::from_str(toml_content);
+        assert!(parsed.is_ok(), "Direct TOML parse failed: {:?}", parsed.err());
+        let direct = parsed.unwrap();
+        assert_eq!(direct.data_dir, "/custom/data/dir", "Direct parse: data_dir mismatch");
+        
+        // Test loading from file
+        let config = Config::load(Some(config_path.to_str().unwrap()));
+        assert!(config.is_ok(), "Should load existing config: {:?}", config.err());
+        
+        let config = config.unwrap();
+        assert_eq!(config.chains.len(), 1, "Expected 1 chain, got {}", config.chains.len());
+        assert!(config.chains.contains_key(&Chain::Bitcoin), "Should have Bitcoin chain");
+        assert_eq!(config.data_dir, "/custom/data/dir", "Loaded config: data_dir should be from file");
+    }
+
+    #[test]
+    fn test_config_chain_accessor() {
+        let config = Config::default();
+        
+        // Should get existing chain
+        let bitcoin = config.chain(&Chain::Bitcoin);
+        assert!(bitcoin.is_ok());
+        
+        // Should error for non-existent chain in default config (all chains exist)
+        // But if we create empty config:
+        let empty_config = Config {
+            chains: HashMap::new(),
+            wallets: HashMap::new(),
+            faucets: HashMap::new(),
+            data_dir: "~/.csv/data".to_string(),
+        };
+        let missing = empty_config.chain(&Chain::Bitcoin);
+        assert!(missing.is_err());
+    }
+
+    #[test]
+    fn test_expand_path() {
+        let expanded = expand_path("~/.csv/config.toml");
+        assert!(!expanded.starts_with('~'), "Path should be expanded");
+        
+        let absolute = expand_path("/absolute/path/config.toml");
+        assert_eq!(absolute, "/absolute/path/config.toml");
+    }
+
+    #[test]
+    fn test_invalid_toml_errors_gracefully() {
+        let invalid_toml = r#"
+[chains.bitcoin
+rpc_url = "missing bracket"
+"#;
+        let config: Result<Config, _> = toml::from_str(invalid_toml);
+        assert!(config.is_err(), "Should error on invalid TOML");
+    }
+
+    #[test]
+    fn test_config_set_chain_and_wallet() {
+        let mut config = Config::default();
+        
+        // Set a new chain config
+        let new_chain = ChainConfig {
+            rpc_url: "https://new.chain.com".to_string(),
+            network: Network::Test,
+            contract_address: None,
+            chain_id: Some(12345),
+            finality_depth: 10,
+            default_fee: Some(1000),
+        };
+        config.set_chain(Chain::Solana, new_chain);
+        
+        assert!(config.chains.contains_key(&Chain::Solana));
+        
+        // Set a wallet
+        let wallet = WalletConfig {
+            private_key: Some("key".to_string()),
+            xpub: None,
+            mnemonic: None,
+            mnemonic_passphrase: None,
+            derivation_path: None,
+        };
+        config.set_wallet(Chain::Bitcoin, wallet);
+        
+        assert!(config.wallets.contains_key(&Chain::Bitcoin));
+    }
+
+    #[test]
+    fn test_network_display() {
+        assert_eq!(Network::Dev.to_string(), "dev");
+        assert_eq!(Network::Test.to_string(), "test");
+        assert_eq!(Network::Main.to_string(), "main");
+    }
+
+    #[test]
+    fn test_chain_display() {
+        assert_eq!(Chain::Bitcoin.to_string(), "bitcoin");
+        assert_eq!(Chain::Ethereum.to_string(), "ethereum");
+        assert_eq!(Chain::Sui.to_string(), "sui");
+        assert_eq!(Chain::Aptos.to_string(), "aptos");
+        assert_eq!(Chain::Solana.to_string(), "solana");
+    }
+
+    #[test]
+    fn test_wallet_and_faucet_accessors() {
+        let config = Config::default();
+        
+        // Wallet accessor returns None for non-existent
+        assert!(config.wallet(&Chain::Bitcoin).is_none());
+        
+        // Faucet accessor returns Some for existing
+        assert!(config.faucet(&Chain::Bitcoin).is_some());
+        
+        // Faucet accessor returns None for chains without faucet (Solana has none in default)
+        assert!(config.faucet(&Chain::Solana).is_none());
+    }
 }

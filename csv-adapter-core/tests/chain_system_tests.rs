@@ -13,22 +13,25 @@ fn test_chain_config_loader() {
     let temp_dir = TempDir::new().unwrap();
     let config_dir = temp_dir.path();
     
-    // Create test configuration
+    // Create test configuration with proper structure
     let config_content = r#"
 chain_id = "test-bitcoin"
 chain_name = "Test Bitcoin"
 default_network = "testnet"
 rpc_endpoints = ["https://test-rpc.example.com"]
-program_id = null
 block_explorer_urls = ["https://test-explorer.example.com"]
 
-[custom_settings]
+[capabilities]
 supports_nfts = true
 supports_smart_contracts = false
 account_model = "UTXO"
 confirmation_blocks = 6
 max_batch_size = 50
 supported_networks = ["testnet", "mainnet"]
+supports_cross_chain = false
+
+[custom_settings]
+test_key = "test_value"
 "#;
     
     let config_file = config_dir.join("test-bitcoin.toml");
@@ -46,10 +49,16 @@ supported_networks = ["testnet", "mainnet"]
     assert_eq!(config.rpc_endpoints.len(), 1);
     assert_eq!(config.rpc_endpoints[0], "https://test-rpc.example.com");
     
+    // Verify capabilities
+    assert_eq!(config.capabilities.supports_nfts, true);
+    assert_eq!(config.capabilities.supports_smart_contracts, false);
+    match config.capabilities.account_model {
+        csv_adapter_core::chain_config::AccountModel::UTXO => {},
+        _ => panic!("Expected UTXO account model"),
+    }
+    
     // Verify custom settings
-    assert_eq!(config.custom_settings.get("supports_nfts").unwrap().as_bool().unwrap(), true);
-    assert_eq!(config.custom_settings.get("supports_smart_contracts").unwrap().as_bool().unwrap(), false);
-    assert_eq!(config.custom_settings.get("account_model").unwrap().as_str().unwrap(), "UTXO");
+    assert_eq!(config.custom_settings.get("test_key").unwrap().as_str().unwrap(), "test_value");
 }
 
 /// Test chain registry functionality
@@ -96,16 +105,19 @@ chain_id = "bitcoin"
 chain_name = "Bitcoin"
 default_network = "mainnet"
 rpc_endpoints = ["https://bitcoin-rpc.example.com"]
-program_id = null
 block_explorer_urls = ["https://bitcoin-explorer.example.com"]
 
-[custom_settings]
+[capabilities]
 supports_nfts = true
 supports_smart_contracts = false
 account_model = "UTXO"
 confirmation_blocks = 6
 max_batch_size = 50
 supported_networks = ["mainnet", "testnet"]
+supports_cross_chain = false
+
+[custom_settings]
+network_type = "bitcoin"
 "#),
         ("ethereum.toml", r#"
 chain_id = "ethereum"
@@ -115,13 +127,17 @@ rpc_endpoints = ["https://ethereum-rpc.example.com"]
 program_id = "0x1234567890123456789012345678901234567890"
 block_explorer_urls = ["https://ethereum-explorer.example.com"]
 
-[custom_settings]
+[capabilities]
 supports_nfts = true
 supports_smart_contracts = true
 account_model = "Account"
 confirmation_blocks = 12
 max_batch_size = 100
 supported_networks = ["mainnet", "sepolia"]
+supports_cross_chain = true
+
+[custom_settings]
+network_type = "ethereum"
 "#),
         ("solana.toml", r#"
 chain_id = "solana"
@@ -131,13 +147,17 @@ rpc_endpoints = ["https://solana-rpc.example.com"]
 program_id = "CsvProgramSolana11111111111111111111111111111"
 block_explorer_urls = ["https://solana-explorer.example.com"]
 
-[custom_settings]
+[capabilities]
 supports_nfts = true
 supports_smart_contracts = true
 account_model = "Account"
 confirmation_blocks = 32
 max_batch_size = 200
 supported_networks = ["mainnet", "devnet"]
+supports_cross_chain = true
+
+[custom_settings]
+network_type = "solana"
 "#),
     ];
     
@@ -161,7 +181,10 @@ supported_networks = ["mainnet", "devnet"]
     // Test chain configurations
     let bitcoin_config = discovery.get_chain_config("bitcoin").unwrap();
     assert_eq!(bitcoin_config.chain_name, "Bitcoin");
-    assert_eq!(bitcoin_config.custom_settings.get("account_model").unwrap().as_str().unwrap(), "UTXO");
+    match bitcoin_config.capabilities.account_model {
+        csv_adapter_core::chain_config::AccountModel::UTXO => {},
+        _ => panic!("Expected UTXO account model for Bitcoin"),
+    }
     
     let ethereum_config = discovery.get_chain_config("ethereum").unwrap();
     assert_eq!(ethereum_config.chain_name, "Ethereum");
@@ -234,16 +257,19 @@ chain_id = "valid-chain"
 chain_name = "Valid Chain"
 default_network = "mainnet"
 rpc_endpoints = ["https://rpc.example.com"]
-program_id = null
 block_explorer_urls = ["https://explorer.example.com"]
 
-[custom_settings]
+[capabilities]
 supports_nfts = true
 supports_smart_contracts = true
 account_model = "Account"
 confirmation_blocks = 6
 max_batch_size = 100
 supported_networks = ["mainnet", "testnet"]
+supports_cross_chain = false
+
+[custom_settings]
+test_key = "test_value"
 "#;
     
     let config_file = config_dir.join("valid.toml");
@@ -261,13 +287,14 @@ supported_networks = ["mainnet", "testnet"]
     assert!(!config.rpc_endpoints.is_empty());
     assert!(!config.block_explorer_urls.is_empty());
     
+    // Validate capabilities
+    assert_eq!(config.capabilities.supports_nfts, true);
+    assert_eq!(config.capabilities.supports_smart_contracts, true);
+    assert_eq!(config.capabilities.confirmation_blocks, 6);
+    assert_eq!(config.capabilities.max_batch_size, 100);
+    
     // Validate custom settings
-    assert!(config.custom_settings.contains_key("supports_nfts"));
-    assert!(config.custom_settings.contains_key("supports_smart_contracts"));
-    assert!(config.custom_settings.contains_key("account_model"));
-    assert!(config.custom_settings.contains_key("confirmation_blocks"));
-    assert!(config.custom_settings.contains_key("max_batch_size"));
-    assert!(config.custom_settings.contains_key("supported_networks"));
+    assert!(config.custom_settings.contains_key("test_key"));
 }
 
 /// Test multiple configuration loading
@@ -283,16 +310,19 @@ chain_id = "chain1"
 chain_name = "Chain 1"
 default_network = "mainnet"
 rpc_endpoints = ["https://chain1-rpc.example.com"]
-program_id = null
 block_explorer_urls = ["https://chain1-explorer.example.com"]
 
-[custom_settings]
+[capabilities]
 supports_nfts = true
 supports_smart_contracts = false
 account_model = "UTXO"
 confirmation_blocks = 6
 max_batch_size = 50
 supported_networks = ["mainnet"]
+supports_cross_chain = false
+
+[custom_settings]
+chain_type = "chain1"
 "#),
         ("chain2.toml", r#"
 chain_id = "chain2"
@@ -302,13 +332,17 @@ rpc_endpoints = ["https://chain2-rpc.example.com"]
 program_id = "0x1234567890123456789012345678901234567890"
 block_explorer_urls = ["https://chain2-explorer.example.com"]
 
-[custom_settings]
+[capabilities]
 supports_nfts = false
 supports_smart_contracts = true
 account_model = "Account"
 confirmation_blocks = 12
 max_batch_size = 100
 supported_networks = ["testnet"]
+supports_cross_chain = true
+
+[custom_settings]
+chain_type = "chain2"
 "#),
     ];
     
@@ -331,10 +365,10 @@ supported_networks = ["testnet"]
     let chain1_config = loader.get_config("chain1").unwrap();
     assert_eq!(chain1_config.chain_name, "Chain 1");
     assert_eq!(chain1_config.default_network, "mainnet");
-    assert_eq!(chain1_config.custom_settings.get("supports_nfts").unwrap().as_bool().unwrap(), true);
+    assert_eq!(chain1_config.capabilities.supports_nfts, true);
     
     let chain2_config = loader.get_config("chain2").unwrap();
     assert_eq!(chain2_config.chain_name, "Chain 2");
     assert_eq!(chain2_config.default_network, "testnet");
-    assert_eq!(chain2_config.custom_settings.get("supports_nfts").unwrap().as_bool().unwrap(), false);
+    assert_eq!(chain2_config.capabilities.supports_nfts, false);
 }

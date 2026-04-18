@@ -22,6 +22,7 @@ pub struct ChainCapabilities {
     /// Whether chain supports cross-chain transfers
     pub supports_cross_chain: bool,
     /// Chain-specific features
+    #[serde(default)]
     pub custom_features: HashMap<String, serde_json::Value>,
 }
 
@@ -73,19 +74,27 @@ impl ChainConfigLoader {
     }
     
     /// Load all chain configurations from directory
+    /// Invalid configs are skipped with a warning rather than failing the entire operation
     pub fn load_from_directory(&mut self, config_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         let entries = std::fs::read_dir(config_dir)?;
         
         for entry in entries {
             let entry = entry?;
             if entry.path().extension() == Some(std::ffi::OsStr::new("toml")) {
-                let content = std::fs::read_to_string(entry.path())?;
-                let config: ChainConfig = toml::from_str(&content)
-                    .map_err(|e| format!("Failed to parse {}: {}", entry.path().display(), e))?;
-                    
-                let chain_id = config.chain_id.clone();
-                self.configs.insert(chain_id.clone(), config);
-                println!("Loaded chain config: {}", chain_id);
+                let path = entry.path();
+                let content = std::fs::read_to_string(&path)?;
+                
+                match toml::from_str::<ChainConfig>(&content) {
+                    Ok(config) => {
+                        let chain_id = config.chain_id.clone();
+                        self.configs.insert(chain_id.clone(), config);
+                        println!("Loaded chain config: {}", chain_id);
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: Failed to parse {}: {}", path.display(), e);
+                        // Skip invalid config and continue
+                    }
+                }
             }
         }
         

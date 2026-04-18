@@ -108,18 +108,25 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let chains_dir = temp_dir.path();
         
-        // Create a test chain config
+        // Create a test chain config with all required fields
         let test_config = r#"
 chain_id = "test-chain"
 chain_name = "Test Chain"
 default_network = "testnet"
 rpc_endpoints = ["https://test-rpc.example.com"]
-program_id = null
 block_explorer_urls = ["https://test-explorer.example.com"]
 
-[custom_settings]
+[capabilities]
 supports_nfts = true
-supports_smart_contracts = false
+supports_smart_contracts = true
+account_model = "Account"
+confirmation_blocks = 12
+max_batch_size = 100
+supported_networks = ["mainnet", "testnet"]
+supports_cross_chain = false
+
+[custom_settings]
+test_setting = "value"
 "#;
         
         let config_path = chains_dir.join("test-chain.toml");
