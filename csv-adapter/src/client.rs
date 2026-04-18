@@ -32,7 +32,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use csv_adapter_core::Chain;
-use csv_adapter_core::chain_system::ChainRegistry;
+use csv_adapter_core::ChainRegistry;
 use tokio::sync::broadcast;
 
 use crate::builder::ClientBuilder;
@@ -77,7 +77,7 @@ pub struct CsvClient {
     /// Event broadcast channel sender.
     pub(crate) event_tx: broadcast::Sender<crate::events::Event>,
     /// Chain registry for dynamic chain management.
-    pub(crate) chain_registry: Option<ChainRegistry>,
+    pub(crate) chain_registry: Option<Arc<ChainRegistry>>,
 }
 
 impl CsvClient {
@@ -217,7 +217,7 @@ pub(crate) struct ClientRef {
     pub(crate) config: Config,
     pub(crate) event_tx: broadcast::Sender<crate::events::Event>,
     #[allow(dead_code)]
-    pub(crate) chain_registry: Option<ChainRegistry>,
+    pub(crate) chain_registry: Option<Arc<ChainRegistry>>,
 }
 
 impl ClientRef {

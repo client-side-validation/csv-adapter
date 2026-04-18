@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use csv_adapter_core::Chain;
-use csv_adapter_core::chain_system::ChainRegistry;
+use csv_adapter_core::ChainRegistry;
 
 use crate::config::Config;
 use crate::errors::CsvError;
@@ -30,7 +30,7 @@ struct ScalableBuilderState {
     wallet: Option<Wallet>,
     store_backend: Option<StoreBackend>,
     config: Option<Config>,
-    chain_registry: Option<ChainRegistry>,
+    chain_registry: Option<Arc<ChainRegistry>>,
 }
 
 /// Scalable fluent builder for constructing a CsvClient with dynamic chain support.
@@ -130,7 +130,7 @@ impl ScalableClientBuilder {
     /// # Ok::<_, csv_adapter::CsvError>(())
     /// ```
     pub fn with_chain_registry(mut self, registry: ChainRegistry) -> Self {
-        self.state.chain_registry = Some(registry);
+        self.state.chain_registry = Some(Arc::new(registry));
         self
     }
 

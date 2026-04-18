@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use csv_adapter_core::Chain;
-use csv_adapter_core::chain_system::ChainRegistry;
+use csv_adapter_core::ChainRegistry;
 
 use crate::config::Config;
 use crate::errors::CsvError;

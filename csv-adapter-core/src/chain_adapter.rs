@@ -1,12 +1,10 @@
 //! Chain adapter trait for dynamic chain support.
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::Chain;
-use crate::chain_config::{ChainConfig, ChainCapabilities, AccountModel};
 
 // Re-export from chain_config for convenience
 pub use crate::chain_config::{ChainConfig, ChainCapabilities, AccountModel};
@@ -15,20 +13,28 @@ pub use crate::chain_config::{ChainConfig, ChainCapabilities, AccountModel};
 #[derive(Debug, Error)]
 pub enum ChainError {
     /// Chain is not supported
+    #[error("Unsupported chain: {0}")]
     UnsupportedChain(String),
     /// Invalid configuration
+    #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
     /// RPC connection failed
+    #[error("RPC error: {0}")]
     RpcError(String),
     /// Transaction failed
+    #[error("Transaction error: {0}")]
     TransactionError(String),
     /// Wallet operation failed
+    #[error("Wallet error: {0}")]
     WalletError(String),
     /// Serialization/deserialization error
+    #[error("Serialization error: {0}")]
     SerializationError(String),
     /// Network error
+    #[error("Network error: {0}")]
     NetworkError(String),
     /// Invalid input
+    #[error("Invalid input: {0}")]
     InvalidInput(String),
 }
 
@@ -155,7 +161,7 @@ impl ChainRegistry {
     }
     
     /// Get adapter by chain ID
-    pub fn get_adapter(&self, chain_id: &str) -> Option<&(dyn ChainAdapter)> {
+    pub fn get_adapter(&self, chain_id: &str) -> Option<&dyn ChainAdapter> {
         self.adapters.get(chain_id).map(|b| b.as_ref())
     }
     
@@ -174,7 +180,7 @@ impl ChainRegistry {
     where
         F: Fn(&ChainCapabilities) -> bool,
     {
-        self.adapters
+        self.capabilities
             .iter()
             .filter(|(_, cap)| capability_check(cap))
             .map(|(id, _)| id.as_str())

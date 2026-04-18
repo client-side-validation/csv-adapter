@@ -48,7 +48,7 @@ struct BuilderState {
     wallet: Option<Wallet>,
     store_backend: Option<StoreBackend>,
     config: Option<Config>,
-    chain_registry: Option<csv_adapter_core::chain_system::ChainRegistry>,
+    chain_registry: Option<Arc<csv_adapter_core::ChainRegistry>>,
 }
 
 /// Fluent builder for constructing a [`CsvClient`](crate::client::CsvClient).

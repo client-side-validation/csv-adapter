@@ -64,6 +64,10 @@ pub enum SolanaError {
     /// Proof generation error
     #[error("Proof generation error: {0}")]
     ProofGeneration(String),
+
+    /// Invalid input
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 /// Result type for Solana operations

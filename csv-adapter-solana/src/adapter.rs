@@ -87,7 +87,7 @@ impl SolanaAnchorLayer {
     fn derive_seal_pda(&self, right_id: &Hash, owner: &Pubkey) -> Pubkey {
         let seeds = [
             b"csv-seal",
-            right_id.as_bytes(),
+            right_id.as_slice(),
             owner.as_ref(),
         ];
         // In production, this would use find_program_address with the actual CSV program
@@ -326,35 +326,59 @@ impl AnchorLayer for SolanaAnchorLayer {
     }
 
     /// Build a complete proof bundle
-    fn build_proof_bundle(&self, anchor_ref: Self::AnchorRef, _segment: DAGSegment) -> Result<ProofBundle> {
-        let inclusion_proof = self.verify_inclusion(anchor_ref.clone())?;
-        let finality_proof = self.verify_finality(anchor_ref.clone())?;
-        
-        // Create a combined proof bundle
-        let bundle = ProofBundle {
-            inclusion_proof: csv_adapter_core::proof::InclusionProof {
-                chain_id: csv_adapter_core::protocol_version::Chain::Solana,
-                block_height: anchor_ref.block_height,
-                tx_merkle_root: anchor_ref.signature.as_ref()[..32].try_into().unwrap_or([0u8; 32]),
-                tx_index: 0,
-                merkle_branch: inclusion_proof.account_proofs.iter().map(|p| {
-                    p.proof.first().cloned().unwrap_or_default()
-                }).collect(),
-            },
-            finality_proof: csv_adapter_core::proof::FinalityProof {
-                chain_id: csv_adapter_core::protocol_version::Chain::Solana,
-                block_height: finality_proof.slot,
-                block_hash: finality_proof.block_hash.as_bytes()[..32].try_into().unwrap_or([0u8; 32]),
-                confirmation_depth: finality_proof.confirmation_depth as u32,
-                timestamp: finality_proof.timestamp as u64,
-            },
-            chain_specific: serde_json::to_vec(&SolanaProofData {
-                signature: bs58::encode(anchor_ref.signature.as_ref()).into_string(),
-                slot: anchor_ref.slot,
-                confirmation_status: format!("{:?}", inclusion_proof.confirmation_status),
-            }).unwrap_or_default(),
+    fn build_proof_bundle(&self, anchor_ref: Self::AnchorRef, segment: DAGSegment) -> Result<ProofBundle> {
+        let solana_inclusion = self.verify_inclusion(anchor_ref.clone())?;
+        let solana_finality = self.verify_finality(anchor_ref.clone())?;
+
+        // Create seal_ref from the first active seal or create a default one
+        let seal_ref = {
+            let seals = self.active_seals.lock().unwrap();
+            seals.first().map(|s| {
+                csv_adapter_core::seal::SealRef::new_unchecked(
+                    s.account.to_bytes().to_vec(),
+                    Some(s.lamports)
+                )
+            }).unwrap_or_else(|| {
+                csv_adapter_core::seal::SealRef::new_unchecked(
+                    anchor_ref.signature.as_ref()[..32].to_vec(),
+                    None
+                )
+            })
         };
-        
+
+        // Create anchor_ref from SolanaAnchorRef
+        let core_anchor_ref = csv_adapter_core::seal::AnchorRef::new_unchecked(
+            anchor_ref.signature.as_ref().to_vec(),
+            anchor_ref.block_height,
+            serde_json::to_vec(&anchor_ref.account_changes).unwrap_or_default(),
+        );
+
+        // Create inclusion proof
+        let inclusion_proof = csv_adapter_core::proof::InclusionProof::new_unchecked(
+            solana_inclusion.account_proofs.iter()
+                .flat_map(|p| p.proof.iter().flatten().cloned())
+                .collect(),
+            csv_adapter_core::hash::Hash::new(anchor_ref.signature.as_ref()[..32].try_into().unwrap_or([0u8; 32])),
+            anchor_ref.slot,
+        );
+
+        // Create finality proof - Solana has deterministic finality after 31 slots
+        let finality_proof = csv_adapter_core::proof::FinalityProof::new_unchecked(
+            solana_finality.block_hash.as_bytes().to_vec(),
+            solana_finality.confirmation_depth,
+            true, // Solana has deterministic finality
+        );
+
+        // Create a complete proof bundle
+        let bundle = csv_adapter_core::proof::ProofBundle::new_unchecked(
+            segment,
+            vec![anchor_ref.signature.as_ref().to_vec()],
+            seal_ref,
+            core_anchor_ref,
+            inclusion_proof,
+            finality_proof,
+        );
+
         Ok(bundle)
     }
 
