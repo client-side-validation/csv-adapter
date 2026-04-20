@@ -1,0 +1,215 @@
+warning: method `from_str` can be confused for the standard trait method `std::str::FromStr::from_str`
+  --> csv-adapter-core/src/advanced_commitments.rs:56:5
+   |
+56 | /     pub fn from_str(s: &str) -> Option<Self> {
+57 | |         match s {
+58 | |             "hash_based" => Some(CommitmentScheme::HashBased),
+59 | |             "pedersen" => Some(CommitmentScheme::Pedersen),
+...  |
+67 | |     }
+   | |_____^
+   |
+   = help: consider implementing the trait `std::str::FromStr` or choosing a less ambiguous method name
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#should_implement_trait
+   = note: `#[warn(clippy::should_implement_trait)]` on by default
+
+warning: method `from_str` can be confused for the standard trait method `std::str::FromStr::from_str`
+   --> csv-adapter-core/src/advanced_commitments.rs:123:5
+    |
+123 | /     pub fn from_str(s: &str) -> Option<Self> {
+124 | |         match s {
+125 | |             "merkle" => Some(InclusionProofType::Merkle),
+126 | |             "merkle_patricia" => Some(InclusionProofType::MerklePatricia),
+...   |
+133 | |     }
+    | |_____^
+    |
+    = help: consider implementing the trait `std::str::FromStr` or choosing a less ambiguous method name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#should_implement_trait
+
+warning: method `from_str` can be confused for the standard trait method `std::str::FromStr::from_str`
+   --> csv-adapter-core/src/advanced_commitments.rs:185:5
+    |
+185 | /     pub fn from_str(s: &str) -> Option<Self> {
+186 | |         match s {
+187 | |             "confirmation_depth" => Some(FinalityProofType::ConfirmationDepth),
+188 | |             "checkpoint" => Some(FinalityProofType::Checkpoint),
+...   |
+194 | |     }
+    | |_____^
+    |
+    = help: consider implementing the trait `std::str::FromStr` or choosing a less ambiguous method name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#should_implement_trait
+
+warning: methods called `from_*` usually take no `self`
+   --> csv-adapter-core/src/chain_adapter.rs:139:25
+    |
+139 |     fn from_private_key(&self, private_key: &str) -> ChainResult<()>;
+    |                         ^^^^^
+    |
+    = help: consider choosing a less ambiguous name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#wrong_self_convention
+    = note: `#[warn(clippy::wrong_self_convention)]` on by default
+
+warning: `csv-adapter-core` (lib) generated 4 warnings
+warning: this function has too many arguments (8/7)
+   --> csv-explorer/storage/src/repositories/priority_addresses.rs:406:5
+    |
+406 | /     pub async fn record_indexing_activity(
+407 | |         &self,
+408 | |         address: &str,
+409 | |         chain: &str,
+...   |
+414 | |         error: Option<&str>,
+415 | |     ) -> Result<(), sqlx::Error> {
+    | |________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: `csv-explorer-storage` (lib) generated 1 warning
+warning: use of `unwrap_or_else` to construct default value
+  --> csv-explorer/indexer/src/sui.rs:95:82
+   |
+95 |         let client = self.rpc_manager.as_ref().and_then(|m| m.get_client("sui")).unwrap_or_else(Client::new);
+   |                                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#unwrap_or_default
+   = note: `#[warn(clippy::unwrap_or_default)]` on by default
+
+warning: this function has too many arguments (11/7)
+   --> csv-explorer/indexer/src/sync.rs:303:1
+    |
+303 | / async fn sync_chain(
+304 | |     indexer: &dyn ChainIndexer,
+305 | |     sync_repo: &SyncRepository,
+306 | |     rights_repo: &RightsRepository,
+...   |
+314 | |     chain_config: Option<&ChainConfig>,
+315 | | ) -> Result<(), ExplorerError> {
+    | |______________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: `csv-explorer-indexer` (lib) generated 2 warnings (run `cargo clippy --fix --lib -p csv-explorer-indexer` to apply 1 suggestion)
+warning: large size difference between variants
+  --> csv-explorer/src/indexing/events.rs:12:1
+   |
+12 | /   pub enum IndexingEvent {
+13 | |       /// Right created on a chain
+14 | |       RightCreated {
+15 | |           right_id: Hash,
+...  |
+23 | | /     RightTransferred {
+24 | | |         right_id: Hash,
+25 | | |         from_chain: Chain,
+26 | | |         to_chain: Chain,
+...  | |
+29 | | |         proof_bundle: Option<csv_adapter_core::proof::ProofBundle>,
+30 | | |     },
+   | | |_____- the largest variant contains at least 358 bytes
+...  |
+41 | | /     RightUpdated {
+42 | | |         right_id: Hash,
+43 | | |         chain: Chain,
+44 | | |         old_metadata: serde_json::Value,
+45 | | |         new_metadata: serde_json::Value,
+46 | | |         updated_at: DateTime<Utc>,
+47 | | |     },
+   | | |_____- the second-largest variant contains at least 109 bytes
+...  |
+63 | |       },
+64 | |   }
+   | |___^ the entire enum is at least 360 bytes
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#large_enum_variant
+   = note: `#[warn(clippy::large_enum_variant)]` on by default
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+   |
+29 -         proof_bundle: Option<csv_adapter_core::proof::ProofBundle>,
+29 +         proof_bundle: Box<Option<csv_adapter_core::proof::ProofBundle>>,
+   |
+
+warning: this function has too many arguments (11/7)
+   --> csv-explorer/src/indexing/sync.rs:320:1
+    |
+320 | / async fn sync_chain(
+321 | |     indexer: &dyn ChainIndexer,
+322 | |     sync_repo: &SyncRepository,
+323 | |     rights_repo: &RightsRepository,
+...   |
+331 | |     chain_config: Option<&ChainConfig>,
+332 | | ) -> Result<(), ExplorerError> {
+    | |______________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: function `chain_id` is never used
+  --> csv-cli/src/chain_registry.rs:10:8
+   |
+10 | pub fn chain_id(chain: &Chain) -> &'static str {
+   |        ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `get_adapter` is never used
+  --> csv-cli/src/chain_registry.rs:21:8
+   |
+21 | pub fn get_adapter(chain: &Chain) -> Option<Box<dyn ChainAdapter>> {
+   |        ^^^^^^^^^^^
+
+warning: function `get_capabilities` is never used
+  --> csv-cli/src/chain_registry.rs:27:8
+   |
+27 | pub fn get_capabilities(chain: &Chain) -> Option<ChainCapabilities> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `supports_capability` is never used
+  --> csv-cli/src/chain_registry.rs:32:8
+   |
+32 | pub fn supports_capability(chain: &Chain, check: impl Fn(&ChainCapabilities) -> bool) -> bool {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `supports_nfts` is never used
+  --> csv-cli/src/chain_registry.rs:37:8
+   |
+37 | pub fn supports_nfts(chain: &Chain) -> bool {
+   |        ^^^^^^^^^^^^^
+
+warning: function `supports_smart_contracts` is never used
+  --> csv-cli/src/chain_registry.rs:42:8
+   |
+42 | pub fn supports_smart_contracts(chain: &Chain) -> bool {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `supported_chains` is never used
+  --> csv-cli/src/chain_registry.rs:47:8
+   |
+47 | pub fn supported_chains() -> Vec<String> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: struct `ChainMetadata` is never constructed
+  --> csv-cli/src/chain_registry.rs:53:12
+   |
+53 | pub struct ChainMetadata {
+   |            ^^^^^^^^^^^^^
+
+warning: function `get_metadata` is never used
+  --> csv-cli/src/chain_registry.rs:61:8
+   |
+61 | pub fn get_metadata(chain: &Chain) -> ChainMetadata {
+   |        ^^^^^^^^^^^^
+
+warning: function `get_badge_class` is never used
+  --> csv-cli/src/chain_registry.rs:97:8
+   |
+97 | pub fn get_badge_class(chain: &Chain) -> &'static str {
+   |        ^^^^^^^^^^^^^^^
+
+warning: `csv-explorer` (lib) generated 2 warnings
+warning: `csv-cli` (bin "csv") generated 10 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.37s
+warning: the following packages contain code that will be rejected by a future version of Rust: ashpd v0.8.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`

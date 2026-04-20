@@ -100,7 +100,7 @@ impl ProofManager {
         //   let bundle = adapter.build_proof_bundle(anchor_ref, dag_segment)?;
 
         // Placeholder: return a minimal valid bundle
-        Ok(ProofBundle::new(
+        ProofBundle::new(
             DAGSegment::new(vec![], Hash::zero()),
             vec![],
             SealRef::new(vec![0u8; 32], None).map_err(|e| CsvError::Generic(e.to_string()))?,
@@ -110,7 +110,7 @@ impl ProofManager {
                 .map_err(|e| CsvError::Generic(e.to_string()))?,
             FinalityProof::new(vec![], 0, false)
                 .map_err(|e| CsvError::Generic(e.to_string()))?,
-        ).map_err(|e| CsvError::Generic(e.to_string()))?)
+        ).map_err(|e| CsvError::Generic(e.to_string()))
     }
 
     /// Verify a proof bundle against an expected Right ID.

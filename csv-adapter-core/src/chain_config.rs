@@ -65,6 +65,12 @@ pub struct ChainConfigLoader {
     configs: HashMap<String, ChainConfig>,
 }
 
+impl Default for ChainConfigLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ChainConfigLoader {
     /// Create new loader
     pub fn new() -> Self {

@@ -151,7 +151,7 @@ fn default_chain_enabled() -> bool {
 impl ExplorerConfig {
     /// Load configuration from a TOML file.
     pub fn from_file(path: &Path) -> Result<Self, crate::ExplorerError> {
-        let content = std::fs::read_to_string(path).map_err(|e| crate::ExplorerError::Io(e))?;
+        let content = std::fs::read_to_string(path).map_err(crate::ExplorerError::Io)?;
         let config: ExplorerConfig =
             toml::from_str(&content).map_err(|e| crate::ExplorerError::Toml(e.to_string()))?;
         Ok(config)

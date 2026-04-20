@@ -21,9 +21,9 @@ impl RightsRepository {
         let metadata_json = right
             .metadata
             .as_ref()
-            .map(|v| serde_json::to_string(v))
+            .map(serde_json::to_string)
             .transpose()?;
-        let last_transfer_at = right.last_transfer_at.map(|dt| dt);
+        let last_transfer_at = right.last_transfer_at;
 
         sqlx::query(
             r#"
@@ -226,7 +226,6 @@ fn row_to_right(row: &SqliteRow) -> Result<RightRecord> {
         metadata,
         transfer_count: row.try_get::<i64, _>("transfer_count")? as u64,
         last_transfer_at: row
-            .try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("last_transfer_at")?
-            .map(|dt| dt),
+            .try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("last_transfer_at")?,
     })
 }

@@ -1,5 +1,4 @@
 //! RPC client for Solana adapter
-use tokio::time::Duration;
 
 use solana_sdk::{
     pubkey::Pubkey,
@@ -112,6 +111,12 @@ impl SolanaRpc for RealSolanaRpc {
 /// Mock RPC client for testing
 pub struct MockSolanaRpc {
     accounts: std::collections::HashMap<Pubkey, Account>,
+}
+
+impl Default for MockSolanaRpc {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MockSolanaRpc {

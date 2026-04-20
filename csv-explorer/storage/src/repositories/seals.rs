@@ -19,7 +19,7 @@ impl SealsRepository {
     /// Insert a new seal record.
     pub async fn insert(&self, seal: &SealRecord) -> Result<()> {
         let right_id = seal.right_id.as_deref();
-        let consumed_at = seal.consumed_at.map(|dt| dt);
+        let consumed_at = seal.consumed_at;
         let consumed_tx = seal.consumed_tx.as_deref();
 
         sqlx::query(
@@ -214,8 +214,7 @@ fn row_to_seal(row: &SqliteRow) -> Result<SealRecord> {
         right_id: row.try_get::<Option<String>, _>("right_id")?,
         status,
         consumed_at: row
-            .try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("consumed_at")?
-            .map(|dt| dt),
+            .try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("consumed_at")?,
         consumed_tx: row.try_get::<Option<String>, _>("consumed_tx")?,
         block_height: row.try_get::<i64, _>("block_height")? as u64,
     })

@@ -92,7 +92,7 @@ impl ChainIndexer for SuiIndexer {
             id: 1,
         };
 
-        let client = self.rpc_manager.as_ref().and_then(|m| m.get_client("sui")).unwrap_or_else(|| Client::new());
+        let client = self.rpc_manager.as_ref().and_then(|m| m.get_client("sui")).unwrap_or_else(Client::new);
         let resp: serde_json::Value = client
             .post(&rpc_url)
             .json(&req)

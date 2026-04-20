@@ -164,13 +164,13 @@ fn cmd_transfer(
 
     // Step 1: Lock on source chain
     output::progress(1, 6, &format!("Step 1: Locking Right on {}...", from_str));
-    let lock_provider = create_lock_provider(&from, source_chain_id.clone());
+    let lock_provider = create_lock_provider(&from, source_chain_id);
     let (lock_event, inclusion_proof) = lock_provider
         .lock_right(
             right_id_hash,
             right_id_hash,
             source_owner_proof,
-            dest_chain_id.clone(),
+            dest_chain_id,
             dest_owner_proof.clone(),
         )
         .map_err(|e| anyhow::anyhow!("Lock failed: {:?}", e))?;
@@ -191,7 +191,7 @@ fn cmd_transfer(
         lock_event,
         inclusion_proof,
         finality_proof: CrossChainFinalityProof {
-            source_chain: source_chain_id.clone(),
+            source_chain: source_chain_id,
             height: source_height,
             current_height,
             is_finalized,
@@ -236,7 +236,7 @@ fn cmd_transfer(
     // Step 5: Mint on destination chain
     output::progress(5, 6, &format!("Step 5: Minting Right on {}...", to_str));
     let mint_provider =
-        create_mint_provider(&to, dest_chain_id.clone()).map_err(|e| anyhow::anyhow!("{}", e))?;
+        create_mint_provider(&to, dest_chain_id).map_err(|e| anyhow::anyhow!("{}", e))?;
     let mint_result = mint_provider
         .mint_right(&transfer_proof)
         .map_err(|e| anyhow::anyhow!("Mint failed: {:?}", e))?;

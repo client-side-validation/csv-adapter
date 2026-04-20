@@ -66,7 +66,7 @@ impl SyncCoordinator {
         poll_interval_ms: u64,
     ) -> Self {
         let arc_indexers: Vec<Arc<dyn ChainIndexer>> =
-            indexers.into_iter().map(|b| Arc::from(b)).collect();
+            indexers.into_iter().map(Arc::from).collect();
 
         let chain_states: Vec<ChainSyncState> = arc_indexers
             .iter()
@@ -124,7 +124,7 @@ impl SyncCoordinator {
         self.advanced_repo
             .init()
             .await
-            .map_err(|e| ExplorerError::Database(e))?;
+            .map_err(ExplorerError::Database)?;
 
         for indexer in &self.indexers {
             if let Some(config) = chain_configs.get(indexer.chain_id()) {

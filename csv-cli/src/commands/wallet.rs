@@ -246,7 +246,7 @@ fn generate_solana_from_mnemonic(_mnemonic: &str, state: &mut State) -> Result<S
     let mut address_bytes = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut address_bytes);
     
-    let address = format!("{}", bs58::encode(address_bytes).into_string());
+    let address = bs58::encode(address_bytes).into_string();
     state.store_address(Chain::Solana, address.clone());
     Ok(address)
 }
@@ -267,7 +267,7 @@ fn save_wallet_config(mnemonic: &str, addresses: &std::collections::HashMap<Chai
     
     writeln!(file, "[wallet]")?;
     writeln!(file, "mnemonic = \"{}\"", mnemonic)?;
-    writeln!(file, "network = \"{}\"", "dev")?;
+    writeln!(file, "network = \"dev\"")?;
     writeln!(file)?;
     
     for (chain, address) in addresses {

@@ -495,7 +495,7 @@ impl Default for Capabilities {
 /// | Movement      | `transfer`      | Cross-chain right movement                     |
 /// | Verification  | `proof`         | Cryptographic proof of lock/mint               |
 /// | Progress      | `sync_status`   | Indexer/sync freshness indicator               |
-
+///
 /// Sync status for indexers and data systems.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

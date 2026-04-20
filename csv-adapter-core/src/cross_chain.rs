@@ -300,12 +300,12 @@ impl CrossChainTransfer {
             right_id,
             commitment,
             owner.clone(),
-            destination_chain.clone(),
+            destination_chain,
             destination_owner.clone(),
         )?;
 
         // Step 2: Build transfer proof
-        let source_chain = lock_event.source_chain.clone();
+        let source_chain = lock_event.source_chain;
         let source_block_height = lock_event.source_block_height;
         let lock_timestamp = lock_event.timestamp;
 
@@ -315,7 +315,7 @@ impl CrossChainTransfer {
             lock_event,
             inclusion_proof,
             finality_proof: CrossChainFinalityProof {
-                source_chain: source_chain.clone(),
+                source_chain,
                 height: source_block_height,
                 current_height: current_block_height,
                 is_finalized,
@@ -335,7 +335,7 @@ impl CrossChainTransfer {
             right_id,
             source_chain,
             source_seal: transfer_proof.lock_event.source_seal.clone(),
-            destination_chain: transfer_proof.lock_event.destination_chain.clone(),
+            destination_chain: transfer_proof.lock_event.destination_chain,
             destination_seal: result.destination_seal.clone(),
             lock_tx_hash: transfer_proof.lock_event.source_tx_hash,
             mint_tx_hash: Hash::new([0u8; 32]),

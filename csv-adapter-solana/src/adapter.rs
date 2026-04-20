@@ -92,7 +92,7 @@ impl SolanaAnchorLayer {
         // In production, this would use find_program_address with the actual CSV program
         // For now, we compute a deterministic hash-based address
         let mut hasher = Sha256::new();
-        hasher.update(&SOLANA_DOMAIN_SEPARATOR);
+        hasher.update(SOLANA_DOMAIN_SEPARATOR);
         hasher.update(b"seal");
         hasher.update(right_id.as_bytes());
         hasher.update(owner.as_ref());
@@ -105,7 +105,7 @@ impl SolanaAnchorLayer {
     /// Derive commitment PDA from commitment hash
     fn derive_commitment_pda(&self, commitment: &Hash) -> Pubkey {
         let mut hasher = Sha256::new();
-        hasher.update(&SOLANA_DOMAIN_SEPARATOR);
+        hasher.update(SOLANA_DOMAIN_SEPARATOR);
         hasher.update(b"commitment");
         hasher.update(commitment.as_bytes());
         let hash = hasher.finalize();
@@ -294,7 +294,7 @@ impl AnchorLayer for SolanaAnchorLayer {
         
         // For now, mark as consumed in our tracking
         if let Ok(mut seals) = self.active_seals.lock() {
-            seals.retain(|s| &s.account != &seal_account.pubkey);
+            seals.retain(|s| s.account != seal_account.pubkey);
         }
         
         Ok(())
@@ -305,7 +305,7 @@ impl AnchorLayer for SolanaAnchorLayer {
         let mut hasher = Sha256::new();
         
         // Domain separator
-        hasher.update(&SOLANA_DOMAIN_SEPARATOR);
+        hasher.update(SOLANA_DOMAIN_SEPARATOR);
         
         // Instruction discriminator
         hasher.update([INSTRUCTION_PUBLISH_COMMITMENT]);
@@ -318,7 +318,7 @@ impl AnchorLayer for SolanaAnchorLayer {
         // Seal reference data
         if let Some(first_change) = seal_ref.account_changes.first() {
             hasher.update(first_change.pubkey.as_ref());
-            hasher.update(&first_change.new_lamports.to_le_bytes());
+            hasher.update(first_change.new_lamports.to_le_bytes());
         }
         
         Hash::new(hasher.finalize().into())

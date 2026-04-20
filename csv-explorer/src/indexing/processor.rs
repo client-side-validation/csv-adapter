@@ -72,7 +72,7 @@ impl EventProcessor {
         {
             let mut stats = self.stats.lock().unwrap();
             stats.events_processed += 1;
-            if !result.is_ok() {
+            if result.is_err() {
                 stats.errors += 1;
             }
             // Update average processing time
@@ -97,7 +97,7 @@ impl EventProcessor {
             id: right_id,
             owner: owner.to_string(),
             chain: chain.to_string(),
-            created_at: created_at,
+            created_at,
             updated_at: created_at,
             status: TransferStatus::Initiated,
             metadata: metadata.clone(),

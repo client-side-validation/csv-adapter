@@ -1,4 +1,4 @@
-/// UI components module.
+//! UI components module.
 
 pub mod dropdown;
 pub mod card;

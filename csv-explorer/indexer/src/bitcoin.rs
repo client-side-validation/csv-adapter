@@ -126,12 +126,12 @@ impl ChainIndexer for BitcoinIndexer {
             // FIX: actually check addresses instead of always returning false
             // ---------------------------------------------------------------
             let output_match = tx.vout.iter().any(|v| {
-                v.scriptpubkey_address.as_deref().map_or(false, |a| relevant.contains(a))
+                v.scriptpubkey_address.as_deref().is_some_and(|a| relevant.contains(a))
             });
             let input_match = tx.vin.iter().any(|vin| {
                 vin.prevout.as_ref()
                     .and_then(|p| p.scriptpubkey_address.as_deref())
-                    .map_or(false, |a| relevant.contains(a))
+                    .is_some_and(|a| relevant.contains(a))
             });
 
             if !output_match && !input_match {

@@ -1,4 +1,4 @@
-/// Sidebar navigation component.
+//! Sidebar navigation component.
 
 use dioxus::prelude::*;
 use crate::routes::Route;

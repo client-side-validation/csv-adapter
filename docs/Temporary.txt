@@ -1,0 +1,46 @@
+Remaining from BLUEPRINT.md
+
+Zero-Knowledge Proofs - Excluded per user request
+Advanced Privacy Features - Confidential transactions, private right ownership, anonymous transfers, privacy-preserving audit trails
+Extended Chain Support - Cosmos SDK, Polkadot/Substrate, additional EVM chains
+Remaining from PLAN.md (Implementation Priority Matrix)
+
+Q1 2026 (Immediate) — Not Yet Completed:
+TypeScript SDK (core APIs) — npm install @csv-adapter/sdk
+create-csv-app scaffolding
+Interactive tutorial system
+Local chain simulator
+Typed error classes with suggestions
+csv doctor diagnostic tool
+Cross-chain subscription app
+Wallet encryption + BIP-39 support
+Seal registry performance optimization
+
+Q2 2026 — Not Yet Completed:
+TypeScript SDK chain providers
+WASM bindings for browser
+Testing framework with mock chains
+Browser-based playground
+Living examples repository
+Code generator
+Property-based test suite
+Cross-chain NFT app
+Multi-sig wallet support
+Cosmos adapter
+Go SDK
+ZK proof verification (Phase 1)
+RGB asset import
+
+Q3-Q4 2026 and Beyond:
+VS Code extension
+React component library
+Python SDK, Swift SDK
+Supply chain provenance app
+Hardware wallet integration
+Post-quantum signatures
+AluVM integration
+Browser extension wallet
+Fraud proof system
+MPC Wallet
+ZK-STARK support
+DeFi applications (lending, DEX, yield aggregation, insurance)

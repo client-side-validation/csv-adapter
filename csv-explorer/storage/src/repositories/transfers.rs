@@ -20,7 +20,7 @@ impl TransfersRepository {
     pub async fn insert(&self, transfer: &TransferRecord) -> Result<()> {
         let mint_tx = transfer.mint_tx.as_deref();
         let proof_ref = transfer.proof_ref.as_deref();
-        let completed_at = transfer.completed_at.map(|dt| dt);
+        let completed_at = transfer.completed_at;
 
         sqlx::query(
             r#"
@@ -223,8 +223,7 @@ fn row_to_transfer(row: &SqliteRow) -> Result<TransferRecord> {
         status,
         created_at: row.try_get::<chrono::DateTime<chrono::Utc>, _>("created_at")?,
         completed_at: row
-            .try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("completed_at")?
-            .map(|dt| dt),
+            .try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("completed_at")?,
         duration_ms: row
             .try_get::<Option<i64>, _>("duration_ms")?
             .map(|v| v as u64),

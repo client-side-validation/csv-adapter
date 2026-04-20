@@ -179,6 +179,12 @@ pub struct FilterStats {
 /// Sequential proof verification engine (optimized for single-threaded performance)
 pub struct SequentialVerifier;
 
+impl Default for SequentialVerifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SequentialVerifier {
     /// Create a new sequential verifier
     pub fn new() -> Self {

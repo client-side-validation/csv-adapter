@@ -226,7 +226,7 @@ impl ScalableClientBuilder {
         }
 
         // Apply config overrides if present
-        let config = self.state.config.unwrap_or_else(Config::default);
+        let config = self.state.config.unwrap_or_default();
 
         // Initialize store backend
         let store = match self.state.store_backend.unwrap_or(StoreBackend::InMemory) {

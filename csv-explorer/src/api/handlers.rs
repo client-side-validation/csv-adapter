@@ -98,7 +98,7 @@ pub async fn search_transfers(
         start_time: request.start_time.and_then(|t| {
             if t >= 0 {
                 std::time::SystemTime::UNIX_EPOCH.checked_add(std::time::Duration::from_secs(t as u64))
-                    .map(|st| DateTime::<Utc>::from(st))
+                    .map(DateTime::<Utc>::from)
             } else {
                 None
             }
@@ -106,7 +106,7 @@ pub async fn search_transfers(
         end_time: request.end_time.and_then(|t| {
             if t >= 0 {
                 std::time::SystemTime::UNIX_EPOCH.checked_add(std::time::Duration::from_secs(t as u64))
-                    .map(|st| DateTime::<Utc>::from(st))
+                    .map(DateTime::<Utc>::from)
             } else {
                 None
             }

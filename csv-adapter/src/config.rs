@@ -94,8 +94,10 @@ impl Default for ChainConfig {
 /// Store backend configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "backend", rename_all = "lowercase")]
+#[derive(Default)]
 pub enum StoreConfig {
     /// In-memory store (non-persistent, for testing).
+    #[default]
     InMemory,
     /// SQLite file-backed store.
     Sqlite {
@@ -104,11 +106,6 @@ pub enum StoreConfig {
     },
 }
 
-impl Default for StoreConfig {
-    fn default() -> Self {
-        Self::InMemory
-    }
-}
 
 /// Top-level CSV Adapter configuration.
 ///
@@ -261,7 +258,7 @@ impl Config {
     /// Set the RPC URL for a specific chain.
     pub fn with_rpc_url(mut self, chain: Chain, url: impl Into<String>) -> Self {
         let name = chain.to_string();
-        let entry = self.chains.entry(name).or_insert_with(ChainConfig::default);
+        let entry = self.chains.entry(name).or_default();
         entry.rpc.url = url.into();
         entry.enabled = true;
         self

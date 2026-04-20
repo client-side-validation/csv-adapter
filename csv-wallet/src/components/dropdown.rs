@@ -1,4 +1,4 @@
-/// Reusable dropdown select component.
+//! Reusable dropdown select component.
 
 use dioxus::prelude::*;
 
@@ -58,7 +58,7 @@ pub fn Dropdown<T: PartialEq + Clone + std::fmt::Display + 'static>(
                             option,
                             selected_str: selected_str.clone(),
                             idx,
-                            on_change: on_change.clone(),
+                            on_change: on_change,
                             on_close: move |_| is_open.set(false),
                         }
                     }

@@ -3,6 +3,8 @@
 //! This module provides integration between the CLI's Chain enum
 //! and the scalable ChainAdapter registry from csv-adapter-core.
 
+#![allow(dead_code)]
+
 use csv_adapter_core::{AdapterFactory, ChainAdapter, ChainCapabilities};
 use crate::config::Chain;
 

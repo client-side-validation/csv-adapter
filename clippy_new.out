@@ -1,0 +1,728 @@
+    Checking csv-adapter-core v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-adapter-core)
+warning: empty line after doc comment
+   --> csv-adapter-core/src/protocol_version.rs:497:1
+    |
+497 | / /// | Progress      | `sync_status`   | Indexer/sync freshness indicator               |
+498 | |
+    | |_^
+...
+502 |   pub enum SyncStatus {
+    |   ------------------- the comment documents this enum
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#empty_line_after_doc_comments
+    = note: `#[warn(clippy::empty_line_after_doc_comments)]` on by default
+    = help: if the empty line is unintentional, remove it
+help: if the documentation should include the empty line include it in the comment
+    |
+498 | ///
+    |
+
+warning: redundant field names in struct initialization
+   --> csv-adapter-core/src/cross_chain.rs:318:17
+    |
+318 |                 source_chain: source_chain,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace it with: `source_chain`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_field_names
+    = note: `#[warn(clippy::redundant_field_names)]` on by default
+
+warning: method `from_str` can be confused for the standard trait method `std::str::FromStr::from_str`
+  --> csv-adapter-core/src/advanced_commitments.rs:56:5
+   |
+56 | /     pub fn from_str(s: &str) -> Option<Self> {
+57 | |         match s {
+58 | |             "hash_based" => Some(CommitmentScheme::HashBased),
+59 | |             "pedersen" => Some(CommitmentScheme::Pedersen),
+...  |
+67 | |     }
+   | |_____^
+   |
+   = help: consider implementing the trait `std::str::FromStr` or choosing a less ambiguous method name
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#should_implement_trait
+   = note: `#[warn(clippy::should_implement_trait)]` on by default
+
+warning: method `from_str` can be confused for the standard trait method `std::str::FromStr::from_str`
+   --> csv-adapter-core/src/advanced_commitments.rs:123:5
+    |
+123 | /     pub fn from_str(s: &str) -> Option<Self> {
+124 | |         match s {
+125 | |             "merkle" => Some(InclusionProofType::Merkle),
+126 | |             "merkle_patricia" => Some(InclusionProofType::MerklePatricia),
+...   |
+133 | |     }
+    | |_____^
+    |
+    = help: consider implementing the trait `std::str::FromStr` or choosing a less ambiguous method name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#should_implement_trait
+
+warning: method `from_str` can be confused for the standard trait method `std::str::FromStr::from_str`
+   --> csv-adapter-core/src/advanced_commitments.rs:185:5
+    |
+185 | /     pub fn from_str(s: &str) -> Option<Self> {
+186 | |         match s {
+187 | |             "confirmation_depth" => Some(FinalityProofType::ConfirmationDepth),
+188 | |             "checkpoint" => Some(FinalityProofType::Checkpoint),
+...   |
+194 | |     }
+    | |_____^
+    |
+    = help: consider implementing the trait `std::str::FromStr` or choosing a less ambiguous method name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#should_implement_trait
+
+warning: you should consider adding a `Default` implementation for `SequentialVerifier`
+   --> csv-adapter-core/src/performance.rs:184:5
+    |
+184 | /     pub fn new() -> Self {
+185 | |         Self
+186 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#new_without_default
+    = note: `#[warn(clippy::new_without_default)]` on by default
+help: try adding this
+    |
+182 + impl Default for SequentialVerifier {
+183 +     fn default() -> Self {
+184 +         Self::new()
+185 +     }
+186 + }
+    |
+
+warning: you should consider adding a `Default` implementation for `ChainConfigLoader`
+  --> csv-adapter-core/src/chain_config.rs:70:5
+   |
+70 | /     pub fn new() -> Self {
+71 | |         Self {
+72 | |             configs: HashMap::new(),
+73 | |         }
+74 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#new_without_default
+help: try adding this
+   |
+68 + impl Default for ChainConfigLoader {
+69 +     fn default() -> Self {
+70 +         Self::new()
+71 +     }
+72 + }
+   |
+
+warning: methods called `from_*` usually take no `self`
+   --> csv-adapter-core/src/chain_adapter.rs:139:25
+    |
+139 |     fn from_private_key(&self, private_key: &str) -> ChainResult<()>;
+    |                         ^^^^^
+    |
+    = help: consider choosing a less ambiguous name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#wrong_self_convention
+    = note: `#[warn(clippy::wrong_self_convention)]` on by default
+
+warning: `csv-adapter-core` (lib) generated 8 warnings (run `cargo clippy --fix --lib -p csv-adapter-core` to apply 1 suggestion)
+    Checking csv-explorer-shared v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-explorer/shared)
+    Checking csv-adapter-store v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-adapter-store)
+    Checking csv-adapter-sui v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-adapter-sui)
+    Checking csv-adapter-aptos v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-adapter-aptos)
+    Checking csv-adapter-solana v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-adapter-solana)
+    Checking csv-adapter-ethereum v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-adapter-ethereum)
+    Checking csv-wallet v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-wallet)
+    Checking csv-adapter v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-adapter)
+    Checking csv-adapter-bitcoin v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-adapter-bitcoin)
+warning: you should consider adding a `Default` implementation for `MockSolanaRpc`
+   --> csv-adapter-solana/src/rpc.rs:118:5
+    |
+118 | /     pub fn new() -> Self {
+119 | |         Self {
+120 | |             accounts: std::collections::HashMap::new(),
+121 | |         }
+122 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#new_without_default
+    = note: `#[warn(clippy::new_without_default)]` on by default
+help: try adding this
+    |
+116 + impl Default for MockSolanaRpc {
+117 +     fn default() -> Self {
+118 +         Self::new()
+119 +     }
+120 + }
+    |
+
+warning: `csv-adapter-solana` (lib) generated 1 warning
+warning: empty line after doc comment
+ --> csv-wallet/src/pages/wallet_page.rs:1:1
+  |
+1 | / /// Wallet Management page with per-chain account management, export/import JSON.
+2 | |
+  | |_^
+3 |   use dioxus::prelude::*;
+  |   - the comment documents this `use` import
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#empty_line_after_doc_comments
+  = note: `#[warn(clippy::empty_line_after_doc_comments)]` on by default
+  = help: if the empty line is unintentional, remove it
+help: if the comment should document the parent module use an inner doc comment
+  |
+1 - /// Wallet Management page with per-chain account management, export/import JSON.
+1 + //! Wallet Management page with per-chain account management, export/import JSON.
+  |
+
+warning: empty line after doc comment
+ --> csv-wallet/src/components/mod.rs:1:1
+  |
+1 | / /// UI components module.
+2 | |
+  | |_^
+3 |   pub mod dropdown;
+  |   ---------------- the comment documents this module
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#empty_line_after_doc_comments
+  = help: if the empty line is unintentional, remove it
+help: if the comment should document the parent module use an inner doc comment
+  |
+1 - /// UI components module.
+1 + //! UI components module.
+  |
+
+warning: empty line after doc comment
+ --> csv-wallet/src/components/dropdown.rs:1:1
+  |
+1 | / /// Reusable dropdown select component.
+2 | |
+  | |_^
+3 |   use dioxus::prelude::*;
+  |   - the comment documents this `use` import
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#empty_line_after_doc_comments
+  = help: if the empty line is unintentional, remove it
+help: if the comment should document the parent module use an inner doc comment
+  |
+1 - /// Reusable dropdown select component.
+1 + //! Reusable dropdown select component.
+  |
+
+warning: empty line after doc comment
+ --> csv-wallet/src/components/card.rs:1:1
+  |
+1 | / /// Reusable card component with consistent styling.
+2 | |
+  | |_^
+3 |   use dioxus::prelude::*;
+  |   - the comment documents this `use` import
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#empty_line_after_doc_comments
+  = help: if the empty line is unintentional, remove it
+help: if the comment should document the parent module use an inner doc comment
+  |
+1 - /// Reusable card component with consistent styling.
+1 + //! Reusable card component with consistent styling.
+  |
+
+warning: empty line after doc comment
+ --> csv-wallet/src/components/chain_display.rs:1:1
+  |
+1 | / /// Display wrapper types for Chain and Network to work with Dropdown component.
+2 | |
+  | |_^
+3 |   use csv_adapter_core::Chain;
+  |   - the comment documents this `use` import
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#empty_line_after_doc_comments
+  = help: if the empty line is unintentional, remove it
+help: if the comment should document the parent module use an inner doc comment
+  |
+1 - /// Display wrapper types for Chain and Network to work with Dropdown component.
+1 + //! Display wrapper types for Chain and Network to work with Dropdown component.
+  |
+
+warning: empty line after doc comment
+ --> csv-wallet/src/components/sidebar.rs:1:1
+  |
+1 | / /// Sidebar navigation component.
+2 | |
+  | |_^
+3 |   use dioxus::prelude::*;
+  |   - the comment documents this `use` import
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#empty_line_after_doc_comments
+  = help: if the empty line is unintentional, remove it
+help: if the comment should document the parent module use an inner doc comment
+  |
+1 - /// Sidebar navigation component.
+1 + //! Sidebar navigation component.
+  |
+
+warning: empty line after doc comment
+ --> csv-wallet/src/components/header.rs:1:1
+  |
+1 | / /// Header component with chain/network selectors and wallet info.
+2 | |
+  | |_^
+3 |   use dioxus::prelude::*;
+  |   - the comment documents this `use` import
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#empty_line_after_doc_comments
+  = help: if the empty line is unintentional, remove it
+help: if the comment should document the parent module use an inner doc comment
+  |
+1 - /// Header component with chain/network selectors and wallet info.
+1 + //! Header component with chain/network selectors and wallet info.
+  |
+
+    Checking csv-cli v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-cli)
+    Checking csv-explorer-storage v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-explorer/storage)
+warning: unreachable pattern
+   --> csv-cli/src/commands/wallet.rs:324:9
+    |
+323 |         Chain::Solana => generate_solana(state),
+    |         ------------- matches all the relevant values
+324 |         Chain::Solana => generate_solana(state),
+    |         ^^^^^^^^^^^^^ no value can reach this
+    |
+    = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `chain_id` is never used
+  --> csv-cli/src/chain_registry.rs:10:8
+   |
+10 | pub fn chain_id(chain: &Chain) -> &'static str {
+   |        ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `get_adapter` is never used
+  --> csv-cli/src/chain_registry.rs:21:8
+   |
+21 | pub fn get_adapter(chain: &Chain) -> Option<Box<dyn ChainAdapter>> {
+   |        ^^^^^^^^^^^
+
+warning: function `get_capabilities` is never used
+  --> csv-cli/src/chain_registry.rs:27:8
+   |
+27 | pub fn get_capabilities(chain: &Chain) -> Option<ChainCapabilities> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `supports_capability` is never used
+  --> csv-cli/src/chain_registry.rs:32:8
+   |
+32 | pub fn supports_capability(chain: &Chain, check: impl Fn(&ChainCapabilities) -> bool) -> bool {
+   |        ^^^^^^^^^^^^^^^^^^^
+
+warning: function `supports_nfts` is never used
+  --> csv-cli/src/chain_registry.rs:37:8
+   |
+37 | pub fn supports_nfts(chain: &Chain) -> bool {
+   |        ^^^^^^^^^^^^^
+
+warning: function `supports_smart_contracts` is never used
+  --> csv-cli/src/chain_registry.rs:42:8
+   |
+42 | pub fn supports_smart_contracts(chain: &Chain) -> bool {
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `supported_chains` is never used
+  --> csv-cli/src/chain_registry.rs:47:8
+   |
+47 | pub fn supported_chains() -> Vec<String> {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: struct `ChainMetadata` is never constructed
+  --> csv-cli/src/chain_registry.rs:53:12
+   |
+53 | pub struct ChainMetadata {
+   |            ^^^^^^^^^^^^^
+
+warning: function `get_metadata` is never used
+  --> csv-cli/src/chain_registry.rs:61:8
+   |
+61 | pub fn get_metadata(chain: &Chain) -> ChainMetadata {
+   |        ^^^^^^^^^^^^
+
+warning: function `get_badge_class` is never used
+  --> csv-cli/src/chain_registry.rs:97:8
+   |
+97 | pub fn get_badge_class(chain: &Chain) -> &'static str {
+   |        ^^^^^^^^^^^^^^^
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain.rs:167:53
+    |
+167 |     let lock_provider = create_lock_provider(&from, source_chain_id.clone());
+    |                                                     ^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `source_chain_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+    = note: `#[warn(clippy::clone_on_copy)]` on by default
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain.rs:173:13
+    |
+173 |             dest_chain_id.clone(),
+    |             ^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `dest_chain_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain.rs:194:27
+    |
+194 |             source_chain: source_chain_id.clone(),
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `source_chain_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain.rs:239:35
+    |
+239 |         create_mint_provider(&to, dest_chain_id.clone()).map_err(|e| anyhow::anyhow!("{}", e))?;
+    |                                   ^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `dest_chain_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: this function has too many arguments (8/7)
+   --> csv-explorer/storage/src/repositories/priority_addresses.rs:406:5
+    |
+406 | /     pub async fn record_indexing_activity(
+407 | |         &self,
+408 | |         address: &str,
+409 | |         chain: &str,
+...   |
+414 | |         error: Option<&str>,
+415 | |     ) -> Result<(), sqlx::Error> {
+    | |________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: unnecessary map of the identity function
+  --> csv-explorer/storage/src/repositories/rights.rs:26:54
+   |
+26 |         let last_transfer_at = right.last_transfer_at.map(|dt| dt);
+   |                                                      ^^^^^^^^^^^^^ help: remove the call to `map`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#map_identity
+   = note: `#[warn(clippy::map_identity)]` on by default
+
+warning: unnecessary map of the identity function
+   --> csv-explorer/storage/src/repositories/rights.rs:229:86
+    |
+229 |               .try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("last_transfer_at")?
+    |  ______________________________________________________________________________________^
+230 | |             .map(|dt| dt),
+    | |_________________________^ help: remove the call to `map`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#map_identity
+
+warning: unnecessary map of the identity function
+  --> csv-explorer/storage/src/repositories/seals.rs:22:43
+   |
+22 |         let consumed_at = seal.consumed_at.map(|dt| dt);
+   |                                           ^^^^^^^^^^^^^ help: remove the call to `map`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#map_identity
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+  --> csv-cli/src/commands/cross_chain_impl.rs:60:27
+   |
+60 |             source_chain: self._chain_id.clone(),
+   |                           ^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `self._chain_id`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain_impl.rs:112:27
+    |
+112 |             source_chain: self._chain_id.clone(),
+    |                           ^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `self._chain_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain_impl.rs:162:27
+    |
+162 |             source_chain: self._chain_id.clone(),
+    |                           ^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `self._chain_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: unnecessary map of the identity function
+   --> csv-explorer/storage/src/repositories/seals.rs:217:81
+    |
+217 |               .try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("consumed_at")?
+    |  _________________________________________________________________________________^
+218 | |             .map(|dt| dt),
+    | |_________________________^ help: remove the call to `map`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#map_identity
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain_impl.rs:211:27
+    |
+211 |             source_chain: self._chain_id.clone(),
+    |                           ^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `self._chain_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain_impl.rs:351:27
+    |
+351 |             source_chain: proof.lock_event.source_chain.clone(),
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `proof.lock_event.source_chain`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain_impl.rs:353:32
+    |
+353 |             destination_chain: self.chain_id.clone(),
+    |                                ^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `self.chain_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain_impl.rs:392:27
+    |
+392 |             source_chain: proof.lock_event.source_chain.clone(),
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `proof.lock_event.source_chain`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain_impl.rs:394:32
+    |
+394 |             destination_chain: self.chain_id.clone(),
+    |                                ^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `self.chain_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain_impl.rs:433:27
+    |
+433 |             source_chain: proof.lock_event.source_chain.clone(),
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `proof.lock_event.source_chain`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: using `clone` on type `Chain` which implements the `Copy` trait
+   --> csv-cli/src/commands/cross_chain_impl.rs:435:32
+    |
+435 |             destination_chain: self.chain_id.clone(),
+    |                                ^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `self.chain_id`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#clone_on_copy
+
+warning: unnecessary map of the identity function
+  --> csv-explorer/storage/src/repositories/transfers.rs:23:49
+   |
+23 |         let completed_at = transfer.completed_at.map(|dt| dt);
+   |                                                 ^^^^^^^^^^^^^ help: remove the call to `map`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#map_identity
+
+warning: unnecessary map of the identity function
+   --> csv-explorer/storage/src/repositories/transfers.rs:226:82
+    |
+226 |               .try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("completed_at")?
+    |  __________________________________________________________________________________^
+227 | |             .map(|dt| dt),
+    | |_________________________^ help: remove the call to `map`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#map_identity
+
+warning: `csv-explorer-storage` (lib) generated 7 warnings
+    Checking csv-explorer-indexer v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-explorer/indexer)
+warning: useless use of `format!`
+   --> csv-cli/src/commands/wallet.rs:249:19
+    |
+249 |     let address = format!("{}", bs58::encode(address_bytes).into_string());
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `bs58::encode(address_bytes).into_string().to_string()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#useless_format
+    = note: `#[warn(clippy::useless_format)]` on by default
+
+warning: literal with an empty format string
+   --> csv-cli/src/commands/wallet.rs:270:40
+    |
+270 |     writeln!(file, "network = \"{}\"", "dev")?;
+    |                                        ^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#write_literal
+    = note: `#[warn(clippy::write_literal)]` on by default
+help: try
+    |
+270 -     writeln!(file, "network = \"{}\"", "dev")?;
+270 +     writeln!(file, "network = \"dev\"")?;
+    |
+
+warning: `csv-cli` (bin "csv") generated 27 warnings (run `cargo clippy --fix --bin "csv" -p csv-cli` to apply 16 suggestions)
+warning: this `map_or` can be simplified
+   --> csv-explorer/indexer/src/bitcoin.rs:129:17
+    |
+129 |                 v.scriptpubkey_address.as_deref().map_or(false, |a| relevant.contains(a))
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#unnecessary_map_or
+    = note: `#[warn(clippy::unnecessary_map_or)]` on by default
+help: use is_some_and instead
+    |
+129 -                 v.scriptpubkey_address.as_deref().map_or(false, |a| relevant.contains(a))
+129 +                 v.scriptpubkey_address.as_deref().is_some_and(|a| relevant.contains(a))
+    |
+
+warning: this `map_or` can be simplified
+   --> csv-explorer/indexer/src/bitcoin.rs:132:17
+    |
+132 | /                 vin.prevout.as_ref()
+133 | |                     .and_then(|p| p.scriptpubkey_address.as_deref())
+134 | |                     .map_or(false, |a| relevant.contains(a))
+    | |____________________________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#unnecessary_map_or
+help: use is_some_and instead
+    |
+134 -                     .map_or(false, |a| relevant.contains(a))
+134 +                     .is_some_and(|a| relevant.contains(a))
+    |
+
+warning: manually reimplementing `div_ceil`
+   --> csv-explorer/indexer/src/rpc_manager.rs:188:41
+    |
+188 |     let mut out = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    |                                         ^^^^^^^^^^^^^^^^^^^^^ help: consider using `.div_ceil()`: `bytes.len().div_ceil(3)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#manual_div_ceil
+    = note: `#[warn(clippy::manual_div_ceil)]` on by default
+
+warning: redundant closure
+  --> csv-explorer/indexer/src/sui.rs:95:97
+   |
+95 |         let client = self.rpc_manager.as_ref().and_then(|m| m.get_client("sui")).unwrap_or_else(|| Client::new());
+   |                                                                                                 ^^^^^^^^^^^^^^^^ help: replace the closure with the associated function itself: `Client::new`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+   = note: `#[warn(clippy::redundant_closure)]` on by default
+
+warning: this function has too many arguments (11/7)
+   --> csv-explorer/indexer/src/sync.rs:303:1
+    |
+303 | / async fn sync_chain(
+304 | |     indexer: &dyn ChainIndexer,
+305 | |     sync_repo: &SyncRepository,
+306 | |     rights_repo: &RightsRepository,
+...   |
+314 | |     chain_config: Option<&ChainConfig>,
+315 | | ) -> Result<(), ExplorerError> {
+    | |______________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: `csv-explorer-indexer` (lib) generated 5 warnings (run `cargo clippy --fix --lib -p csv-explorer-indexer` to apply 4 suggestions)
+    Checking csv-explorer v0.2.0 (/home/zorvan/Work/projects/csv-adapter/csv-explorer)
+warning: redundant field names in struct initialization
+   --> csv-explorer/src/indexing/processor.rs:100:13
+    |
+100 |             created_at: created_at,
+    |             ^^^^^^^^^^^^^^^^^^^^^^ help: replace it with: `created_at`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_field_names
+    = note: `#[warn(clippy::redundant_field_names)]` on by default
+
+warning: `csv-wallet` (bin "csv-wallet") generated 7 warnings
+warning: large size difference between variants
+  --> csv-explorer/src/indexing/events.rs:12:1
+   |
+12 | /   pub enum IndexingEvent {
+13 | |       /// Right created on a chain
+14 | |       RightCreated {
+15 | |           right_id: Hash,
+...  |
+23 | | /     RightTransferred {
+24 | | |         right_id: Hash,
+25 | | |         from_chain: Chain,
+26 | | |         to_chain: Chain,
+...  | |
+29 | | |         proof_bundle: Option<csv_adapter_core::proof::ProofBundle>,
+30 | | |     },
+   | | |_____- the largest variant contains at least 358 bytes
+...  |
+41 | | /     RightUpdated {
+42 | | |         right_id: Hash,
+43 | | |         chain: Chain,
+44 | | |         old_metadata: serde_json::Value,
+45 | | |         new_metadata: serde_json::Value,
+46 | | |         updated_at: DateTime<Utc>,
+47 | | |     },
+   | | |_____- the second-largest variant contains at least 109 bytes
+...  |
+63 | |       },
+64 | |   }
+   | |___^ the entire enum is at least 360 bytes
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#large_enum_variant
+   = note: `#[warn(clippy::large_enum_variant)]` on by default
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+   |
+29 -         proof_bundle: Option<csv_adapter_core::proof::ProofBundle>,
+29 +         proof_bundle: Box<Option<csv_adapter_core::proof::ProofBundle>>,
+   |
+
+warning: this boolean expression can be simplified
+  --> csv-explorer/src/indexing/processor.rs:75:16
+   |
+75 |             if !result.is_ok() {
+   |                ^^^^^^^^^^^^^^^ help: try: `result.is_err()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#nonminimal_bool
+   = note: `#[warn(clippy::nonminimal_bool)]` on by default
+
+warning: redundant closure
+  --> csv-explorer/src/indexing/sync.rs:69:38
+   |
+69 |             indexers.into_iter().map(|b| Arc::from(b)).collect();
+   |                                      ^^^^^^^^^^^^^^^^ help: replace the closure with the associated function itself: `Arc::from`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+   = note: `#[warn(clippy::redundant_closure)]` on by default
+
+warning: redundant closure
+   --> csv-explorer/src/indexing/sync.rs:127:22
+    |
+127 |             .map_err(|e| ExplorerError::Database(e))?;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `ExplorerError::Database`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+warning: this function has too many arguments (11/7)
+   --> csv-explorer/src/indexing/sync.rs:320:1
+    |
+320 | / async fn sync_chain(
+321 | |     indexer: &dyn ChainIndexer,
+322 | |     sync_repo: &SyncRepository,
+323 | |     rights_repo: &RightsRepository,
+...   |
+331 | |     chain_config: Option<&ChainConfig>,
+332 | | ) -> Result<(), ExplorerError> {
+    | |______________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: redundant closure
+   --> csv-explorer/src/api/handlers.rs:101:26
+    |
+101 |                     .map(|st| DateTime::<Utc>::from(st))
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the associated function itself: `DateTime::<Utc>::from`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+warning: redundant closure
+   --> csv-explorer/src/api/handlers.rs:109:26
+    |
+109 |                     .map(|st| DateTime::<Utc>::from(st))
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the associated function itself: `DateTime::<Utc>::from`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.94.0/index.html#redundant_closure
+
+warning: `csv-explorer` (lib) generated 8 warnings (run `cargo clippy --fix --lib -p csv-explorer` to apply 6 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.97s
+warning: the following packages contain code that will be rejected by a future version of Rust: ashpd v0.8.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`

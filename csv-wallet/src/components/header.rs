@@ -1,4 +1,4 @@
-/// Header component with chain/network selectors and wallet info.
+//! Header component with chain/network selectors and wallet info.
 
 use dioxus::prelude::*;
 use crate::context::{use_wallet_context, truncate_address};

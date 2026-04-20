@@ -1,4 +1,4 @@
-/// Display wrapper types for Chain and Network to work with Dropdown component.
+//! Display wrapper types for Chain and Network to work with Dropdown component.
 
 use csv_adapter_core::Chain;
 use crate::context::Network;

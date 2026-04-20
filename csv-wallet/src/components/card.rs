@@ -1,4 +1,4 @@
-/// Reusable card component with consistent styling.
+//! Reusable card component with consistent styling.
 
 use dioxus::prelude::*;
 

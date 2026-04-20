@@ -348,8 +348,8 @@ fn AddAccountCard(chain: Chain) -> Element {
     let mut wallet_ctx = use_wallet_context();
     let chain_accounts = wallet_ctx.accounts_for_chain(chain);
     let mut show_form = use_signal(|| false);
-    let mut pk_input = use_signal(|| String::new());
-    let mut name_input = use_signal(|| String::new());
+    let mut pk_input = use_signal(String::new);
+    let mut name_input = use_signal(String::new);
     let mut error = use_signal(|| Option::<String>::None);
 
     if *show_form.read() {
@@ -468,8 +468,8 @@ fn DashboardChainCard(chain: Chain) -> Element {
 #[component]
 fn AddAccountFormModal(chain: Chain, on_close: EventHandler<()>) -> Element {
     let mut wallet_ctx = use_wallet_context();
-    let mut pk_input = use_signal(|| String::new());
-    let mut name_input = use_signal(|| String::new());
+    let mut pk_input = use_signal(String::new);
+    let mut name_input = use_signal(String::new);
     let mut error = use_signal(|| Option::<String>::None);
 
     rsx! {
@@ -565,7 +565,7 @@ fn ImportJsonButton() -> Element {
                                                             }
                                                         }
                                                     }) as Box<dyn FnMut(_)>);
-                                                    let _ = reader.set_onload(Some(onload.as_ref().unchecked_ref()));
+                                                    reader.set_onload(Some(onload.as_ref().unchecked_ref()));
                                                     onload.forget();
                                                     let _ = reader.read_as_text(&file);
                                                 }
@@ -689,7 +689,7 @@ pub fn CreateRight() -> Element {
 fn CreateRightForm() -> Element {
     let mut wallet_ctx = use_wallet_context();
     let mut selected_chain = use_signal(|| Chain::Bitcoin);
-    let mut value = use_signal(|| String::new());
+    let mut value = use_signal(String::new);
     let mut result = use_signal(|| Option::<String>::None);
     let mut error = use_signal(|| Option::<String>::None);
 
@@ -815,8 +815,8 @@ pub fn ShowRight(id: String) -> Element {
 #[component]
 pub fn TransferRight() -> Element {
     let _wallet_ctx = use_wallet_context();
-    let mut right_id = use_signal(|| String::new());
-    let mut to_address = use_signal(|| String::new());
+    let mut right_id = use_signal(String::new);
+    let mut to_address = use_signal(String::new);
     let mut result = use_signal(|| Option::<String>::None);
 
     rsx! {
@@ -866,7 +866,7 @@ pub fn TransferRight() -> Element {
 #[component]
 pub fn ConsumeRight() -> Element {
     let mut wallet_ctx = use_wallet_context();
-    let mut right_id = use_signal(|| String::new());
+    let mut right_id = use_signal(String::new);
     let mut result = use_signal(|| Option::<String>::None);
 
     rsx! {
@@ -981,7 +981,7 @@ pub fn Proofs() -> Element {
 pub fn GenerateProof() -> Element {
     let mut wallet_ctx = use_wallet_context();
     let mut selected_chain = use_signal(|| Chain::Bitcoin);
-    let mut right_id = use_signal(|| String::new());
+    let mut right_id = use_signal(String::new);
     let mut result = use_signal(|| Option::<String>::None);
 
     let proof_type = match *selected_chain.read() {
@@ -1051,7 +1051,7 @@ pub fn GenerateProof() -> Element {
 #[component]
 pub fn VerifyProof() -> Element {
     let mut selected_chain = use_signal(|| Chain::Bitcoin);
-    let mut proof_input = use_signal(|| String::new());
+    let mut proof_input = use_signal(String::new);
     let mut result = use_signal(|| Option::<String>::None);
 
     rsx! {
@@ -1208,8 +1208,8 @@ pub fn CrossChainTransfer() -> Element {
     let mut wallet_ctx = use_wallet_context();
     let mut from_chain = use_signal(|| Chain::Bitcoin);
     let mut to_chain = use_signal(|| Chain::Sui);
-    let mut right_id = use_signal(|| String::new());
-    let mut dest_owner = use_signal(|| String::new());
+    let mut right_id = use_signal(String::new);
+    let mut dest_owner = use_signal(String::new);
     let mut step = use_signal(|| 0);
     let mut result = use_signal(|| Option::<String>::None);
 
@@ -1316,7 +1316,7 @@ pub fn CrossChainTransfer() -> Element {
 #[component]
 pub fn CrossChainStatus() -> Element {
     let wallet_ctx = use_wallet_context();
-    let mut transfer_id = use_signal(|| String::new());
+    let mut transfer_id = use_signal(String::new);
     let mut result = use_signal(|| Option::<TrackedTransfer>::None);
 
     rsx! {
@@ -1372,7 +1372,7 @@ pub fn CrossChainStatus() -> Element {
 #[component]
 pub fn CrossChainRetry() -> Element {
     let wallet_ctx = use_wallet_context();
-    let mut transfer_id = use_signal(|| String::new());
+    let mut transfer_id = use_signal(String::new);
     let mut result = use_signal(|| Option::<String>::None);
 
     rsx! {
@@ -1469,7 +1469,7 @@ pub fn DeployContract() -> Element {
     let mut wallet_ctx = use_wallet_context();
     let mut selected_chain = use_signal(|| Chain::Ethereum);
     let mut selected_network = use_signal(|| Network::Test);
-    let mut deployer_key = use_signal(|| String::new());
+    let mut deployer_key = use_signal(String::new);
     let mut result = use_signal(|| Option::<String>::None);
 
     let is_bitcoin = *selected_chain.read() == Chain::Bitcoin;
@@ -1664,7 +1664,7 @@ pub fn Seals() -> Element {
 pub fn CreateSeal() -> Element {
     let mut wallet_ctx = use_wallet_context();
     let mut selected_chain = use_signal(|| Chain::Bitcoin);
-    let mut value = use_signal(|| String::new());
+    let mut value = use_signal(String::new);
     let mut result = use_signal(|| Option::<String>::None);
 
     rsx! {
@@ -1719,7 +1719,7 @@ pub fn CreateSeal() -> Element {
 pub fn ConsumeSeal() -> Element {
     let mut wallet_ctx = use_wallet_context();
     let mut selected_chain = use_signal(|| Chain::Bitcoin);
-    let mut seal_ref = use_signal(|| String::new());
+    let mut seal_ref = use_signal(String::new);
     let mut result = use_signal(|| Option::<String>::None);
     let mut error = use_signal(|| Option::<String>::None);
 
@@ -1789,7 +1789,7 @@ pub fn ConsumeSeal() -> Element {
 pub fn VerifySeal() -> Element {
     let wallet_ctx = use_wallet_context();
     let mut selected_chain = use_signal(|| Chain::Bitcoin);
-    let mut seal_ref = use_signal(|| String::new());
+    let mut seal_ref = use_signal(String::new);
     let mut result = use_signal(|| Option::<bool>::None);
 
     rsx! {
@@ -2166,7 +2166,7 @@ pub fn ValidateProof() -> Element {
 
 #[component]
 pub fn ValidateSeal() -> Element {
-    let mut seal_ref = use_signal(|| String::new());
+    let mut seal_ref = use_signal(String::new);
     let mut result = use_signal(|| Option::<bool>::None);
 
     rsx! {

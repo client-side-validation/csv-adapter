@@ -17,8 +17,10 @@ use serde::{Deserialize, Serialize};
 /// Commitment scheme type - identifies the cryptographic construction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum CommitmentScheme {
     /// Simple hash-based commitment (SHA-256)
+    #[default]
     HashBased,
     /// Pedersen commitment (hiding, binding)
     Pedersen,
@@ -34,11 +36,6 @@ pub enum CommitmentScheme {
     Custom,
 }
 
-impl Default for CommitmentScheme {
-    fn default() -> Self {
-        CommitmentScheme::HashBased
-    }
-}
 
 impl core::fmt::Display for CommitmentScheme {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -90,8 +87,10 @@ impl CommitmentScheme {
 /// Type of inclusion proof used to anchor commitment on-chain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum InclusionProofType {
     /// Bitcoin-style: Merkle proof (double-SHA256)
+    #[default]
     Merkle,
     /// Ethereum-style: Merkle-Patricia Trie proof
     MerklePatricia,
@@ -105,11 +104,6 @@ pub enum InclusionProofType {
     Custom,
 }
 
-impl Default for InclusionProofType {
-    fn default() -> Self {
-        InclusionProofType::Merkle
-    }
-}
 
 impl core::fmt::Display for InclusionProofType {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -158,8 +152,10 @@ impl InclusionProofType {
 /// Type of finality proof.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum FinalityProofType {
     /// Confirmation depth (probabilistic)
+    #[default]
     ConfirmationDepth,
     /// Checkpoint finality (deterministic, 2f+1)
     Checkpoint,
@@ -171,11 +167,6 @@ pub enum FinalityProofType {
     Custom,
 }
 
-impl Default for FinalityProofType {
-    fn default() -> Self {
-        FinalityProofType::ConfirmationDepth
-    }
-}
 
 impl core::fmt::Display for FinalityProofType {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

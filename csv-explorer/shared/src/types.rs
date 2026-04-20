@@ -423,20 +423,17 @@ pub struct IndexerStatus {
 /// Priority level for address indexing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum PriorityLevel {
     /// High priority - index immediately and frequently
     High,
     /// Normal priority - index in regular cycle
+    #[default]
     Normal,
     /// Low priority - index when resources available
     Low,
 }
 
-impl Default for PriorityLevel {
-    fn default() -> Self {
-        PriorityLevel::Normal
-    }
-}
 
 impl std::fmt::Display for PriorityLevel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

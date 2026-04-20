@@ -57,8 +57,7 @@ pub fn NftPage() -> Element {
 #[component]
 pub fn NftGallery() -> Element {
     // Mock NFT data for demonstration
-    let mock_nfts = vec![
-        NftRecord {
+    let mock_nfts = [NftRecord {
             id: "nft-1".to_string(),
             chain: csv_adapter_core::Chain::Ethereum,
             collection_id: Some("collection-1".to_string()),
@@ -87,8 +86,7 @@ pub fn NftGallery() -> Element {
             external_url: Some("https://magiceden.io/items/567".to_string()),
             created_at: 1640995200,
             status: NftStatus::Owned,
-        },
-    ];
+        }];
 
     rsx! {
         div { class: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
@@ -104,8 +102,7 @@ pub fn NftGallery() -> Element {
 #[component]
 pub fn NftCollections() -> Element {
     // Mock collection data
-    let mock_collections = vec![
-        NftCollection {
+    let mock_collections = [NftCollection {
             id: "collection-1".to_string(),
             chain: csv_adapter_core::Chain::Ethereum,
             name: "Bored Ape Yacht Club".to_string(),
@@ -130,8 +127,7 @@ pub fn NftCollections() -> Element {
             owner_count: 1200,
             floor_price: Some(2.8),
             created_at: 1640995200,
-        },
-    ];
+        }];
 
     rsx! {
         div { class: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",

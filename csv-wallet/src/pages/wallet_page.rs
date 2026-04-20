@@ -1,4 +1,4 @@
-/// Wallet Management page with per-chain account management, export/import JSON.
+//! Wallet Management page with per-chain account management, export/import JSON.
 
 use dioxus::prelude::*;
 use csv_adapter_core::Chain;
@@ -163,8 +163,8 @@ fn chain_name(chain: &Chain) -> &'static str {
 fn AddAccountTab() -> Element {
     let mut wallet_ctx = use_wallet_context();
     let mut selected_chain = use_signal(|| ChainDisplay(Chain::Bitcoin));
-    let mut pk_input = use_signal(|| String::new());
-    let mut name_input = use_signal(|| String::new());
+    let mut pk_input = use_signal(String::new);
+    let mut name_input = use_signal(String::new);
     let mut message = use_signal(|| Option::<String>::None);
     let mut error = use_signal(|| Option::<String>::None);
 
@@ -374,7 +374,7 @@ fn ImportTab() -> Element {
                                                                     }
                                                                 }
                                                             }) as Box<dyn FnMut(_)>);
-                                                            let _ = reader.set_onload(Some(onload.as_ref().unchecked_ref()));
+                                                            reader.set_onload(Some(onload.as_ref().unchecked_ref()));
                                                             onload.forget();
                                                             let _ = reader.read_as_text(&file);
                                                         }

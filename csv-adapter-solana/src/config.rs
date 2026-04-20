@@ -5,10 +5,12 @@ use std::str::FromStr;
 
 /// Solana network configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum Network {
     /// Solana mainnet
     Mainnet,
     /// Solana devnet
+    #[default]
     Devnet,
     /// Solana testnet
     Testnet,
@@ -16,11 +18,6 @@ pub enum Network {
     Local,
 }
 
-impl Default for Network {
-    fn default() -> Self {
-        Self::Devnet
-    }
-}
 
 impl Network {
     /// Get the default RPC URL for this network
