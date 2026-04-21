@@ -13,6 +13,8 @@ mod pages;
 mod components;
 mod hooks;
 mod services;
+mod seals;
+mod assets;
 
 use routes::Route;
 use context::WalletProvider;
@@ -57,7 +59,10 @@ fn App() -> Element {
         }
 
         if *ready.read() {
-            WalletProvider {}
+            // Main app with providers
+            WalletProvider {
+                Router::<Route> {}
+            }
         } else {
             // Loading screen (inline styles, no Tailwind needed)
             div {

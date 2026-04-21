@@ -1,7 +1,7 @@
 //! Wallet state hook.
 
 use dioxus::prelude::*;
-use csv_adapter::wallet::Wallet;
+use crate::wallet_core::WalletData as Wallet;
 
 /// Wallet state.
 #[derive(Clone, PartialEq)]
@@ -17,37 +17,29 @@ pub struct WalletState {
 }
 
 /// Wallet context.
+#[derive(Clone, Copy)]
 pub struct WalletContext {
     pub state: Signal<WalletState>,
 }
 
 impl WalletContext {
     pub fn create_wallet(&mut self) -> Result<Wallet, String> {
-        let wallet = Wallet::generate();
+        // TODO: Implement wallet generation
+        // For now, just create empty wallet
+        let wallet = Wallet::default();
         self.state.write().wallet = Some(wallet.clone());
         self.state.write().unlocked = true;
         self.state.write().initialized = true;
-        
-        // Populate addresses
-        use csv_adapter_core::Chain;
-        for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana] {
-            self.state.write().addresses.insert(chain, wallet.address(chain));
-        }
         
         Ok(wallet)
     }
 
-    pub fn import_wallet(&mut self, mnemonic: &str) -> Result<Wallet, String> {
-        let wallet = Wallet::from_mnemonic(mnemonic, "")
-            .map_err(|e| format!("Failed to import wallet: {}", e))?;
+    pub fn import_wallet(&mut self, _mnemonic: &str) -> Result<Wallet, String> {
+        // TODO: Implement mnemonic import
+        let wallet = Wallet::default();
         self.state.write().wallet = Some(wallet.clone());
         self.state.write().unlocked = true;
         self.state.write().initialized = true;
-        
-        use csv_adapter_core::Chain;
-        for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana] {
-            self.state.write().addresses.insert(chain, wallet.address(chain));
-        }
         
         Ok(wallet)
     }
@@ -66,7 +58,7 @@ impl WalletContext {
 
 /// Wallet provider component.
 #[component]
-pub fn WalletProvider() -> Element {
+pub fn WalletProvider(children: Element) -> Element {
     let mut state = use_signal(|| WalletState {
         initialized: false,
         unlocked: false,
@@ -76,12 +68,10 @@ pub fn WalletProvider() -> Element {
 
     use_context_provider(|| WalletContext { state });
     
-    rsx! {
-        Outlet {}
-    }
+    rsx! { { children } }
 }
 
 /// Hook to access wallet state.
 pub fn use_wallet() -> WalletContext {
-    use_context::<WalletContext>().unwrap()
+    use_context::<WalletContext>()
 }

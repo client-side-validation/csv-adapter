@@ -13,6 +13,7 @@ pub struct AssetState {
 }
 
 /// Asset context.
+#[derive(Clone, Copy)]
 pub struct AssetContext {
     pub state: Signal<AssetState>,
 }
@@ -46,7 +47,7 @@ impl AssetContext {
 
 /// Asset provider component.
 #[component]
-pub fn AssetProvider() -> Element {
+pub fn AssetProvider(children: Element) -> Element {
     let mut state = use_signal(|| AssetState {
         assets: Vec::new(),
         total_value_usd: 0.0,
@@ -55,12 +56,10 @@ pub fn AssetProvider() -> Element {
 
     use_context_provider(|| AssetContext { state });
     
-    rsx! {
-        Outlet {}
-    }
+    rsx! { { children } }
 }
 
 /// Hook to access asset state.
 pub fn use_assets() -> AssetContext {
-    use_context::<AssetContext>().unwrap()
+    use_context::<AssetContext>()
 }

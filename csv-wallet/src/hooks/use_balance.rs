@@ -1,7 +1,6 @@
 //! Balance fetching hook.
 
 use dioxus::prelude::*;
-use dioxus_router::components::Outlet;
 use csv_adapter_core::Chain;
 use std::collections::HashMap;
 
@@ -56,19 +55,17 @@ impl BalanceContext {
 
 /// Balance provider component.
 #[component]
-pub fn BalanceProvider() -> Element {
+pub fn BalanceProvider(children: Element) -> Element {
     let balances = use_signal(|| HashMap::<String, AccountBalance>::new());
 
     use_context_provider(|| BalanceContext { balances });
 
-    rsx! {
-        Outlet {}
-    }
+    rsx! { { children } }
 }
 
 /// Hook to access balance context.
 pub fn use_balance() -> BalanceContext {
-    use_context::<BalanceContext>().expect("BalanceContext not found")
+    use_context::<BalanceContext>()
 }
 
 /// Format balance for display with appropriate precision.

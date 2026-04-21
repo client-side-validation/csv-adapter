@@ -28,7 +28,8 @@ pub struct ChainAccount {
     /// Derived address for display
     pub address: String,
     /// Balance in native token (BTC, ETH, SUI, APT, etc.)
-    #[serde(default)]
+    /// Not serialized - fetched dynamically from blockchain
+    #[serde(default, skip_serializing)]
     pub balance: f64,
 }
 
@@ -183,7 +184,7 @@ impl ChainAccount {
 }
 
 /// Complete wallet data — collection of per-chain accounts.
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct WalletData {
     /// All accounts (multiple per chain allowed)
     pub accounts: Vec<ChainAccount>,

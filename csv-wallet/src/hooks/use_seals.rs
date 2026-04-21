@@ -12,6 +12,7 @@ pub struct SealState {
 }
 
 /// Seal context.
+#[derive(Clone, Copy)]
 pub struct SealContext {
     pub state: Signal<SealState>,
 }
@@ -38,7 +39,7 @@ impl SealContext {
 
 /// Seal provider component.
 #[component]
-pub fn SealProvider() -> Element {
+pub fn SealProvider(children: Element) -> Element {
     let mut state = use_signal(|| SealState {
         seals: Vec::new(),
         loading: false,
@@ -46,12 +47,10 @@ pub fn SealProvider() -> Element {
 
     use_context_provider(|| SealContext { state });
     
-    rsx! {
-        Outlet {}
-    }
+    rsx! { { children } }
 }
 
 /// Hook to access seal state.
 pub fn use_seals() -> SealContext {
-    use_context::<SealContext>().unwrap()
+    use_context::<SealContext>()
 }

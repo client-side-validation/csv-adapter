@@ -376,7 +376,7 @@ pub struct CrossChainTransferResult {
 pub type ContractDeployments = std::collections::HashMap<Chain, ContractDeployment>;
 
 /// Browser wallet interface for signing transactions.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BrowserWallet {
     pub chain: Chain,
     pub address: String,

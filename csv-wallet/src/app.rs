@@ -13,16 +13,20 @@ use crate::components::{Header, Sidebar};
 #[component]
 pub fn App() -> Element {
     rsx! {
-        // Global providers
-        wallet::WalletProvider {}
-        network::NetworkProvider {}
-        seals::SealProvider {}
-        assets::AssetProvider {}
-        balance::BalanceProvider {}
-        wallet_connection::WalletConnectionProvider {}
-
-        // Router
-        Router::<Route> {}
+        // Global providers - nested to provide context to all children
+        wallet::WalletProvider {
+            network::NetworkProvider {
+                seals::SealProvider {
+                    assets::AssetProvider {
+                        balance::BalanceProvider {
+                            wallet_connection::WalletConnectionProvider {
+                                Router::<Route> {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

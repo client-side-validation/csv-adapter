@@ -130,19 +130,17 @@ impl WalletConnectionContext {
 
 /// Wallet connection provider component.
 #[component]
-pub fn WalletConnectionProvider() -> Element {
+pub fn WalletConnectionProvider(children: Element) -> Element {
     let state = use_signal(|| WalletConnectionState::default());
     
     use_context_provider(|| WalletConnectionContext { state });
     
-    rsx! {
-        Outlet {}
-    }
+    rsx! { { children } }
 }
 
 /// Hook to access wallet connection context.
 pub fn use_wallet_connection() -> WalletConnectionContext {
-    use_context::<WalletConnectionContext>().expect("WalletConnectionContext not found")
+    use_context::<WalletConnectionContext>()
 }
 
 /// Component to show wallet connection button.
@@ -230,5 +228,3 @@ fn truncate_address(addr: &str, chars: usize) -> String {
         format!("{}...{}", &addr[..chars + 2], &addr[addr.len() - chars..])
     }
 }
-
-use dioxus_router::components::Outlet;

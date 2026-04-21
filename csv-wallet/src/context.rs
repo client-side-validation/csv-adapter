@@ -370,18 +370,24 @@ impl WalletContext {
 
         // Load wallet data (per-chain accounts)
         if let Some(wallet_json) = store.get_raw(storage::WALLET_MNEMONIC_KEY).ok().flatten() {
-            match WalletData::from_json(&wallet_json) {
+            // The wallet JSON might be double-encoded (stored as a JSON string)
+            // Try to parse it directly first
+            let parse_result = WalletData::from_json(&wallet_json)
+                .or_else(|_| {
+                    // If that fails, try to parse it as a JSON string (double-encoded)
+                    serde_json::from_str::<String>(&wallet_json)
+                        .ok()
+                        .and_then(|inner_json| WalletData::from_json(&inner_json).ok())
+                        .ok_or_else(|| "Failed to parse wallet JSON".to_string())
+                });
+            
+            match parse_result {
                 Ok(wallet) => {
                     self.state.write().wallet = wallet;
                     web_sys::console::log_1(&"Wallet loaded successfully".into());
                 }
                 Err(e) => {
                     web_sys::console::error_1(&format!("Failed to load wallet: {}", e).into());
-                    // Try to migrate old format without balance field
-                    if let Ok(mut wallet) = serde_json::from_str::<WalletData>(&wallet_json) {
-                        web_sys::console::log_1(&"Wallet loaded with migration".into());
-                        self.state.write().wallet = wallet;
-                    }
                 }
             }
         }
@@ -606,7 +612,7 @@ impl WalletContext {
 
 /// Wallet provider component.
 #[component]
-pub fn WalletProvider() -> Element {
+pub fn WalletProvider(children: Element) -> Element {
     let state = use_signal(AppState::default);
     let loaded = use_signal(|| false);
     let ctx = use_hook(|| {
@@ -614,9 +620,7 @@ pub fn WalletProvider() -> Element {
     });
     use_context_provider(|| ctx.clone());
 
-    rsx! {
-        Router::<Route> {}
-    }
+    rsx! { { children } }
 }
 
 /// Hook to access wallet context.

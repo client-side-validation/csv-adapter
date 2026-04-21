@@ -2,7 +2,7 @@
 
 use dioxus::prelude::*;
 use csv_adapter_core::Chain;
-use crate::services::NetworkType;
+use crate::services::network::NetworkType;
 
 /// Network state.
 #[derive(Clone, PartialEq)]
@@ -11,6 +11,7 @@ pub struct NetworkState {
 }
 
 /// Network context.
+#[derive(Clone, Copy)]
 pub struct NetworkContext {
     pub state: Signal<NetworkState>,
 }
@@ -32,7 +33,7 @@ impl NetworkContext {
 
 /// Network provider component.
 #[component]
-pub fn NetworkProvider() -> Element {
+pub fn NetworkProvider(children: Element) -> Element {
     let mut state = use_signal(|| NetworkState {
         networks: [
             (Chain::Bitcoin, NetworkType::Testnet),
@@ -45,12 +46,10 @@ pub fn NetworkProvider() -> Element {
 
     use_context_provider(|| NetworkContext { state });
     
-    rsx! {
-        Outlet {}
-    }
+    rsx! { { children } }
 }
 
 /// Hook to access network state.
 pub fn use_network() -> NetworkContext {
-    use_context::<NetworkContext>().unwrap()
+    use_context::<NetworkContext>()
 }

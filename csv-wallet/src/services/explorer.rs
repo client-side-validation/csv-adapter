@@ -147,7 +147,7 @@ impl ExplorerService {
             .map_err(|e| format!("Failed to fetch wallet addresses: {}", e))?
             .json()
             .await
-            .map_err(|e| format!("Failed to parse response: {}", e));
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
 
         Ok(response.data)
     }
@@ -177,7 +177,7 @@ impl ExplorerService {
             .map_err(|e| format!("Failed to fetch address rights: {}", e))?
             .json()
             .await
-            .map_err(|e| format!("Failed to parse response: {}", e));
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
 
         Ok(response.data)
     }
@@ -193,7 +193,7 @@ impl ExplorerService {
             .map_err(|e| format!("Failed to fetch address seals: {}", e))?
             .json()
             .await
-            .map_err(|e| format!("Failed to parse response: {}", e));
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
 
         Ok(response.data)
     }
@@ -209,7 +209,7 @@ impl ExplorerService {
             .map_err(|e| format!("Failed to fetch address transfers: {}", e))?
             .json()
             .await
-            .map_err(|e| format!("Failed to parse response: {}", e));
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
 
         Ok(response.data)
     }
@@ -225,7 +225,7 @@ impl ExplorerService {
             .map_err(|e| format!("Failed to fetch priority status: {}", e))?
             .json()
             .await
-            .map_err(|e| format!("Failed to parse response: {}", e));
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
 
         Ok(response.data)
     }
