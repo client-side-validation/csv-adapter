@@ -272,6 +272,7 @@ impl PartialEq for AppState {
 pub struct WalletContext {
     state: Signal<AppState>,
     store: Option<LocalStorageManager>,
+    loaded: Signal<bool>,
 }
 
 impl PartialEq for WalletContext {
@@ -283,11 +284,24 @@ impl PartialEq for WalletContext {
 
 impl WalletContext {
     /// Create context with localStorage persistence.
-    pub fn new(state: Signal<AppState>) -> Self {
+    pub fn new(state: Signal<AppState>, loaded: Signal<bool>) -> Self {
         let store = storage::wallet_storage().ok();
-        let mut ctx = Self { state, store };
+        let mut ctx = Self { state, store, loaded };
         ctx.load_persisted();
+        ctx.loaded.set(true);
         ctx
+    }
+
+    /// Check if wallet data has been loaded from storage.
+    pub fn is_loaded(&self) -> bool {
+        *self.loaded.read()
+    }
+
+    /// Force reload wallet data from storage.
+    pub fn reload_from_storage(&mut self) {
+        web_sys::console::log_1(&"Reloading wallet from storage...".into());
+        self.load_persisted();
+        web_sys::console::log_1(&format!("Wallet reloaded. Accounts: {}", self.accounts().len()).into());
     }
 
     // ===== Persistence =====
@@ -594,13 +608,11 @@ impl WalletContext {
 #[component]
 pub fn WalletProvider() -> Element {
     let state = use_signal(AppState::default);
+    let loaded = use_signal(|| false);
     let ctx = use_hook(|| {
-        let store = storage::wallet_storage().ok();
-        let mut ctx = WalletContext { state, store };
-        ctx.load_persisted();
-        ctx
+        WalletContext::new(state, loaded)
     });
-    use_context_provider(|| WalletContext { state: ctx.state, store: ctx.store.clone() });
+    use_context_provider(|| ctx.clone());
 
     rsx! {
         Router::<Route> {}

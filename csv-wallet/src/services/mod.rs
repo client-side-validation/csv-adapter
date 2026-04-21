@@ -5,3 +5,4 @@ pub mod seal_service;
 pub mod asset_service;
 pub mod chain_api;
 pub mod network;
+pub mod blockchain_service;
