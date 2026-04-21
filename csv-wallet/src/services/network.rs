@@ -31,6 +31,7 @@ impl NetworkConfig {
         networks.insert(Chain::Ethereum, NetworkType::Testnet);
         networks.insert(Chain::Sui, NetworkType::Testnet);
         networks.insert(Chain::Aptos, NetworkType::Testnet);
+        networks.insert(Chain::Solana, NetworkType::Testnet);
         Self { networks }
     }
 

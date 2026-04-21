@@ -165,6 +165,19 @@ impl Default for Config {
             },
         );
 
+        // Solana Devnet
+        chains.insert(
+            Chain::Solana,
+            ChainConfig {
+                rpc_url: "https://api.devnet.solana.com".to_string(),
+                network: Network::Test,
+                contract_address: None, // Not deployed yet
+                chain_id: None,
+                finality_depth: 32, // Solana finality
+                default_fee: Some(5000), // 5000 lamports
+            },
+        );
+
         let wallets = HashMap::new();
         let mut faucets = HashMap::new();
 
@@ -204,6 +217,15 @@ impl Default for Config {
             },
         );
 
+        // Solana faucet
+        faucets.insert(
+            Chain::Solana,
+            FaucetConfig {
+                url: "https://faucet.devnet.solana.com".to_string(),
+                amount: Some(1_000_000_000), // 1 SOL
+            },
+        );
+
         Self {
             chains,
             wallets,
@@ -224,7 +246,17 @@ impl Config {
 
         if Path::new(&path).exists() {
             let content = std::fs::read_to_string(&path)?;
-            let config: Config = toml::from_str(&content)?;
+            let mut config: Config = toml::from_str(&content)?;
+            
+            // Merge missing chains and faucets from defaults
+            let defaults = Config::default();
+            for (chain, chain_config) in defaults.chains {
+                config.chains.entry(chain).or_insert(chain_config);
+            }
+            for (chain, faucet_config) in defaults.faucets {
+                config.faucets.entry(chain).or_insert(faucet_config);
+            }
+            
             Ok(config)
         } else {
             // Create default config
@@ -420,8 +452,13 @@ finality_depth = 3
         assert!(config.is_ok(), "Should load existing config: {:?}", config.err());
         
         let config = config.unwrap();
-        assert_eq!(config.chains.len(), 1, "Expected 1 chain, got {}", config.chains.len());
+        // Config now merges missing chains from defaults, so we expect 5 chains total
+        assert_eq!(config.chains.len(), 5, "Expected 5 chains (1 from file + 4 merged defaults), got {}", config.chains.len());
         assert!(config.chains.contains_key(&Chain::Bitcoin), "Should have Bitcoin chain");
+        assert!(config.chains.contains_key(&Chain::Ethereum), "Should have Ethereum chain (merged)");
+        assert!(config.chains.contains_key(&Chain::Sui), "Should have Sui chain (merged)");
+        assert!(config.chains.contains_key(&Chain::Aptos), "Should have Aptos chain (merged)");
+        assert!(config.chains.contains_key(&Chain::Solana), "Should have Solana chain (merged)");
         assert_eq!(config.data_dir, "/custom/data/dir", "Loaded config: data_dir should be from file");
     }
 
@@ -520,7 +557,7 @@ rpc_url = "missing bracket"
         // Faucet accessor returns Some for existing
         assert!(config.faucet(&Chain::Bitcoin).is_some());
         
-        // Faucet accessor returns None for chains without faucet (Solana has none in default)
-        assert!(config.faucet(&Chain::Solana).is_none());
+        // Faucet accessor returns Some for Solana (now configured by default)
+        assert!(config.faucet(&Chain::Solana).is_some());
     }
 }

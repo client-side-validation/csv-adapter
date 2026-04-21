@@ -11,6 +11,8 @@ mod wallet_core;
 mod storage;
 mod pages;
 mod components;
+mod hooks;
+mod services;
 
 use routes::Route;
 use context::WalletProvider;

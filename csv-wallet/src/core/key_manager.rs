@@ -196,6 +196,11 @@ impl KeyManager {
                 let hash = hasher.finalize();
                 Ok(format!("0x{}", hex::encode(&hash[..])))
             }
+            Chain::Solana => {
+                let (_, verifying_key) = self.derive_solana_keys()?;
+                // Solana address is the base58-encoded public key
+                Ok(bs58::encode(verifying_key.as_bytes()).into_string())
+            }
         }
     }
 }

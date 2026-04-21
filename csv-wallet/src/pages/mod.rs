@@ -6,6 +6,7 @@ use wasm_bindgen::prelude::*;
 use crate::routes::Route;
 use crate::context::{use_wallet_context, Network, generate_id, truncate_address, TrackedRight, RightStatus, TrackedTransfer, TransferStatus, SealRecord, DeployedContract, ProofRecord, TestResult, TestStatus, NotificationKind};
 use crate::wallet_core::ChainAccount;
+use crate::hooks::{use_balance, AccountBalance, format_balance};
 use csv_adapter_core::Chain;
 
 pub mod wallet_page;
@@ -429,8 +430,48 @@ fn AddAccountCard(chain: Chain) -> Element {
 #[component]
 fn DashboardChainCard(chain: Chain) -> Element {
     let wallet_ctx = use_wallet_context();
+    let balance_ctx = use_balance();
     let chain_accounts = wallet_ctx.accounts_for_chain(chain);
     let mut show_add = use_signal(|| false);
+
+    // Fetch balances when component mounts
+    use_effect(move || {
+        let accounts = chain_accounts.clone();
+        let mut balance_ctx = balance_ctx;
+        wasm_bindgen_futures::spawn_local(async move {
+            let chain_api = match crate::services::chain_api::ChainApi::new() {
+                Ok(api) => api,
+                Err(_) => return,
+            };
+            for account in accounts {
+                let balance_data = AccountBalance {
+                    account_id: account.id.clone(),
+                    chain: account.chain,
+                    address: account.address.clone(),
+                    balance: 0.0,
+                    loading: true,
+                    error: None,
+                };
+                balance_ctx.set_balance(account.id.clone(), balance_data);
+
+                // Fetch from API
+                if let Ok(balance) = chain_api.get_balance(account.chain, &account.address).await {
+                    let balance_data = AccountBalance {
+                        account_id: account.id.clone(),
+                        chain: account.chain,
+                        address: account.address.clone(),
+                        balance,
+                        loading: false,
+                        error: None,
+                    };
+                    balance_ctx.set_balance(account.id.clone(), balance_data);
+                }
+            }
+        });
+    });
+
+    // Calculate chain total balance
+    let chain_total = balance_ctx.chain_total(chain);
 
     rsx! {
         div { class: "{card_class()} p-5 card-hover",
@@ -443,15 +484,38 @@ fn DashboardChainCard(chain: Chain) -> Element {
                 }
             }
 
+            // Show chain total if there are accounts
+            if !chain_accounts.is_empty() {
+                div { class: "mb-3 pb-3 border-b border-gray-800",
+                    span { class: "text-xs text-gray-500", "Total Balance: " }
+                    span { class: "text-sm font-semibold text-gray-200",
+                        {format_balance(chain_total, chain)}
+                    }
+                }
+            }
+
             if chain_accounts.is_empty() {
                 p { class: "text-sm text-gray-600", "No account added" }
                 p { class: "text-xs text-gray-500 mt-1", "Click '+ Add' to import a private key" }
             } else {
                 div { class: "space-y-2",
                     for account in chain_accounts {
-                        div { class: "flex items-center justify-between text-xs bg-gray-800/50 rounded p-2",
-                            span { class: "font-mono text-gray-300", "{truncate_address(&account.address, 8)}" }
-                            span { class: "text-gray-500", "{account.name}" }
+                        {
+                            let balance_opt = balance_ctx.get_balance(&account.id);
+                            let balance_str = match balance_opt {
+                                Some(b) if !b.loading => format_balance(b.balance, chain),
+                                Some(_) => "Loading...".to_string(),
+                                None => "--".to_string(),
+                            };
+                            rsx! {
+                                div { class: "flex items-center justify-between text-xs bg-gray-800/50 rounded p-2",
+                                    div { class: "flex flex-col",
+                                        span { class: "font-mono text-gray-300", "{truncate_address(&account.address, 8)}" }
+                                        span { class: "text-gray-500 text-[10px]", "{account.name}" }
+                                    }
+                                    span { class: "text-gray-300 font-medium", "{balance_str}" }
+                                }
+                            }
                         }
                     }
                 }

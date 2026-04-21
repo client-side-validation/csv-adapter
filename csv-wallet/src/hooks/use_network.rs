@@ -39,6 +39,7 @@ pub fn NetworkProvider() -> Element {
             (Chain::Ethereum, NetworkType::Testnet),
             (Chain::Sui, NetworkType::Testnet),
             (Chain::Aptos, NetworkType::Testnet),
+            (Chain::Solana, NetworkType::Testnet),
         ].into_iter().collect(),
     });
 

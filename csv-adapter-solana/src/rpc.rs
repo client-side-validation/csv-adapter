@@ -1,5 +1,7 @@
 //! RPC client for Solana adapter
 
+use std::time::Duration;
+
 use solana_sdk::{
     pubkey::Pubkey,
     signature::Signature,

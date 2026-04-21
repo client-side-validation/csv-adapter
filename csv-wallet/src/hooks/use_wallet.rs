@@ -30,7 +30,7 @@ impl WalletContext {
         
         // Populate addresses
         use csv_adapter_core::Chain;
-        for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos] {
+        for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana] {
             self.state.write().addresses.insert(chain, wallet.address(chain));
         }
         
@@ -45,7 +45,7 @@ impl WalletContext {
         self.state.write().initialized = true;
         
         use csv_adapter_core::Chain;
-        for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos] {
+        for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana] {
             self.state.write().addresses.insert(chain, wallet.address(chain));
         }
         

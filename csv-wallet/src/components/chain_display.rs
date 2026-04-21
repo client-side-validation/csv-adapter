@@ -13,6 +13,7 @@ impl std::fmt::Display for ChainDisplay {
             Chain::Ethereum => write!(f, "\u{1F537} Ethereum"),
             Chain::Sui => write!(f, "\u{1F30A} Sui"),
             Chain::Aptos => write!(f, "\u{1F7E2} Aptos"),
+            Chain::Solana => write!(f, "\u{2600} Solana"),
             _ => write!(f, "Unknown"),
         }
     }
@@ -62,6 +63,7 @@ pub fn all_chain_displays() -> Vec<ChainDisplay> {
         ChainDisplay(Chain::Ethereum),
         ChainDisplay(Chain::Sui),
         ChainDisplay(Chain::Aptos),
+        ChainDisplay(Chain::Solana),
     ]
 }
 

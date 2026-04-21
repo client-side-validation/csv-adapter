@@ -12,7 +12,7 @@ pub enum TestAction {
     /// Run end-to-end tests
     Run {
         /// Chain pair to test (source:dest)
-        #[arg(short, long, value_parser = parse_chain_pair)]
+        #[arg(short = 'p', long, value_parser = parse_chain_pair)]
         chain_pair: Option<(Chain, Chain)>,
         /// Run all chain pairs
         #[arg(long)]

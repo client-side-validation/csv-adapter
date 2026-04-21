@@ -31,6 +31,7 @@ sha2 = "0.10"
 sha3 = "0.10"
 blake2 = "0.10"
 hex = "0.4"
+bs58 = "0.5"
 rand = "0.8"
 bip32 = { version = "0.5", features = ["std", "mnemonic"] }
 bitcoin = { version = "0.32", features = ["std", "rand-std"] }

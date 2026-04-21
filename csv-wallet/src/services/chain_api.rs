@@ -66,6 +66,10 @@ impl ChainConfig {
                     "https://api.mainnet-beta.solana.com".to_string()
                 }
             }
+            _ => {
+                // Default to testnet for unknown chains
+                "https://rpc.sepolia.org".to_string()
+            }
         };
         Self::new(api_url, is_testnet)
     }
@@ -123,6 +127,10 @@ impl ChainApi {
             Chain::Aptos,
             ChainConfig::for_chain(Chain::Aptos, NetworkType::Testnet),
         );
+        configs.insert(
+            Chain::Solana,
+            ChainConfig::for_chain(Chain::Solana, NetworkType::Testnet),
+        );
 
         Ok(Self { client, configs })
     }
@@ -145,6 +153,10 @@ impl ChainApi {
         configs.insert(
             Chain::Aptos,
             ChainConfig::for_chain(Chain::Aptos, NetworkType::Testnet),
+        );
+        configs.insert(
+            Chain::Solana,
+            ChainConfig::for_chain(Chain::Solana, NetworkType::Testnet),
         );
 
         Self { client, configs }
@@ -170,6 +182,7 @@ impl ChainApi {
             Chain::Sui => self.get_sui_balance(address).await,
             Chain::Aptos => self.get_aptos_balance(address).await,
             Chain::Solana => self.get_solana_balance(address).await,
+            _ => Err(ChainApiError::ApiError("Unsupported chain".to_string())),
         }
     }
 
@@ -350,6 +363,45 @@ impl ChainApi {
         // 1 APT = 10^8 octas
         Ok(balance_octas / 1e8)
     }
+
+    /// Query Solana balance via JSON-RPC.
+    async fn get_solana_balance(&self, address: &str) -> Result<f64, ChainApiError> {
+        let config = self
+            .configs
+            .get(&Chain::Solana)
+            .ok_or_else(|| ChainApiError::ApiError("Solana config not found".to_string()))?;
+
+        let body = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getBalance",
+            "params": [address]
+        });
+
+        let response = self
+            .client
+            .post(&config.api_url)
+            .json(&body)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(ChainApiError::ApiError(format!(
+                "Solana API error: {}",
+                response.status()
+            )));
+        }
+
+        let json: serde_json::Value = response.json().await?;
+        let balance_lamports = json
+            .get("result")
+            .and_then(|v| v.get("value"))
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| ChainApiError::ApiError("Missing balance in response".to_string()))?;
+
+        // 1 SOL = 10^9 lamports
+        Ok(balance_lamports as f64 / 1e9)
+    }
 }
 
 impl Default for ChainApi {
@@ -390,5 +442,6 @@ mod tests {
         assert!(api.get_config(Chain::Ethereum).is_some());
         assert!(api.get_config(Chain::Sui).is_some());
         assert!(api.get_config(Chain::Aptos).is_some());
+        assert!(api.get_config(Chain::Solana).is_some());
     }
 }

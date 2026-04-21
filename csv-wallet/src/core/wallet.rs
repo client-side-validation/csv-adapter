@@ -226,6 +226,13 @@ impl ExtendedWallet {
         let hash = hasher.finalize();
         addresses.push((Chain::Aptos, format!("0x{}", hex::encode(&hash[..]))));
 
+        // Solana
+        let mut solana_key = [0u8; 32];
+        solana_key.copy_from_slice(&self.seed[..32]);
+        let solana_signing = SigningKey::from_bytes(&solana_key);
+        let solana_verifying: ed25519_dalek::VerifyingKey = solana_signing.verifying_key();
+        addresses.push((Chain::Solana, bs58::encode(solana_verifying.as_bytes()).into_string()));
+
         addresses
     }
 

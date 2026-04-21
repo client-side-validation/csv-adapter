@@ -21,6 +21,7 @@ impl SealMonitor {
             Chain::Ethereum => self.check_ethereum_seal(seal).await,
             Chain::Sui => self.check_sui_seal(seal).await,
             Chain::Aptos => self.check_aptos_seal(seal).await,
+            Chain::Solana => self.check_solana_seal(seal).await,
         }
     }
 
@@ -45,6 +46,12 @@ impl SealMonitor {
     /// Check Aptos seal status.
     async fn check_aptos_seal(&self, seal: &SealRecord) -> Result<SealStatus, String> {
         // In production, check Aptos RPC
+        Ok(seal.status.clone())
+    }
+
+    /// Check Solana seal status.
+    async fn check_solana_seal(&self, seal: &SealRecord) -> Result<SealStatus, String> {
+        // In production, check Solana RPC
         Ok(seal.status.clone())
     }
 

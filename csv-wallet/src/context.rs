@@ -444,7 +444,7 @@ impl WalletContext {
 
     pub fn all_addresses(&self) -> Vec<(Chain, String)> {
         let wallet = self.state.read().wallet.clone();
-        [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos]
+        [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana]
             .iter().filter_map(|&c| {
                 wallet.accounts_for_chain(c).first().map(|a| (c, a.address.clone()))
             }).collect()
@@ -625,6 +625,7 @@ pub fn chain_badge_class(chain: &Chain) -> &'static str {
         Chain::Ethereum => "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-blue-400 bg-blue-500/20 border border-blue-500/30",
         Chain::Sui => "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-cyan-400 bg-cyan-500/20 border border-cyan-500/30",
         Chain::Aptos => "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-emerald-400 bg-emerald-500/20 border border-emerald-500/30",
+        Chain::Solana => "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-purple-400 bg-purple-500/20 border border-purple-500/30",
         _ => "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-gray-400 bg-gray-500/20 border border-gray-500/30",
     }
 }
@@ -635,6 +636,7 @@ pub fn chain_icon_emoji(chain: &Chain) -> &'static str {
         Chain::Ethereum => "\u{1F537}",
         Chain::Sui => "\u{1F30A}",
         Chain::Aptos => "\u{1F7E2}",
+        Chain::Solana => "\u{2600}",
         _ => "\u{26AA}",
     }
 }
@@ -645,6 +647,7 @@ pub fn chain_name(chain: &Chain) -> &'static str {
         Chain::Ethereum => "Ethereum",
         Chain::Sui => "Sui",
         Chain::Aptos => "Aptos",
+        Chain::Solana => "Solana",
         _ => "Unknown",
     }
 }

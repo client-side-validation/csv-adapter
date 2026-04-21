@@ -3759,6 +3759,7 @@ dependencies = [
  "bip32",
  "bitcoin 0.32.8",
  "blake2",
+ "bs58",
  "chrono",
  "console_error_panic_hook",
  "csv-adapter-core",

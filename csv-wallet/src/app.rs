@@ -6,7 +6,7 @@ use dioxus::prelude::*;
 use dioxus_router::*;
 
 use crate::routes::Route;
-use crate::hooks::{use_wallet, use_network, use_seals, use_assets};
+use crate::hooks::{use_wallet, use_network, use_seals, use_assets, use_balance};
 use crate::components::{Header, Sidebar};
 
 /// Root application component.
@@ -18,6 +18,7 @@ pub fn App() -> Element {
         network::NetworkProvider {}
         seals::SealProvider {}
         assets::AssetProvider {}
+        balance::BalanceProvider {}
 
         // Router
         Router::<Route> {}

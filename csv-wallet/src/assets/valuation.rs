@@ -30,6 +30,7 @@ impl AssetValuation {
             Chain::Ethereum => "ethereum",
             Chain::Sui => "sui",
             Chain::Aptos => "aptos",
+            Chain::Solana => "solana",
         };
 
         Self::fetch_price(symbol).await
@@ -86,7 +87,7 @@ impl AssetValuation {
 
     /// Get prices for all chains.
     pub async fn get_all_prices(&self) -> Result<Vec<PriceData>, String> {
-        let chains = [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos];
+        let chains = [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana];
         let mut prices = Vec::new();
 
         for chain in chains {

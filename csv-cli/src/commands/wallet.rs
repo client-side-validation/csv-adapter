@@ -95,7 +95,7 @@ fn cmd_init(network: Network, words: u8, fund: bool, config: &Config, state: &mu
     // Step 2: Generate wallets for all supported chains
     let mut addresses = HashMap::new();
     
-    for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos] {
+    for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana] {
         output::info(&format!("Generating {} wallet...", chain));
         let address = generate_wallet_for_chain(&chain, &network, &mnemonic, state)?;
         addresses.insert(chain.clone(), address.clone());
@@ -131,21 +131,16 @@ fn cmd_init(network: Network, words: u8, fund: bool, config: &Config, state: &mu
 }
 
 // Helper functions for wallet initialization
-fn generate_mnemonic(words: u8) -> Result<String> {
+fn generate_mnemonic(_words: u8) -> Result<String> {
     use rand::RngCore;
+    use bip32::{Mnemonic, Language};
     
-    // Generate a simple mnemonic-like phrase (simplified version)
-    let word_count = words as usize;
-    let mut words_vec = Vec::with_capacity(word_count);
+    // Generate 256-bit entropy for 24-word BIP39 mnemonic
+    let mut entropy = [0u8; 32];
+    rand::rngs::OsRng.fill_bytes(&mut entropy);
+    let mnemonic = Mnemonic::from_entropy(entropy, Language::English);
     
-    for _ in 0..word_count {
-        let mut bytes = [0u8; 4];
-        rand::rngs::OsRng.fill_bytes(&mut bytes);
-        let word_num = u32::from_be_bytes(bytes) % 2048; // BIP39 word list size
-        words_vec.push(format!("word{}", word_num));
-    }
-    
-    Ok(words_vec.join(" "))
+    Ok(mnemonic.phrase().to_string())
 }
 
 fn generate_wallet_for_chain(chain: &Chain, network: &Network, mnemonic: &str, state: &mut State) -> Result<String> {
@@ -968,7 +963,7 @@ fn cmd_list(config: &Config, state: &State) -> Result<()> {
     let headers = vec!["Chain", "Address", "Balance", "Network"];
     let mut rows = Vec::new();
 
-    for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos] {
+    for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana] {
         let address = state
             .get_address(&chain)
             .map(|a| a.as_str())
@@ -979,14 +974,178 @@ fn cmd_list(config: &Config, state: &State) -> Result<()> {
             .map(|c| c.network.to_string())
             .unwrap_or_else(|_| "unknown".to_string());
 
+        // Fetch balance if address exists and chain is configured
+        let balance = if address != "Not generated" {
+            match fetch_balance(chain.clone(), address, config) {
+                Ok(bal) => bal,
+                Err(_) => "—".to_string(),
+            }
+        } else {
+            "—".to_string()
+        };
+
         rows.push(vec![
             format!("{}", chain).to_string(),
             address.to_string(),
-            "—".to_string(),
+            balance,
             network,
         ]);
     }
 
     output::table(&headers, &rows);
     Ok(())
+}
+
+/// Fetch balance for a chain and address
+fn fetch_balance(chain: Chain, addr: &str, config: &Config) -> Result<String> {
+    match chain {
+        Chain::Bitcoin => {
+            let chain_config = config.chain(&chain)?;
+            let url = format!(
+                "{}/address/{}/utxo",
+                chain_config.rpc_url.trim_end_matches('/'),
+                addr
+            );
+            match reqwest::blocking::get(&url)?.json::<serde_json::Value>() {
+                Ok(utxos) => {
+                    if let Some(arr) = utxos.as_array() {
+                        let total_sat: u64 = arr
+                            .iter()
+                            .filter_map(|u| u.get("value").and_then(|v| v.as_u64()))
+                            .sum();
+                        Ok(format!("{} sats", total_sat))
+                    } else {
+                        Ok("0 sats".to_string())
+                    }
+                }
+                Err(_) => Ok("—".to_string()),
+            }
+        }
+        Chain::Ethereum => {
+            let chain_config = config.chain(&chain)?;
+            let rpc_req = serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "eth_getBalance",
+                "params": [addr, "latest"],
+                "id": 1
+            });
+
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()?;
+
+            let resp = client
+                .post(&chain_config.rpc_url)
+                .json(&rpc_req)
+                .send()?
+                .json::<serde_json::Value>()?;
+
+            if let Some(balance_hex) = resp.get("result").and_then(|r| r.as_str()) {
+                let balance_wei =
+                    u64::from_str_radix(balance_hex.trim_start_matches("0x"), 16).unwrap_or(0);
+                let balance_eth = balance_wei as f64 / 1e18;
+                Ok(format!("{:.6} ETH", balance_eth))
+            } else {
+                Ok("—".to_string())
+            }
+        }
+        Chain::Sui => {
+            let chain_config = config.chain(&chain)?;
+            let rpc_req = serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "suix_getBalance",
+                "params": [addr, "0x2::sui::SUI"],
+                "id": 1
+            });
+
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()?;
+
+            let resp = client
+                .post(&chain_config.rpc_url)
+                .json(&rpc_req)
+                .send()?
+                .json::<serde_json::Value>()?;
+
+            if let Some(result) = resp.get("result") {
+                if let Some(balance) = result.get("totalBalance").and_then(|b| b.as_str()) {
+                    let balance_sui: u64 = balance.parse().unwrap_or(0);
+                    let balance_display = balance_sui as f64 / 1e9;
+                    Ok(format!("{:.4} SUI", balance_display))
+                } else {
+                    Ok("0 SUI".to_string())
+                }
+            } else {
+                Ok("—".to_string())
+            }
+        }
+        Chain::Aptos => {
+            let chain_config = config.chain(&chain)?;
+            let url = format!(
+                "{}/accounts/{}/balance/0x1::aptos_coin::AptosCoin",
+                chain_config.rpc_url.trim_end_matches('/'),
+                addr
+            );
+
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()?;
+
+            let resp = client.get(&url).send()?;
+
+            if resp.status().as_u16() == 404 {
+                Ok("0 APT".to_string())
+            } else {
+                let body = resp.text()?;
+                let balance_oct: u64 = if body.starts_with('{') {
+                    if let Ok(info) = serde_json::from_str::<serde_json::Value>(&body) {
+                        info.get("amount")
+                            .and_then(|b| b.as_str())
+                            .or_else(|| info.as_str())
+                            .unwrap_or("0")
+                            .parse()
+                            .unwrap_or(0)
+                    } else {
+                        0
+                    }
+                } else {
+                    body.trim().parse().unwrap_or(0)
+                };
+
+                let balance_apt = balance_oct as f64 / 1e8;
+                Ok(format!("{:.4} APT", balance_apt))
+            }
+        }
+        Chain::Solana => {
+            let chain_config = config.chain(&chain)?;
+            let rpc_req = serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "getBalance",
+                "params": [addr],
+                "id": 1
+            });
+
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()?;
+
+            let resp = client
+                .post(&chain_config.rpc_url)
+                .json(&rpc_req)
+                .send()?
+                .json::<serde_json::Value>()?;
+
+            if let Some(result) = resp.get("result") {
+                if let Some(value) = result.get("value").and_then(|v| v.as_u64()) {
+                    let balance_sol = value as f64 / 1e9;
+                    Ok(format!("{:.4} SOL", balance_sol))
+                } else {
+                    Ok("0 SOL".to_string())
+                }
+            } else {
+                Ok("—".to_string())
+            }
+        }
+    }
 }

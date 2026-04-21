@@ -223,6 +223,8 @@ pub enum Chain {
     Sui,
     /// Aptos chain.
     Aptos,
+    /// Solana chain.
+    Solana,
 }
 
 impl std::fmt::Display for Chain {
@@ -232,6 +234,7 @@ impl std::fmt::Display for Chain {
             Self::Ethereum => write!(f, "ethereum"),
             Self::Sui => write!(f, "sui"),
             Self::Aptos => write!(f, "aptos"),
+            Self::Solana => write!(f, "solana"),
         }
     }
 }
@@ -245,7 +248,8 @@ impl std::str::FromStr for Chain {
             "ethereum" | "eth" => Ok(Self::Ethereum),
             "sui" => Ok(Self::Sui),
             "aptos" | "apt" => Ok(Self::Aptos),
-            _ => Err(format!("Unknown chain: {}. Supported: bitcoin, ethereum, sui, aptos", s)),
+            "solana" | "sol" => Ok(Self::Solana),
+            _ => Err(format!("Unknown chain: {}. Supported: bitcoin, ethereum, sui, aptos, solana", s)),
         }
     }
 }
@@ -260,6 +264,7 @@ mod tests {
         assert_eq!(Chain::Ethereum.to_string(), "ethereum");
         assert_eq!(Chain::Sui.to_string(), "sui");
         assert_eq!(Chain::Aptos.to_string(), "aptos");
+        assert_eq!(Chain::Solana.to_string(), "solana");
     }
 
     #[test]
@@ -267,7 +272,8 @@ mod tests {
         assert_eq!("bitcoin".parse::<Chain>().unwrap(), Chain::Bitcoin);
         assert_eq!("btc".parse::<Chain>().unwrap(), Chain::Bitcoin);
         assert_eq!("ETH".parse::<Chain>().unwrap(), Chain::Ethereum);
-        assert!("solana".parse::<Chain>().is_err());
+        assert_eq!("solana".parse::<Chain>().unwrap(), Chain::Solana);
+        assert_eq!("SOL".parse::<Chain>().unwrap(), Chain::Solana);
     }
 
     #[test]

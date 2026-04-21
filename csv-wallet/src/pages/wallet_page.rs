@@ -100,7 +100,7 @@ fn AccountsTab() -> Element {
 
     rsx! {
         div { class: "space-y-6",
-            for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos] {
+            for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana] {
                 ChainAccountsSection { chain }
             }
         }
@@ -155,6 +155,7 @@ fn chain_name(chain: &Chain) -> &'static str {
         Chain::Ethereum => "Ethereum",
         Chain::Sui => "Sui",
         Chain::Aptos => "Aptos",
+        Chain::Solana => "Solana",
         _ => "Unknown",
     }
 }

@@ -27,6 +27,9 @@ pub struct ChainAccount {
     pub private_key: String,
     /// Derived address for display
     pub address: String,
+    /// Balance in native token (BTC, ETH, SUI, APT, etc.)
+    #[serde(default)]
+    pub balance: f64,
 }
 
 impl ChainAccount {
@@ -41,6 +44,7 @@ impl ChainAccount {
             Chain::Ethereum => Self::derive_ethereum_address(&bytes),
             Chain::Sui => Self::derive_sui_address(&bytes),
             Chain::Aptos => Self::derive_aptos_address(&bytes),
+            Chain::Solana => Self::derive_solana_address(&bytes),
             _ => Err(format!("Unsupported chain: {:?}", chain)),
         }
     }
@@ -54,6 +58,7 @@ impl ChainAccount {
             name: name.to_string(),
             private_key: hex_key.to_string(),
             address,
+            balance: 0.0,
         })
     }
 
@@ -151,6 +156,28 @@ impl ChainAccount {
             Ok(format!("0x{}", hex::encode(&hash[..])))
         } else {
             Err("Invalid ed25519 key for Aptos".to_string())
+        }
+    }
+
+    fn derive_solana_address(key_bytes: &[u8]) -> Result<String, String> {
+        let key = if key_bytes.len() == 32 {
+            key_bytes.to_vec()
+        } else if key_bytes.len() == 64 {
+            key_bytes[..32].to_vec()
+        } else {
+            return Err(format!("Invalid key length: {}", key_bytes.len()));
+        };
+
+        if key.len() == 32 {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&key);
+            let signing_key = SigningKey::from_bytes(&arr);
+            let verifying_key: VerifyingKey = signing_key.verifying_key();
+
+            // Solana address is the base58-encoded public key
+            Ok(bs58::encode(verifying_key.as_bytes()).into_string())
+        } else {
+            Err("Invalid ed25519 key for Solana".to_string())
         }
     }
 }
