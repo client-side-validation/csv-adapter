@@ -13,8 +13,6 @@ mod pages;
 mod components;
 mod hooks;
 mod services;
-mod seals;
-mod assets;
 
 use routes::Route;
 use context::WalletProvider;
