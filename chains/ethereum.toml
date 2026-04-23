@@ -15,6 +15,9 @@ block_explorer_urls = [
     "https://www.oklink.com/eth"
 ]
 
+# Indexing configuration
+start_block = 0  # Genesis block
+
 [custom_settings]
 supports_nfts = true
 supports_smart_contracts = true

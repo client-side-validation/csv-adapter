@@ -8,12 +8,15 @@ rpc_endpoints = [
     "https://api.blockchair.com/bitcoin",
     "https://blockchain.info/api"
 ]
-program_id = null
+# program_id is null for Bitcoin (no smart contract program)
 block_explorer_urls = [
     "https://blockstream.info",
     "https://blockchair.com/bitcoin",
     "https://blockchain.info"
 ]
+
+# Indexing configuration
+start_block = 0  # Genesis block
 
 [custom_settings]
 supports_nfts = true

@@ -1,18 +1,20 @@
 
 Q1 2026:
-Q1-00 Already implemented as scalable architecture, Finish Plug and Play Architecture for adding new chains to core, wallet, explorer and indexer.
-Q1-01 I tested addint Solana but it took two days to deploy a contract on devnet. Check state of previous step.
-Q1-02 I still can not be sure if Explorer and Indexer support all chains and Solana, Index them from proper blocknumber and parse and import and present them.
-Q1-03 In wallet, I still can not see details of transactions or a link to proper external explorer. Not sure If I can do a cross-chain transfer.
+
 Q1-1 Typed error classes with suggestions
+
 Q1-2 Seal registry performance optimization
-Q1-3 TypeScript SDK (core APIs) — npm install @csv-adapter/sdk
-Q1-4 Cross-chain subscription app
-Q1-5 Cross-chain NFT app
+
+Q1-3 Cross-chain subscription app
+Q1-4 Cross-chain NFT app
+
+Q1-5 TypeScript SDK (core APIs) — npm install @csv-adapter/sdk
 Q1-6 create-csv-app scaffolding
+
 Q1-7 Interactive tutorial system
 Q1-8 Multi-sig wallet support
 Q1-9 ZK proof verification 
+
 Q1-10 RGB asset import 
 Q1-11 TypeScript SDK chain providers 
 Q1-12 WASM bindings for browser 

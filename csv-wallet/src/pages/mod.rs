@@ -3,7 +3,7 @@
 use crate::context::{
     generate_id, truncate_address, use_wallet_context, DeployedContract, Network, NotificationKind,
     ProofRecord, RightStatus, SealRecord, TestResult, TestStatus, TrackedRight, TrackedTransfer,
-    TransferStatus,
+    TransferStatus, TransactionRecord, TransactionStatus, TransactionType,
 };
 use crate::hooks::{
     format_balance, use_balance, AccountBalance,
@@ -2963,6 +2963,256 @@ pub fn Settings() -> Element {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+// ===== Transactions List Page =====
+#[component]
+pub fn Transactions() -> Element {
+    let wallet_ctx = use_wallet_context();
+    let transactions = wallet_ctx.transactions();
+    let accounts = wallet_ctx.accounts();
+
+    // Get unique addresses from accounts for filtering
+    let account_addresses: Vec<String> = accounts.iter().map(|a| a.address.clone()).collect();
+
+    // Filter transactions related to our accounts
+    let relevant_transactions: Vec<TransactionRecord> = transactions
+        .into_iter()
+        .filter(|tx| {
+            account_addresses.contains(&tx.from_address)
+                || tx.to_address.as_ref().map_or(false, |addr| account_addresses.contains(addr))
+        })
+        .collect();
+
+    rsx! {
+        div { class: "space-y-6",
+            div { class: "flex items-center justify-between",
+                h1 { class: "text-2xl font-bold", "Transactions" }
+                span { class: "text-sm text-gray-400", "{relevant_transactions.len()} total" }
+            }
+
+            if relevant_transactions.is_empty() {
+                {empty_state("\u{1F4B8}", "No Transactions", "Your transaction history will appear here")}
+            } else {
+                div { class: "space-y-3",
+                    for tx in relevant_transactions {
+                        TransactionCard { transaction: tx.clone() }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ===== Transaction Card Component =====
+#[component]
+fn TransactionCard(transaction: TransactionRecord) -> Element {
+    let wallet_ctx = use_wallet_context();
+    let tx_clone = transaction.clone();
+
+    let status_class = match transaction.status {
+        TransactionStatus::Confirmed => "text-green-400 bg-green-500/20",
+        TransactionStatus::Pending => "text-yellow-400 bg-yellow-500/20",
+        TransactionStatus::Failed => "text-red-400 bg-red-500/20",
+    };
+
+    let explorer_url = wallet_ctx.get_explorer_url(transaction.chain, &transaction.tx_hash);
+
+    rsx! {
+        Link {
+            to: Route::TransactionDetail { id: transaction.id.clone() },
+            class: "{card_class()} p-4 block card-hover",
+            div { class: "flex items-center justify-between",
+                div { class: "flex items-center gap-3",
+                    span { class: "{chain_badge_class(&transaction.chain)}",
+                        "{chain_icon_emoji(&transaction.chain)}"
+                    }
+                    div {
+                        p { class: "font-medium text-sm", "{transaction.tx_type.to_string()}" }
+                        p { class: "text-xs text-gray-500",
+                            {format!("{} → {}", 
+                                truncate_address(&transaction.from_address, 6),
+                                transaction.to_address.as_ref().map_or("?".to_string(), |a| truncate_address(a, 6))
+                            )}
+                        }
+                    }
+                }
+                div { class: "text-right",
+                    span { class: "inline-flex items-center px-2 py-1 rounded text-xs font-medium {status_class}",
+                        "{transaction.status.to_string()}"
+                    }
+                    if let Some(block) = transaction.block_number {
+                        p { class: "text-xs text-gray-500 mt-1", "Block {block}" }
+                    }
+                }
+            }
+            if let Some(url) = explorer_url {
+                div { class: "mt-3 pt-3 border-t border-gray-800 flex items-center justify-between",
+                    span { class: "text-xs text-gray-500", "{truncate_address(&transaction.tx_hash, 8)}" }
+                    a {
+                        href: "{url}",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                        class: "text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1",
+                        onclick: |e| e.stop_propagation(),
+                        "View on Explorer \u{2197}"
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ===== Transaction Detail Page =====
+#[component]
+pub fn TransactionDetail(id: String) -> Element {
+    let wallet_ctx = use_wallet_context();
+    let transaction = wallet_ctx.transaction_by_id(&id);
+
+    if let Some(tx) = transaction {
+        let explorer_url = wallet_ctx.get_explorer_url(tx.chain, &tx.tx_hash);
+        let from_explorer_url = wallet_ctx.get_address_explorer_url(tx.chain, &tx.from_address);
+        let to_explorer_url = tx.to_address.as_ref().and_then(|addr| {
+            wallet_ctx.get_address_explorer_url(tx.chain, addr)
+        });
+
+        let status_class = match tx.status {
+            TransactionStatus::Confirmed => "text-green-400 bg-green-500/20",
+            TransactionStatus::Pending => "text-yellow-400 bg-yellow-500/20",
+            TransactionStatus::Failed => "text-red-400 bg-red-500/20",
+        };
+
+        rsx! {
+            div { class: "space-y-6",
+                div { class: "flex items-center justify-between",
+                    h1 { class: "text-2xl font-bold", "Transaction Details" }
+                    Link { to: Route::Transactions {}, class: "text-sm text-blue-400 hover:text-blue-300", "\u{2190} Back" }
+                }
+
+                div { class: "{card_class()} p-6 space-y-6",
+                    // Header
+                    div { class: "flex items-center justify-between pb-6 border-b border-gray-800",
+                        div { class: "flex items-center gap-3",
+                            span { class: "{chain_badge_class(&tx.chain)}",
+                                "{chain_icon_emoji(&tx.chain)} {chain_name(&tx.chain)}"
+                            }
+                            span { class: "px-3 py-1 rounded-full text-sm font-medium {status_class}",
+                                "{tx.status.to_string()}"
+                            }
+                        }
+                        if let Some(url) = explorer_url.clone() {
+                            a {
+                                href: "{url}",
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                class: "text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1",
+                                "View on Explorer \u{2197}"
+                            }
+                        }
+                    }
+
+                    // Transaction Type
+                    div { class: "grid grid-cols-2 gap-4",
+                        div {
+                            p { class: "text-xs text-gray-500 mb-1", "Transaction Type" }
+                            p { class: "text-sm font-medium", "{tx.tx_type.to_string()}" }
+                        }
+                        div {
+                            p { class: "text-xs text-gray-500 mb-1", "Transaction Hash" }
+                            p { class: "text-sm font-mono", "{truncate_address(&tx.tx_hash, 12)}" }
+                        }
+                    }
+
+                    // Addresses
+                    div { class: "space-y-3",
+                        div {
+                            p { class: "text-xs text-gray-500 mb-1", "From" }
+                            div { class: "flex items-center justify-between bg-gray-800/50 rounded p-3",
+                                span { class: "text-sm font-mono", "{tx.from_address}" }
+                                if let Some(url) = from_explorer_url {
+                                    a {
+                                        href: "{url}",
+                                        target: "_blank",
+                                        rel: "noopener noreferrer",
+                                        class: "text-xs text-blue-400 hover:text-blue-300",
+                                        "View \u{2197}"
+                                    }
+                                }
+                            }
+                        }
+                        if let Some(to) = &tx.to_address {
+                            div {
+                                p { class: "text-xs text-gray-500 mb-1", "To" }
+                                div { class: "flex items-center justify-between bg-gray-800/50 rounded p-3",
+                                    span { class: "text-sm font-mono", "{to}" }
+                                    if let Some(url) = to_explorer_url {
+                                        a {
+                                            href: "{url}",
+                                            target: "_blank",
+                                            rel: "noopener noreferrer",
+                                            class: "text-xs text-blue-400 hover:text-blue-300",
+                                            "View \u{2197}"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Amount & Fee
+                    div { class: "grid grid-cols-2 gap-4 pt-4 border-t border-gray-800",
+                        if let Some(amount) = tx.amount {
+                            div {
+                                p { class: "text-xs text-gray-500 mb-1", "Amount" }
+                                p { class: "text-lg font-semibold", "{format_balance(amount as f64, tx.chain)}" }
+                            }
+                        }
+                        if let Some(fee) = tx.fee {
+                            div {
+                                p { class: "text-xs text-gray-500 mb-1", "Fee" }
+                                p { class: "text-lg font-semibold", "{format_balance(fee as f64, tx.chain)}" }
+                            }
+                        }
+                    }
+
+                    // Block Info
+                    div { class: "grid grid-cols-2 gap-4 pt-4 border-t border-gray-800",
+                        if let Some(block) = tx.block_number {
+                            div {
+                                p { class: "text-xs text-gray-500 mb-1", "Block Number" }
+                                p { class: "text-sm font-medium", "{block}" }
+                            }
+                        }
+                        if let Some(confirmations) = tx.confirmations {
+                            div {
+                                p { class: "text-xs text-gray-500 mb-1", "Confirmations" }
+                                p { class: "text-sm font-medium", "{confirmations}" }
+                            }
+                        }
+                    }
+
+                    // Timestamp
+                    div { class: "pt-4 border-t border-gray-800",
+                        p { class: "text-xs text-gray-500 mb-1", "Timestamp" }
+                        p { class: "text-sm font-medium",
+                            {
+                                let date = js_sys::Date::new(&(tx.created_at as f64 * 1000.0));
+                                format!("{} UTC", date.to_utc_string())
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        rsx! {
+            div { class: "space-y-6",
+                h1 { class: "text-2xl font-bold", "Transaction Not Found" }
+                {empty_state("\u{274C}", "Transaction Not Found", "The transaction you're looking for doesn't exist")}
+                Link { to: Route::Transactions {}, class: "text-blue-400 hover:text-blue-300", "Back to Transactions" }
             }
         }
     }

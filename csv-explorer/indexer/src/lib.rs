@@ -6,6 +6,7 @@ pub mod aptos;
 pub mod bitcoin;
 pub mod chain_indexer;
 pub mod ethereum;
+pub mod indexer_plugin;
 pub mod metrics;
 pub mod rpc_manager;
 pub mod solana;
@@ -14,6 +15,7 @@ pub mod sync;
 pub mod wallet_bridge;
 
 pub use chain_indexer::{AddressIndexingResult, ChainIndexer, ChainResult};
+pub use indexer_plugin::{IndexerPluginRegistry, IndexerPluginRegistryBuilder};
 pub use rpc_manager::{load_rpc_config, AuthType, RpcConfig, RpcEndpoint, RpcManager, RpcType};
 pub use sync::SyncCoordinator;
 pub use wallet_bridge::{WalletIndexerBridge, WalletIndexerBridgeConfig};
@@ -27,29 +29,26 @@ pub struct Indexer {
     coordinator: SyncCoordinator,
     wallet_bridge: Option<WalletIndexerBridge>,
     rpc_manager: RpcManager,
+    plugin_registry: IndexerPluginRegistry,
 }
 
 impl Indexer {
     /// Create a new indexer with the given configuration and database pool.
+    /// Uses the plug-and-play indexer registry for dynamic chain support.
     pub async fn new(config: ExplorerConfig, pool: SqlitePool) -> Result<Self> {
         // Load RPC configuration
         let rpc_manager = RpcManager::new(load_rpc_config()?);
 
-        // Build chain indexers based on configuration
-        let mut indexers: Vec<Box<dyn ChainIndexer>> = Vec::new();
+        // Build plugin registry with all built-in chains
+        let plugin_registry = IndexerPluginRegistryBuilder::new().build();
 
-        for (chain_id, chain_config) in &config.chains {
-            if !chain_config.enabled {
-                continue;
-            }
-            if let Some(indexer) =
-                build_boxed_indexer(chain_id, chain_config.clone(), rpc_manager.clone())
-            {
-                indexers.push(indexer);
-            } else {
-                tracing::warn!(chain = %chain_id, "No indexer implementation registered for discovered chain");
-            }
-        }
+        // Create indexers using the plugin registry
+        let indexers = plugin_registry.create_all_indexers(&config.chains, rpc_manager.clone());
+
+        tracing::info!(
+            "Indexer initialized with {} chains from plugin registry",
+            indexers.len()
+        );
 
         let coordinator = SyncCoordinator::new(
             indexers,
@@ -65,26 +64,58 @@ impl Indexer {
             coordinator,
             wallet_bridge: None,
             rpc_manager,
+            plugin_registry,
+        })
+    }
+
+    /// Create a new indexer with a custom plugin registry.
+    /// This enables custom chain support beyond the built-in chains.
+    pub async fn with_registry(
+        config: ExplorerConfig,
+        pool: SqlitePool,
+        plugin_registry: IndexerPluginRegistry,
+    ) -> Result<Self> {
+        // Load RPC configuration
+        let rpc_manager = RpcManager::new(load_rpc_config()?);
+
+        // Create indexers using the provided plugin registry
+        let indexers = plugin_registry.create_all_indexers(&config.chains, rpc_manager.clone());
+
+        tracing::info!(
+            "Indexer initialized with {} chains from custom plugin registry",
+            indexers.len()
+        );
+
+        let coordinator = SyncCoordinator::new(
+            indexers,
+            pool.clone(),
+            config.chains.clone(),
+            config.indexer.concurrency,
+            config.indexer.batch_size,
+            config.indexer.poll_interval_ms,
+        );
+
+        Ok(Self {
+            config,
+            coordinator,
+            wallet_bridge: None,
+            rpc_manager,
+            plugin_registry,
         })
     }
 
     /// Initialize the wallet-indexer bridge with priority indexing.
+    /// Uses the plugin registry for dynamic chain support.
     pub async fn with_wallet_bridge(mut self, config: WalletIndexerBridgeConfig) -> Result<Self> {
-        // Rebuild indexers as Arc<dyn ChainIndexer> using the existing rpc_manager
-        let mut indexers: Vec<std::sync::Arc<dyn ChainIndexer>> = Vec::new();
+        // Create Arc-wrapped indexers using the plugin registry
+        let indexers = self
+            .plugin_registry
+            .create_all_arc_indexers(&self.config.chains, self.rpc_manager.clone());
 
-        for (chain_id, chain_config) in &self.config.chains {
-            if !chain_config.enabled {
-                continue;
-            }
-            if let Some(indexer) =
-                build_arc_indexer(chain_id, chain_config.clone(), self.rpc_manager.clone())
-            {
-                indexers.push(indexer);
-            } else {
-                tracing::warn!(chain = %chain_id, "No wallet-bridge indexer implementation registered for discovered chain");
-            }
-        }
+        tracing::info!(
+            "Wallet bridge initialized with {} chains from plugin registry",
+            indexers.len()
+        );
 
         let bridge =
             WalletIndexerBridge::new(self.coordinator.get_pool().clone(), indexers, config);
@@ -93,6 +124,21 @@ impl Indexer {
 
         self.wallet_bridge = Some(bridge);
         Ok(self)
+    }
+
+    /// Get the plugin registry for dynamic chain registration.
+    pub fn plugin_registry(&self) -> &IndexerPluginRegistry {
+        &self.plugin_registry
+    }
+
+    /// Check if a chain is supported by the indexer.
+    pub fn is_chain_supported(&self, chain_id: &str) -> bool {
+        self.plugin_registry.is_registered(chain_id)
+    }
+
+    /// Get all supported chain IDs.
+    pub fn supported_chains(&self) -> Vec<&str> {
+        self.plugin_registry.registered_chains()
     }
 
     /// Get a reference to the wallet bridge if available.
@@ -161,50 +207,26 @@ impl Indexer {
     }
 }
 
-fn build_boxed_indexer(
+/// Build a boxed indexer using the plugin registry.
+/// This function is kept for backward compatibility.
+/// Consider using IndexerPluginRegistry directly for new code.
+pub fn build_boxed_indexer(
     chain_id: &str,
     config: csv_explorer_shared::ChainConfig,
     rpc_manager: RpcManager,
 ) -> Option<Box<dyn ChainIndexer>> {
-    match chain_id {
-        "bitcoin" => Some(Box::new(bitcoin::BitcoinIndexer::new(config, rpc_manager))),
-        "ethereum" => Some(Box::new(ethereum::EthereumIndexer::new(
-            config,
-            rpc_manager,
-        ))),
-        "sui" => Some(Box::new(sui::SuiIndexer::new(config, rpc_manager))),
-        "aptos" => Some(Box::new(aptos::AptosIndexer::new(config, rpc_manager))),
-        "solana" => Some(Box::new(solana::SolanaIndexer::new(config, rpc_manager))),
-        _ => None,
-    }
+    let registry = IndexerPluginRegistryBuilder::new().build();
+    registry.create_indexer(chain_id, config, rpc_manager)
 }
 
-fn build_arc_indexer(
+/// Build an Arc-wrapped indexer using the plugin registry.
+/// This function is kept for backward compatibility.
+/// Consider using IndexerPluginRegistry directly for new code.
+pub fn build_arc_indexer(
     chain_id: &str,
     config: csv_explorer_shared::ChainConfig,
     rpc_manager: RpcManager,
 ) -> Option<std::sync::Arc<dyn ChainIndexer>> {
-    match chain_id {
-        "bitcoin" => Some(std::sync::Arc::new(bitcoin::BitcoinIndexer::new(
-            config,
-            rpc_manager,
-        ))),
-        "ethereum" => Some(std::sync::Arc::new(ethereum::EthereumIndexer::new(
-            config,
-            rpc_manager,
-        ))),
-        "sui" => Some(std::sync::Arc::new(sui::SuiIndexer::new(
-            config,
-            rpc_manager,
-        ))),
-        "aptos" => Some(std::sync::Arc::new(aptos::AptosIndexer::new(
-            config,
-            rpc_manager,
-        ))),
-        "solana" => Some(std::sync::Arc::new(solana::SolanaIndexer::new(
-            config,
-            rpc_manager,
-        ))),
-        _ => None,
-    }
+    let registry = IndexerPluginRegistryBuilder::new().build();
+    registry.create_arc_indexer(chain_id, config, rpc_manager)
 }

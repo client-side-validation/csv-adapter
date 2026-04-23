@@ -54,10 +54,17 @@ pub struct ChainConfig {
     pub program_id: Option<String>,
     /// Block explorer URLs
     pub block_explorer_urls: Vec<String>,
+    /// Starting block for indexing (0 = genesis)
+    #[serde(default = "default_start_block")]
+    pub start_block: u64,
     /// Chain capabilities
     pub capabilities: ChainCapabilities,
     /// Chain-specific settings
     pub custom_settings: HashMap<String, serde_json::Value>,
+}
+
+fn default_start_block() -> u64 {
+    0
 }
 
 /// Configuration loader for dynamic chain discovery
@@ -180,6 +187,7 @@ mod tests {
             rpc_endpoints: vec!["https://test-rpc.example.com".to_string()],
             program_id: Some("TestProgram11111111111111111111111111111".to_string()),
             block_explorer_urls: vec!["https://test-explorer.example.com".to_string()],
+            start_block: 0,
             capabilities: ChainCapabilities {
                 supports_nfts: true,
                 supports_smart_contracts: true,

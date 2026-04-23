@@ -163,6 +163,72 @@ impl std::fmt::Display for NftStatus {
     }
 }
 
+/// A transaction record with explorer links.
+#[derive(Clone, Debug)]
+pub struct TransactionRecord {
+    pub id: String,
+    pub chain: Chain,
+    pub tx_hash: String,
+    pub tx_type: TransactionType,
+    pub status: TransactionStatus,
+    pub from_address: String,
+    pub to_address: Option<String>,
+    pub amount: Option<u64>,
+    pub fee: Option<u64>,
+    pub block_number: Option<u64>,
+    pub confirmations: Option<u64>,
+    pub created_at: u64,
+    pub explorer_url: Option<String>,
+}
+
+/// Transaction type.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TransactionType {
+    Transfer,
+    ContractDeployment,
+    ContractCall,
+    RightCreation,
+    RightTransfer,
+    SealCreation,
+    SealConsumption,
+    CrossChainLock,
+    CrossChainMint,
+}
+
+impl std::fmt::Display for TransactionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TransactionType::Transfer => write!(f, "Transfer"),
+            TransactionType::ContractDeployment => write!(f, "Contract Deployment"),
+            TransactionType::ContractCall => write!(f, "Contract Call"),
+            TransactionType::RightCreation => write!(f, "Right Creation"),
+            TransactionType::RightTransfer => write!(f, "Right Transfer"),
+            TransactionType::SealCreation => write!(f, "Seal Creation"),
+            TransactionType::SealConsumption => write!(f, "Seal Consumption"),
+            TransactionType::CrossChainLock => write!(f, "Cross-Chain Lock"),
+            TransactionType::CrossChainMint => write!(f, "Cross-Chain Mint"),
+        }
+    }
+}
+
+/// Transaction status.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TransactionStatus {
+    Pending,
+    Confirmed,
+    Failed,
+}
+
+impl std::fmt::Display for TransactionStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TransactionStatus::Pending => write!(f, "Pending"),
+            TransactionStatus::Confirmed => write!(f, "Confirmed"),
+            TransactionStatus::Failed => write!(f, "Failed"),
+        }
+    }
+}
+
 /// NFT collection information.
 #[derive(Clone, Debug, PartialEq)]
 pub struct NftCollection {
@@ -218,6 +284,7 @@ pub struct AppState {
     pub contracts: Vec<DeployedContract>,
     pub seals: Vec<SealRecord>,
     pub proofs: Vec<ProofRecord>,
+    pub transactions: Vec<TransactionRecord>,
     pub test_results: Vec<TestResult>,
     pub nfts: Vec<NftRecord>,
     pub nft_collections: Vec<NftCollection>,
@@ -249,6 +316,7 @@ impl Default for AppState {
             contracts: Vec::new(),
             seals: Vec::new(),
             proofs: Vec::new(),
+            transactions: Vec::new(),
             test_results: Vec::new(),
             nfts: Vec::new(),
             nft_collections: Vec::new(),
@@ -693,6 +761,76 @@ impl WalletContext {
     pub fn add_proof(&mut self, proof: ProofRecord) {
         self.state.write().proofs.push(proof);
         self.save_persisted();
+    }
+
+    // ===== Transactions =====
+    pub fn transactions(&self) -> Vec<TransactionRecord> {
+        self.state.read().transactions.clone()
+    }
+
+    pub fn transaction_by_id(&self, id: &str) -> Option<TransactionRecord> {
+        self.state
+            .read()
+            .transactions
+            .iter()
+            .find(|t| t.id == id)
+            .cloned()
+    }
+
+    pub fn transactions_for_chain(&self, chain: Chain) -> Vec<TransactionRecord> {
+        self.state
+            .read()
+            .transactions
+            .iter()
+            .filter(|t| t.chain == chain)
+            .cloned()
+            .collect()
+    }
+
+    pub fn transactions_for_address(&self, address: &str) -> Vec<TransactionRecord> {
+        self.state
+            .read()
+            .transactions
+            .iter()
+            .filter(|t| t.from_address == address || t.to_address.as_ref() == Some(&address.to_string()))
+            .cloned()
+            .collect()
+    }
+
+    pub fn add_transaction(&mut self, transaction: TransactionRecord) {
+        self.state.write().transactions.push(transaction);
+        self.save_persisted();
+    }
+
+    pub fn update_transaction_status(&mut self, id: &str, status: TransactionStatus) {
+        if let Some(tx) = self.state.write().transactions.iter_mut().find(|t| t.id == id) {
+            tx.status = status;
+            self.save_persisted();
+        }
+    }
+
+    /// Get explorer URL for a transaction on a specific chain
+    pub fn get_explorer_url(&self, chain: Chain, tx_hash: &str) -> Option<String> {
+        match chain {
+            Chain::Bitcoin => Some(format!("https://blockstream.info/tx/{}", tx_hash)),
+            Chain::Ethereum => Some(format!("https://etherscan.io/tx/{}", tx_hash)),
+            Chain::Solana => Some(format!("https://explorer.solana.com/tx/{}", tx_hash)),
+            Chain::Sui => Some(format!("https://suivision.xyz/txblock/{}", tx_hash)),
+            Chain::Aptos => Some(format!("https://explorer.aptoslabs.com/txn/{}", tx_hash)),
+            _ => None,
+        }
+    }
+
+    /// Get address explorer URL for a specific chain
+    pub fn get_address_explorer_url(&self, chain: Chain, address: &str) -> Option<String> {
+        match chain {
+            Chain::Bitcoin => Some(format!("https://blockstream.info/address/{}", address)),
+            Chain::Ethereum => Some(format!("https://etherscan.io/address/{}", address)),
+            Chain::Solana => Some(format!("https://explorer.solana.com/address/{}", address)),
+            Chain::Sui => Some(format!("https://suivision.xyz/account/{}", address)),
+            Chain::Aptos => Some(format!("https://explorer.aptoslabs.com/account/{}", address)),
+            _ => None,
+        }
     }
 
     // ===== Test Results =====

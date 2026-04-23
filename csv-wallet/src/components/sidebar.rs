@@ -52,6 +52,7 @@ pub fn Sidebar(sidebar_open: bool) -> Element {
                 nav { class: "flex-1 py-3 px-2 overflow-y-auto",
                     {sidebar_section("Overview", rsx! {
                         {sidebar_link(Route::Dashboard {}, "\u{1F4CA}", "Dashboard")}
+                        {sidebar_link(Route::Transactions {}, "\u{1F4B8}", "Transactions")}
                     })}
 
                     {sidebar_section("Rights", rsx! {
@@ -101,6 +102,7 @@ pub fn Sidebar(sidebar_open: bool) -> Element {
                 // Collapsed sidebar - icons only
                 nav { class: "flex-1 py-3 px-2 flex flex-col items-center gap-1",
                     Link { to: Route::Dashboard {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Dashboard", "\u{1F4CA}" }
+                    Link { to: Route::Transactions {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Transactions", "\u{1F4B8}" }
                     Link { to: Route::Rights {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Rights", "\u{1F48E}" }
                     Link { to: Route::Seals {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Seals", "\u{1F512}" }
                     Link { to: Route::CrossChain {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Cross-Chain", "\u{21C4}" }

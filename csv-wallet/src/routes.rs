@@ -96,6 +96,12 @@ pub enum Route {
     #[route("/wallet")]
     WalletPage {},
 
+    // Transactions
+    #[route("/transactions")]
+    Transactions {},
+    #[route("/transactions/:id")]
+    TransactionDetail { id: String },
+
     // Settings
     #[route("/settings")]
     Settings {},

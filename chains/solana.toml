@@ -8,12 +8,15 @@ rpc_endpoints = [
     "https://solana-api.projectserum.com",
     "https://rpc.ankr.com/solana"
 ]
-program_id = "CsvProgramSolana11111111111111111111111111111"
+program_id = "HdxSFwzk2v6JMm3w55MW1EuMeNcM9gTC4ETFMKqYyy6m"
 block_explorer_urls = [
     "https://explorer.solana.com",
     "https://solscan.io",
     "https://solanabeach.io"
 ]
+
+# Indexing configuration
+start_block = 0  # Genesis slot
 
 [custom_settings]
 supports_nfts = true
