@@ -435,7 +435,7 @@ pub async fn fetch_sui_gas_objects(
     if let Some(data) = json.get("result").and_then(|r| r.get("data")) {
         if let Some(array) = data.as_array() {
             for coin in array {
-                if let (Some(coin_type), Some(obj_id), Some(version), Some(digest), Some(balance)) = (
+                if let (Some(coin_type), Some(obj_id), Some(_version), Some(digest), Some(balance)) = (
                     coin.get("coinType").and_then(|v| v.as_str()),
                     coin.get("coinObjectId").and_then(|v| v.as_str()),
                     coin.get("version").and_then(|v| v.as_str()),

@@ -385,14 +385,167 @@ fn deploy_aptos(config: &Config, state: &mut State) -> Result<()> {
     Ok(())
 }
 
-/// Deploy Solana programs via solana CLI (stub for now)
-fn deploy_solana(_config: &Config, _state: &mut State) -> Result<()> {
-    output::info("Solana program deployment uses Anchor framework");
-    output::info("Building...");
-    output::warning("Solana deployment not yet fully implemented");
-    output::info("To deploy manually:");
-    output::info("  cd csv-adapter-solana && anchor build && anchor deploy");
+/// Deploy Solana programs via Anchor CLI
+fn deploy_solana(config: &Config, state: &mut State) -> Result<()> {
+    output::progress(1, 5, "Building Anchor program...");
+
+    let anchor_path = std::env::var("ANCHOR_BIN").unwrap_or_else(|_| "anchor".to_string());
+    let contracts_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("csv-adapter-solana/contracts");
+
+    // Check anchor is available
+    let anchor_check = Command::new(&anchor_path)
+        .arg("--version")
+        .output();
+    if anchor_check.is_err() {
+        return Err(anyhow::anyhow!(
+            "Anchor CLI not available. Install with: npm install -g @coral-xyz/anchor-cli"
+        ));
+    }
+
+    // Check solana CLI is available
+    let solana_check = Command::new("solana")
+        .arg("--version")
+        .output();
+    if solana_check.is_err() {
+        return Err(anyhow::anyhow!(
+            "Solana CLI not available. Install from: https://docs.solana.com/cli/install"
+        ));
+    }
+
+    // Build
+    let build_status = Command::new(&anchor_path)
+        .arg("build")
+        .current_dir(&contracts_dir)
+        .output()?;
+
+    if !build_status.status.success() {
+        let stderr = String::from_utf8_lossy(&build_status.stderr);
+        return Err(anyhow::anyhow!("Anchor build failed:\n{}", stderr));
+    }
+    output::info("  csv_seal program ✓");
+
+    // Get chain config for network
+    let chain_config = config.chain(&Chain::Solana)?;
+    let network = chain_config.network.to_string();
+
+    output::progress(2, 5, &format!("Connecting to Solana {}...", network));
+    output::info(&format!("  RPC: {}", chain_config.rpc_url));
+
+    // Set solana config
+    let _ = Command::new("solana")
+        .args(["config", "set", "--url", &chain_config.rpc_url])
+        .output();
+
+    // Get wallet address
+    let wallet_output = Command::new("solana")
+        .arg("address")
+        .output()?;
+    let wallet = String::from_utf8_lossy(&wallet_output.stdout).trim().to_string();
+    output::info(&format!("  Wallet: {}", wallet));
+
+    output::progress(3, 5, "Deploying CSV Seal program...");
+
+    // Deploy using the deploy script
+    let deploy_script = contracts_dir.parent().unwrap().join("scripts/deploy.sh");
+    if !deploy_script.exists() {
+        return Err(anyhow::anyhow!(
+            "Deploy script not found: {:?}",
+            deploy_script
+        ));
+    }
+
+    let deploy_output = Command::new(&deploy_script)
+        .arg(&network)
+        .arg(&anchor_path)
+        .output()?;
+
+    if !deploy_output.status.success() {
+        let stderr = String::from_utf8_lossy(&deploy_output.stderr);
+        let stdout = String::from_utf8_lossy(&deploy_output.stdout);
+        return Err(anyhow::anyhow!(
+            "Deploy failed:\nstdout: {}\nstderr: {}",
+            stdout,
+            stderr
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&deploy_output.stdout);
+
+    // Extract program ID from output
+    let program_id = extract_program_id(&stdout)
+        .or_else(|| {
+            // Try to read from deploy output file
+            let deploy_file = contracts_dir
+                .parent()
+                .unwrap()
+                .join(format!("scripts/deploy-{}.json", network));
+            if deploy_file.exists() {
+                std::fs::read_to_string(deploy_file)
+                    .ok()
+                    .and_then(|content| {
+                        content
+                            .lines()
+                            .find(|l| l.contains("program_id"))
+                            .and_then(|l| l.split('"').nth(3))
+                            .map(|s| s.to_string())
+                    })
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| anyhow::anyhow!("Could not extract program ID from deploy output"))?;
+
+    output::progress(4, 5, "Initializing LockRegistry...");
+
+    // Initialize the registry using the script
+    let init_script = contracts_dir.parent().unwrap().join("scripts/initialize.sh");
+    let _ = Command::new(&init_script)
+        .arg(&network)
+        .arg(&program_id)
+        .output();
+
+    output::progress(5, 5, "Verifying deployment...");
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    state.store_contract(DeployedContract {
+        chain: Chain::Solana,
+        address: program_id.clone(),
+        tx_hash: "solana_deploy".to_string(),
+        deployed_at: timestamp,
+    });
+
+    println!();
+    output::success("Solana program deployed");
+    output::kv("Program ID", &program_id);
+    output::kv("Network", &network);
+    output::info("Program ID saved to state.json");
+
     Ok(())
+}
+
+/// Extract Solana program ID from deploy output
+fn extract_program_id(output: &str) -> Option<String> {
+    for line in output.lines() {
+        if line.contains("Program Id:") || line.contains("Program ID:") {
+            // Format: "Program Id: CsvSeal111111111111111111111111111111111111"
+            if let Some(id) = line.split(':').nth(1) {
+                let id = id
+                    .trim()
+                    .trim_matches(|c: char| c.is_whitespace() || c == '"');
+                if id.len() >= 32 && id.len() <= 44 {
+                    return Some(id.to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 fn cmd_status(chain: Chain, _config: &Config, state: &State) -> Result<()> {

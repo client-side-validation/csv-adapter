@@ -197,7 +197,10 @@ impl Commitment {
     }
 
     /// Backwards-compatible alias for [`Commitment::simple`].
-    #[deprecated(since = "0.2.0", note = "Use `Commitment::simple` instead")]
+    #[deprecated(since = "0.3.0", note = "Use `Commitment::simple` instead")]
+    // Note: The `since` field must be a string literal per Rust's `deprecated` attribute.
+    // It cannot use the generated constant directly. However, this is okay because
+    // the deprecation marker itself rarely changes - only the crate version does.
     pub fn v1(
         contract_id: Hash,
         previous_commitment: Hash,

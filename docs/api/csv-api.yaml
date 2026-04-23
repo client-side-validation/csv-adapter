@@ -14,7 +14,7 @@ info:
     - **Right**: A transferrable claim anchored to a chain's single-use seal
     - **Seal**: Chain-specific mechanism enforcing single-use (UTXO, Object, Resource, Nullifier)
     - **Cross-chain transfer**: Right moves by consuming seal on source, proving on destination
-  version: 0.1.0
+  version: 0.3.0
   contact:
     name: CSV Adapter Team
     url: https://github.com/zorvan/csv-adapter

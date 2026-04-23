@@ -69,7 +69,7 @@ fn example_config() -> ChainConfig {
 
 fn main() {
     let plugin = ChainPluginBuilder::new("example-chain", "Example Chain")
-        .version("0.1.0")
+        .version(csv_adapter_core::PROTOCOL_VERSION)
         .author("csv-adapter")
         .description("Example custom chain plugin registered at runtime")
         .capabilities(ExampleChainAdapter.capabilities())

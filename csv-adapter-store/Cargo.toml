@@ -1,6 +1,6 @@
 [package]
 name = "csv-adapter-store"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "SQLite persistence layer for CSV Adapter seal and anchor storage"
 license = "MIT OR Apache-2.0"
@@ -19,6 +19,6 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-csv-adapter-core = { version = "0.2.0", path = "../csv-adapter-core" }
+csv-adapter-core = { version = "0.3.0", path = "../csv-adapter-core" }
 rusqlite = { version = "0.30", features = ["bundled"] }
 thiserror = "1.0"

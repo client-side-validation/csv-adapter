@@ -8,6 +8,7 @@
 //! - Signatures (64 bytes each)
 
 use crate::services::blockchain_service::BlockchainError;
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use csv_adapter_core::Chain;
 
 /// Solana Pubkey (32 bytes)
@@ -314,7 +315,7 @@ pub async fn broadcast_solana_transaction(
     
     // Serialize transaction
     let serialized = signed_tx.serialize();
-    let encoded = base64::encode(&serialized);
+    let encoded = STANDARD.encode(&serialized);
     
     let request_body = serde_json::json!({
         "jsonrpc": "2.0",

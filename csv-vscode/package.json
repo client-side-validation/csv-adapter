@@ -2,7 +2,7 @@
   "name": "csv-adapter",
   "displayName": "CSV Adapter",
   "description": "CSV Adapter integration for VS Code - syntax highlighting, snippets, IntelliSense, wallet explorer, and proof visualizer",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "publisher": "csv-adapter",
   "license": "MIT",
   "repository": {

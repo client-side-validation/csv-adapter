@@ -1,6 +1,6 @@
 {
   "name": "@csv-adapter/sdk",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Client-side validation SDK for cross-chain rights on CSV Adapter",
   "author": "Amin Razavi",
   "repository": "https://github.com/zorvan/csv-adapter",

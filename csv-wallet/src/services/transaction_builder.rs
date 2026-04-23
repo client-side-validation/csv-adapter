@@ -349,7 +349,7 @@ pub fn build_sui_transaction_data(
         "sender": sender,
         "kind": {
             "ProgrammableTransaction": {
-                "inputs": arguments.iter().enumerate().map(|(i, arg)| {
+                "inputs": arguments.iter().enumerate().map(|(_i, arg)| {
                     serde_json::json!({
                         "Pure": hex::encode(arg)
                     })

@@ -5,6 +5,9 @@ use dioxus_router::components::{Link, Outlet};
 use crate::app::routes::Route;
 use crate::pages::{Home, RightsList, SealsList, Stats, TransfersList, Wallet};
 
+/// Version from workspace Cargo.toml (via csv-adapter-core)
+const VERSION: &str = csv_adapter_core::PROTOCOL_VERSION_DISPLAY;
+
 pub mod routes;
 
 /// Root application component.
@@ -57,7 +60,7 @@ pub fn App() -> Element {
             footer { class: "border-t border-gray-800 mt-auto",
                 div { class: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6",
                     div { class: "flex items-center justify-between text-sm text-gray-500",
-                        span { "CSV Explorer v0.1.0" }
+                        span { "CSV Explorer {VERSION}" }
                         div { class: "flex items-center gap-4",
                             span { class: "flex items-center gap-2",
                                 span { class: "w-2 h-2 rounded-full bg-green-500" }

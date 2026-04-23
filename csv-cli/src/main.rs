@@ -47,11 +47,14 @@ use commands::*;
 use config::Config;
 use state::State;
 
+/// CLI version from Cargo.toml - single source of truth
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Parser)]
 #[command(
     name = "csv",
     about = "CSV Adapter CLI — Cross-Chain Rights, Proofs, and Transfers",
-    version = "0.1.0",
+    version = VERSION,
     long_about = None
 )]
 struct Cli {

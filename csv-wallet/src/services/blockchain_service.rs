@@ -370,8 +370,7 @@ impl BlockchainService {
         program_id: &str,
         signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
-        use crate::services::solana_tx::{build_solana_transaction, Transaction, broadcast_solana_transaction};
-        use crate::services::native_signer::NativeSigner;
+        use crate::services::solana_tx::{build_solana_transaction, broadcast_solana_transaction};
         use ed25519_dalek::{Signer, SigningKey};
         
         // Build instruction data (simplified - just the right_id as bytes)

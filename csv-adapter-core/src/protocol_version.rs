@@ -38,6 +38,9 @@
 
 use serde::{Deserialize, Serialize};
 
+// Include auto-generated version constants from build.rs
+include!(concat!(env!("OUT_DIR"), "/version.rs"));
+
 // ===========================================================================
 // Protocol Version
 // ===========================================================================
@@ -46,7 +49,9 @@ use serde::{Deserialize, Serialize};
 ///
 /// This version is used to ensure all components (adapters, CLI, SDK, explorer,
 /// wallet) are speaking the same protocol dialect.
-pub const PROTOCOL_VERSION: &str = "0.1.0";
+///
+/// Note: This is auto-generated from the workspace Cargo.toml version.
+pub const PROTOCOL_VERSION: &str = PROTOCOL_VERSION_STR;
 
 /// Protocol version components.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,9 +68,9 @@ impl ProtocolVersion {
     /// Current stable protocol version.
     pub const fn current() -> Self {
         Self {
-            major: 0,
-            minor: 1,
-            patch: 0,
+            major: VERSION_MAJOR,
+            minor: VERSION_MINOR,
+            patch: VERSION_PATCH,
         }
     }
 
@@ -575,11 +580,11 @@ mod tests {
     #[test]
     fn test_protocol_version() {
         let v = ProtocolVersion::current();
-        assert_eq!(v.major, 0);
-        assert_eq!(v.minor, 1);
-        assert_eq!(v.patch, 0);
+        assert_eq!(v.major, VERSION_MAJOR);
+        assert_eq!(v.minor, VERSION_MINOR);
+        assert_eq!(v.patch, VERSION_PATCH);
         assert!(v.is_compatible());
-        assert_eq!(v.to_string(), "0.1.0");
+        assert_eq!(v.to_string(), PROTOCOL_VERSION_STR);
     }
 
     #[test]

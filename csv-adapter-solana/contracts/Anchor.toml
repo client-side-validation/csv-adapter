@@ -1,0 +1,29 @@
+[toolchain]
+anchor_version = "1.0.0"
+
+[features]
+resolution = false
+skip-lint = false
+
+[programs.devnet]
+csv_seal = "HdxSFwzk2v6JMm3w55MW1EuMeNcM9gTC4ETFMKqYyy6m"
+
+[programs.localnet]
+csv_seal = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+
+[programs.mainnet]
+csv_seal = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+
+[programs.testnet]
+csv_seal = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+lint = "cargo clippy"
+test = "cargo test"
+initialize = "bash ../scripts/initialize.sh"
+
+[hooks]

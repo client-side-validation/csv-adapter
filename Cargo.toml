@@ -15,7 +15,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Amin Razavi, ALL FREE LLMs"]
 repository = "https://github.com/zorvan/csv-adapter"
 homepage = "https://github.com/zorvan/csv-adapter"

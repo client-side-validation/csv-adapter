@@ -1,0 +1,658 @@
+{
+  "version": "0.3.0",
+  "name": "csv_seal",
+  "instructions": [
+    {
+      "name": "initializeRegistry",
+      "accounts": [
+        {
+          "name": "registry",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "lock_registry"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "createSeal",
+      "accounts": [
+        {
+          "name": "rightAccount",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "right"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "owner"
+              },
+              {
+                "kind": "arg",
+                "type": "bytes",
+                "path": "rightId"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rightId",
+          "type": "bytes"
+        },
+        {
+          "name": "commitment",
+          "type": "bytes"
+        },
+        {
+          "name": "stateRoot",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "consumeSeal",
+      "accounts": [
+        {
+          "name": "rightAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "consumer",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "lockRight",
+      "accounts": [
+        {
+          "name": "rightAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "registry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "recentBlockhashes",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "destinationChain",
+          "type": "u8"
+        },
+        {
+          "name": "destinationOwner",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "mintRight",
+      "accounts": [
+        {
+          "name": "rightAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "rightId",
+          "type": "bytes"
+        },
+        {
+          "name": "commitment",
+          "type": "bytes"
+        },
+        {
+          "name": "stateRoot",
+          "type": "bytes"
+        },
+        {
+          "name": "sourceChain",
+          "type": "u8"
+        },
+        {
+          "name": "sourceSealRef",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "refundRight",
+      "accounts": [
+        {
+          "name": "registry",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "originalRight",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "newRightAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "claimant",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "stateRoot",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "transferRight",
+      "accounts": [
+        {
+          "name": "rightAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "currentOwner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newOwner",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "registerNullifier",
+      "accounts": [
+        {
+          "name": "rightAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "nullifier",
+          "type": "bytes"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "RightAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "rightId",
+            "type": "bytes"
+          },
+          {
+            "name": "commitment",
+            "type": "bytes"
+          },
+          {
+            "name": "stateRoot",
+            "type": "bytes"
+          },
+          {
+            "name": "nullifier",
+            "type": "bytes"
+          },
+          {
+            "name": "consumed",
+            "type": "bool"
+          },
+          {
+            "name": "locked",
+            "type": "bool"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockRegistry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "refundTimeout",
+            "type": "u32"
+          },
+          {
+            "name": "lockCount",
+            "type": "u32"
+          },
+          {
+            "name": "locks",
+            "type": {
+              "vec": {
+                "defined": "LockRecord"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "LockRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "rightId",
+            "type": "bytes"
+          },
+          {
+            "name": "commitment",
+            "type": "bytes"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "destinationChain",
+            "type": "u8"
+          },
+          {
+            "name": "destinationOwner",
+            "type": "bytes"
+          },
+          {
+            "name": "lockedAt",
+            "type": "i64"
+          },
+          {
+            "name": "refunded",
+            "type": "bool"
+          }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "RegistryInitialized",
+      "fields": [
+        {
+          "name": "authority",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "refundTimeout",
+          "type": "u32",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "RightCreated",
+      "fields": [
+        {
+          "name": "rightId",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "commitment",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "owner",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "account",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "RightConsumed",
+      "fields": [
+        {
+          "name": "rightId",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "commitment",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "consumer",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "account",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CrossChainLock",
+      "fields": [
+        {
+          "name": "rightId",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "commitment",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "owner",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "destinationChain",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "destinationOwner",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "sourceTxHash",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "lockedAt",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CrossChainMint",
+      "fields": [
+        {
+          "name": "rightId",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "commitment",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "owner",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "sourceChain",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "sourceSealRef",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "account",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "CrossChainRefund",
+      "fields": [
+        {
+          "name": "rightId",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "commitment",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "claimant",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "refundedAt",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "RightTransferred",
+      "fields": [
+        {
+          "name": "rightId",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "NullifierRegistered",
+      "fields": [
+        {
+          "name": "nullifier",
+          "type": "bytes",
+          "index": false
+        },
+        {
+          "name": "rightId",
+          "type": "bytes",
+          "index": false
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "AlreadyConsumed",
+      "msg": "Right has already been consumed"
+    },
+    {
+      "code": 6001,
+      "name": "AlreadyLocked",
+      "msg": "Right has already been locked"
+    },
+    {
+      "code": 6002,
+      "name": "LockNotFound",
+      "msg": "Lock record not found in registry"
+    },
+    {
+      "code": 6003,
+      "name": "RefundTimeoutNotExpired",
+      "msg": "Refund timeout has not yet expired"
+    },
+    {
+      "code": 6004,
+      "name": "AlreadyRefunded",
+      "msg": "Right has already been refunded"
+    },
+    {
+      "code": 6005,
+      "name": "NotAuthorized",
+      "msg": "Caller is not authorized"
+    },
+    {
+      "code": 6006,
+      "name": "NullifierAlreadyRegistered",
+      "msg": "Nullifier already registered"
+    },
+    {
+      "code": 6007,
+      "name": "NotConsumed",
+      "msg": "Right has not been consumed"
+    },
+    {
+      "code": 6008,
+      "name": "RegistryFull",
+      "msg": "Lock registry is full"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidChainId",
+      "msg": "Invalid chain ID"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidCommitment",
+      "msg": "Invalid commitment"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidProof",
+      "msg": "Proof verification failed"
+    },
+    {
+      "code": 6012,
+      "name": "RightNotFound",
+      "msg": "Right not found"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidStateRoot",
+      "msg": "Invalid state root"
+    }
+  ],
+  "metadata": {
+    "address": "CsvSeal111111111111111111111111111111111111"
+  }
+}

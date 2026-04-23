@@ -10,7 +10,7 @@ use crate::hooks::{
 };
 use crate::routes::Route;
 use crate::wallet_core::ChainAccount;
-use csv_adapter_core::Chain;
+use csv_adapter_core::{Chain, PROTOCOL_VERSION};
 use dioxus::prelude::*;
 use std::rc::Rc;
 use wasm_bindgen::closure::Closure;
@@ -2883,7 +2883,7 @@ pub fn Settings() -> Element {
                 div { class: "p-6 space-y-3",
                     div { class: "flex justify-between",
                         span { class: "text-sm text-gray-400", "Version" }
-                        span { class: "text-sm font-mono", "0.1.0" }
+                        span { class: "text-sm font-mono", "{PROTOCOL_VERSION}" }
                     }
                     div { class: "flex justify-between",
                         span { class: "text-sm text-gray-400", "Chains" }
