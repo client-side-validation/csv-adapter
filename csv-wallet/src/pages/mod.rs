@@ -1889,21 +1889,110 @@ pub fn CrossChainRetry() -> Element {
 // ===== Contracts Pages =====
 #[component]
 pub fn Contracts() -> Element {
-    let wallet_ctx = use_wallet_context();
+    let mut wallet_ctx = use_wallet_context();
     let contracts = wallet_ctx.contracts();
+    let accounts = wallet_ctx.accounts();
+
+    // State for contract discovery
+    let discovering = use_signal(|| false);
+    let discovered_count = use_signal(|| 0usize);
 
     rsx! {
         div { class: "space-y-6",
             div { class: "flex items-center justify-between",
                 h1 { class: "text-2xl font-bold", "Contracts" }
                 div { class: "flex gap-2",
+                    button {
+                        onclick: move |_| {
+                            if *discovering.read() {
+                                return;
+                            }
+                            discovering.set(true);
+                            discovered_count.set(0);
+
+                            spawn({
+                                let mut wallet_ctx = wallet_ctx.clone();
+                                let mut discovering_signal = discovering;
+                                let mut count_signal = discovered_count;
+                                async move {
+                                    use crate::services::chain_api::ChainConfig;
+                                    use crate::services::network::NetworkType;
+                                    use crate::services::transaction_builder::discover_contracts;
+
+                                    let mut total_found = 0;
+
+                                    for account in &accounts {
+                                        if matches!(account.chain, Chain::Bitcoin) {
+                                            continue;
+                                        }
+
+                                        let config = ChainConfig::for_chain(account.chain, NetworkType::Testnet);
+
+                                        match discover_contracts(account.chain, &account.address, &config.api_url).await {
+                                            Ok(contracts) => {
+                                                for c in contracts {
+                                                    wallet_ctx.add_contract(DeployedContract {
+                                                        chain: account.chain,
+                                                        address: c.address,
+                                                        tx_hash: generate_id(),
+                                                        deployed_at: js_sys::Date::now() as u64 / 1000,
+                                                    });
+                                                    total_found += 1;
+                                                }
+                                            }
+                                            Err(e) => {
+                                                web_sys::console::warn_1(&format!("Discovery failed for {:?}: {:?}", account.chain, e).into());
+                                            }
+                                        }
+                                    }
+
+                                    count_signal.set(total_found);
+                                    discovering_signal.set(false);
+
+                                    if total_found > 0 {
+                                        wallet_ctx.set_notification(
+                                            NotificationKind::Success,
+                                            format!("Discovered {} contract(s) from chain", total_found)
+                                        );
+                                    } else {
+                                        wallet_ctx.set_notification(
+                                            NotificationKind::Info,
+                                            "No new contracts found on chain".to_string()
+                                        );
+                                    }
+                                }
+                            });
+                        },
+                        disabled: *discovering.read() || accounts.is_empty(),
+                        class: if *discovering.read() {
+                            "px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-700 text-gray-400 cursor-not-allowed"
+                        } else {
+                            "px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+                        },
+                        if *discovering.read() {
+                            span { class: "flex items-center gap-2",
+                                span { class: "animate-spin", "\u{27F3}" }
+                                "Discovering..."
+                            }
+                        } else {
+                            "\u{1F50D} Discover from Chain"
+                        }
+                    }
                     Link { to: Route::AddContract {}, class: "{btn_secondary_class()}", "+ Add Existing" }
                     Link { to: Route::DeployContract {}, class: "{btn_primary_class()}", "+ Deploy New" }
                 }
             }
 
+            if *discovered_count.read() > 0 {
+                div { class: "bg-green-900/30 border border-green-700/50 rounded-lg p-3",
+                    p { class: "text-sm text-green-300",
+                        "\u{2713} Discovered and added {discovered_count} contract(s) from chain"
+                    }
+                }
+            }
+
             if contracts.is_empty() {
-                {empty_state("\u{1F4DC}", "No contracts deployed", "Deploy contracts to enable cross-chain functionality.")}
+                {empty_state("\u{1F4DC}", "No contracts deployed", "Deploy contracts or discover from chain to enable cross-chain functionality.")}
             } else {
                 div { class: "{table_class()}",
                     div { class: "{card_header_class()}",
@@ -2079,7 +2168,9 @@ pub fn AddContract() -> Element {
                             error.set(Some("Contract address is required".to_string()));
                             return;
                         }
-                        if !addr.starts_with("0x") {
+                        // Only require 0x prefix for non-Solana chains (Solana uses base58)
+                        let chain = *selected_chain.read();
+                        if chain != Chain::Solana && !addr.starts_with("0x") {
                             error.set(Some("Address must start with 0x".to_string()));
                             return;
                         }
@@ -3199,7 +3290,8 @@ pub fn TransactionDetail(id: String) -> Element {
                         p { class: "text-xs text-gray-500 mb-1", "Timestamp" }
                         p { class: "text-sm font-medium",
                             {
-                                let date = js_sys::Date::new(&(tx.created_at as f64 * 1000.0));
+                                let timestamp_ms = (tx.created_at as f64) * 1000.0;
+                                let date = js_sys::Date::new(&timestamp_ms.into());
                                 format!("{} UTC", date.to_utc_string())
                             }
                         }

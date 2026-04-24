@@ -164,7 +164,7 @@ impl std::fmt::Display for NftStatus {
 }
 
 /// A transaction record with explorer links.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TransactionRecord {
     pub id: String,
     pub chain: Chain,
@@ -803,10 +803,12 @@ impl WalletContext {
     }
 
     pub fn update_transaction_status(&mut self, id: &str, status: TransactionStatus) {
-        if let Some(tx) = self.state.write().transactions.iter_mut().find(|t| t.id == id) {
+        let mut state = self.state.write();
+        if let Some(tx) = state.transactions.iter_mut().find(|t| t.id == id) {
             tx.status = status;
-            self.save_persisted();
         }
+        drop(state);
+        self.save_persisted();
     }
 
     /// Get explorer URL for a transaction on a specific chain

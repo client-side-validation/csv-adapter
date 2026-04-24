@@ -27,9 +27,77 @@
 //! - `EAnchorDataExists` (3): AnchorData already exists for this seal
 //! - `ESealNotFound` (4): Seal object not found
 
-module csv_seal::CSVSeal {
+module csv_seal::CSVSealV2 {
     use std::signer;
     use std::event;
+    use std::account;
+    use std::object;
+    use aptos_std::smart_table::{Self, SmartTable};
+    use std::vector;
+    use std::bcs;
+
+    // =========================================================================
+    // Cross-Chain Events (matching Sui version)
+    // =========================================================================
+
+    /// Emitted when a new seal/Right is created.
+    #[event]
+    struct RightCreated has drop, store {
+        right_id: vector<u8>,
+        commitment: vector<u8>,
+        owner: address,
+    }
+
+    /// Emitted when a seal/Right is consumed.
+    #[event]
+    struct RightConsumed has drop, store {
+        right_id: vector<u8>,
+        consumer: address,
+    }
+
+    /// Emitted when a Right is locked for cross-chain transfer.
+    #[event]
+    struct CrossChainLock has drop, store {
+        right_id: vector<u8>,
+        commitment: vector<u8>,
+        owner: address,
+        destination_chain: u8,
+        destination_owner: vector<u8>,
+        source_tx_hash: vector<u8>,
+        locked_at: u64,
+    }
+
+    /// Emitted when a Right is minted from cross-chain proof.
+    #[event]
+    struct CrossChainMint has drop, store {
+        right_id: vector<u8>,
+        commitment: vector<u8>,
+        owner: address,
+        source_chain: u8,
+        source_seal_ref: vector<u8>,
+    }
+
+    /// Emitted when a Right is refunded after timeout.
+    #[event]
+    struct CrossChainRefund has drop, store {
+        right_id: vector<u8>,
+        commitment: vector<u8>,
+        claimant: address,
+        refunded_at: u64,
+    }
+
+    // =========================================================================
+    // Transfer State
+    // =========================================================================
+
+    /// Represents a seal that is pending transfer to a specific recipient.
+    /// This is the safe transfer pattern - recipient must accept the transfer.
+    struct PendingTransfer has key, drop {
+        /// The seal being transferred
+        seal: Seal,
+        /// The intended recipient address
+        recipient: address,
+    }
 
     // =========================================================================
     // Error Codes
@@ -63,7 +131,7 @@ module csv_seal::CSVSeal {
 
     /// Seal resource that can be consumed exactly once.
     /// Contains a consumed flag and nonce for replay resistance.
-    struct Seal has key, store {
+    struct Seal has key, store, drop {
         /// Nonce for replay resistance.
         nonce: u64,
         /// Whether this seal has been consumed.
@@ -72,7 +140,7 @@ module csv_seal::CSVSeal {
 
     /// Persistent storage of commitment after seal consumption.
     /// Created when a seal is consumed and persists the commitment data.
-    struct AnchorData has key, store {
+    struct AnchorData has key, store, copy, drop {
         /// The commitment hash that was anchored.
         commitment: vector<u8>,
         /// Timestamp when the seal was consumed (Unix epoch seconds).
@@ -148,32 +216,77 @@ module csv_seal::CSVSeal {
     }
 
     // =========================================================================
-    // Seal Transfer
+    // Seal Transfer (Safe Two-Phase Pattern)
     // =========================================================================
 
-    /// Transfer a seal to another address.
-    /// Only unconsumed seals can be transferred.
+    /// Initiate a seal transfer to a specific recipient.
+    /// The seal is moved to a pending state where only the specified
+    /// recipient can claim it. This is the safe transfer pattern.
     ///
     /// # Arguments
-    /// * `from` - Current seal owner
-    /// * `to` - Recipient address
-    ///
-    /// # Note
-    /// This function moves the Seal resource from `from` to `to`.
-    /// In Aptos, resources can only be moved, not copied, ensuring
-    /// single-use semantics are preserved.
-    #[cmd]
-    public entry fun transfer_seal(from: &signer, to: address) {
+    /// * `from` - Current seal owner (initiates transfer)
+    /// * `recipient` - Address that will be allowed to claim the seal
+    public entry fun initiate_transfer(from: &signer, recipient: address) {
         let from_addr = signer::address_of(from);
         assert!(exists<Seal>(from_addr), ESealNotFound);
 
         let seal = borrow_global<Seal>(from_addr);
-        assert!(!seal.consumed, ESealNotConsumed);
+        assert!(!seal.consumed, ESealAlreadyConsumed);
+        assert!(!exists<PendingTransfer>(from_addr), EAnchorDataExists);
 
-        // Move seal from sender to recipient
+        // Move seal to pending transfer state at sender's address
         let seal_res = move_from<Seal>(from_addr);
-        assert!(!exists<Seal>(to), EAnchorDataExists);
-        move_to(&to, seal_res);
+        move_to(from, PendingTransfer {
+            seal: seal_res,
+            recipient,
+        });
+    }
+
+    /// Accept a pending seal transfer.
+    /// The intended recipient calls this to claim the seal.
+    ///
+    /// # Arguments
+    /// * `recipient_signer` - Signer of the intended recipient (verifies identity)
+    /// * `sender_addr` - Address of the account that initiated the transfer
+    public entry fun accept_transfer(recipient_signer: &signer, sender_addr: address) {
+        let recipient_addr = signer::address_of(recipient_signer);
+
+        // Verify transfer exists and recipient is authorized
+        assert!(exists<PendingTransfer>(sender_addr), ESealNotFound);
+        let pending = borrow_global<PendingTransfer>(sender_addr);
+        assert!(pending.recipient == recipient_addr, ESealNotFound);
+
+        // Verify recipient doesn't already have a seal
+        assert!(!exists<Seal>(recipient_addr), EAnchorDataExists);
+
+        // Move seal from pending to recipient's account
+        let PendingTransfer { seal, recipient: _ } = move_from<PendingTransfer>(sender_addr);
+        move_to(recipient_signer, seal);
+    }
+
+    /// Cancel a pending transfer (only the sender can cancel).
+    ///
+    /// # Arguments
+    /// * `sender` - Original seal owner who initiated the transfer
+    public entry fun cancel_transfer(sender: &signer) {
+        let sender_addr = signer::address_of(sender);
+        assert!(exists<PendingTransfer>(sender_addr), ESealNotFound);
+
+        // Return seal to sender's account
+        assert!(!exists<Seal>(sender_addr), EAnchorDataExists);
+        let PendingTransfer { seal, recipient: _ } = move_from<PendingTransfer>(sender_addr);
+        move_to(sender, seal);
+    }
+
+    /// Check if there's a pending transfer for a specific sender.
+    public fun has_pending_transfer(sender_addr: address): bool {
+        exists<PendingTransfer>(sender_addr)
+    }
+
+    /// Get the intended recipient for a pending transfer.
+    public fun get_pending_recipient(sender_addr: address): address {
+        assert!(exists<PendingTransfer>(sender_addr), ESealNotFound);
+        borrow_global<PendingTransfer>(sender_addr).recipient
     }
 
     // =========================================================================
@@ -224,6 +337,211 @@ module csv_seal::CSVSeal {
     }
 
     // =========================================================================
+    // Cross-Chain Lock Registry
+    // =========================================================================
+
+    /// Lock record for tracking cross-chain transfers and refunds.
+    struct LockRecord has store, drop {
+        right_id: vector<u8>,
+        commitment: vector<u8>,
+        owner: address,
+        destination_chain: u8,
+        locked_at: u64,
+        refunded: bool,
+    }
+
+    /// Shared registry tracking all locks for settlement support.
+    struct LockRegistry has key {
+        locks: SmartTable<vector<u8>, LockRecord>,
+        refund_timeout: u64,
+    }
+
+    /// Initialize the LockRegistry (called once during deployment).
+    public entry fun init_registry(account: &signer) {
+        let addr = signer::address_of(account);
+        assert!(!exists<LockRegistry>(addr), EAnchorDataExists);
+        move_to(account, LockRegistry {
+            locks: smart_table::new(),
+            refund_timeout: 86400, // 24 hours in seconds
+        });
+    }
+
+    /// Get the LockRegistry address (module deployer).
+    public fun get_registry_addr(): address {
+        @csv_seal
+    }
+
+    /// Lock a seal for cross-chain transfer.
+    /// This consumes the seal and records the lock in the registry.
+    public entry fun lock_right(
+        account: &signer,
+        right_id: vector<u8>,
+        destination_chain: u8,
+        destination_owner: vector<u8>,
+    ) acquires Seal, LockRegistry {
+        let owner_addr = signer::address_of(account);
+        assert!(exists<Seal>(owner_addr), ESealNotFound);
+
+        let seal = borrow_global<Seal>(owner_addr);
+        assert!(!seal.consumed, ESealAlreadyConsumed);
+
+        let nonce = seal.nonce;
+        let commitment = get_commitment_bytes(right_id, nonce);
+
+        // Record lock in registry
+        let registry_addr = get_registry_addr();
+        assert!(exists<LockRegistry>(registry_addr), ESealNotFound);
+        let registry = borrow_global_mut<LockRegistry>(registry_addr);
+        let locked_at = aptos_framework::timestamp::now_seconds();
+
+        assert!(!smart_table::contains(&registry.locks, right_id), EAnchorDataExists);
+        smart_table::add(&mut registry.locks, right_id, LockRecord {
+            right_id: copy right_id,
+            commitment: copy commitment,
+            owner: owner_addr,
+            destination_chain,
+            locked_at,
+            refunded: false,
+        });
+
+        // Get transaction hash (use empty for now - filled off-chain)
+        let source_tx_hash = vector::empty<u8>();
+
+        // Emit CrossChainLock event
+        event::emit(CrossChainLock {
+            right_id: copy right_id,
+            commitment: copy commitment,
+            owner: owner_addr,
+            destination_chain,
+            destination_owner,
+            source_tx_hash,
+            locked_at,
+        });
+
+        // Emit RightConsumed event
+        event::emit(RightConsumed {
+            right_id: copy right_id,
+            consumer: owner_addr,
+        });
+
+        // Consume the seal (mark as consumed and store AnchorData)
+        let seal_res = move_from<Seal>(owner_addr);
+        move_to(account, AnchorData {
+            commitment,
+            consumed_at: locked_at,
+            nonce: seal_res.nonce,
+        });
+        // seal_res dropped automatically (has drop ability)
+    }
+
+    /// Mint a new seal from a cross-chain transfer proof.
+    public entry fun mint_right(
+        account: &signer,
+        right_id: vector<u8>,
+        commitment: vector<u8>,
+        source_chain: u8,
+        source_seal_ref: vector<u8>,
+        nonce: u64,
+    ) {
+        let owner_addr = signer::address_of(account);
+        assert!(!exists<Seal>(owner_addr), EAnchorDataExists);
+
+        // Create new seal
+        move_to(account, Seal { nonce, consumed: false });
+
+        // Emit CrossChainMint event
+        event::emit(CrossChainMint {
+            right_id: copy right_id,
+            commitment: copy commitment,
+            owner: owner_addr,
+            source_chain,
+            source_seal_ref,
+        });
+
+        // Emit RightCreated event
+        event::emit(RightCreated {
+            right_id,
+            commitment,
+            owner: owner_addr,
+        });
+    }
+
+    /// Refund a seal after the lock timeout has elapsed.
+    public entry fun refund_right(
+        account: &signer,
+        right_id: vector<u8>,
+        registry_addr: address,
+    ) acquires LockRegistry {
+        let claimant = signer::address_of(account);
+
+        assert!(exists<LockRegistry>(registry_addr), ESealNotFound);
+        let registry = borrow_global_mut<LockRegistry>(registry_addr);
+
+        assert!(smart_table::contains(&registry.locks, right_id), ESealNotFound);
+        let lock = smart_table::borrow_mut(&mut registry.locks, right_id);
+
+        // Verify not already refunded
+        assert!(!lock.refunded, ESealAlreadyConsumed);
+
+        // Verify timeout has elapsed
+        let now = aptos_framework::timestamp::now_seconds();
+        assert!(now >= lock.locked_at + registry.refund_timeout, ESealNotConsumed);
+
+        // Mark as refunded
+        lock.refunded = true;
+
+        // Copy values for event emission
+        let commitment_copy = lock.commitment;
+        let right_id_copy = right_id;
+
+        // Emit CrossChainRefund event
+        event::emit(CrossChainRefund {
+            right_id: right_id_copy,
+            commitment: commitment_copy,
+            claimant,
+            refunded_at: now,
+        });
+    }
+
+    /// Get lock info for off-chain verification.
+    public fun get_lock_info(
+        registry_addr: address,
+        right_id: vector<u8>,
+    ): (vector<u8>, address, u64, bool) acquires LockRegistry {
+        assert!(exists<LockRegistry>(registry_addr), ESealNotFound);
+        let registry = borrow_global<LockRegistry>(registry_addr);
+        assert!(smart_table::contains(&registry.locks, right_id), ESealNotFound);
+        let lock = smart_table::borrow(&registry.locks, right_id);
+        (lock.commitment, lock.owner, lock.locked_at, lock.refunded)
+    }
+
+    /// Check if refund is available for a seal.
+    public fun can_refund(
+        registry_addr: address,
+        right_id: vector<u8>,
+        now: u64,
+    ): bool acquires LockRegistry {
+        if (!exists<LockRegistry>(registry_addr)) {
+            return false
+        };
+        let registry = borrow_global<LockRegistry>(registry_addr);
+        if (!smart_table::contains(&registry.locks, right_id)) {
+            return false
+        };
+        let lock = smart_table::borrow(&registry.locks, right_id);
+        !lock.refunded && now >= lock.locked_at + registry.refund_timeout
+    }
+
+    /// Helper to generate commitment from right_id and nonce.
+    fun get_commitment_bytes(right_id: vector<u8>, nonce: u64): vector<u8> {
+        // Simple concatenation - in production use proper hash
+        let result = right_id;
+        let nonce_bytes = bcs::to_bytes(&nonce);
+        vector::append(&mut result, nonce_bytes);
+        result
+    }
+
+    // =========================================================================
     // Module Initialization
     // =========================================================================
 
@@ -234,7 +552,7 @@ module csv_seal::CSVSeal {
         let addr = signer::address_of(account);
         assert!(!exists<AnchorEventHandle>(addr), EAnchorDataExists);
         move_to(account, AnchorEventHandle {
-            events: event::new_event_handle<AnchorEvent>(account),
+            events: account::new_event_handle<AnchorEvent>(account),
         });
     }
 

@@ -9,6 +9,23 @@ use crate::config::{Chain, Config};
 use crate::output;
 use crate::state::{DeployedContract, State};
 
+/// A discovered contract from chain query
+#[derive(Debug, Clone)]
+struct DiscoveredContract {
+    pub address: String,
+    pub contract_type: ContractType,
+    pub description: String,
+}
+
+#[derive(Debug, Clone)]
+enum ContractType {
+    Lock,
+    Mint,
+    Package,
+    Program,
+    Unknown,
+}
+
 #[derive(Subcommand)]
 pub enum ContractAction {
     /// Deploy contracts to a chain
@@ -37,6 +54,12 @@ pub enum ContractAction {
     },
     /// List all deployed contracts
     List,
+    /// Fetch contracts from chain for stored addresses
+    Fetch {
+        /// Specific chain to fetch (optional, fetches all if omitted)
+        #[arg(value_enum)]
+        chain: Option<Chain>,
+    },
 }
 
 pub fn execute(action: ContractAction, config: &Config, state: &mut State) -> Result<()> {
@@ -49,6 +72,7 @@ pub fn execute(action: ContractAction, config: &Config, state: &mut State) -> Re
         ContractAction::Status { chain } => cmd_status(chain, config, state),
         ContractAction::Verify { chain } => cmd_verify(chain, config, state),
         ContractAction::List => cmd_list(state),
+        ContractAction::Fetch { chain } => cmd_fetch(chain, config, state),
     }
 }
 
@@ -644,4 +668,286 @@ fn extract_account(output: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// Fetch contracts from chain for stored addresses
+fn cmd_fetch(chain_filter: Option<Chain>, config: &Config, state: &mut State) -> Result<()> {
+    let rt = tokio::runtime::Runtime::new()?;
+
+    let chains_to_fetch: Vec<Chain> = match chain_filter {
+        Some(c) => vec![c],
+        None => {
+            // Get all chains that have addresses stored
+            state.addresses.keys().cloned().collect()
+        }
+    };
+
+    if chains_to_fetch.is_empty() {
+        output::info("No addresses configured. Use 'csv wallet address' to set addresses first.");
+        return Ok(());
+    }
+
+    output::header("Fetching Contracts from Chain");
+
+    let mut total_discovered = 0;
+
+    for chain in chains_to_fetch {
+        if let Some(address) = state.get_address(&chain).cloned() {
+            if chain == Chain::Bitcoin {
+                continue; // Bitcoin doesn't have contracts
+            }
+
+            let chain_config = config.chain(&chain)?;
+            let rpc_url = &chain_config.rpc_url;
+
+            output::progress(1, 2, &format!("Querying {} for {}...", chain, &address[..20.min(address.len())]));
+
+            let discovered = rt.block_on(discover_contracts(chain.clone(), &address, rpc_url))?;
+
+            for contract in discovered {
+                output::info(&format!("  Found: {} - {}", contract.address, contract.description));
+                state.store_contract(DeployedContract {
+                    chain: chain.clone(),
+                    address: contract.address,
+                    tx_hash: "discovered_from_chain".to_string(),
+                    deployed_at: SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                });
+                total_discovered += 1;
+            }
+        } else {
+            output::warning(&format!("No address configured for {}", chain));
+        }
+    }
+
+    if total_discovered > 0 {
+        output::success(&format!("Discovered and stored {} contract(s)", total_discovered));
+    } else {
+        output::info("No new contracts discovered on chain.");
+    }
+
+    Ok(())
+}
+
+/// Discover contracts owned by an address on a chain
+async fn discover_contracts(
+    chain: Chain,
+    address: &str,
+    rpc_url: &str,
+) -> Result<Vec<DiscoveredContract>> {
+    match chain {
+        Chain::Sui => discover_sui_contracts(address, rpc_url).await,
+        Chain::Aptos => discover_aptos_contracts(address, rpc_url).await,
+        Chain::Ethereum => discover_ethereum_contracts(address, rpc_url).await,
+        Chain::Solana => discover_solana_contracts(address, rpc_url).await,
+        _ => Ok(Vec::new()), // Bitcoin doesn't have contracts
+    }
+}
+
+/// Discover Sui packages owned by address
+async fn discover_sui_contracts(
+    address: &str,
+    rpc_url: &str,
+) -> Result<Vec<DiscoveredContract>> {
+    let client = reqwest::Client::new();
+
+    // Query for objects owned by address
+    let body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "suix_getOwnedObjects",
+        "params": [
+            address,
+            {
+                "filter": {
+                    "MatchNone": [{"Package": {}}]
+                },
+                "options": {
+                    "showType": true,
+                    "showContent": true,
+                    "showDisplay": true
+                }
+            }
+        ],
+        "id": 1
+    });
+
+    let response = client
+        .post(rpc_url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to query Sui objects: {}", e))?;
+
+    let json: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to parse Sui response: {}", e))?;
+
+    let mut contracts = Vec::new();
+
+    if let Some(data) = json
+        .get("result")
+        .and_then(|r| r.get("data"))
+        .and_then(|d| d.as_array())
+    {
+        for obj in data {
+            if let Some(obj_type) = obj
+                .get("data")
+                .and_then(|d| d.get("type"))
+                .and_then(|t| t.as_str())
+            {
+                // Look for CSV-related object types
+                if obj_type.contains("csv_seal") || obj_type.contains("Anchor") {
+                    let object_id = obj
+                        .get("data")
+                        .and_then(|d| d.get("objectId"))
+                        .and_then(|o| o.as_str())
+                        .unwrap_or("unknown");
+
+                    contracts.push(DiscoveredContract {
+                        address: object_id.to_string(),
+                        contract_type: ContractType::Lock,
+                        description: format!("CSV Seal object: {}", obj_type),
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(contracts)
+}
+
+/// Discover Aptos modules/resources for address
+async fn discover_aptos_contracts(
+    address: &str,
+    rpc_url: &str,
+) -> Result<Vec<DiscoveredContract>> {
+    let client = reqwest::Client::new();
+
+    // Query resources for account
+    let url = format!("{}/accounts/{}/resources", rpc_url.trim_end_matches('/'), address);
+
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to query Aptos resources: {}", e))?;
+
+    let json: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to parse Aptos response: {}", e))?;
+
+    let mut contracts = Vec::new();
+
+    if let Some(resources) = json.as_array() {
+        for resource in resources {
+            if let Some(type_str) = resource.get("type").and_then(|t| t.as_str()) {
+                // Look for CSV-related resource types
+                if type_str.contains("csv_seal") || type_str.contains("Anchor") {
+                    contracts.push(DiscoveredContract {
+                        address: address.to_string(),
+                        contract_type: ContractType::Lock,
+                        description: format!("CSV resource: {}", type_str),
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(contracts)
+}
+
+/// Discover Ethereum contracts
+async fn discover_ethereum_contracts(
+    address: &str,
+    rpc_url: &str,
+) -> Result<Vec<DiscoveredContract>> {
+    let client = reqwest::Client::new();
+
+    // Query for contract code at address
+    let body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "eth_getCode",
+        "params": [address, "latest"],
+        "id": 1
+    });
+
+    let response = client
+        .post(rpc_url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to query Ethereum code: {}", e))?;
+
+    let json: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to parse Ethereum response: {}", e))?;
+
+    let mut contracts = Vec::new();
+
+    if let Some(code) = json.get("result").and_then(|r| r.as_str()) {
+        if code.len() > 2 && code != "0x" {
+            // This is a contract address
+            contracts.push(DiscoveredContract {
+                address: address.to_string(),
+                contract_type: ContractType::Unknown,
+                description: format!("Smart contract ({} bytes)", (code.len() - 2) / 2),
+            });
+        }
+    }
+
+    Ok(contracts)
+}
+
+/// Discover Solana programs
+async fn discover_solana_contracts(
+    address: &str,
+    rpc_url: &str,
+) -> Result<Vec<DiscoveredContract>> {
+    let client = reqwest::Client::new();
+
+    // Query for account info to check if it's a program
+    let body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "getAccountInfo",
+        "params": [address, {"encoding": "jsonParsed"}],
+        "id": 1
+    });
+
+    let response = client
+        .post(rpc_url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to query Solana account: {}", e))?;
+
+    let json: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to parse Solana response: {}", e))?;
+
+    let mut contracts = Vec::new();
+
+    // Check if this is a program (executable account)
+    if let Some(owner) = json
+        .get("result")
+        .and_then(|r| r.get("value"))
+        .and_then(|v| v.get("owner"))
+        .and_then(|o| o.as_str())
+    {
+        // BPFLoader accounts indicate programs
+        if owner.contains("BPFLoader") {
+            contracts.push(DiscoveredContract {
+                address: address.to_string(),
+                contract_type: ContractType::Program,
+                description: "Solana program (BPF Loader)".to_string(),
+            });
+        }
+    }
+
+    Ok(contracts)
 }

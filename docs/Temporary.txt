@@ -1,15 +1,17 @@
 
 Q1 2026:
 
+Q1-06 Cross-chain NFT Rust App
+Q1-04 Supply chain provenance Rust App 
+Q1-05 Cross-chain subscription Rust App
+Q1-16 DeFi applications (lending, DEX, yield aggregation, insurance) Rust App
+Q1-07 create-csv-app scaffolding Rust App
+
 Q1-00 Wallet encryption + BIP-39 support + mnemonic recovery + common security and known attack vectors mitigation for dioxus web (specially local storage, cookies, session storage), desktop and mobile versions
 
 Q1-03 TypeScript SDK (core APIs) — npm install @csv-adapter/sdk
 Q1-08 TypeScript SDK chain providers 
-Q1-04 Supply chain provenance app 
-Q1-05 Cross-chain subscription app
-Q1-06 Cross-chain NFT app
-Q1-16 DeFi applications (lending, DEX, yield aggregation, insurance)
-Q1-07 create-csv-app scaffolding
+Q1-08p NFT, subscription, DeFi, etc. using TypeScript SDKs
 
 Q1-09 WASM bindings for browser 
 
