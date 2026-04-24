@@ -62,6 +62,20 @@ impl ChainAccount {
         })
     }
 
+    /// Refresh the address from the private key using current derivation.
+    /// This is useful when derivation method changes (e.g., SegWit v0 -> Taproot).
+    pub fn refresh_address(&mut self) -> Result<(), String> {
+        let new_address = Self::derive_address(self.chain, &self.private_key)?;
+        if new_address != self.address {
+            web_sys::console::log_1(&format!(
+                "Updated {} address: {} -> {}",
+                self.chain, self.address, new_address
+            ).into());
+            self.address = new_address;
+        }
+        Ok(())
+    }
+
     // ===== Address derivation per chain =====
 
     fn derive_bitcoin_address(key_bytes: &[u8]) -> Result<String, String> {
@@ -73,13 +87,27 @@ impl ChainAccount {
             return Err(format!("Invalid key length: {}", key_bytes.len()));
         };
 
-        if let Ok(secret_key) = SecretKey::from_slice(&key) {
+        if key.len() == 32 {
+            use bitcoin::{
+                secp256k1::{Secp256k1, Keypair, XOnlyPublicKey, SecretKey},
+                key::TapTweak,
+                Address, Network,
+            };
+            
+            let secret_key = SecretKey::from_slice(&key)
+                .map_err(|e| format!("Invalid secret key: {}", e))?;
             let secp = Secp256k1::new();
-            let pubkey = secret_key.public_key(&secp);
-            let pubkey_bytes = pubkey.serialize();
-            Ok(format!("bc1q{}", hex::encode(&pubkey_bytes[1..21])))
+            // Create keypair from secret key
+            let keypair = Keypair::from_secret_key(&secp, &secret_key);
+            // Get x-only public key
+            let (xonly_pubkey, _parity) = XOnlyPublicKey::from_keypair(&keypair);
+            // Apply taproot tweak for key-path only (no script tree)
+            let (tweaked_pubkey, _parity) = xonly_pubkey.tap_tweak(&secp, None);
+            // Create P2TR address - use testnet for tb1p addresses
+            let address = Address::p2tr_tweaked(tweaked_pubkey, Network::Testnet);
+            Ok(address.to_string())
         } else {
-            Err("Invalid secp256k1 key for Bitcoin".to_string())
+            Err("Invalid key length for Bitcoin address derivation".to_string())
         }
     }
 
@@ -224,6 +252,11 @@ impl WalletData {
         self.accounts.iter_mut().find(|a| a.id == id)
     }
 
+    /// Get all accounts.
+    pub fn all_accounts(&self) -> Vec<ChainAccount> {
+        self.accounts.clone()
+    }
+
     /// Get total account count.
     pub fn total_accounts(&self) -> usize {
         self.accounts.len()
@@ -232,6 +265,13 @@ impl WalletData {
     /// Check if wallet has any accounts.
     pub fn is_empty(&self) -> bool {
         self.accounts.is_empty()
+    }
+
+    /// Refresh/update an account address.
+    pub fn refresh_address(&mut self, chain: Chain, old_address: &str, new_address: String) {
+        if let Some(account) = self.accounts.iter_mut().find(|a| a.chain == chain && a.address == old_address) {
+            account.address = new_address;
+        }
     }
 
     /// Select an account.

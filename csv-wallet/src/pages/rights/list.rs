@@ -1,0 +1,102 @@
+//! Rights list page.
+
+use crate::context::{use_wallet_context, RightStatus};
+use crate::pages::common::*;
+use crate::routes::Route;
+use csv_adapter_core::Chain;
+use dioxus::prelude::*;
+
+#[component]
+pub fn Rights() -> Element {
+    let mut wallet_ctx = use_wallet_context();
+    let rights = wallet_ctx.rights();
+    let mut filter_chain = use_signal(|| Option::<Chain>::None);
+
+    let filtered = match *filter_chain.read() {
+        Some(c) => rights
+            .iter()
+            .filter(|r| r.chain == c)
+            .cloned()
+            .collect::<Vec<_>>(),
+        None => rights,
+    };
+
+    rsx! {
+        div { class: "space-y-6",
+            div { class: "flex items-center justify-between",
+                h1 { class: "text-2xl font-bold", "Rights" }
+                Link { to: Route::CreateRight {}, class: "{btn_primary_class()}", "+ Create Right" }
+            }
+
+            // Filter bar
+            div { class: "flex items-center gap-2",
+                span { class: "text-sm text-gray-400", "Filter:" }
+                button {
+                    onclick: move |_| filter_chain.set(None),
+                    class: if filter_chain.read().is_none() { "{btn_primary_class()}" } else { "{btn_secondary_class()}" },
+                    "All"
+                }
+                for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana] {
+                    button {
+                        key: "{chain}",
+                        onclick: move |_| filter_chain.set(Some(chain)),
+                        class: if matches!(*filter_chain.read(), Some(c) if c == chain) { "{chain_badge_class(&chain)} cursor-pointer" } else { "{chain_badge_class(&chain)} opacity-50 cursor-pointer" },
+                        "{chain_icon_emoji(&chain)} {chain_name(&chain)}"
+                    }
+                }
+            }
+
+            if filtered.is_empty() {
+                {empty_state("\u{1F48E}", "No Rights found", "Create a Right to get started.")}
+            } else {
+                div { class: "{table_class()}",
+                    div { class: "{card_header_class()} flex items-center justify-between",
+                        h2 { class: "font-semibold text-sm", "Tracked Rights" }
+                        span { class: "text-xs text-gray-400", "{filtered.len()} total" }
+                    }
+                    div { class: "overflow-x-auto",
+                        table { class: "w-full text-sm",
+                            thead {
+                                tr { class: "text-left text-gray-400 border-b border-gray-800",
+                                    th { class: "px-4 py-2 font-medium", "Right ID" }
+                                    th { class: "px-4 py-2 font-medium", "Chain" }
+                                    th { class: "px-4 py-2 font-medium", "Value" }
+                                    th { class: "px-4 py-2 font-medium", "Status" }
+                                    th { class: "px-4 py-2 font-medium", "Actions" }
+                                }
+                            }
+                            tbody { class: "divide-y divide-gray-800",
+                                for (idx, right) in filtered.iter().enumerate() {
+                                    tr { key: "{idx}-{right.id}", class: "hover:bg-gray-800/50 transition-colors",
+                                        td { class: "px-4 py-3 font-mono text-xs text-gray-300", "{truncate_address(&right.id, 8)}" }
+                                        td { class: "px-4 py-3", span { class: "{chain_badge_class(&right.chain)}", "{chain_icon_emoji(&right.chain)} {chain_name(&right.chain)}" } }
+                                        td { class: "px-4 py-3 font-mono text-xs", "{right.value}" }
+                                        td { class: "px-4 py-3",
+                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {right_status_class(&right.status)}",
+                                                "{right.status}"
+                                            }
+                                        }
+                                        td { class: "px-4 py-3 flex gap-2",
+                                            Link { to: Route::ShowRight { id: right.id.clone() }, class: "text-blue-400 hover:text-blue-300 text-xs", "View" }
+                                            button {
+                                                onclick: {
+                                                    let mut wallet_ctx = wallet_ctx.clone();
+                                                    let right_id = right.id.clone();
+                                                    move |_| {
+                                                        wallet_ctx.remove_right(&right_id);
+                                                    }
+                                                },
+                                                class: "text-red-400 hover:text-red-300 text-xs",
+                                                "Remove"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

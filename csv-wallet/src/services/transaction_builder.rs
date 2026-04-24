@@ -6,7 +6,7 @@
 //! - Sui: BCS-encoded Move transactions
 //! - Aptos: BCS-encoded EntryFunction transactions
 
-use crate::services::blockchain_service::BlockchainError;
+use crate::services::blockchain::BlockchainError;
 use csv_adapter_core::Chain;
 
 /// Build a complete, serialized transaction ready for signing

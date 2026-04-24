@@ -3,7 +3,8 @@
 use crate::components::{
     all_chain_displays, all_network_displays, ChainDisplay, Dropdown, NetworkDisplay,
 };
-use crate::context::{truncate_address, use_wallet_context};
+use crate::context::use_wallet_context;
+use crate::pages::common::truncate_address;
 use crate::routes::Route;
 use dioxus::prelude::*;
 

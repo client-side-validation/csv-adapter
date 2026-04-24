@@ -1,0 +1,291 @@
+//! Page components - styled to match csv-explorer design patterns.
+
+use crate::context::{
+    generate_id, truncate_address, use_wallet_context, DeployedContract, Network, NotificationKind,
+    ProofRecord, RightStatus, SealRecord, TestResult, TestStatus, TrackedRight, TrackedTransfer,
+    TransferStatus, TransactionRecord, TransactionStatus,
+};
+use crate::hooks::{
+    format_balance, use_balance, AccountBalance,
+};
+use crate::routes::Route;
+use crate::wallet_core::ChainAccount;
+use csv_adapter_core::{Chain, PROTOCOL_VERSION};
+use dioxus::prelude::*;
+use std::rc::Rc;
+use wasm_bindgen::closure::Closure;
+use wasm_bindgen::JsCast;
+
+pub mod nft_page;
+pub mod wallet_page;
+pub use nft_page::{NftCollections, NftDetail, NftGallery};
+pub use wallet_page::WalletPage;
+
+// ===== Chain Styling Helpers =====
+fn chain_color(chain: &Chain) -> &'static str {
+    match chain {
+        Chain::Bitcoin => "#F7931A",
+        Chain::Ethereum => "#627EEA",
+        Chain::Sui => "#06BDFF",
+        Chain::Aptos => "#2DD8A3",
+        Chain::Solana => "#9945FF",
+        _ => "#888888",
+    }
+}
+
+fn chain_badge_class(chain: &Chain) -> &'static str {
+    match chain {
+        Chain::Bitcoin => "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-orange-400 bg-orange-500/20 border border-orange-500/30",
+        Chain::Ethereum => "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-blue-400 bg-blue-500/20 border border-blue-500/30",
+        Chain::Sui => "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-cyan-400 bg-cyan-500/20 border border-cyan-500/30",
+        Chain::Aptos => "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-emerald-400 bg-emerald-500/20 border border-emerald-500/30",
+        Chain::Solana => "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-purple-400 bg-purple-500/20 border border-purple-500/30",
+        _ => "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium text-gray-400 bg-gray-500/20 border border-gray-500/30",
+    }
+}
+
+fn chain_icon_emoji(chain: &Chain) -> &'static str {
+    match chain {
+        Chain::Bitcoin => "\u{1F7E0}",
+        Chain::Ethereum => "\u{1F537}",
+        Chain::Sui => "\u{1F30A}",
+        Chain::Aptos => "\u{1F7E2}",
+        Chain::Solana => "\u{25C8}",
+        _ => "\u{26AA}",
+    }
+}
+
+fn chain_name(chain: &Chain) -> &'static str {
+    match chain {
+        Chain::Bitcoin => "Bitcoin",
+        Chain::Ethereum => "Ethereum",
+        Chain::Sui => "Sui",
+        Chain::Aptos => "Aptos",
+        Chain::Solana => "Solana",
+        _ => "Unknown",
+    }
+}
+
+fn format_timestamp(timestamp: u64) -> String {
+    // Simple timestamp formatting
+    let now = js_sys::Date::now() as u64 / 1000;
+    let diff = now.saturating_sub(timestamp);
+    
+    if diff < 60 {
+        "Just now".to_string()
+    } else if diff < 3600 {
+        format!("{} minutes ago", diff / 60)
+    } else if diff < 86400 {
+        format!("{} hours ago", diff / 3600)
+    } else {
+        format!("{} days ago", diff / 86400)
+    }
+}
+
+fn right_status_class(status: &RightStatus) -> &'static str {
+    match status {
+        RightStatus::Active => "text-green-400 bg-green-500/20",
+        RightStatus::Transferred => "text-blue-400 bg-blue-500/20",
+        RightStatus::Consumed => "text-gray-400 bg-gray-500/20",
+    }
+}
+
+fn transfer_status_class(status: &TransferStatus) -> &'static str {
+    match status {
+        TransferStatus::Completed => "text-green-400 bg-green-500/20",
+        TransferStatus::Failed => "text-red-400 bg-red-500/20",
+        _ => "text-yellow-400 bg-yellow-500/20",
+    }
+}
+
+fn test_status_class(status: &TestStatus) -> &'static str {
+    match status {
+        TestStatus::Passed => "text-green-400 bg-green-500/20",
+        TestStatus::Failed => "text-red-400 bg-red-500/20",
+        TestStatus::Running => "text-blue-400 bg-blue-500/20",
+        TestStatus::Pending => "text-gray-400 bg-gray-500/20",
+    }
+}
+
+fn seal_consumed_class(consumed: bool) -> &'static str {
+    if consumed {
+        "bg-red-900/30 border-red-700/50"
+    } else {
+        "bg-green-900/30 border-green-700/50"
+    }
+}
+
+fn seal_consumed_text_class(consumed: bool) -> &'static str {
+    if consumed {
+        "text-red-300"
+    } else {
+        "text-green-300"
+    }
+}
+
+// ===== Shared UI Patterns =====
+fn card_class() -> &'static str {
+    "bg-gray-900 rounded-xl border border-gray-800"
+}
+
+fn card_header_class() -> &'static str {
+    "px-4 py-3 border-b border-gray-800"
+}
+
+fn input_class() -> &'static str {
+    "w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+}
+
+fn input_mono_class() -> &'static str {
+    "w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+}
+
+fn btn_primary_class() -> &'static str {
+    "px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium transition-colors"
+}
+
+fn btn_secondary_class() -> &'static str {
+    "px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm font-medium transition-colors"
+}
+
+fn btn_full_primary_class() -> &'static str {
+    "w-full px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-sm font-medium transition-colors"
+}
+
+fn table_class() -> &'static str {
+    "bg-gray-900 rounded-xl border border-gray-800 overflow-hidden"
+}
+
+fn label_class() -> &'static str {
+    "block text-sm text-gray-400 mb-1"
+}
+
+fn select_class() -> &'static str {
+    "w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+}
+
+fn chain_options() -> Vec<(Chain, &'static str)> {
+    vec![
+        (Chain::Bitcoin, "\u{1F7E0} Bitcoin"),
+        (Chain::Ethereum, "\u{1F537} Ethereum"),
+        (Chain::Sui, "\u{1F30A} Sui"),
+        (Chain::Aptos, "\u{1F7E2} Aptos"),
+        (Chain::Solana, "\u{25C8} Solana"),
+    ]
+}
+
+fn network_options() -> Vec<(Network, &'static str)> {
+    vec![
+        (Network::Dev, "Dev"),
+        (Network::Test, "Test"),
+        (Network::Main, "Main"),
+    ]
+}
+
+fn chain_select(mut onchange: impl FnMut(Rc<FormData>) + 'static, value: Chain) -> Element {
+    rsx! {
+        select {
+            class: "{select_class()}",
+            value: "{value}",
+            onchange: move |evt| onchange(evt.data()),
+            for (c, label) in chain_options() {
+                option { key: "{c}", value: "{c}", selected: c == value, "{label}" }
+            }
+        }
+    }
+}
+
+fn network_select(mut onchange: impl FnMut(Network) + 'static, value: Network) -> Element {
+    rsx! {
+        select {
+            class: "{select_class()}",
+            value: "{value}",
+            onchange: move |evt| {
+                let n = match evt.value().as_str() {
+                    "dev" => Network::Dev,
+                    "main" => Network::Main,
+                    _ => Network::Test,
+                };
+                onchange(n);
+            },
+            for (n, label) in network_options() {
+                option { key: "{n}", value: "{n}", selected: n == value, "{label}" }
+            }
+        }
+    }
+}
+
+fn form_field(label_text: &str, children: Element) -> Element {
+    rsx! {
+        div { class: "space-y-2",
+            label { class: "{label_class()}", "{label_text}" }
+            {children}
+        }
+    }
+}
+
+fn notification_banner(
+    kind: NotificationKind,
+    message: String,
+    mut on_close: impl FnMut() + 'static,
+) -> Element {
+    let (bg, border, text, icon) = match kind {
+        NotificationKind::Success => (
+            "bg-green-900/30",
+            "border-green-700/50",
+            "text-green-300",
+            "\u{2705}",
+        ),
+        NotificationKind::Error => (
+            "bg-red-900/30",
+            "border-red-700/50",
+            "text-red-300",
+            "\u{274C}",
+        ),
+        NotificationKind::Warning => (
+            "bg-yellow-900/30",
+            "border-yellow-700/50",
+            "text-yellow-300",
+            "\u{26A0}\u{FE0F}",
+        ),
+        NotificationKind::Info => (
+            "bg-blue-900/30",
+            "border-blue-700/50",
+            "text-blue-300",
+            "\u{2139}\u{FE0F}",
+        ),
+    };
+    rsx! {
+        div { class: "flex items-center justify-between p-3 {bg} border {border} rounded-lg",
+            div { class: "flex items-center gap-2",
+                span { class: "{text}", "{icon}" }
+                p { class: "{text} text-sm", "{message}" }
+            }
+            button { onclick: move |_| on_close(), class: "{text} hover:opacity-70 text-sm", "\u{2715}" }
+        }
+    }
+}
+
+fn empty_state(icon: &str, title: &str, subtitle: &str) -> Element {
+    rsx! {
+        div { class: "{card_class()} p-8 text-center",
+            span { class: "text-4xl block mb-3", "{icon}" }
+            p { class: "text-gray-400", "{title}" }
+            p { class: "text-sm text-gray-500 mt-1", "{subtitle}" }
+        }
+    }
+}
+
+fn stat_card(label: &str, value: &str, icon: &str) -> Element {
+    rsx! {
+        div { class: "{card_class()} p-5",
+            div { class: "flex items-center justify-between",
+                div {
+                    p { class: "text-sm text-gray-400", "{label}" }
+                    p { class: "text-xl font-bold font-mono mt-1", "{value}" }
+                }
+                span { class: "text-2xl", "{icon}" }
+            }
+        }
+    }
+}

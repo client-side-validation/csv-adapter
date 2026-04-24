@@ -3,161 +3,20 @@
 //!
 //! Uses native signing with imported private keys - no browser wallet required.
 
+use crate::services::blockchain::config::BlockchainConfig;
+use crate::services::blockchain::types::{
+    BlockchainError, ContractDeployment, ContractType, CrossChainProof, CrossChainStatus,
+    CrossChainTransferResult, ProofData, TransactionReceipt, TransactionStatus,
+};
+use crate::services::blockchain::wallet::NativeWallet;
 use crate::services::native_signer::{NativeSigner, SignedTransaction, UnsignedTransaction};
 use crate::wallet_core::ChainAccount;
 use csv_adapter_core::Chain;
-use serde::{Deserialize, Serialize};
-
-/// Blockchain operation error.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlockchainError {
-    pub message: String,
-    pub chain: Option<Chain>,
-    pub code: Option<u32>,
-}
-
-impl std::fmt::Display for BlockchainError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Blockchain error: {}", self.message)
-    }
-}
-
-/// Transaction receipt.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TransactionReceipt {
-    pub tx_hash: String,
-    pub block_number: Option<u64>,
-    pub gas_used: Option<u64>,
-    pub status: TransactionStatus,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum TransactionStatus {
-    Pending,
-    Confirmed,
-    Failed(String),
-}
-
-/// Cross-chain transfer status.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum CrossChainStatus {
-    Initiated,
-    Locked,
-    ProofGenerated,
-    ProofVerified,
-    Minted,
-    Completed,
-    Failed(String),
-}
-
-/// Proof data for cross-chain verification.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CrossChainProof {
-    pub source_chain: Chain,
-    pub target_chain: Chain,
-    pub right_id: String,
-    pub lock_tx_hash: String,
-    pub proof_data: ProofData,
-    pub timestamp: u64,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum ProofData {
-    Merkle {
-        root: String,
-        path: Vec<String>,
-        leaf: String,
-    },
-    Mpt {
-        account_proof: Vec<String>,
-        storage_proof: Vec<String>,
-        value: String,
-    },
-    Checkpoint {
-        checkpoint_digest: String,
-        transaction_block: u64,
-        certificate: String,
-    },
-    Ledger {
-        ledger_version: u64,
-        proof: Vec<u8>,
-        root_hash: String,
-    },
-}
-
-/// Contract deployment info.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ContractDeployment {
-    pub chain: Chain,
-    pub contract_address: String,
-    pub tx_hash: String,
-    pub deployed_at: u64,
-    pub contract_type: ContractType,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum ContractType {
-    Registry,
-    Bridge,
-    Lock,
-}
-
-/// Native wallet wrapper that uses imported private keys.
-#[derive(Clone, Debug)]
-pub struct NativeWallet {
-    pub chain: Chain,
-    pub account: ChainAccount,
-}
-
-impl NativeWallet {
-    pub fn new(chain: Chain, account: ChainAccount) -> Self {
-        Self { chain, account }
-    }
-
-    pub fn address(&self) -> String {
-        self.account.address.clone()
-    }
-
-    pub fn private_key(&self) -> String {
-        self.account.private_key.clone()
-    }
-
-    /// Sign a transaction using the native signer.
-    pub fn sign_transaction(&self, tx: &UnsignedTransaction) -> Result<SignedTransaction, BlockchainError> {
-        NativeSigner::sign_transaction(tx, &self.private_key())
-            .map_err(|e| BlockchainError {
-                message: e.to_string(),
-                chain: Some(self.chain),
-                code: None,
-            })
-    }
-}
 
 /// Main blockchain service.
 pub struct BlockchainService {
     config: BlockchainConfig,
     client: reqwest::Client,
-}
-
-#[derive(Clone, Debug)]
-pub struct BlockchainConfig {
-    pub ethereum_rpc: String,
-    pub bitcoin_rpc: String,
-    pub sui_rpc: String,
-    pub aptos_rpc: String,
-    pub solana_rpc: String,
-}
-
-impl Default for BlockchainConfig {
-    fn default() -> Self {
-        Self {
-            ethereum_rpc: "https://ethereum-sepolia-rpc.publicnode.com".to_string(),
-            bitcoin_rpc: "https://mempool.space/testnet/api".to_string(),
-            sui_rpc: "https://fullnode.testnet.sui.io:443".to_string(),
-            aptos_rpc: "https://fullnode.testnet.aptoslabs.com/v1".to_string(),
-            solana_rpc: "https://api.devnet.solana.com".to_string(),
-        }
-    }
 }
 
 impl BlockchainService {
@@ -424,17 +283,31 @@ impl BlockchainService {
     async fn lock_bitcoin_right(
         &self,
         right_id: &str,
-        owner: &str,
+        _owner: &str,
         signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
         use crate::services::bitcoin_tx;
+        use crate::wallet_core::ChainAccount;
+        
+        // Derive Bitcoin address from signer's private key
+        // This ensures consistency - the signing key matches the address
+        let bitcoin_address = ChainAccount::derive_address(
+            csv_adapter_core::Chain::Bitcoin,
+            &signer.private_key()
+        ).map_err(|e| BlockchainError {
+            message: format!("Failed to derive Bitcoin address: {}", e),
+            chain: Some(csv_adapter_core::Chain::Bitcoin),
+            code: None,
+        })?;
+        
+        web_sys::console::log_1(&format!("Using derived Bitcoin address: {}", bitcoin_address).into());
         
         // Build lock data (OP_RETURN payload)
         let lock_data = format!("CSV:LOCK:{}", right_id).into_bytes();
         
-        // Build unsigned transaction with UTXOs
+        // Build unsigned transaction with UTXOs for the derived address
         let (unsigned_tx, utxo) = bitcoin_tx::build_anchor_transaction(
-            owner,
+            &bitcoin_address,
             &lock_data,
             &self.config.bitcoin_rpc,
         ).await?;
@@ -444,6 +317,7 @@ impl BlockchainService {
             &unsigned_tx,
             &signer.private_key(),
             &utxo,
+            &bitcoin_address,
         )?;
         
         // Broadcast
@@ -945,6 +819,22 @@ impl BlockchainService {
                 signer,
             )
             .await?;
+        
+        // Check if lock transaction was successful
+        let is_failed = matches!(lock_receipt.status, TransactionStatus::Failed(_));
+        if is_failed || lock_receipt.tx_hash.is_empty() || lock_receipt.tx_hash == "0x" {
+            let err_msg = match &lock_receipt.status {
+                TransactionStatus::Failed(msg) => format!("Lock transaction failed: {}", msg),
+                _ => "Lock transaction failed or returned invalid hash".to_string(),
+            };
+            return Err(BlockchainError {
+                message: err_msg,
+                chain: Some(from_chain),
+                code: None,
+            });
+        }
+
+        web_sys::console::log_1(&format!("Lock transaction confirmed: {}", lock_receipt.tx_hash).into());
 
         // Step 2: Generate proof
         let proof = self
@@ -986,7 +876,7 @@ impl BlockchainService {
             transfer_id: format!("0x{}", hex::encode([0u8; 32])),
             lock_tx_hash: lock_receipt.tx_hash,
             mint_tx_hash: mint_receipt.tx_hash,
-            proof,
+            proof: Some(proof),
             status: CrossChainStatus::Completed,
         })
     }
@@ -1009,16 +899,6 @@ fn signer_address_for_chain(chain: Chain, address: &str) -> String {
         }
         _ => address.to_string(),
     }
-}
-
-/// Result of a cross-chain transfer.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CrossChainTransferResult {
-    pub transfer_id: String,
-    pub lock_tx_hash: String,
-    pub mint_tx_hash: String,
-    pub proof: CrossChainProof,
-    pub status: CrossChainStatus,
 }
 
 /// Map of deployed contracts by chain.

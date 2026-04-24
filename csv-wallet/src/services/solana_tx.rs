@@ -7,7 +7,7 @@
 //! - Instructions (compact array)
 //! - Signatures (64 bytes each)
 
-use crate::services::blockchain_service::BlockchainError;
+use crate::services::blockchain::BlockchainError;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use csv_adapter_core::Chain;
 

@@ -3,7 +3,7 @@
 //! Uses the `bcs` crate for proper BCS serialization matching the official SDKs.
 //! No wallet adapter required - uses imported private keys directly.
 
-use crate::services::blockchain_service::BlockchainError;
+use crate::services::blockchain::BlockchainError;
 use csv_adapter_core::Chain;
 use serde::{Serialize, Deserialize};
 

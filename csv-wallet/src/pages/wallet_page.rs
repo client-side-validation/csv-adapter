@@ -139,18 +139,58 @@ fn ChainAccountsSection(chain: Chain) -> Element {
 
 #[component]
 fn ChainAccountRow(account: ChainAccount, mut wallet_ctx: WalletContext) -> Element {
+    let mut show_key = use_signal(|| false);
+    let account_clone = account.clone();
+    let is_bitcoin = account.chain == Chain::Bitcoin;
+    
     rsx! {
         div { class: "flex items-center justify-between bg-gray-800/50 rounded-lg p-3",
             div { class: "flex-1 min-w-0",
                 p { class: "font-mono text-sm text-gray-200 truncate", "{account.address}" }
                 p { class: "text-xs text-gray-500 mt-0.5", "{account.name}" }
+                if show_key() {
+                    div { class: "mt-2 p-2 bg-gray-900 rounded",
+                        p { class: "text-xs text-yellow-400 font-mono break-all", "{account_clone.private_key}" }
+                    }
+                }
             }
-            button {
-                onclick: move |_| {
-                    wallet_ctx.remove_account(&account.id);
-                },
-                class: "ml-3 px-2 py-1 rounded text-xs bg-red-900/30 text-red-400 hover:bg-red-900/50 transition-colors",
-                "Remove"
+            div { class: "flex gap-2",
+                if is_bitcoin {
+                    button {
+                        onclick: {
+                            let mut wallet_ctx = wallet_ctx.clone();
+                            let account_id = account.id.clone();
+                            move |_| {
+                                if let Ok(updated) = wallet_ctx.refresh_account_address(&account_id) {
+                                    if updated {
+                                        web_sys::console::log_1(&"Bitcoin address refreshed to new Taproot derivation".into());
+                                    }
+                                }
+                            }
+                        },
+                        class: "px-2 py-1 rounded text-xs bg-blue-900/30 text-blue-400 hover:bg-blue-900/50 transition-colors",
+                        "Refresh Address"
+                    }
+                }
+                button {
+                    onclick: move |_| {
+                        show_key.set(!show_key());
+                    },
+                    class: "px-2 py-1 rounded text-xs bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors",
+                    if show_key() { "Hide Key" } else { "Show Key" }
+                }
+                button {
+                    onclick: {
+                        let mut wallet_ctx = wallet_ctx.clone();
+                        let chain = account.chain;
+                        let address = account.address.clone();
+                        move |_| {
+                            wallet_ctx.remove_account(chain, &address);
+                        }
+                    },
+                    class: "px-2 py-1 rounded text-xs bg-red-900/30 text-red-400 hover:bg-red-900/50 transition-colors",
+                    "Remove"
+                }
             }
         }
     }

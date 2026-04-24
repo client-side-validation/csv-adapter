@@ -142,6 +142,14 @@ impl LocalStorageManager {
             .map_err(|e| StorageError::BrowserError(format!("{:?}", e)))
     }
 
+    /// Set raw string value.
+    pub fn set_raw(&self, key: &str, value: &str) -> Result<(), StorageError> {
+        let full_key = format!("{}:{}", self.prefix, key);
+        self.storage
+            .set_item(&full_key, value)
+            .map_err(|e| StorageError::BrowserError(format!("{:?}", e)))
+    }
+
     /// Check if key exists.
     pub fn contains(&self, key: &str) -> bool {
         let full_key = format!("{}:{}", self.prefix, key);

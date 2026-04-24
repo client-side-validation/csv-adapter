@@ -1,6 +1,6 @@
 [package]
 name = "csv-wallet"
-version = "0.3.0"
+version = "0.3.5"
 edition = "2021"
 description = "Standalone multi-chain wallet for CSV Adapter with Dioxus UI"
 license = "MIT OR Apache-2.0"

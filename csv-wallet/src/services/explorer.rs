@@ -1,5 +1,6 @@
 //! Explorer integration service.
 
+use csv_adapter_core::Chain;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -7,12 +8,62 @@ use serde::{Deserialize, Serialize};
 pub struct ExplorerConfig {
     /// Base URL for the CSV Explorer
     pub base_url: String,
+    /// Transaction URL template (e.g., "https://mempool.space/tx/{}")
+    pub tx_url_template: String,
+    /// Address URL template (e.g., "https://mempool.space/address/{}")
+    pub address_url_template: String,
+}
+
+impl ExplorerConfig {
+    /// Get explorer config for a chain (testnet by default).
+    pub fn for_chain(chain: Chain) -> Option<Self> {
+        match chain {
+            Chain::Bitcoin => Some(Self {
+                base_url: "https://mempool.space/testnet".to_string(),
+                tx_url_template: "https://mempool.space/testnet/tx/{}".to_string(),
+                address_url_template: "https://mempool.space/testnet/address/{}".to_string(),
+            }),
+            Chain::Ethereum => Some(Self {
+                base_url: "https://sepolia.etherscan.io".to_string(),
+                tx_url_template: "https://sepolia.etherscan.io/tx/{}".to_string(),
+                address_url_template: "https://sepolia.etherscan.io/address/{}".to_string(),
+            }),
+            Chain::Sui => Some(Self {
+                base_url: "https://suiscan.xyz/testnet".to_string(),
+                tx_url_template: "https://suiscan.xyz/testnet/tx/{}".to_string(),
+                address_url_template: "https://suiscan.xyz/testnet/address/{}".to_string(),
+            }),
+            Chain::Aptos => Some(Self {
+                base_url: "https://explorer.aptoslabs.com/testnet".to_string(),
+                tx_url_template: "https://explorer.aptoslabs.com/txn/{}?network=testnet".to_string(),
+                address_url_template: "https://explorer.aptoslabs.com/account/{}?network=testnet".to_string(),
+            }),
+            Chain::Solana => Some(Self {
+                base_url: "https://explorer.solana.com".to_string(),
+                tx_url_template: "https://explorer.solana.com/tx/{}?cluster=devnet".to_string(),
+                address_url_template: "https://explorer.solana.com/address/{}?cluster=devnet".to_string(),
+            }),
+            _ => None,
+        }
+    }
+
+    /// Get transaction URL for a given tx_hash.
+    pub fn tx_url(&self, tx_hash: &str) -> String {
+        self.tx_url_template.replace("{}", tx_hash)
+    }
+
+    /// Get address URL for a given address.
+    pub fn address_url(&self, address: &str) -> String {
+        self.address_url_template.replace("{}", address)
+    }
 }
 
 impl Default for ExplorerConfig {
     fn default() -> Self {
         Self {
             base_url: "http://localhost:8181".to_string(),
+            tx_url_template: "http://localhost:8181/tx/{}".to_string(),
+            address_url_template: "http://localhost:8181/address/{}".to_string(),
         }
     }
 }

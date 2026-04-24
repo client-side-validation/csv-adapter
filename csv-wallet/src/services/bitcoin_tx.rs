@@ -3,7 +3,7 @@
 //! Builds real Bitcoin transactions for cross-chain locking.
 //! Uses mempool.space API for UTXO fetching and transaction broadcast.
 
-use crate::services::blockchain_service::BlockchainError;
+use crate::services::blockchain::BlockchainError;
 use csv_adapter_core::Chain;
 
 /// UTXO from blockchain
@@ -70,7 +70,7 @@ pub async fn build_anchor_transaction(
     tx.extend_from_slice(&0xffffffffu32.to_le_bytes());
     
     // Output count (varint)
-    tx.push(2); // OP_RETURN + change
+    tx.push(1); // Only OP_RETURN output - remaining value goes to miner fee
     
     // Output 1: OP_RETURN with lock data
     // Value: 0 satoshis
@@ -83,19 +83,9 @@ pub async fn build_anchor_transaction(
         tx.extend_from_slice(lock_data);
     }
     
-    // Output 2: Change back to sender (simplified - no fee calculation)
-    let change_value = utxo.value; // Should subtract fee
-    tx.extend_from_slice(&change_value.to_le_bytes());
-    // P2PKH script: OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG
-    // (simplified - would need proper address to script conversion)
-    tx.push(0x19); // 25 bytes script
-    tx.push(0x76); // OP_DUP
-    tx.push(0xa9); // OP_HASH160
-    tx.push(0x14); // Push 20 bytes
-    // Would add 20 bytes of hash160 of public key here
-    tx.extend_from_slice(&[0u8; 20]); // Placeholder
-    tx.push(0x88); // OP_EQUALVERIFY
-    tx.push(0xac); // OP_CHECKSIG
+    // Note: No change output - the entire UTXO value minus 0 goes to miner fee
+    // This is acceptable for testnet where UTXO values are small
+    web_sys::console::log_1(&format!("Building tx: consuming {} satoshi, all to miner fee", utxo.value).into());
     
     // Locktime (4 bytes)
     tx.extend_from_slice(&0u32.to_le_bytes());
@@ -182,22 +172,78 @@ fn encode_varint(buf: &mut Vec<u8>, value: u64) {
     }
 }
 
-/// Sign a Bitcoin transaction with ECDSA
+/// Derive scriptPubKey from a Bitcoin address
+/// This is needed because mempool.space /utxo endpoint doesn't return scriptPubKey
+fn derive_script_pubkey_from_address(address: &str) -> Result<Vec<u8>, BlockchainError> {
+    use bitcoin::{Address, Network, ScriptBuf};
+    use std::str::FromStr;
+    
+    // Parse the address
+    let addr = Address::from_str(address)
+        .map_err(|e| BlockchainError {
+            message: format!("Invalid address: {}", e),
+            chain: Some(Chain::Bitcoin),
+            code: None,
+        })?;
+    
+    // Assume testnet for tb1... addresses
+    let script_pubkey: ScriptBuf = if address.starts_with("tb1") || address.starts_with("m") || address.starts_with("n") || address.starts_with("2") {
+        addr.require_network(Network::Testnet)
+            .map_err(|e| BlockchainError {
+                message: format!("Wrong network: {}", e),
+                chain: Some(Chain::Bitcoin),
+                code: None,
+            })?
+            .script_pubkey()
+    } else {
+        // Mainnet addresses
+        addr.assume_checked().script_pubkey()
+    };
+    
+    Ok(script_pubkey.to_bytes())
+}
+
+/// Sign a Bitcoin transaction using the bitcoin crate for proper format support
+/// 
+/// This uses the `bitcoin` crate which has full support for:
+/// - Legacy P2PKH (1... addresses)
+/// - SegWit v0 P2WPKH (tb1q... addresses)  
+/// - Taproot P2TR (tb1p... addresses) with BIP340 Schnorr signatures
 pub fn sign_bitcoin_transaction(
     unsigned_tx: &[u8],
     private_key_hex: &str,
-    _utxo: &Utxo,
+    utxo: &Utxo,
+    sender_address: &str,
 ) -> Result<Vec<u8>, BlockchainError> {
-    use secp256k1::{Message, Secp256k1, SecretKey};
-    use sha2::{Digest, Sha256};
+    use bitcoin::{
+        secp256k1::{Secp256k1, SecretKey, Keypair, Message, XOnlyPublicKey, PublicKey, Scalar},
+        sighash::{SighashCache, EcdsaSighashType, TapSighashType},
+        consensus::serialize,
+        key::TapTweak,
+        hashes::Hash,
+        taproot::TapTweakHash,
+        Transaction, TxOut, ScriptBuf, Witness,
+    };
     
-    web_sys::console::log_1(&format!("Signing with key (first 10 chars): {}", &private_key_hex[..private_key_hex.len().min(10)]).into());
-    web_sys::console::log_1(&format!("Key length: {} chars", private_key_hex.len()).into());
+    // Detect address type from scriptPubKey
+    let is_taproot = if let Ok(script) = hex::decode(&utxo.script_pubkey) {
+        // Taproot: 0x51 0x20 <32_bytes> (34 bytes total)
+        script.len() == 34 && script[0] == 0x51 && script[1] == 0x20
+    } else {
+        false
+    };
     
-    // Clean the key - remove 0x prefix and whitespace
+    let is_segwit_v0 = if let Ok(script) = hex::decode(&utxo.script_pubkey) {
+        // P2WPKH: 0x00 0x14 <20_bytes> (22 bytes total)
+        script.len() == 22 && script[0] == 0x00 && script[1] == 0x14
+    } else {
+        false
+    };
+    
+    web_sys::console::log_1(&format!("Address type - Taproot: {}, SegWit v0: {}", is_taproot, is_segwit_v0).into());
+    
+    // Parse the private key (take first 32 bytes for 64-byte seeds)
     let cleaned = private_key_hex.trim().trim_start_matches("0x").trim();
-    
-    // Try to decode as hex
     let key_bytes = hex::decode(cleaned)
         .map_err(|e| BlockchainError {
             message: format!("Invalid private key hex: {}", e),
@@ -205,81 +251,262 @@ pub fn sign_bitcoin_transaction(
             code: None,
         })?;
     
-    web_sys::console::log_1(&format!("Key bytes length: {}", key_bytes.len()).into());
-    
-    // Handle different key formats
-    let secret_key = match key_bytes.len() {
-        32 => {
-            // Standard raw private key
-            SecretKey::from_slice(&key_bytes[..])
-                .map_err(|e| BlockchainError {
-                    message: format!("Invalid 32-byte secret key: {}", e),
-                    chain: Some(Chain::Bitcoin),
-                    code: None,
-                })?
-        }
-        33 if key_bytes[32] == 0x01 => {
-            // Compressed format - drop the 01 suffix
-            SecretKey::from_slice(&key_bytes[..32])
-                .map_err(|e| BlockchainError {
-                    message: format!("Invalid 33-byte secret key: {}", e),
-                    chain: Some(Chain::Bitcoin),
-                    code: None,
-                })?
-        }
-        64 => {
-            // 64-byte seed format - use first 32 bytes as private key
-            // (This is common in Bitcoin seed formats)
-            SecretKey::from_slice(&key_bytes[..32])
-                .map_err(|e| BlockchainError {
-                    message: format!("Invalid 64-byte seed: {}", e),
-                    chain: Some(Chain::Bitcoin),
-                    code: None,
-                })?
-        }
-        _ => {
-            return Err(BlockchainError {
-                message: format!("Unsupported key length: {} bytes. Expected 32, 33, or 64", key_bytes.len()),
-                chain: Some(Chain::Bitcoin),
-                code: None,
-            });
-        }
-    };
-    
-    // Double SHA256 hash for Bitcoin
-    let hash1 = Sha256::digest(unsigned_tx);
-    let hash2 = Sha256::digest(&hash1);
-    
-    let message = Message::from_digest_slice(&hash2)
-        .map_err(|e| BlockchainError {
-            message: format!("Invalid message: {}", e),
+    // Use first 32 bytes (handles both 32-byte and 64-byte formats)
+    let key_32: [u8; 32] = key_bytes[..32.min(key_bytes.len())]
+        .try_into()
+        .map_err(|_| BlockchainError {
+            message: "Key too short".to_string(),
             chain: Some(Chain::Bitcoin),
             code: None,
         })?;
     
     let secp = Secp256k1::new();
-    let signature = secp.sign_ecdsa(&message, &secret_key);
+    let secret_key = SecretKey::from_slice(&key_32)
+        .map_err(|e| BlockchainError {
+            message: format!("Invalid secret key: {}", e),
+            chain: Some(Chain::Bitcoin),
+            code: None,
+        })?;
     
-    // Build signed transaction with scriptSig
-    // For P2PKH: <sig len> <sig> <pubkey len> <pubkey>
-    let sig_der = signature.serialize_der().to_vec();
-    let sig_with_hashtype = [&sig_der[..], &[0x01]].concat(); // SIGHASH_ALL
+    // Parse the unsigned transaction
+    let mut tx: Transaction = bitcoin::consensus::deserialize(unsigned_tx)
+        .map_err(|e| BlockchainError {
+            message: format!("Failed to parse unsigned tx: {}", e),
+            chain: Some(Chain::Bitcoin),
+            code: None,
+        })?;
     
-    let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
-    let pubkey_bytes = public_key.serialize();
+    // Build the UTXO output script from scriptPubKey hex, or derive from address if empty
+    let script_pubkey_bytes = if utxo.script_pubkey.is_empty() {
+        web_sys::console::log_1(&"UTXO scriptPubKey empty, deriving from sender address".into());
+        derive_script_pubkey_from_address(sender_address)?
+    } else {
+        hex::decode(&utxo.script_pubkey)
+            .map_err(|e| BlockchainError {
+                message: format!("Invalid scriptPubKey hex: {}", e),
+                chain: Some(Chain::Bitcoin),
+                code: None,
+            })?
+    };
     
-    // Build scriptSig
-    let mut script_sig = Vec::new();
-    script_sig.push(sig_with_hashtype.len() as u8);
-    script_sig.extend_from_slice(&sig_with_hashtype);
-    script_sig.push(pubkey_bytes.len() as u8);
-    script_sig.extend_from_slice(&pubkey_bytes);
+    let prev_output = TxOut {
+        value: bitcoin::Amount::from_sat(utxo.value),
+        script_pubkey: ScriptBuf::from_bytes(script_pubkey_bytes),
+    };
     
-    // Insert scriptSig into transaction
-    // (This is simplified - real implementation would reconstruct the tx)
-    let signed_tx = unsigned_tx.to_vec();
+    // Re-detect address type from actual script
+    let is_taproot = prev_output.script_pubkey.len() == 34 && 
+                     prev_output.script_pubkey.as_bytes()[0] == 0x51 &&
+                     prev_output.script_pubkey.as_bytes()[1] == 0x20;
+    let is_segwit_v0 = prev_output.script_pubkey.len() == 22 && 
+                       prev_output.script_pubkey.as_bytes()[0] == 0x00 &&
+                       prev_output.script_pubkey.as_bytes()[1] == 0x14;
     
-    Ok(signed_tx)
+    web_sys::console::log_1(&format!("Actual address type - Taproot: {}, SegWit v0: {}, script len: {}", 
+        is_taproot, is_segwit_v0, prev_output.script_pubkey.len()).into());
+    
+    if is_taproot {
+        // Taproot signing (BIP340 Schnorr)
+        // Get the internal keypair and x-only pubkey
+        let keypair = Keypair::from_secret_key(&secp, &secret_key);
+        let (xonly_pubkey, _parity) = XOnlyPublicKey::from_keypair(&keypair);
+        
+        // Compute the tweaked pubkey for key-path spending (no script tree = None)
+        let (_tweaked_pubkey, _parity) = xonly_pubkey.tap_tweak(&secp, None);
+        
+        // For key-path signing, we need the tweaked secret key
+        // The tweak is computed as: hash_tap_tweak(xonly_pubkey || merkle_root)
+        // For key-path only: merkle_root is None (empty hash)
+        // TapTweakHash::hash() computes the tagged hash
+        let tweak_hash = TapTweakHash::from_key_and_tweak(xonly_pubkey, None);
+        let tweak_scalar = Scalar::from_be_bytes(tweak_hash.to_byte_array())
+            .map_err(|e| BlockchainError {
+                message: format!("Invalid tweak scalar: {:?}", e),
+                chain: Some(Chain::Bitcoin),
+                code: None,
+            })?;
+        
+        // Add tweak to secret key: tweaked_key = key + tweak (mod n)
+        let tweaked_secret_key = secret_key.add_tweak(&tweak_scalar)
+            .map_err(|e| BlockchainError {
+                message: format!("Failed to tweak secret key: {:?}", e),
+                chain: Some(Chain::Bitcoin),
+                code: None,
+            })?;
+        let tweaked_keypair = Keypair::from_secret_key(&secp, &tweaked_secret_key);
+        
+        // For P2TR key path spending, we sign with Schnorr using the tweaked key
+        // Build the sighash for Taproot
+        let mut sighash_cache = SighashCache::new(&mut tx);
+        let sighash = sighash_cache
+            .taproot_key_spend_signature_hash(
+                0, // input index
+                &bitcoin::sighash::Prevouts::All(&[prev_output]),
+                TapSighashType::Default,
+            )
+            .map_err(|e| BlockchainError {
+                message: format!("Sighash failed: {}", e),
+                chain: Some(Chain::Bitcoin),
+                code: None,
+            })?;
+        
+        let msg = Message::from_digest_slice(sighash.as_ref())
+            .map_err(|e| BlockchainError {
+                message: format!("Message error: {}", e),
+                chain: Some(Chain::Bitcoin),
+                code: None,
+            })?;
+        
+        // Sign with Schnorr (BIP340) using the tweaked keypair
+        let signature = secp.sign_schnorr(&msg, &tweaked_keypair);
+        
+        // The signature is 64 bytes for Schnorr (no sighash byte needed)
+        let sig_bytes = signature.as_ref();
+        
+        // Build witness: just the signature (key path spend)
+        let sig_vec = sig_bytes.to_vec();
+        let witness = Witness::from_slice(&[sig_vec.as_slice()]);
+        tx.input[0].witness = witness;
+        
+        web_sys::console::log_1(&"Signed with Taproot BIP340 Schnorr".into());
+        
+    } else if is_segwit_v0 {
+        // SegWit v0 (P2WPKH) signing - ECDSA with witness
+        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+        
+        let mut sighash_cache = SighashCache::new(&mut tx);
+        let sighash = sighash_cache
+            .p2wpkh_signature_hash(
+                0, // input index
+                &prev_output.script_pubkey,
+                prev_output.value,
+                EcdsaSighashType::All,
+            )
+            .map_err(|e| BlockchainError {
+                message: format!("Sighash failed: {}", e),
+                chain: Some(Chain::Bitcoin),
+                code: None,
+            })?;
+        
+        let msg = Message::from_digest_slice(sighash.as_ref())
+            .map_err(|e| BlockchainError {
+                message: format!("Message error: {}", e),
+                chain: Some(Chain::Bitcoin),
+                code: None,
+            })?;
+        
+        // Sign with ECDSA
+        let signature = secp.sign_ecdsa(&msg, &secret_key);
+        let sig_der = signature.serialize_der();
+        let mut sig_with_hashtype = sig_der.to_vec();
+        sig_with_hashtype.push(EcdsaSighashType::All as u8); // SIGHASH_ALL
+        
+        let pubkey_bytes = public_key.serialize();
+        
+        // Build witness: [signature, pubkey]
+        let witness = Witness::from_slice(&[sig_with_hashtype.as_slice(), pubkey_bytes.as_slice()]);
+        tx.input[0].witness = witness;
+        
+        web_sys::console::log_1(&"Signed with SegWit v0 ECDSA".into());
+        
+    } else {
+        // Legacy P2PKH signing - ECDSA with scriptSig
+        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+        
+        let sighash_cache = SighashCache::new(&tx);
+        let sighash = sighash_cache
+            .legacy_signature_hash(
+                0, // input index
+                &prev_output.script_pubkey,
+                EcdsaSighashType::All as u32,
+            )
+            .map_err(|e| BlockchainError {
+                message: format!("Sighash failed: {}", e),
+                chain: Some(Chain::Bitcoin),
+                code: None,
+            })?;
+        
+        let msg = Message::from_digest_slice(sighash.as_ref())
+            .map_err(|e| BlockchainError {
+                message: format!("Message error: {}", e),
+                chain: Some(Chain::Bitcoin),
+                code: None,
+            })?;
+        
+        // Sign with ECDSA
+        let signature = secp.sign_ecdsa(&msg, &secret_key);
+        let sig_der = signature.serialize_der();
+        let mut sig_with_hashtype = sig_der.to_vec();
+        sig_with_hashtype.push(EcdsaSighashType::All as u8); // SIGHASH_ALL
+        
+        let pubkey_bytes = public_key.serialize();
+        
+        // Build scriptSig: <sig> <pubkey>
+        let script_sig = ScriptBuf::builder()
+            .push_slice(<&bitcoin::script::PushBytes>::try_from(sig_with_hashtype.as_slice()).unwrap())
+            .push_slice(<&bitcoin::script::PushBytes>::try_from(pubkey_bytes.as_slice()).unwrap())
+            .into_script();
+        
+        tx.input[0].script_sig = script_sig;
+        
+        web_sys::console::log_1(&"Signed with Legacy P2PKH ECDSA".into());
+    }
+    
+    // Serialize the signed transaction
+    let signed_bytes = serialize(&tx);
+    
+    web_sys::console::log_1(&format!("Signed tx hex (first 120 chars): {}", 
+        &hex::encode(&signed_bytes)[..120.min(hex::encode(&signed_bytes).len())]).into());
+    
+    Ok(signed_bytes)
+}
+
+/// Extract hash160 (20 bytes) from a Bitcoin address
+/// Supports P2PKH (1...) and P2SH (3...) addresses
+fn extract_hash160_from_address(address: &str) -> Option<[u8; 20]> {
+    // Try to decode as base58 (P2PKH or P2SH)
+    if let Ok(decoded) = bs58::decode(address).into_vec() {
+        if decoded.len() == 25 {
+            // P2PKH: 1 byte version + 20 bytes hash160 + 4 bytes checksum
+            // P2SH: same structure
+            let mut hash = [0u8; 20];
+            hash.copy_from_slice(&decoded[1..21]);
+            return Some(hash);
+        }
+    }
+    
+    // Bech32 addresses (bc1...) - Taproot/SegWit v1
+    // For now, return None and we'll use UTXO script hash instead
+    None
+}
+
+/// Extract hash160 from a scriptPubKey
+fn extract_hash160_from_script(script: &str) -> Option<[u8; 20]> {
+    if script.len() >= 40 {
+        // Try to extract last 20 bytes (40 hex chars) from common script patterns
+        // P2PKH: 76a914{20bytes}88ac
+        // P2SH: a914{20bytes}87
+        // P2WPKH: 0014{20bytes}
+        if let Ok(bytes) = hex::decode(script) {
+            if bytes.len() >= 22 {
+                // Check for P2WPKH pattern (0x00, 0x14, ...)
+                if bytes[0] == 0x00 && bytes[1] == 0x14 {
+                    let mut hash = [0u8; 20];
+                    hash.copy_from_slice(&bytes[2..22]);
+                    return Some(hash);
+                }
+            }
+            if bytes.len() >= 23 {
+                // Check for P2PKH pattern (0x76, 0xa9, 0x14, ...)
+                if bytes[0] == 0x76 && bytes[1] == 0xa9 && bytes[2] == 0x14 {
+                    let mut hash = [0u8; 20];
+                    hash.copy_from_slice(&bytes[3..23]);
+                    return Some(hash);
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Broadcast a Bitcoin transaction
@@ -302,11 +529,22 @@ pub async fn broadcast_transaction(
             code: None,
         })?;
     
-    let txid = response.text().await.map_err(|e| BlockchainError {
+    // Check for HTTP error status
+    let status = response.status();
+    let body = response.text().await.map_err(|e| BlockchainError {
         message: format!("Failed to read response: {}", e),
         chain: Some(Chain::Bitcoin),
         code: None,
     })?;
     
-    Ok(txid)
+    if !status.is_success() {
+        return Err(BlockchainError {
+            message: format!("Broadcast failed (HTTP {}): {}", status, body),
+            chain: Some(Chain::Bitcoin),
+            code: Some(status.as_u16() as u32),
+        });
+    }
+    
+    // Body should be the txid on success
+    Ok(body)
 }

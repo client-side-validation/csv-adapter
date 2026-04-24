@@ -96,6 +96,10 @@ pub enum Route {
     #[route("/wallet")]
     WalletPage {},
 
+    // Account-specific views
+    #[route("/account/:id/transactions")]
+    AccountTransactions { id: String },
+
     // Transactions
     #[route("/transactions")]
     Transactions {},

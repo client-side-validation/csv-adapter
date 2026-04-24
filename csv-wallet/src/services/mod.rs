@@ -2,7 +2,7 @@
 
 pub mod asset_service;
 pub mod bitcoin_tx;
-pub mod blockchain_service;
+pub mod blockchain;
 pub mod chain_api;
 pub mod explorer;
 pub mod native_signer;
