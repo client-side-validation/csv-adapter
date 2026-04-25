@@ -73,12 +73,12 @@ impl WalletContext {
 
         // Load app state (rights, seals, etc.)
         if let Some(persisted) = store.try_load::<csv_adapter_store::unified::UnifiedStorage>(UNIFIED_STORAGE_KEY) {
-            if let Ok(c) = persisted.selected_chain.parse::<Chain>() {
-                s.selected_chain = c;
+            if let Some(c) = persisted.selected_chain {
+                s.selected_chain = convert_chain_from_store(c);
             }
-            s.selected_network = match persisted.selected_network.as_str() {
-                "dev" => Network::Dev,
-                "main" => Network::Main,
+            s.selected_network = match persisted.selected_network {
+                Some(csv_adapter_store::unified::Network::Dev) => Network::Dev,
+                Some(csv_adapter_store::unified::Network::Main) => Network::Main,
                 _ => Network::Test,
             };
             s.rights = persisted
@@ -87,13 +87,12 @@ impl WalletContext {
                 .filter_map(|r| {
                     Some(TrackedRight {
                         id: r.id,
-                        chain: r.chain.parse().ok()?,
+                        chain: convert_chain_from_store(r.chain),
                         value: r.value,
-                        status: match r.status.as_str() {
-                            "Active" => RightStatus::Active,
-                            "Transferred" => RightStatus::Transferred,
-                            "Consumed" => RightStatus::Consumed,
-                            _ => RightStatus::Active,
+                        status: match r.status {
+                            csv_adapter_store::unified::RightStatus::Active => RightStatus::Active,
+                            csv_adapter_store::unified::RightStatus::Transferred => RightStatus::Transferred,
+                            csv_adapter_store::unified::RightStatus::Consumed => RightStatus::Consumed,
                         },
                         owner: r.owner,
                     })
@@ -105,24 +104,23 @@ impl WalletContext {
                 .filter_map(|t| {
                     Some(TrackedTransfer {
                         id: t.id,
-                        from_chain: t.from_chain.parse().ok()?,
-                        to_chain: t.to_chain.parse().ok()?,
+                        from_chain: convert_chain_from_store(t.source_chain),
+                        to_chain: convert_chain_from_store(t.dest_chain),
                         right_id: t.right_id,
-                        dest_owner: t.dest_owner,
-                        status: match t.status.as_str() {
-                            "Initiated" => TransferStatus::Initiated,
-                            "Locked" => TransferStatus::Locked,
-                            "Verifying" => TransferStatus::Verifying,
-                            "Minting" => TransferStatus::Minting,
-                            "Completed" => TransferStatus::Completed,
-                            "Failed" => TransferStatus::Failed,
-                            _ => TransferStatus::Initiated,
+                        dest_owner: t.destination_address.unwrap_or_default(),
+                        status: match t.status {
+                            csv_adapter_store::unified::TransferStatus::Initiated => TransferStatus::Initiated,
+                            csv_adapter_store::unified::TransferStatus::Locked => TransferStatus::Locked,
+                            csv_adapter_store::unified::TransferStatus::Verifying => TransferStatus::Verifying,
+                            csv_adapter_store::unified::TransferStatus::Minting => TransferStatus::Minting,
+                            csv_adapter_store::unified::TransferStatus::Completed => TransferStatus::Completed,
+                            csv_adapter_store::unified::TransferStatus::Failed => TransferStatus::Failed,
                         },
                         created_at: t.created_at,
-                        source_tx_hash: None,
-                        dest_tx_hash: None,
+                        source_tx_hash: t.source_tx_hash,
+                        dest_tx_hash: t.dest_tx_hash,
                         source_contract: None,
-                        dest_contract: None,
+                        dest_contract: t.destination_contract,
                         source_fee: None,
                         dest_fee: None,
                     })
@@ -134,7 +132,7 @@ impl WalletContext {
                 .filter_map(|s_rec| {
                     Some(SealRecord {
                         seal_ref: s_rec.seal_ref,
-                        chain: s_rec.chain.parse().ok()?,
+                        chain: convert_chain_from_store(s_rec.chain),
                         value: s_rec.value,
                         consumed: s_rec.consumed,
                         created_at: s_rec.created_at,
@@ -146,7 +144,7 @@ impl WalletContext {
                 .into_iter()
                 .filter_map(|p| {
                     Some(ProofRecord {
-                        chain: p.chain.parse().ok()?,
+                        chain: convert_chain_from_store(p.chain),
                         right_id: p.right_id,
                         proof_type: p.proof_type,
                         verified: p.verified,
@@ -158,7 +156,7 @@ impl WalletContext {
                 .into_iter()
                 .filter_map(|c| {
                     Some(DeployedContract {
-                        chain: c.chain.parse().ok()?,
+                        chain: convert_chain_from_store(c.chain),
                         address: c.address,
                         tx_hash: c.tx_hash,
                         deployed_at: c.deployed_at,
@@ -192,40 +190,72 @@ impl WalletContext {
         let Some(store) = &self.store else { return };
         let s = self.state.read();
 
+        // Convert local types to unified storage types
+        use csv_adapter_store::unified::{RightRecord, TransferRecord, 
+            SealRecord, ProofRecord, ContractRecord, ChainConfig, FaucetConfig, WalletConfig};
+
         let persisted = csv_adapter_store::unified::UnifiedStorage {
+            version: 1,
             initialized: !s.wallet.is_empty(),
-            selected_chain: s.selected_chain.to_string(),
-            selected_network: s.selected_network.to_string(),
+            selected_chain: Some(convert_chain_to_store(s.selected_chain.clone())),
+            selected_network: Some(match s.selected_network {
+                Network::Dev => csv_adapter_store::unified::Network::Dev,
+                Network::Test => csv_adapter_store::unified::Network::Test,
+                Network::Main => csv_adapter_store::unified::Network::Main,
+            }),
             rights: s
                 .rights
                 .iter()
-                .map(|r| storage::PersistedRight {
+                .map(|r| RightRecord {
                     id: r.id.clone(),
-                    chain: r.chain.to_string(),
-                    value: r.value,
-                    status: r.status.to_string(),
+                    chain: convert_chain_to_store(r.chain.clone()),
+                    seal_ref: String::new(), // TODO: populate from context
                     owner: r.owner.clone(),
+                    value: r.value,
+                    commitment: r.id.clone(), // TODO: use actual commitment
+                    nullifier: None,
+                    status: match r.status {
+                        RightStatus::Active => csv_adapter_store::unified::RightStatus::Active,
+                        RightStatus::Transferred => csv_adapter_store::unified::RightStatus::Transferred,
+                        RightStatus::Consumed => csv_adapter_store::unified::RightStatus::Consumed,
+                    },
+                    created_at: 0, // TODO: track creation time
                 })
                 .collect(),
             transfers: s
                 .transfers
                 .iter()
-                .map(|t| storage::PersistedTransfer {
+                .map(|t| TransferRecord {
                     id: t.id.clone(),
-                    from_chain: t.from_chain.to_string(),
-                    to_chain: t.to_chain.to_string(),
+                    source_chain: convert_chain_to_store(t.from_chain.clone()),
+                    dest_chain: convert_chain_to_store(t.to_chain.clone()),
                     right_id: t.right_id.clone(),
-                    dest_owner: t.dest_owner.clone(),
-                    status: t.status.to_string(),
+                    sender_address: None, // TODO: populate
+                    destination_address: Some(t.dest_owner.clone()),
+                    source_tx_hash: t.source_tx_hash.clone(),
+                    source_fee: None,
+                    dest_tx_hash: t.dest_tx_hash.clone(),
+                    dest_fee: None,
+                    destination_contract: t.dest_contract.clone(),
+                    proof: None,
+                    status: match t.status {
+                        TransferStatus::Initiated => csv_adapter_store::unified::TransferStatus::Initiated,
+                        TransferStatus::Locked => csv_adapter_store::unified::TransferStatus::Locked,
+                        TransferStatus::Verifying => csv_adapter_store::unified::TransferStatus::Verifying,
+                        TransferStatus::Minting => csv_adapter_store::unified::TransferStatus::Minting,
+                        TransferStatus::Completed => csv_adapter_store::unified::TransferStatus::Completed,
+                        TransferStatus::Failed => csv_adapter_store::unified::TransferStatus::Failed,
+                    },
                     created_at: t.created_at,
+                    completed_at: None, // TODO: track completion
                 })
                 .collect(),
             seals: s
                 .seals
                 .iter()
-                .map(|s_rec| storage::PersistedSeal {
+                .map(|s_rec| SealRecord {
                     seal_ref: s_rec.seal_ref.clone(),
-                    chain: s_rec.chain.to_string(),
+                    chain: convert_chain_to_store(s_rec.chain.clone()),
                     value: s_rec.value,
                     consumed: s_rec.consumed,
                     created_at: s_rec.created_at,
@@ -234,23 +264,31 @@ impl WalletContext {
             proofs: s
                 .proofs
                 .iter()
-                .map(|p| storage::PersistedProof {
-                    chain: p.chain.to_string(),
+                .map(|p| ProofRecord {
+                    chain: convert_chain_to_store(p.chain.clone()),
                     right_id: p.right_id.clone(),
                     proof_type: p.proof_type.clone(),
                     verified: p.verified,
+                    proof_data: None,
                 })
                 .collect(),
             contracts: s
                 .contracts
                 .iter()
-                .map(|c| storage::PersistedContract {
-                    chain: c.chain.to_string(),
+                .map(|c| ContractRecord {
+                    chain: convert_chain_to_store(c.chain.clone()),
                     address: c.address.clone(),
                     tx_hash: c.tx_hash.clone(),
                     deployed_at: c.deployed_at,
                 })
                 .collect(),
+            // Default/empty fields
+            chains: std::collections::HashMap::new(),
+            wallet: WalletConfig::default(),
+            faucets: std::collections::HashMap::new(),
+            transactions: Vec::new(),
+            gas_accounts: Vec::new(),
+            data_dir: "~/.csv/data".to_string(),
         };
 
         if let Err(e) = store.save(UNIFIED_STORAGE_KEY, &persisted) {
@@ -569,6 +607,29 @@ pub fn WalletProvider(children: Element) -> Element {
 
     rsx! {
         {children}
+    }
+}
+
+/// Convert csv_adapter_core::Chain to csv_adapter_store::Chain
+fn convert_chain_to_store(chain: csv_adapter_core::Chain) -> csv_adapter_store::unified::Chain {
+    match chain {
+        csv_adapter_core::Chain::Bitcoin => csv_adapter_store::unified::Chain::Bitcoin,
+        csv_adapter_core::Chain::Ethereum => csv_adapter_store::unified::Chain::Ethereum,
+        csv_adapter_core::Chain::Sui => csv_adapter_store::unified::Chain::Sui,
+        csv_adapter_core::Chain::Aptos => csv_adapter_store::unified::Chain::Aptos,
+        csv_adapter_core::Chain::Solana => csv_adapter_store::unified::Chain::Solana,
+        _ => csv_adapter_store::unified::Chain::Bitcoin, // fallback for any future chains
+    }
+}
+
+/// Convert csv_adapter_store::Chain to csv_adapter_core::Chain
+fn convert_chain_from_store(chain: csv_adapter_store::unified::Chain) -> csv_adapter_core::Chain {
+    match chain {
+        csv_adapter_store::unified::Chain::Bitcoin => csv_adapter_core::Chain::Bitcoin,
+        csv_adapter_store::unified::Chain::Ethereum => csv_adapter_core::Chain::Ethereum,
+        csv_adapter_store::unified::Chain::Sui => csv_adapter_core::Chain::Sui,
+        csv_adapter_store::unified::Chain::Aptos => csv_adapter_core::Chain::Aptos,
+        csv_adapter_store::unified::Chain::Solana => csv_adapter_core::Chain::Solana,
     }
 }
 

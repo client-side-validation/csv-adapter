@@ -5,7 +5,7 @@ use clap::Subcommand;
 
 use crate::config::{Chain, Config};
 use crate::output;
-use crate::state::UnifiedStateManager;
+use crate::state::{UnifiedStateManager, SealRecord};
 
 #[derive(Subcommand)]
 pub enum SealAction {
@@ -77,7 +77,7 @@ fn cmd_create(chain: Chain, value: Option<u64>, _config: &Config, state: &mut Un
         }
     };
 
-    state.record_seal_consumption(seal_bytes.clone());
+    state.record_seal_consumption(hex::encode(&seal_bytes));
 
     output::kv("Chain", &chain.to_string());
     output::kv_hash("Seal", &seal_bytes);
@@ -98,12 +98,12 @@ fn cmd_consume(chain: Chain, seal_ref: String, _config: &Config, state: &mut Uni
     let seal_bytes = hex::decode(seal_ref.trim_start_matches("0x"))
         .map_err(|e| anyhow::anyhow!("Invalid seal reference: {}", e))?;
 
-    if state.is_seal_consumed(&seal_bytes) {
+    if state.is_seal_consumed(&hex::encode(&seal_bytes)) {
         output::error("Seal already consumed");
         return Err(anyhow::anyhow!("Seal replay detected"));
     }
 
-    state.record_seal_consumption(seal_bytes.clone());
+    state.record_seal_consumption(hex::encode(&seal_bytes));
 
     output::kv("Chain", &chain.to_string());
     output::kv_hash("Seal", &seal_bytes);
@@ -118,7 +118,7 @@ fn cmd_verify(chain: Chain, seal_ref: String, _config: &Config, state: &UnifiedS
     let seal_bytes = hex::decode(seal_ref.trim_start_matches("0x"))
         .map_err(|e| anyhow::anyhow!("Invalid seal reference: {}", e))?;
 
-    let consumed = state.is_seal_consumed(&seal_bytes);
+    let consumed = state.is_seal_consumed(&hex::encode(&seal_bytes));
 
     output::kv("Chain", &chain.to_string());
     output::kv_hash("Seal", &seal_bytes);
@@ -134,43 +134,26 @@ fn cmd_verify(chain: Chain, seal_ref: String, _config: &Config, state: &UnifiedS
 fn cmd_list(chain: Option<Chain>, state: &UnifiedStateManager) -> Result<()> {
     output::header("Consumed Seals");
 
-    if state.consumed_seals.is_empty() {
+    let consumed_seals: Vec<&SealRecord> = state.storage.seals.iter().filter(|s| s.consumed).collect();
+
+    if consumed_seals.is_empty() {
         output::info("No seals consumed");
     } else {
         let headers = vec!["#", "Seal (hex)", "Chain", "Consumed"];
         let mut rows = Vec::new();
 
-        for (i, seal) in state.consumed_seals.iter().enumerate() {
-            // Determine chain from seal prefix
-            let chain_str = if seal.first() == Some(&0x01) {
-                "Bitcoin"
-            } else if seal.first() == Some(&0x02) {
-                "Ethereum"
-            } else if seal.first() == Some(&0x03) {
-                "Sui"
-            } else if seal.first() == Some(&0x04) {
-                "Aptos"
-            } else {
-                "Unknown"
-            };
-
+        for (i, seal) in consumed_seals.iter().enumerate() {
+            // Filter by chain if specified
             if let Some(ref filter_chain) = chain {
-                let filter_prefix = match filter_chain {
-                    Chain::Bitcoin => 0x01,
-                    Chain::Ethereum => 0x02,
-                    Chain::Sui => 0x03,
-                    Chain::Aptos => 0x04,
-                    Chain::Solana => 0x05,
-                };
-                if seal.first() != Some(&filter_prefix) {
+                if &seal.chain != filter_chain {
                     continue;
                 }
             }
 
             rows.push(vec![
                 (i + 1).to_string(),
-                hex::encode(seal)[..16].to_string(),
-                chain_str.to_string(),
+                seal.seal_ref[..16.min(seal.seal_ref.len())].to_string(),
+                seal.chain.to_string(),
                 "Yes".to_string(),
             ]);
         }

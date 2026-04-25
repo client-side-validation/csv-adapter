@@ -103,7 +103,7 @@ fn cmd_seal(seal_ref: String, _config: &Config, state: &UnifiedStateManager) -> 
     let seal_bytes = hex::decode(seal_ref.trim_start_matches("0x"))
         .map_err(|e| anyhow::anyhow!("Invalid seal reference: {}", e))?;
 
-    let consumed = state.is_seal_consumed(&seal_bytes);
+    let consumed = state.is_seal_consumed(&hex::encode(&seal_bytes));
 
     output::kv_hash("Seal", &seal_bytes);
     output::kv("Status", if consumed { "Consumed" } else { "Unconsumed" });

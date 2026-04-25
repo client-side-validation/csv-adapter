@@ -58,7 +58,7 @@ pub fn cmd_import_csv_wallet(path: Option<String>, config: &Config, state: &mut 
         };
         
         // Check existing address first, then update
-        let existing = state.get_address(&chain).cloned();
+        let existing = state.get_address(&chain).map(|s| s.to_string());
         let was_same = existing.as_ref() == Some(&account.address);
         
         // Update address in state
@@ -100,23 +100,21 @@ pub fn cmd_export_csv_wallet(output: Option<String>, config: &Config, state: &Un
     let mut accounts = Vec::new();
     
     for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana] {
-        if let Some(wallet) = config.wallet(&chain) {
-            if let Some(address) = state.get_address(&chain) {
-                if let Some(private_key) = &wallet.private_key {
-                    accounts.push(CsvWalletAccount {
-                        id: format!("{}-cli-{}", chain, &address[..8.min(address.len())]),
-                        chain: chain.to_string().to_lowercase(),
-                        name: format!("CSV CLI {} Account", chain),
-                        private_key: private_key.clone(),
-                        address: address.clone(),
-                    });
-                    output::success(&format!("Exported {} account", chain));
-                } else {
-                    output::warning(&format!("{}: no private key available", chain));
-                }
+        if let Some(account) = state.get_account(&chain) {
+            if let Some(private_key) = &account.private_key {
+                accounts.push(CsvWalletAccount {
+                    id: format!("{}-cli-{}", chain, &account.address[..8.min(account.address.len())]),
+                    chain: chain.to_string().to_lowercase(),
+                    name: format!("CSV CLI {} Account", chain),
+                    private_key: private_key.clone(),
+                    address: account.address.clone(),
+                });
+                output::success(&format!("Exported {} account", chain));
             } else {
-                output::warning(&format!("{}: no address configured", chain));
+                output::warning(&format!("{}: no private key available", chain));
             }
+        } else {
+            output::warning(&format!("{}: no account configured", chain));
         }
     }
     

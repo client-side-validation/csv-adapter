@@ -255,7 +255,7 @@ fn cmd_results(state: &UnifiedStateManager) -> Result<()> {
     let headers = vec!["Transfer", "From", "To", "Status"];
     let mut rows = Vec::new();
 
-    for transfer in &state.transfers {
+    for transfer in &state.storage.transfers {
         rows.push(vec![
             hex::encode(transfer.id.as_bytes())[..10].to_string(),
             transfer.source_chain.to_string(),

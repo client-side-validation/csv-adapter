@@ -169,7 +169,7 @@ impl UnifiedStateManager {
     pub fn store_address(&mut self, chain: Chain, address: String) {
         self.storage.set_account(WalletAccount {
             id: format!("{}-cli", chain),
-            chain,
+            chain: chain.clone(),
             name: format!("{} CLI Account", chain),
             address,
             private_key: None,

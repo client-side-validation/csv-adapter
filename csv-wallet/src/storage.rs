@@ -4,7 +4,6 @@
 //! seamless data sharing between csv-wallet (browser) and csv-cli (desktop).
 
 use csv_adapter_core::agent_types::{HasErrorSuggestion, FixAction, error_codes};
-use csv_adapter_store::unified::UnifiedStorage;
 use serde::{Deserialize, Serialize};
 use web_sys::{Storage, Window};
 
@@ -240,59 +239,6 @@ impl UnifiedStorageManager {
     }
 }
 
-// Helper traits for migration from legacy string-based storage
-impl TryFrom<String> for Chain {
-    type Error = ();
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        match s.to_lowercase().as_str() {
-            "bitcoin" => Ok(Chain::Bitcoin),
-            "ethereum" => Ok(Chain::Ethereum),
-            "sui" => Ok(Chain::Sui),
-            "aptos" => Ok(Chain::Aptos),
-            "solana" => Ok(Chain::Solana),
-            _ => Err(()),
-        }
-    }
-}
-
-impl TryFrom<String> for Network {
-    type Error = ();
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        match s.to_lowercase().as_str() {
-            "dev" => Ok(Network::Dev),
-            "test" => Ok(Network::Test),
-            "main" => Ok(Network::Main),
-            _ => Err(()),
-        }
-    }
-}
-
-impl TryFrom<String> for csv_adapter_store::unified::RightStatus {
-    type Error = ();
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        match s.to_lowercase().as_str() {
-            "active" => Ok(csv_adapter_store::unified::RightStatus::Active),
-            "transferred" => Ok(csv_adapter_store::unified::RightStatus::Transferred),
-            "consumed" => Ok(csv_adapter_store::unified::RightStatus::Consumed),
-            _ => Err(()),
-        }
-    }
-}
-
-impl TryFrom<String> for csv_adapter_store::unified::TransferStatus {
-    type Error = ();
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        match s.to_lowercase().as_str() {
-            "initiated" => Ok(csv_adapter_store::unified::TransferStatus::Initiated),
-            "locked" => Ok(csv_adapter_store::unified::TransferStatus::Locked),
-            "verifying" => Ok(csv_adapter_store::unified::TransferStatus::Verifying),
-            "minting" => Ok(csv_adapter_store::unified::TransferStatus::Minting),
-            "completed" => Ok(csv_adapter_store::unified::TransferStatus::Completed),
-            "failed" => Ok(csv_adapter_store::unified::TransferStatus::Failed),
-            _ => Err(()),
-        }
-    }
-}
 
 /// Legacy state format for migration purposes (deprecated)
 #[derive(Serialize, Deserialize, Default)]

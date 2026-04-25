@@ -4,7 +4,10 @@
 #![allow(dead_code)]
 
 use csv_adapter_core::{AnchorRecord, Hash, SealRecord, SealStore, StoreError};
+
+#[cfg(feature = "sqlite")]
 use rusqlite::{params, Connection};
+#[cfg(feature = "sqlite")]
 use std::sync::Mutex;
 
 pub mod unified;
@@ -17,10 +20,12 @@ pub use unified::{
 };
 
 /// SQLite-backed seal and anchor store
+#[cfg(feature = "sqlite")]
 pub struct SqliteSealStore {
     conn: Mutex<Connection>,
 }
 
+#[cfg(feature = "sqlite")]
 impl SqliteSealStore {
     /// Create or open a SQLite store at the given path
     pub fn open(path: &str) -> Result<Self, StoreError> {
@@ -75,6 +80,7 @@ impl SqliteSealStore {
     }
 }
 
+#[cfg(feature = "sqlite")]
 impl SealStore for SqliteSealStore {
     fn save_seal(&mut self, record: &SealRecord) -> Result<(), StoreError> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());

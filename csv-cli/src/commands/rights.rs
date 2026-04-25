@@ -8,7 +8,7 @@ use csv_adapter_core::hash::Hash;
 
 use crate::config::{Chain, Config};
 use crate::output;
-use crate::state::{UnifiedStateManager, RightRecord};
+use crate::state::{UnifiedStateManager, RightRecord, RightStatus};
 
 #[derive(Subcommand)]
 pub enum RightAction {
@@ -77,16 +77,21 @@ fn cmd_create(chain: Chain, value: Option<u64>, _config: &Config, state: &mut Un
     let right_id = Hash::new(right_id_bytes);
 
     let tracked = RightRecord {
-        id: right_id,
+        id: right_id.to_string(),
         chain: chain.clone(),
-        seal_ref: vec![], // Would come from adapter
-        owner: vec![],    // Would come from wallet
-        commitment: right_id,
+        seal_ref: String::new(), // Would come from adapter
+        owner: String::new(),    // Would come from wallet
+        value: value.unwrap_or(0),
+        commitment: right_id.to_string(),
         nullifier: None,
-        consumed: false,
+        status: RightStatus::Active,
+        created_at: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
     };
 
-    state.rights.push(tracked);
+    state.storage.rights.push(tracked);
 
     output::kv("Chain", &chain.to_string());
     output::kv_hash("Right ID", right_id_bytes.as_slice());
@@ -122,16 +127,16 @@ fn cmd_show(right_id: String, state: &UnifiedStateManager) -> Result<()> {
 
     output::header(&format!("Right: {}", hex::encode(right_id.as_bytes())));
 
-    if let Some(tracked) = state.get_right(&right_id) {
+    if let Some(tracked) = state.get_right(&right_id.to_string()) {
         output::kv("Chain", &tracked.chain.to_string());
         output::kv_hash("Commitment", tracked.commitment.as_bytes());
         output::kv(
             "Status",
-            if tracked.consumed {
-                "Consumed"
-            } else {
-                "Active"
-            },
+            match tracked.status {
+            RightStatus::Consumed => "Consumed",
+            RightStatus::Transferred => "Transferred",
+            RightStatus::Active => "Active",
+        },
         );
         if let Some(nullifier) = &tracked.nullifier {
             output::kv_hash("Nullifier", nullifier.as_bytes());
@@ -150,7 +155,7 @@ fn cmd_list(chain: Option<Chain>, state: &UnifiedStateManager) -> Result<()> {
     let headers = vec!["Right ID", "Chain", "Status", "Commitment"];
     let mut rows = Vec::new();
 
-    for right in &state.rights {
+    for right in &state.storage.rights {
         if let Some(ref filter_chain) = chain {
             if right.chain != *filter_chain {
                 continue;
@@ -158,8 +163,8 @@ fn cmd_list(chain: Option<Chain>, state: &UnifiedStateManager) -> Result<()> {
         }
 
         // Check if seal is consumed in registry even if flag not set
-        let seal_consumed = state.is_seal_consumed(right.id.as_bytes());
-        let status = if right.consumed || seal_consumed {
+        let seal_consumed = state.is_seal_consumed(&right.id);
+        let status = if right.status == RightStatus::Consumed || seal_consumed {
             "Consumed".to_string()
         } else {
             "Active".to_string()

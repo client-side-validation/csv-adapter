@@ -568,7 +568,7 @@ fn cmd_balance(
     state: &UnifiedStateManager,
 ) -> Result<()> {
     let addr = address
-        .or_else(|| state.get_address(&chain).cloned())
+        .or_else(|| state.get_address(&chain).map(|s| s.to_string()))
         .ok_or_else(|| {
             anyhow::anyhow!(
                 "No address for {}. Generate or import a wallet first.",
@@ -760,7 +760,7 @@ fn cmd_balance(
 
 fn cmd_fund(chain: Chain, address: Option<String>, config: &Config, state: &UnifiedStateManager) -> Result<()> {
     let addr = address
-        .or_else(|| state.get_address(&chain).cloned())
+        .or_else(|| state.get_address(&chain).map(|s| s.to_string()))
         .ok_or_else(|| anyhow::anyhow!("No address for {}. Generate a wallet first.", chain))?;
 
     let faucet = config
@@ -1050,7 +1050,6 @@ fn cmd_list(config: &Config, state: &UnifiedStateManager) -> Result<()> {
     ] {
         let address = state
             .get_address(&chain)
-            .map(|a| a.as_str())
             .unwrap_or("Not generated");
 
         let network = config

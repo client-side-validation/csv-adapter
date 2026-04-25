@@ -531,8 +531,8 @@ Use --simulation for demo output, or wire real lock/mint providers first."
         "Destination Seal",
         &hex::encode(mint_result.destination_seal.to_vec()),
     );
-    if let Some(addr) = dest_address {
-        output::kv("Recipient Address", &addr);
+    if let Some(ref addr) = dest_owner_str {
+        output::kv("Recipient Address", addr);
     }
 
     println!();
@@ -560,7 +560,7 @@ fn run_real_bitcoin_to_aptos(
 ) -> Result<()> {
     output::progress(1, 6, "Step 1: Locking Right on bitcoin...");
     let btc_cfg = config.chain(&Chain::Bitcoin)?;
-    let btc_key = get_private_key(config, Chain::Bitcoin)?;
+    let btc_key = get_private_key(state, Chain::Bitcoin)?;
     let btc_address = state
         .get_address(&Chain::Bitcoin)
         .map(|s| s.to_string())
@@ -576,10 +576,10 @@ fn run_real_bitcoin_to_aptos(
 
     output::progress(5, 6, "Step 5: Minting Right on aptos...");
     let aptos_cfg = config.chain(&Chain::Aptos)?;
-    let aptos_key = get_private_key(config, Chain::Aptos)?;
+    let aptos_key = get_private_key(state, Chain::Aptos)?;
     let commitment = state
-        .get_right(&right_id_hash)
-        .map(|r| r.commitment)
+        .get_right(&right_id_hash.to_string())
+        .and_then(|r| hash_from_hex_32(&r.commitment).ok())
         .unwrap_or(right_id_hash);
     let aptos_tx_hash_hex = send_aptos_mint_via_cli(
         &destination_contract,
@@ -592,23 +592,23 @@ fn run_real_bitcoin_to_aptos(
     let dest_tx_hash = hash_from_hex_32(&aptos_tx_hash_hex)?;
 
     output::progress(6, 6, "Step 6: Recording transfer...");
-    state.record_seal_consumption(right_id_hash.as_bytes().to_vec());
-    let _ = state.consume_right(&right_id_hash);
+    state.record_seal_consumption(right_id_hash.to_string());
+    let _ = state.consume_right(&right_id_hash.to_string());
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
     state.add_transfer(TransferRecord {
-        id: transfer_id,
+        id: transfer_id.to_string(),
         source_chain: Chain::Bitcoin,
         dest_chain: Chain::Aptos,
-        right_id: right_id_hash,
-        sender_address: state.get_address(&Chain::Bitcoin).cloned(),
+        right_id: right_id_hash.to_string(),
+        sender_address: state.get_address(&Chain::Bitcoin).map(|s| s.to_string()),
         destination_address: dest_owner_str.clone(),
-        source_tx_hash: Some(source_tx_hash),
+        source_tx_hash: Some(source_tx_hash.to_string()),
         source_fee: None,
-        dest_tx_hash: Some(dest_tx_hash),
-        destination_fee: None,
+        dest_tx_hash: Some(dest_tx_hash.to_string()),
+        dest_fee: None,
         destination_contract: Some(destination_contract),
         proof: None,
         status: TransferStatus::Completed,
@@ -649,7 +649,7 @@ fn run_real_bitcoin_to_ethereum(
 ) -> Result<()> {
     output::progress(1, 6, "Step 1: Locking Right on bitcoin...");
     let btc_cfg = config.chain(&Chain::Bitcoin)?;
-    let btc_key = get_private_key(config, Chain::Bitcoin)?;
+    let btc_key = get_private_key(state, Chain::Bitcoin)?;
     let btc_address = state
         .get_address(&Chain::Bitcoin)
         .map(|s| s.to_string())
@@ -665,10 +665,10 @@ fn run_real_bitcoin_to_ethereum(
 
     output::progress(5, 6, "Step 5: Minting Right on ethereum...");
     let eth_cfg = config.chain(&Chain::Ethereum)?;
-    let eth_key = get_private_key(config, Chain::Ethereum)?;
+    let eth_key = get_private_key(state, Chain::Ethereum)?;
     let commitment = state
-        .get_right(&right_id_hash)
-        .map(|r| r.commitment)
+        .get_right(&right_id_hash.to_string())
+        .and_then(|r| hash_from_hex_32(&r.commitment).ok())
         .unwrap_or(right_id_hash);
     let state_root = Hash::new([0u8; 32]);
     let proof = build_demo_merkle_proof(right_id_hash, commitment, 0u8);
@@ -687,23 +687,23 @@ fn run_real_bitcoin_to_ethereum(
     let dest_tx_hash = hash_from_hex_32(&dest_tx_hex)?;
 
     output::progress(6, 6, "Step 6: Recording transfer...");
-    state.record_seal_consumption(right_id_hash.as_bytes().to_vec());
-    let _ = state.consume_right(&right_id_hash);
+    state.record_seal_consumption(right_id_hash.to_string());
+    let _ = state.consume_right(&right_id_hash.to_string());
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
     state.add_transfer(TransferRecord {
-        id: transfer_id,
+        id: transfer_id.to_string(),
         source_chain: Chain::Bitcoin,
         dest_chain: Chain::Ethereum,
-        right_id: right_id_hash,
-        sender_address: state.get_address(&Chain::Bitcoin).cloned(),
+        right_id: right_id_hash.to_string(),
+        sender_address: state.get_address(&Chain::Bitcoin).map(|s| s.to_string()),
         destination_address: dest_owner_str.clone(),
-        source_tx_hash: Some(source_tx_hash),
+        source_tx_hash: Some(source_tx_hash.to_string()),
         source_fee: None,
-        dest_tx_hash: Some(dest_tx_hash),
-        destination_fee: None,
+        dest_tx_hash: Some(dest_tx_hash.to_string()),
+        dest_fee: None,
         destination_contract: Some(destination_contract),
         proof: None,
         status: TransferStatus::Completed,
@@ -747,7 +747,7 @@ fn run_real_ethereum_to_sui(
 ) -> Result<()> {
     output::progress(1, 6, "Step 1: Locking Right on ethereum...");
     let eth_cfg = config.chain(&Chain::Ethereum)?;
-    let eth_key = get_private_key(config, Chain::Ethereum)?;
+    let eth_key = get_private_key(state, Chain::Ethereum)?;
     let eth_address = state
         .get_address(&Chain::Ethereum)
         .map(|s| s.to_string())
@@ -768,10 +768,10 @@ fn run_real_ethereum_to_sui(
 
     output::progress(5, 6, "Step 5: Minting Right on sui...");
     let sui_cfg = config.chain(&Chain::Sui)?;
-    let sui_key = get_private_key(config, Chain::Sui)?;
+    let sui_key = get_private_key(state, Chain::Sui)?;
     let commitment = state
-        .get_right(&right_id_hash)
-        .map(|r| r.commitment)
+        .get_right(&right_id_hash.to_string())
+        .and_then(|r| hash_from_hex_32(&r.commitment).ok())
         .unwrap_or(right_id_hash);
     // Use SDK-based mint instead of CLI
     let sui_tx_digest = csv_adapter_sui::mint_right(
@@ -787,23 +787,23 @@ fn run_real_ethereum_to_sui(
     let dest_tx_hash = hash_from_hex_32(&sui_tx_digest)?;
 
     output::progress(6, 6, "Step 6: Recording transfer...");
-    state.record_seal_consumption(right_id_hash.as_bytes().to_vec());
-    let _ = state.consume_right(&right_id_hash);
+    state.record_seal_consumption(right_id_hash.to_string());
+    let _ = state.consume_right(&right_id_hash.to_string());
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
     state.add_transfer(TransferRecord {
-        id: transfer_id,
+        id: transfer_id.to_string(),
         source_chain: Chain::Ethereum,
         dest_chain: Chain::Sui,
-        right_id: right_id_hash,
+        right_id: right_id_hash.to_string(),
         sender_address: Some(eth_address),
         destination_address: dest_owner_str.clone(),
-        source_tx_hash: Some(source_tx_hash),
+        source_tx_hash: Some(source_tx_hash.to_string()),
         source_fee: None,
-        dest_tx_hash: Some(dest_tx_hash),
-        destination_fee: None,
+        dest_tx_hash: Some(dest_tx_hash.to_string()),
+        dest_fee: None,
         destination_contract: None,
         proof: None,
         status: TransferStatus::Completed,
@@ -843,7 +843,7 @@ fn run_real_ethereum_to_aptos(
 ) -> Result<()> {
     output::progress(1, 6, "Step 1: Locking Right on ethereum...");
     let eth_cfg = config.chain(&Chain::Ethereum)?;
-    let eth_key = get_private_key(config, Chain::Ethereum)?;
+    let eth_key = get_private_key(state, Chain::Ethereum)?;
     let eth_address = state
         .get_address(&Chain::Ethereum)
         .map(|s| s.to_string())
@@ -864,10 +864,10 @@ fn run_real_ethereum_to_aptos(
 
     output::progress(5, 6, "Step 5: Minting Right on aptos...");
     let aptos_cfg = config.chain(&Chain::Aptos)?;
-    let aptos_key = get_private_key(config, Chain::Aptos)?;
+    let aptos_key = get_private_key(state, Chain::Aptos)?;
     let commitment = state
-        .get_right(&right_id_hash)
-        .map(|r| r.commitment)
+        .get_right(&right_id_hash.to_string())
+        .and_then(|r| hash_from_hex_32(&r.commitment).ok())
         .unwrap_or(right_id_hash);
     let aptos_tx_hash_hex = send_aptos_mint_via_cli(
         &destination_contract,
@@ -880,23 +880,23 @@ fn run_real_ethereum_to_aptos(
     let dest_tx_hash = hash_from_hex_32(&aptos_tx_hash_hex)?;
 
     output::progress(6, 6, "Step 6: Recording transfer...");
-    state.record_seal_consumption(right_id_hash.as_bytes().to_vec());
-    let _ = state.consume_right(&right_id_hash);
+    state.record_seal_consumption(right_id_hash.to_string());
+    let _ = state.consume_right(&right_id_hash.to_string());
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
     state.add_transfer(TransferRecord {
-        id: transfer_id,
+        id: transfer_id.to_string(),
         source_chain: Chain::Ethereum,
         dest_chain: Chain::Aptos,
-        right_id: right_id_hash,
+        right_id: right_id_hash.to_string(),
         sender_address: Some(eth_address),
         destination_address: dest_owner_str.clone(),
-        source_tx_hash: Some(source_tx_hash),
+        source_tx_hash: Some(source_tx_hash.to_string()),
         source_fee: None,
-        dest_tx_hash: Some(dest_tx_hash),
-        destination_fee: None,
+        dest_tx_hash: Some(dest_tx_hash.to_string()),
+        dest_fee: None,
         destination_contract: Some(destination_contract),
         proof: None,
         status: TransferStatus::Completed,
@@ -935,7 +935,7 @@ fn run_real_ethereum_to_solana(
 ) -> Result<()> {
     output::progress(1, 6, "Step 1: Locking Right on ethereum...");
     let eth_cfg = config.chain(&Chain::Ethereum)?;
-    let eth_key = get_private_key(config, Chain::Ethereum)?;
+    let eth_key = get_private_key(state, Chain::Ethereum)?;
     let eth_address = state
         .get_address(&Chain::Ethereum)
         .map(|s| s.to_string())
@@ -956,10 +956,10 @@ fn run_real_ethereum_to_solana(
 
     output::progress(5, 6, "Step 5: Minting Right on solana...");
     let sol_cfg = config.chain(&Chain::Solana)?;
-    let sol_key = get_private_key(config, Chain::Solana)?;
+    let sol_key = get_private_key(state, Chain::Solana)?;
     let commitment = state
-        .get_right(&right_id_hash)
-        .map(|r| r.commitment)
+        .get_right(&right_id_hash.to_string())
+        .and_then(|r| hash_from_hex_32(&r.commitment).ok())
         .unwrap_or(right_id_hash);
     // Use SDK-based mint instead of CLI
     let state_root = Hash::new([0u8; 32]);
@@ -981,23 +981,23 @@ fn run_real_ethereum_to_solana(
     let dest_tx_hash = Hash::new(hash_bytes);
 
     output::progress(6, 6, "Step 6: Recording transfer...");
-    state.record_seal_consumption(right_id_hash.as_bytes().to_vec());
-    let _ = state.consume_right(&right_id_hash);
+    state.record_seal_consumption(right_id_hash.to_string());
+    let _ = state.consume_right(&right_id_hash.to_string());
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
     state.add_transfer(TransferRecord {
-        id: transfer_id,
+        id: transfer_id.to_string(),
         source_chain: Chain::Ethereum,
         dest_chain: Chain::Solana,
-        right_id: right_id_hash,
+        right_id: right_id_hash.to_string(),
         sender_address: Some(eth_address),
         destination_address: dest_owner_str.clone(),
-        source_tx_hash: Some(source_tx_hash),
+        source_tx_hash: Some(source_tx_hash.to_string()),
         source_fee: None,
-        dest_tx_hash: Some(dest_tx_hash),
-        destination_fee: None,
+        dest_tx_hash: Some(dest_tx_hash.to_string()),
+        dest_fee: None,
         destination_contract: None,
         proof: None,
         status: TransferStatus::Completed,
@@ -1108,22 +1108,15 @@ fn send_ethereum_lock(
     hash_from_hex_32(&tx_hash)
 }
 
-fn get_private_key(config: &Config, chain: Chain) -> Result<String> {
-    let wallet = config
-        .wallet(&chain)
+fn get_private_key(state: &UnifiedStateManager, chain: Chain) -> Result<String> {
+    let account = state
+        .get_account(&chain)
         .ok_or_else(|| anyhow::anyhow!("Missing wallet config for {}", chain))?;
     
-    // Debug: check if it came from config.toml or csv-wallet
-    if config.wallets.contains_key(&chain) {
-        eprintln!("DEBUG: Key source: config.toml [wallets.{}]", chain);
-    } else {
-        eprintln!("DEBUG: Key source: csv-wallet.json fallback");
-    }
-    
-    wallet
+    account
         .private_key
         .clone()
-        .ok_or_else(|| anyhow::anyhow!("Missing wallets.{}.private_key", chain))
+        .ok_or_else(|| anyhow::anyhow!("Missing private_key for {}", chain))
 }
 
 #[derive(Clone, Debug)]
@@ -1513,7 +1506,7 @@ fn cmd_status(transfer_id: String, state: &UnifiedStateManager) -> Result<()> {
 
     output::header(&format!("Transfer: {}", transfer_id));
 
-    if let Some(transfer) = state.get_transfer(&transfer_id_hash) {
+    if let Some(transfer) = state.get_transfer(&transfer_id_hash.to_string()) {
         output::header("📋 Cross-Chain Transfer Report");
 
         output::kv("Transfer ID", &hex::encode(transfer.id.as_bytes()));
@@ -1545,7 +1538,7 @@ fn cmd_status(transfer_id: String, state: &UnifiedStateManager) -> Result<()> {
         if let Some(dest_tx) = &transfer.dest_tx_hash {
             output::kv_hash("Transaction ID", dest_tx.as_bytes());
         }
-        if let Some(fee) = transfer.destination_fee {
+        if let Some(fee) = transfer.dest_fee {
             output::kv("Transaction Fee", &fee.to_string());
         }
         if let Some(contract) = &transfer.destination_contract {
@@ -1564,7 +1557,7 @@ fn cmd_list(from: Option<Chain>, to: Option<Chain>, state: &UnifiedStateManager)
     let headers = vec!["Transfer ID", "From", "To", "Right ID", "Status"];
     let mut rows = Vec::new();
 
-    for transfer in &state.transfers {
+    for transfer in &state.storage.transfers {
         if let Some(ref filter_from) = from {
             if transfer.source_chain != *filter_from {
                 continue;
@@ -1578,7 +1571,7 @@ fn cmd_list(from: Option<Chain>, to: Option<Chain>, state: &UnifiedStateManager)
 
         let status_str = match &transfer.status {
             TransferStatus::Completed => "Completed".to_string(),
-            TransferStatus::Failed { reason } => format!("Failed: {}", reason),
+            TransferStatus::Failed => "Failed".to_string(),
             other => format!("{:?}", other),
         };
 
@@ -1612,7 +1605,7 @@ fn cmd_retry(transfer_id: String, _config: &Config, state: &mut UnifiedStateMana
     let transfer_id_hash = Hash::new(hash_bytes);
 
     // Look up transfer
-    let transfer = state.get_transfer(&transfer_id_hash);
+    let transfer = state.get_transfer(&transfer_id_hash.to_string());
     match transfer {
         Some(t) => {
             output::kv("Source", &t.source_chain.to_string());
@@ -1620,8 +1613,8 @@ fn cmd_retry(transfer_id: String, _config: &Config, state: &mut UnifiedStateMana
             output::kv("Status", &format!("{:?}", t.status));
 
             match &t.status {
-                TransferStatus::Failed { reason } => {
-                    output::warning(&format!("Failure reason: {}", reason));
+                TransferStatus::Failed => {
+                    output::warning("Transfer failed");
                     output::info("If lock was successful but mint failed, wait for timeout (24h) and the source chain seal will be recoverable via refund.");
                     output::info("For timed-out locks: the refund function is available on the source chain contract.");
                 }
