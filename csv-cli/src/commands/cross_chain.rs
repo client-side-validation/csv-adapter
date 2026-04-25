@@ -958,12 +958,14 @@ fn run_real_ethereum_to_solana(
         .map(|r| r.commitment)
         .unwrap_or(right_id_hash);
     // Use SDK-based mint instead of CLI
+    let state_root = Hash::new([0u8; 32]);
     let sol_tx_sig = csv_adapter_solana::mint_right_from_hex_key(
         &sol_cfg.rpc_url,
         &_destination_contract, // program_id from contract
         &sol_key,
         right_id_hash,
         commitment,
+        state_root,
         1u8, // source_chain = 1 for Ethereum
         source_tx_hash,
     ).map_err(|e| anyhow::anyhow!("Solana mint failed: {:?}", e))?;
@@ -1020,7 +1022,7 @@ fn run_real_ethereum_to_solana(
 
 /// Lock a right on Ethereum (calls the lock function on the CSV contract)
 fn send_ethereum_lock(
-    _owner_address: &str,
+    owner_address: &str,
     rpc_url: &str,
     private_key: &str,
     right_id: Hash,
@@ -1031,7 +1033,20 @@ fn send_ethereum_lock(
     // Parse private key
     let cleaned_key = private_key.trim().trim_start_matches("0x").trim();
     let key_bytes = hex::decode(cleaned_key)?;
-    let secret_key = SecretKey::from_slice(&key_bytes)?;
+    eprintln!("DEBUG: Private key hex length: {} chars, decoded bytes: {} bytes", cleaned_key.len(), key_bytes.len());
+    eprintln!("DEBUG: First 8 chars of key: {}...", &cleaned_key[..8.min(cleaned_key.len())]);
+    
+    // csv-wallet takes first 32 bytes if key is 64 bytes - emulate that behavior
+    let key_32 = if key_bytes.len() == 64 {
+        eprintln!("DEBUG: Key is 64 bytes, taking first 32 bytes (csv-wallet compatible)");
+        &key_bytes[..32]
+    } else if key_bytes.len() == 32 {
+        &key_bytes[..]
+    } else {
+        return Err(anyhow::anyhow!("Invalid key length: {} bytes (expected 32 or 64)", key_bytes.len()));
+    };
+    
+    let secret_key = SecretKey::from_slice(key_32)?;
     
     // Derive public key and address
     let secp = secp256k1::Secp256k1::new();
@@ -1039,10 +1054,32 @@ fn send_ethereum_lock(
     let public_key_bytes = public_key.serialize_uncompressed();
     let hash = Keccak256::digest(&public_key_bytes[1..]);
     let sender_address = format!("0x{}", hex::encode(&hash[12..]));
+    eprintln!("DEBUG: Derived sender address: {}", sender_address);
+    eprintln!("DEBUG: Expected owner address: {}", owner_address);
     
-    // Get nonce
+    // Verify the derived address matches the expected address
+    let expected = owner_address.to_lowercase();
+    let derived = sender_address.to_lowercase();
+    if expected != derived {
+        return Err(anyhow::anyhow!(
+            "Address mismatch: config has '{}', but private key derives to '{}'. \n\
+             The 0.263 ETH is at the config address, but tx will be sent from derived address (0 balance).\n\
+             Key length: {} bytes (hex: {} chars)",
+            owner_address,
+            sender_address,
+            key_bytes.len(),
+            cleaned_key.len()
+        ));
+    }
+    
+    // Get nonce and gas price
     let nonce = get_ethereum_nonce(&sender_address, rpc_url)?;
     let gas_price = get_ethereum_gas_price(rpc_url)?;
+    let balance = get_ethereum_balance(&sender_address, rpc_url)?;
+    eprintln!("DEBUG: RPC URL: {}", rpc_url);
+    eprintln!("DEBUG: Balance: {} wei ({} ETH)", balance, balance as f64 / 1e18);
+    eprintln!("DEBUG: Gas price: {} wei, Gas limit: 50000", gas_price);
+    eprintln!("DEBUG: Total cost: {} wei ({} ETH)", gas_price * 50000, (gas_price * 50000) as f64 / 1e18);
     
     // For now, create a simple lock transaction by sending a small amount to self
     // with the right_id in the data field as a marker
@@ -1071,6 +1108,14 @@ fn get_private_key(config: &Config, chain: Chain) -> Result<String> {
     let wallet = config
         .wallet(&chain)
         .ok_or_else(|| anyhow::anyhow!("Missing wallet config for {}", chain))?;
+    
+    // Debug: check if it came from config.toml or csv-wallet
+    if config.wallets.contains_key(&chain) {
+        eprintln!("DEBUG: Key source: config.toml [wallets.{}]", chain);
+    } else {
+        eprintln!("DEBUG: Key source: csv-wallet.json fallback");
+    }
+    
     wallet
         .private_key
         .clone()
@@ -2097,6 +2142,24 @@ fn get_ethereum_gas_price(rpc_url: &str) -> Result<u64> {
     Ok(u64::from_str_radix(price_hex.trim_start_matches("0x"), 16).unwrap_or(20000000000))
 }
 
+fn get_ethereum_balance(address: &str, rpc_url: &str) -> Result<u128> {
+    let client = reqwest::blocking::Client::new();
+    let resp = client
+        .post(rpc_url)
+        .json(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "eth_getBalance",
+            "params": [address, "latest"],
+            "id": 1
+        }))
+        .send()?
+        .json::<serde_json::Value>()?;
+    
+    let balance_hex = resp.get("result").and_then(|r| r.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Failed to get balance"))?;
+    Ok(u128::from_str_radix(balance_hex.trim_start_matches("0x"), 16).unwrap_or(0))
+}
+
 fn sign_ethereum_transaction(tx: &EthTransaction, secret_key: &secp256k1::SecretKey) -> Result<String> {
     use sha3::{Digest, Keccak256};
     use secp256k1::{Message, Secp256k1};
@@ -2128,12 +2191,14 @@ fn sign_ethereum_transaction(tx: &EthTransaction, secret_key: &secp256k1::Secret
     rlp.push(0x80);
     
     // Wrap in list
-    let mut encoded = vec![0xc0 + rlp.len() as u8];
-    if rlp.len() > 55 {
+    let mut encoded = if rlp.len() <= 55 {
+        vec![0xc0 + rlp.len() as u8]
+    } else {
         let len_bytes = encode_length_bytes(rlp.len());
-        encoded = vec![0xf7 + len_bytes.len() as u8];
-        encoded.extend_from_slice(&len_bytes);
-    }
+        let mut e = vec![0xf7 + len_bytes.len() as u8];
+        e.extend_from_slice(&len_bytes);
+        e
+    };
     encoded.extend_from_slice(&rlp);
     
     // Hash and sign
@@ -2171,12 +2236,14 @@ fn sign_ethereum_transaction(tx: &EthTransaction, secret_key: &secp256k1::Secret
     signed_rlp.extend_from_slice(&encode_rlp_bytes(&sig_bytes[32..]));
     
     // Wrap in list
-    let mut signed_encoded = vec![0xc0 + signed_rlp.len() as u8];
-    if signed_rlp.len() > 55 {
+    let mut signed_encoded = if signed_rlp.len() <= 55 {
+        vec![0xc0 + signed_rlp.len() as u8]
+    } else {
         let len_bytes = encode_length_bytes(signed_rlp.len());
-        signed_encoded = vec![0xf7 + len_bytes.len() as u8];
-        signed_encoded.extend_from_slice(&len_bytes);
-    }
+        let mut e = vec![0xf7 + len_bytes.len() as u8];
+        e.extend_from_slice(&len_bytes);
+        e
+    };
     signed_encoded.extend_from_slice(&signed_rlp);
     
     Ok(hex::encode(signed_encoded))
@@ -2214,7 +2281,9 @@ fn encode_rlp_bytes(bytes: &[u8]) -> Vec<u8> {
     if bytes.len() == 1 && bytes[0] < 0x80 {
         return vec![bytes[0]];
     }
-    encode_rlp_length(bytes.len())
+    let mut result = encode_rlp_length(bytes.len());
+    result.extend_from_slice(bytes);
+    result
 }
 
 fn encode_length_bytes(len: usize) -> Vec<u8> {

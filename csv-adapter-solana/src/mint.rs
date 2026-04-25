@@ -15,6 +15,7 @@ pub fn mint_right_from_hex_key(
     private_key_hex: &str,
     right_id: CsvHash,
     commitment: CsvHash,
+    state_root: CsvHash,
     source_chain: u8,
     source_seal_ref: CsvHash,
 ) -> SolanaResult<String> {
@@ -69,16 +70,26 @@ pub fn mint_right_from_hex_key(
     let blockhash = blockhash_str.parse()
         .map_err(|e| SolanaError::Rpc(format!("Invalid blockhash: {}", e)))?;
     
-    // Derive the right PDA
+    // Derive the right PDA with correct seeds: ["right", owner, right_id]
     let (right_pda, _bump) = Pubkey::find_program_address(
-        &[b"right", right_id.as_bytes()],
+        &[b"right", payer.pubkey().as_ref(), right_id.as_bytes()],
         &program_id,
     );
     
-    // Build instruction data
-    let mut data = vec![0u8; 8]; // 8-byte discriminator
+    // Build instruction data with correct Anchor discriminator
+    // Anchor discriminator = first 8 bytes of sha256("global:instruction_name")
+    // For mint_right: sha256("global:mint_right")[0..8]
+    let discriminator = {
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        hasher.update(b"global:mint_right");
+        let hash = hasher.finalize();
+        hash[..8].to_vec()
+    };
+    let mut data = discriminator;
     data.extend_from_slice(right_id.as_bytes());
     data.extend_from_slice(commitment.as_bytes());
+    data.extend_from_slice(state_root.as_bytes());
     data.push(source_chain);
     data.extend_from_slice(source_seal_ref.as_bytes());
     
