@@ -269,33 +269,57 @@ impl ChainApi {
             .ok_or_else(|| ChainApiError::ApiError("Bitcoin config not found".to_string()))?;
 
         let url = format!("{}/address/{}", config.api_url, address);
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&format!("Fetching Bitcoin balance from: {}", url).into());
+
         let response = self.client.get(&url).send().await?;
 
         if !response.status().is_success() {
+            let status = response.status();
+            #[cfg(target_arch = "wasm32")]
+            web_sys::console::error_1(&format!("Bitcoin API error {} for address {}", status, address).into());
             return Err(ChainApiError::ApiError(format!(
-                "Bitcoin API error: {}",
-                response.status()
+                "Bitcoin API error: {} (Address format may not be supported by mempool.space)",
+                status
             )));
         }
 
         // mempool.space returns: { chain_stats: { funded_txo_sum, spent_txo_sum }, ... }
         let json: serde_json::Value = response.json().await?;
-        let stats = json.get("chain_stats").ok_or_else(|| {
-            ChainApiError::ApiError("Missing chain_stats in response".to_string())
-        })?;
 
-        let funded = stats
-            .get("funded_txo_sum")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0);
-        let spent = stats
-            .get("spent_txo_sum")
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0);
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&format!("Bitcoin API response: {:?}", json).into());
 
-        // Balance in satoshis, convert to BTC
-        let balance_sats = funded - spent;
-        Ok(balance_sats / 100_000_000.0)
+        // Try multiple ways to get the balance
+        // Method 1: chain_stats.funded_txo_sum - chain_stats.spent_txo_sum
+        if let Some(stats) = json.get("chain_stats") {
+            let funded = stats
+                .get("funded_txo_sum")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let spent = stats
+                .get("spent_txo_sum")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+
+            let balance_sats = funded - spent;
+            let balance_btc = balance_sats / 100_000_000.0;
+
+            #[cfg(target_arch = "wasm32")]
+            web_sys::console::log_1(&format!("Bitcoin balance: {} satoshis = {} BTC for {}", balance_sats, balance_btc, address).into());
+
+            return Ok(balance_btc);
+        }
+
+        // Method 2: Try balance field directly
+        if let Some(balance) = json.get("balance").and_then(|v| v.as_f64()) {
+            return Ok(balance / 100_000_000.0);
+        }
+
+        Err(ChainApiError::ApiError(
+            "Could not parse balance from response. Address may not exist or API format changed.".to_string()
+        ))
     }
 
     /// Query Ethereum balance via JSON-RPC eth_getBalance.

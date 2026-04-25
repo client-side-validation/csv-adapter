@@ -83,7 +83,7 @@ pub fn Sidebar(sidebar_open: bool) -> Element {
                     {sidebar_section("Seals", rsx! {
                         {sidebar_link(Route::Seals {}, "\u{1F512}", "All Seals")}
                         {sidebar_link(Route::CreateSeal {}, "\u{2795}", "Create Seal")}
-                        {sidebar_link(Route::ConsumeSeal {}, "\u{1F525}", "Consume Seal")}
+                        {sidebar_link(Route::ConsumeSeal { seal_ref: None }, "\u{1F525}", "Consume Seal")}
                     })}
 
                     {sidebar_section("Test & Validate", rsx! {

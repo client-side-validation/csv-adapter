@@ -528,6 +528,18 @@ impl WalletContext {
         }
     }
 
+    pub fn remove_seal(&mut self, seal_ref: &str) -> bool {
+        let mut s = self.state.write();
+        let before = s.seals.len();
+        s.seals.retain(|s| s.seal_ref != seal_ref);
+        let removed = s.seals.len() < before;
+        drop(s);
+        if removed {
+            self.save_persisted();
+        }
+        removed
+    }
+
     pub fn is_seal_consumed(&self, seal_ref: &str) -> bool {
         self.state
             .read()
@@ -541,6 +553,18 @@ impl WalletContext {
     pub fn add_proof(&mut self, proof: ProofRecord) {
         self.state.write().proofs.push(proof);
         self.save_persisted();
+    }
+
+    pub fn remove_proof(&mut self, right_id: &str, proof_type: &str) -> bool {
+        let mut s = self.state.write();
+        let before = s.proofs.len();
+        s.proofs.retain(|p| !(p.right_id == right_id && p.proof_type == proof_type));
+        let removed = s.proofs.len() < before;
+        drop(s);
+        if removed {
+            self.save_persisted();
+        }
+        removed
     }
 
     pub fn add_transaction(&mut self, tx: TransactionRecord) {

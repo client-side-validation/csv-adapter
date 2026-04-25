@@ -8,10 +8,23 @@ use dioxus::prelude::*;
 use std::rc::Rc;
 
 #[component]
-pub fn ConsumeSeal() -> Element {
+pub fn ConsumeSeal(seal_ref: Option<String>) -> Element {
     let mut wallet_ctx = use_wallet_context();
-    let mut selected_chain = use_signal(|| Chain::Bitcoin);
-    let mut seal_ref = use_signal(String::new);
+    let seals = wallet_ctx.seals();
+
+    // Get available (unconsumed) seals
+    let available_seals: Vec<_> = seals.iter().filter(|s| !s.consumed).cloned().collect();
+
+    // Initialize selected seal from URL parameter or first available
+    let initial_seal_ref = seal_ref.clone().or_else(|| available_seals.first().map(|s| s.seal_ref.clone()));
+    let mut selected_seal_ref = use_signal(|| initial_seal_ref.unwrap_or_default());
+
+    // Get the currently selected seal by computing it from the signal
+    let selected_seal_ref_read = selected_seal_ref.read();
+    let selected_seal: Option<SealRecord> = seals.iter()
+        .find(|s| s.seal_ref == *selected_seal_ref_read)
+        .cloned();
+
     let mut result = use_signal(|| Option::<String>::None);
     let mut error = use_signal(|| Option::<String>::None);
 
@@ -30,18 +43,48 @@ pub fn ConsumeSeal() -> Element {
             }
 
             div { class: "{card_class()} p-6 space-y-5",
-                {form_field("Chain", chain_select(move |v: Rc<FormData>| {
-                    if let Ok(c) = v.value().parse::<Chain>() { selected_chain.set(c); }
-                }, *selected_chain.read()))}
-
-                {form_field("Seal Reference (hex)", rsx! {
-                    input {
-                        value: "{seal_ref.read()}",
-                        oninput: move |evt| { seal_ref.set(evt.value()); error.set(None); },
-                        class: "{input_mono_class()}",
-                        placeholder: "0x..."
+                if available_seals.is_empty() {
+                    div { class: "bg-gray-800/50 rounded-lg p-4 text-center",
+                        p { class: "text-gray-400", "No available seals to consume." }
+                        p { class: "text-sm text-gray-500 mt-2", "Create a seal first from the Seals page." }
                     }
-                })}
+                } else {
+                    {form_field("Select Seal", rsx! {
+                        select {
+                            class: "{select_class()}",
+                            value: "{selected_seal_ref.read()}",
+                            onchange: move |evt| {
+                                selected_seal_ref.set(evt.value());
+                                error.set(None);
+                                result.set(None);
+                            },
+                            for seal in available_seals.iter() {
+                                option {
+                                    key: "{seal.seal_ref}",
+                                    value: "{seal.seal_ref}",
+                                    selected: seal.seal_ref == *selected_seal_ref.read(),
+                                    "{chain_icon_emoji(&seal.chain)} {chain_name(&seal.chain)} - {truncate_address(&seal.seal_ref, 16)} (Value: {seal.value})"
+                                }
+                            }
+                        }
+                    })}
+
+                    // Show selected seal details
+                    {match selected_seal {
+                        Some(seal) => rsx! {
+                            div { class: "bg-gray-800/50 rounded-lg p-3 border border-gray-700",
+                                p { class: "text-xs text-gray-400 mb-2", "Selected Seal Details:" }
+                                div { class: "grid grid-cols-2 gap-2 text-xs",
+                                    div { span { class: "text-gray-500", "Full Ref: " }, span { class: "font-mono text-gray-300 break-all", "{seal.seal_ref}" } }
+                                    div { span { class: "text-gray-500", "Chain: " }, span { class: "{chain_badge_class(&seal.chain)}", "{chain_icon_emoji(&seal.chain)} {chain_name(&seal.chain)}" } }
+                                    div { span { class: "text-gray-500", "Value: " }, span { class: "font-mono text-gray-300", "{seal.value}" } }
+                                    div { span { class: "text-gray-500", "Status: " }, span { class: "text-green-300", "Available" } }
+                                }
+                            }
+                        },
+                        None => rsx! {}
+                    }}
+                }
 
                 if let Some(e) = error.read().as_ref() {
                     div { class: "p-3 bg-red-900/30 border border-red-700/50 rounded-lg text-sm text-red-300", "{e}" }
@@ -55,22 +98,23 @@ pub fn ConsumeSeal() -> Element {
 
                 button {
                     onclick: move |_| {
-                        if wallet_ctx.is_seal_consumed(&seal_ref.read()) {
+                        let seal_ref_val = selected_seal_ref.read().clone();
+                        if seal_ref_val.is_empty() {
+                            error.set(Some("Please select a seal to consume.".to_string()));
+                            return;
+                        }
+                        if wallet_ctx.is_seal_consumed(&seal_ref_val) {
                             error.set(Some("Seal replay detected: this seal has already been consumed.".to_string()));
                         } else {
-                            let val: u64 = 0;
-                            wallet_ctx.add_seal(SealRecord {
-                                seal_ref: seal_ref.read().clone(),
-                                chain: *selected_chain.read(),
-                                value: val,
-                                consumed: true,
-                                created_at: 0,
-                            });
-                            result.set(Some("Seal consumed successfully.".to_string()));
+                            wallet_ctx.consume_seal(&seal_ref_val);
+                            result.set(Some(format!("Seal {} consumed successfully.", truncate_address(&seal_ref_val, 12))));
+                            // Refresh the list by clearing selection
+                            selected_seal_ref.set(String::new());
                         }
                     },
-                    class: "w-full px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-sm font-medium transition-colors",
-                    "Consume Seal"
+                    disabled: available_seals.is_empty() || selected_seal_ref.read().is_empty(),
+                    class: "w-full px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+                    if available_seals.is_empty() { "No Available Seals" } else { "Consume Seal" }
                 }
             }
         }

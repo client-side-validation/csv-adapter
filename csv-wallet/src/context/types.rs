@@ -59,7 +59,7 @@ impl std::fmt::Display for RightStatus {
 }
 
 /// A cross-chain transfer record.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TrackedTransfer {
     pub id: String,
     pub from_chain: Chain,
@@ -110,7 +110,7 @@ pub struct DeployedContract {
 }
 
 /// A seal record.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SealRecord {
     pub seal_ref: String,
     pub chain: Chain,
@@ -120,7 +120,7 @@ pub struct SealRecord {
 }
 
 /// A proof record.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ProofRecord {
     pub chain: Chain,
     pub right_id: String,

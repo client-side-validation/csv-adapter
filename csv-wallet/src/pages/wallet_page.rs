@@ -257,7 +257,17 @@ fn AddAccountTab() -> Element {
                             oninput: move |evt| { pk_input.set(evt.value()); error.set(None); },
                             class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-gray-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none",
                             rows: 3,
-                            placeholder: "Enter hex-encoded private key..."
+                            placeholder: "Enter hex-encoded private key or generate one..."
+                        }
+                        button {
+                            onclick: move |_| {
+                                let chain = selected_chain.read().0;
+                                let key = generate_key_for_chain(chain);
+                                pk_input.set(key);
+                                error.set(None);
+                            },
+                            class: "mt-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium transition-all duration-200 text-white",
+                            "Generate Key"
                         }
                     }
 
@@ -471,4 +481,15 @@ fn trigger_download(filename: &str, content: &str) {
             }
         }
     }
+}
+
+/// Generate a random 32-byte private key for any chain.
+/// All supported chains (Bitcoin/Ethereum secp256k1, Sui/Aptos/Solana ed25519) use 32-byte keys.
+fn generate_key_for_chain(_chain: Chain) -> String {
+    use rand::RngCore;
+    use rand::rngs::OsRng;
+
+    let mut key = [0u8; 32];
+    OsRng.fill_bytes(&mut key);
+    format!("0x{}", hex::encode(key))
 }

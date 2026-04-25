@@ -5,7 +5,7 @@ use crate::context::use_wallet_context;
 use crate::hooks::{format_balance, use_balance, AccountBalance};
 use crate::pages::common::*;
 use crate::routes::Route;
-use csv_adapter_core::Chain;
+pub use csv_adapter_core::Chain;
 use dioxus::prelude::*;
 use std::collections::HashMap;
 
@@ -123,10 +123,18 @@ pub fn Dashboard() -> Element {
                                             if balance_data.loading {
                                                 p { class: "text-xs text-gray-500", "Loading..." }
                                             } else if let Some(ref error) = balance_data.error {
-                                                p { class: "text-xs text-red-400", "Error: {error}" }
-                                            } else {
+                                                p { class: "text-xs text-red-400", "Error fetching balance" }
+                                                // Show detailed error for Bitcoin debugging
+                                                if account.chain == Chain::Bitcoin {
+                                                    p { class: "text-[10px] text-gray-500 max-w-[200px] truncate", "{error}" }
+                                                }
+                                            } else if balance_data.balance > 0.0 {
                                                 p { class: "text-xs text-green-400 font-medium",
                                                     "{format_balance(balance_data.balance, account.chain)}"
+                                                }
+                                            } else {
+                                                p { class: "text-xs text-yellow-400 font-medium",
+                                                    "{format_balance(balance_data.balance, account.chain)} (No funds)"
                                                 }
                                             }
                                         } else {

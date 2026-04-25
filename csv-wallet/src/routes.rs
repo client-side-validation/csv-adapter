@@ -63,7 +63,7 @@ pub enum Route {
     #[route("/seals/create")]
     CreateSeal {},
     #[route("/seals/consume")]
-    ConsumeSeal {},
+    ConsumeSeal { seal_ref: Option<String> },
     #[route("/seals/verify")]
     VerifySeal {},
 
