@@ -345,8 +345,16 @@ fn deploy_aptos(config: &Config, state: &mut UnifiedStateManager) -> Result<()> 
     }
     output::info("  csv_seal.move ✓");
 
-    output::progress(2, 4, "Connecting to Aptos Testnet...");
     let chain_config = config.chain(&Chain::Aptos)?;
+    let network = chain_config.network.to_string();
+    // Map generic network names to Aptos CLI network names
+    let aptos_network = match chain_config.network {
+        crate::config::Network::Dev => "devnet",
+        crate::config::Network::Test => "testnet",
+        crate::config::Network::Main => "mainnet",
+    };
+
+    output::progress(2, 4, &format!("Connecting to Aptos {}...", network));
     output::info(&format!("  RPC: {}", chain_config.rpc_url));
 
     // Run deploy script
@@ -361,7 +369,7 @@ fn deploy_aptos(config: &Config, state: &mut UnifiedStateManager) -> Result<()> 
     }
 
     let deploy_output = Command::new(&deploy_script)
-        .arg("testnet")
+        .arg(aptos_network)
         .arg(&aptos_path)
         .output()?;
 
@@ -447,11 +455,17 @@ fn deploy_solana(config: &Config, state: &mut UnifiedStateManager) -> Result<()>
     // Get chain config for network
     let chain_config = config.chain(&Chain::Solana)?;
     let network = chain_config.network.to_string();
+    // Map generic network names to Solana CLI network names
+    let solana_network = match chain_config.network {
+        crate::config::Network::Dev => "localnet",
+        crate::config::Network::Test => "devnet",  // Test network uses Solana devnet
+        crate::config::Network::Main => "mainnet-beta",
+    };
 
     output::progress(2, 5, &format!("Connecting to Solana {}...", network));
     output::info(&format!("  RPC: {}", chain_config.rpc_url));
 
-    // Set solana config
+    // Set solana config with RPC URL
     let _ = Command::new("solana")
         .args(["config", "set", "--url", &chain_config.rpc_url])
         .output();
@@ -475,7 +489,7 @@ fn deploy_solana(config: &Config, state: &mut UnifiedStateManager) -> Result<()>
     }
 
     let deploy_output = Command::new(&deploy_script)
-        .arg(&network)
+        .arg(solana_network)
         .arg(&anchor_path)
         .output()?;
 
@@ -520,7 +534,7 @@ fn deploy_solana(config: &Config, state: &mut UnifiedStateManager) -> Result<()>
     // Initialize the registry using the script
     let init_script = contracts_dir.parent().unwrap().join("scripts/initialize.sh");
     let _ = Command::new(&init_script)
-        .arg(&network)
+        .arg(solana_network)
         .arg(&program_id)
         .output();
 

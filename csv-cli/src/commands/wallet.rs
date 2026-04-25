@@ -1038,44 +1038,42 @@ fn cmd_import(chain: Chain, secret: String, _config: &Config, state: &mut Unifie
 fn cmd_list(config: &Config, state: &UnifiedStateManager) -> Result<()> {
     output::header("Wallets");
 
-    let headers = vec!["Chain", "Address", "Balance", "Network"];
+    let headers = vec!["Account ID", "Chain", "Name", "Address", "Balance", "Network"];
     let mut rows = Vec::new();
 
-    for chain in [
-        Chain::Bitcoin,
-        Chain::Ethereum,
-        Chain::Sui,
-        Chain::Aptos,
-        Chain::Solana,
-    ] {
-        let address = state
-            .get_address(&chain)
-            .unwrap_or("Not generated");
+    // Show all wallet accounts (supports multiple accounts per chain)
+    if state.storage.wallet.accounts.is_empty() {
+        output::info("No wallets configured. Use 'csv wallet generate' or 'csv wallet import' to create one.");
+    } else {
+        for account in &state.storage.wallet.accounts {
+            let network = config
+                .chain(&account.chain)
+                .map(|c| c.network.to_string())
+                .unwrap_or_else(|_| "unknown".to_string());
 
-        let network = config
-            .chain(&chain)
-            .map(|c| c.network.to_string())
-            .unwrap_or_else(|_| "unknown".to_string());
+            // Fetch balance if address exists and chain is configured
+            let balance = if !account.address.is_empty() {
+                match fetch_balance(account.chain.clone(), &account.address, config) {
+                    Ok(bal) => bal,
+                    Err(_) => "—".to_string(),
+                }
+            } else {
+                "—".to_string()
+            };
 
-        // Fetch balance if address exists and chain is configured
-        let balance = if address != "Not generated" {
-            match fetch_balance(chain.clone(), address, config) {
-                Ok(bal) => bal,
-                Err(_) => "—".to_string(),
-            }
-        } else {
-            "—".to_string()
-        };
+            rows.push(vec![
+                account.id.clone(),
+                format!("{}", account.chain).to_string(),
+                account.name.clone(),
+                account.address.clone(),
+                balance,
+                network,
+            ]);
+        }
 
-        rows.push(vec![
-            format!("{}", chain).to_string(),
-            address.to_string(),
-            balance,
-            network,
-        ]);
+        output::table(&headers, &rows);
     }
 
-    output::table(&headers, &rows);
     Ok(())
 }
 

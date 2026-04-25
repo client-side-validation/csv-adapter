@@ -171,10 +171,10 @@ fn cmd_list(chain: Option<Chain>, state: &UnifiedStateManager) -> Result<()> {
         };
 
         rows.push(vec![
-            hex::encode(right.id.as_bytes()),
+            right.id.clone(),
             right.chain.to_string(),
             status,
-            hex::encode(right.commitment.as_bytes()),
+            right.commitment.clone(),
         ]);
     }
 
