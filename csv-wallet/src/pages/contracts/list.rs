@@ -10,7 +10,6 @@ use dioxus::prelude::*;
 #[component]
 pub fn Contracts() -> Element {
     let wallet_ctx = use_wallet_context();
-    let contracts = wallet_ctx.contracts();
     let accounts = wallet_ctx.accounts();
 
     // State for contract discovery
@@ -23,6 +22,7 @@ pub fn Contracts() -> Element {
     // Clone for use in closures
     let accounts_empty = accounts.is_empty();
     let mut selected_contract_modal_clone = selected_contract_for_modal.clone();
+    let wallet_ctx_for_discovery = wallet_ctx.clone();
 
     rsx! {
         div { class: "space-y-6",
@@ -37,6 +37,7 @@ pub fn Contracts() -> Element {
                             discovering.set(true);
                             discovered_count.set(0);
                             let accounts_clone = accounts_for_discovery.clone();
+                            let mut wallet_ctx_clone = wallet_ctx_for_discovery.clone();
                             wasm_bindgen_futures::spawn_local(async move {
                                 use crate::services::chain_api::ChainConfig;
                                 use crate::services::network::NetworkType;
@@ -51,7 +52,7 @@ pub fn Contracts() -> Element {
 
                                     let config = ChainConfig::for_chain(account.chain, NetworkType::Testnet);
 
-                                    match discover_contracts(account.chain, &account.address, &config.api_url).await {
+                                    match discover_contracts(account.chain, &account.address, &config.api_url, None).await {
                                         Ok(contracts) => {
                                             for c in contracts {
                                                 let c_addr = c.address.clone();
@@ -63,9 +64,8 @@ pub fn Contracts() -> Element {
                                                     tx_hash,
                                                     deployed_at: js_sys::Date::now() as u64 / 1000,
                                                 };
-                                                // Note: Contract persistence would need to be done via a service call
-                                                // Since we can't directly access context from async block safely
                                                 web_sys::console::log_1(&format!("Discovered contract: {:?}", contract).into());
+                                                wallet_ctx_clone.add_contract(contract);
                                                 total_found += 1;
                                             }
                                         }
@@ -107,12 +107,12 @@ pub fn Contracts() -> Element {
                 }
             }
 
-            if contracts.is_empty() {
+            if wallet_ctx.contracts().is_empty() {
                 {empty_state("\u{1F4DC}", "No contracts deployed", "Deploy contracts or discover from chain to enable cross-chain functionality.")}
             } else {
                 div { class: "{table_class()}",
                     div { class: "{card_header_class()}",
-                        h2 { class: "font-semibold text-sm", "Deployed Contracts ({contracts.len()})" }
+                        h2 { class: "font-semibold text-sm", "Deployed Contracts ({wallet_ctx.contracts().len()})" }
                     }
                     div { class: "overflow-x-auto",
                         table { class: "w-full text-sm",
@@ -125,7 +125,7 @@ pub fn Contracts() -> Element {
                                 }
                             }
                             tbody { class: "divide-y divide-gray-800",
-                                {contracts.clone().into_iter().enumerate().map(|(idx, c)| {
+                                {wallet_ctx.contracts().into_iter().enumerate().map(|(idx, c)| {
                                     let c_for_click = c.clone();
                                     let key = format!("{}-{}-{}", idx, c.chain, c.address);
                                     rsx! {

@@ -9,6 +9,32 @@ use crate::config::{Chain, Config};
 use crate::output;
 use crate::state::{ContractRecord, UnifiedStateManager};
 
+/// Find the forge executable, trying common locations
+fn find_forge() -> Result<String> {
+    // Try Foundry default installation paths and common locations
+    let common_paths = vec![
+        dirs::home_dir().map(|h| h.join(".foundry/bin/forge")),
+        Some(std::path::PathBuf::from("/usr/local/bin/forge")),
+        Some(std::path::PathBuf::from("/opt/homebrew/bin/forge")),
+    ];
+    
+    for path_opt in common_paths {
+        if let Some(path) = path_opt {
+            if path.exists() {
+                return Ok(path.to_string_lossy().to_string());
+            }
+        }
+    }
+    
+    // Fall back to trying "forge" in PATH
+    match Command::new("forge").arg("--version").output() {
+        Ok(_) => Ok("forge".to_string()),
+        Err(_) => Err(anyhow::anyhow!(
+            "forge not found in PATH or common installation directories. Please install Foundry: https://book.getfoundry.sh/"
+        )),
+    }
+}
+
 /// A discovered contract from chain query
 #[derive(Debug, Clone)]
 struct DiscoveredContract {
@@ -95,10 +121,10 @@ fn cmd_deploy(
             output::info("Adapter connectivity: use 'csv testnet validate' to verify");
         }
         Chain::Ethereum => {
-            deploy_ethereum(config, state, deployer_key)?;
+            deploy_ethereum(config, state, deployer_key, account)?;
         }
         Chain::Sui => {
-            deploy_sui(config, state)?;
+            deploy_sui(config, state, account)?;
         }
         Chain::Aptos => {
             deploy_aptos(config, state, account)?;
@@ -112,15 +138,22 @@ fn cmd_deploy(
 }
 
 /// Deploy Ethereum contracts via Foundry
-fn deploy_ethereum(config: &Config, state: &mut UnifiedStateManager, deployer_key: Option<String>) -> Result<()> {
+fn deploy_ethereum(config: &Config, state: &mut UnifiedStateManager, deployer_key: Option<String>, account: Option<String>) -> Result<()> {
     let chain_config = config.chain(&Chain::Ethereum)?;
 
     output::progress(1, 5, "Compiling Solidity contracts...");
 
-    // Run forge build first
-    let build_status = Command::new("forge")
-        .args(["build", "--root", "contracts"])
-        .current_dir(env!("CARGO_MANIFEST_DIR").trim_end_matches("csv-cli"))
+    // Run forge build first - need to use the correct path to ethereum contracts
+    let contracts_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("csv-adapter-ethereum/contracts");
+    
+    let forge_path = find_forge()?;
+    
+    let build_status = Command::new(&forge_path)
+        .args(["build"])
+        .current_dir(&contracts_dir)
         .output()?;
 
     if !build_status.status.success() {
@@ -133,16 +166,28 @@ fn deploy_ethereum(config: &Config, state: &mut UnifiedStateManager, deployer_ke
     output::progress(2, 5, "Connecting to Sepolia...");
     output::info(&format!("  RPC: {}", chain_config.rpc_url));
 
-    // Check for DEPLOYER_KEY env var or argument
-    let deployer_key_env = deployer_key.or_else(|| std::env::var("DEPLOYER_KEY").ok());
+    // Check for DEPLOYER_KEY env var, argument, or stored wallet account
+    let deployer_key_env = deployer_key
+        .or_else(|| std::env::var("DEPLOYER_KEY").ok())
+        .or_else(|| {
+            // Try to get from stored Ethereum wallet account
+            if let Some(acc) = state.get_account(&Chain::Ethereum) {
+                if let Some(private_key) = &acc.private_key {
+                    output::info(&format!("Using stored wallet account: {}", acc.name));
+                    return Some(private_key.clone());
+                }
+            }
+            None
+        });
+    
     if deployer_key_env.is_none() {
         return Err(anyhow::anyhow!(
-            "DEPLOYER_KEY not set. Pass --deployer-key <hex> or set DEPLOYER_KEY env var"
+            "DEPLOYER_KEY not found. Options:\n  1. Pass --deployer-key <hex>\n  2. Set DEPLOYER_KEY env var\n  3. Store wallet account with 'csv wallet generate ethereum' or 'csv wallet import ethereum <key>'"
         ));
     }
 
     // Set env for deploy script
-    let mut deploy_cmd = Command::new("forge");
+    let mut deploy_cmd = Command::new(&forge_path);
     deploy_cmd
         .args([
             "script",
@@ -150,14 +195,9 @@ fn deploy_ethereum(config: &Config, state: &mut UnifiedStateManager, deployer_ke
             "--rpc-url",
             &chain_config.rpc_url,
             "--broadcast",
-            "--json",
+            "--verify",
         ])
-        .current_dir(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .parent()
-                .unwrap()
-                .join("csv-adapter-ethereum/contracts"),
-        )
+        .current_dir(&contracts_dir)
         .env("DEPLOYER_KEY", deployer_key_env.as_ref().unwrap());
 
     output::progress(3, 5, "Deploying CSVLock...");
@@ -175,16 +215,28 @@ fn deploy_ethereum(config: &Config, state: &mut UnifiedStateManager, deployer_ke
         ));
     }
 
+    // Combine stdout and stderr since forge script logs to both
     let stdout = String::from_utf8_lossy(&deploy_output.stdout);
+    let stderr = String::from_utf8_lossy(&deploy_output.stderr);
+    let all_output = format!("{}\n{}", stdout, stderr);
 
     // Parse contract addresses from output
-    let csvlock_addr = extract_address(&stdout, "CSVLock deployed at:")
-        .or_else(|| extract_address(&stdout, "CSVLock:"))
-        .ok_or_else(|| anyhow::anyhow!("Could not parse CSVLock address from deploy output"))?;
+    let csvlock_addr = extract_address(&all_output, "CSVLock deployed at:")
+        .or_else(|| extract_address(&all_output, "CSVLock:"))
+        .ok_or_else(|| {
+            // Provide debugging info
+            let preview = all_output.lines().take(50).collect::<Vec<_>>().join("\n");
+            anyhow::anyhow!(
+                "Could not parse CSVLock address from deploy output.\n\nFirst 50 lines of output:\n{}",
+                preview
+            )
+        })?;
 
-    let csvmint_addr = extract_address(&stdout, "CSVMint deployed at:")
-        .or_else(|| extract_address(&stdout, "CSVMint:"))
-        .ok_or_else(|| anyhow::anyhow!("Could not parse CSVMint address from deploy output"))?;
+    let csvmint_addr = extract_address(&all_output, "CSVMint deployed at:")
+        .or_else(|| extract_address(&all_output, "CSVMint:"))
+        .ok_or_else(|| {
+            anyhow::anyhow!("Could not parse CSVMint address from deploy output")
+        })?;
 
     output::progress(5, 5, "Verifying deployment...");
 
@@ -196,7 +248,7 @@ fn deploy_ethereum(config: &Config, state: &mut UnifiedStateManager, deployer_ke
     state.store_contract(ContractRecord {
         chain: Chain::Ethereum,
         address: csvlock_addr.clone(),
-        tx_hash: stdout
+        tx_hash: all_output
             .lines()
             .find(|l| l.contains("transactionHash") || l.contains("txHash"))
             .and_then(|l| l.split(':').nth(1))
@@ -227,7 +279,7 @@ fn deploy_ethereum(config: &Config, state: &mut UnifiedStateManager, deployer_ke
 }
 
 /// Deploy Sui contracts via sui CLI
-fn deploy_sui(config: &Config, state: &mut UnifiedStateManager) -> Result<()> {
+fn deploy_sui(config: &Config, state: &mut UnifiedStateManager, account: Option<String>) -> Result<()> {
     output::progress(1, 4, "Building Move package...");
 
     let sui_path = std::env::var("SUI_BIN").unwrap_or_else(|_| "sui".to_string());
@@ -263,6 +315,46 @@ fn deploy_sui(config: &Config, state: &mut UnifiedStateManager) -> Result<()> {
     let chain_config = config.chain(&Chain::Sui)?;
     output::info(&format!("  RPC: {}", chain_config.rpc_url));
 
+    // Get Sui account from unified state
+    // If --account is specified, find that specific account, otherwise use first available
+    let sui_account = if let Some(ref account_addr) = account {
+        // Find the specified account
+        state.storage.wallet.accounts.iter()
+            .find(|a| a.chain == Chain::Sui && a.address == *account_addr)
+            .or_else(|| {
+                // Try matching without 0x prefix
+                let addr_normalized = account_addr.strip_prefix("0x").unwrap_or(account_addr.as_str());
+                state.storage.wallet.accounts.iter()
+                    .find(|a| a.chain == Chain::Sui && 
+                          (a.address == *account_addr || 
+                           a.address.strip_prefix("0x").unwrap_or(&a.address) == addr_normalized))
+            })
+    } else {
+        // Get first Sui account
+        state.get_account(&Chain::Sui)
+    };
+    
+    // List available accounts if multiple exist and none was specified
+    let sui_accounts: Vec<_> = state.storage.wallet.accounts.iter()
+        .filter(|a| a.chain == Chain::Sui)
+        .collect();
+    
+    if sui_account.is_none() && !sui_accounts.is_empty() {
+        output::warning("Multiple Sui accounts found. Please specify one with --account <ADDRESS>");
+        output::info("Available accounts:");
+        for (idx, acc) in sui_accounts.iter().enumerate() {
+            output::info(&format!("  [{}] {} ({})", idx + 1, acc.address, acc.name));
+        }
+        return Err(anyhow::anyhow!("Please specify account with --account <ADDRESS>"));
+    }
+    
+    if let Some(ref acc) = sui_account {
+        output::info(&format!("  Using account from unified state: {}", acc.address));
+    } else {
+        output::warning("No Sui account found in unified state. Using Sui CLI active wallet.");
+        output::info("Create an account with: csv wallet create --chain sui");
+    }
+
     // Run deploy script
     output::progress(3, 4, "Publishing package...");
 
@@ -274,10 +366,42 @@ fn deploy_sui(config: &Config, state: &mut UnifiedStateManager) -> Result<()> {
         ));
     }
 
-    let deploy_output = Command::new(&deploy_script)
-        .arg("testnet")
-        .arg(&sui_path)
-        .output()?;
+    // Prepare command with environment variables for account override
+    let mut deploy_cmd = Command::new(&deploy_script);
+    deploy_cmd.arg("testnet").arg(&sui_path);
+    
+    // Pass unified state account to deploy script if available
+    if let Some(account) = sui_account {
+        if let Some(ref pk) = account.private_key {
+            // Calculate correct address from private key
+            use blake2::{digest::Digest, Blake2b};
+            use ed25519_dalek::SigningKey;
+            use typenum::U32;
+
+            let seed = hex::decode(pk)
+                .map_err(|_| anyhow::anyhow!("Invalid private key hex for Sui account"))?;
+            if seed.len() != 32 {
+                return Err(anyhow::anyhow!("Invalid private key length for Sui account"));
+            }
+            let seed_array: [u8; 32] = seed.try_into().unwrap();
+            let signing_key = SigningKey::from_bytes(&seed_array);
+            let verifying_key = signing_key.verifying_key();
+
+            let mut hasher = Blake2b::<U32>::new();
+            hasher.update([0x00]);
+            hasher.update(verifying_key.as_bytes());
+            let address_bytes = hasher.finalize();
+            let correct_address = format!("0x{}", hex::encode(address_bytes));
+
+            deploy_cmd.env("CSV_SUI_ADDRESS", correct_address);
+            deploy_cmd.env("CSV_SUI_PRIVATE_KEY", pk);
+        } else {
+            // No private key available, use stored address (may be incorrect for old accounts)
+            deploy_cmd.env("CSV_SUI_ADDRESS", &account.address);
+        }
+    }
+
+    let deploy_output = deploy_cmd.output()?;
 
     if !deploy_output.status.success() {
         let stderr = String::from_utf8_lossy(&deploy_output.stderr);
@@ -876,13 +1000,15 @@ fn contract_explorer_url(chain: Chain, address: &str) -> Option<String> {
 fn extract_address(output: &str, prefix: &str) -> Option<String> {
     for line in output.lines() {
         if line.contains(prefix) {
-            // Format: "CSVLock deployed at: 0x..."
-            if let Some(addr) = line.split(':').nth(1) {
-                let addr = addr
-                    .trim()
-                    .trim_matches(|c: char| c.is_whitespace() || c == '"');
-                if addr.starts_with("0x") && addr.len() >= 42 {
-                    return Some(addr.to_string());
+            // Look for 0x followed by 40 hex characters (42 chars total)
+            let chars: Vec<char> = line.chars().collect();
+            for i in 0..chars.len().saturating_sub(41) {
+                if chars[i] == '0' && chars[i + 1] == 'x' {
+                    let addr: String = chars[i..i + 42].iter().collect();
+                    // Verify all chars after 0x are hex
+                    if addr.len() == 42 && addr.chars().skip(2).all(|c| c.is_ascii_hexdigit()) {
+                        return Some(addr);
+                    }
                 }
             }
         }

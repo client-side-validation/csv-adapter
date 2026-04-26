@@ -20,6 +20,45 @@ fi
 
 cd "$(dirname "$0")/.."
 
+# Check if sui config exists
+SUI_CONFIG_DIR="${SUI_CONFIG_DIR:-$HOME/.sui}"
+if [ ! -f "$SUI_CONFIG_DIR/client.yaml" ]; then
+    echo "ERROR: Sui client not configured. Please run:"
+    echo "  $SUI client new-address ed25519"
+    echo "  $SUI client switch --address <your-address>"
+    echo "Or set SUI_CONFIG_DIR to your sui config directory."
+    exit 1
+fi
+
+# Handle csv-cli wallet if specified
+if [ -n "${CSV_SUI_PRIVATE_KEY:-}" ]; then
+    echo "Using csv-cli wallet for deployment..."
+    # Create temp keypair file
+    KEYPAIR_FILE=$(mktemp)
+    echo "{\"privateKey\": \"$CSV_SUI_PRIVATE_KEY\", \"scheme\": \"ed25519\"}" > "$KEYPAIR_FILE"
+    echo "Created keypair file: $KEYPAIR_FILE"
+    cat "$KEYPAIR_FILE"
+    # Import the keypair
+    IMPORT_OUTPUT=$("$SUI" client import --keypair-file "$KEYPAIR_FILE" --alias csv-deploy --json 2>&1)
+    IMPORT_EXIT=$?
+    echo "Import exit code: $IMPORT_EXIT"
+    echo "Import output: $IMPORT_OUTPUT"
+    if [ $IMPORT_EXIT -ne 0 ]; then
+        echo "Failed to import private key: $IMPORT_OUTPUT"
+        rm "$KEYPAIR_FILE"
+        exit 1
+    fi
+    # Switch to the imported address
+    SWITCH_OUTPUT=$("$SUI" client switch --address "$CSV_SUI_ADDRESS" 2>&1)
+    SWITCH_EXIT=$?
+    echo "Switch exit code: $SWITCH_EXIT"
+    echo "Switch output: $SWITCH_OUTPUT"
+    rm "$KEYPAIR_FILE"
+    echo "Switched to csv-cli wallet: $CSV_SUI_ADDRESS"
+else
+    echo "Using Sui CLI active wallet"
+fi
+
 # Get active address
 echo "Active wallet:"
 "$SUI" client active-address 2>/dev/null || {

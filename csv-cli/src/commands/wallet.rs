@@ -267,14 +267,37 @@ fn generate_ethereum_from_mnemonic(_mnemonic: &str, state: &mut UnifiedStateMana
 }
 
 fn generate_sui_from_mnemonic(_mnemonic: &str, state: &mut UnifiedStateManager) -> Result<String> {
+    use blake2::{digest::Digest, Blake2b};
+    use ed25519_dalek::SigningKey;
     use rand::RngCore;
+    use typenum::U32;
 
-    // Generate a simple Sui-like address (simplified)
-    let mut address_bytes = [0u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut address_bytes);
+    let mut seed = [0u8; 32];
+    rand::rngs::OsRng.fill_bytes(&mut seed);
 
+    let signing_key = SigningKey::from_bytes(&seed);
+    let verifying_key = signing_key.verifying_key();
+
+    // Sui address: BLAKE2b-256(signature_scheme_flag || public_key)
+    // Signature scheme flag 0x00 = Ed25519
+    let mut hasher = Blake2b::<U32>::new();
+    hasher.update([0x00]);
+    hasher.update(verifying_key.as_bytes());
+    let address_bytes = hasher.finalize();
     let address = format!("0x{}", hex::encode(address_bytes));
-    state.store_address(Chain::Sui, address.clone());
+
+    // Store the account with private key
+    let wallet_account = crate::state::WalletAccount {
+        id: format!("sui-{}", &address[2..10]),
+        chain: crate::config::Chain::Sui,
+        name: "Generated Sui Account".to_string(),
+        address: address.clone(),
+        private_key: Some(hex::encode(seed)),
+        xpub: None,
+        derivation_path: None,
+    };
+    state.set_account(wallet_account);
+
     Ok(address)
 }
 
