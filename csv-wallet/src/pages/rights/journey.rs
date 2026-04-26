@@ -148,8 +148,12 @@ fn flow_visualization(
                     }
                     span { class: "text-sm font-medium", "Proof" }
                     if !proofs.is_empty() {
-                        let verified_count = proofs.iter().filter(|p| p.status == ProofStatus::Verified).count();
-                        span { class: "text-xs text-gray-400", "{verified_count}/{proofs.len()} verified" }
+                        span { class: "text-xs text-gray-400",
+                            {
+                                let verified_count = proofs.iter().filter(|p| p.status == ProofStatus::Verified).count();
+                                format!("{}/{}", verified_count, proofs.len())
+                            } " verified"
+                        }
                     } else {
                         span { class: "text-xs text-gray-500", "Not generated" }
                     }
@@ -333,29 +337,21 @@ fn seal_details_section(seal: &SealRecord) -> Element {
 /// Proofs section
 fn proofs_section(proofs: &[ProofRecord]) -> Element {
     rsx! {
-        div { class: "{card_class()}",
-            div { class: "{card_header_class()}",
-                h2 { class: "font-semibold", "\u{1F4C4} Proofs ({proofs.len()})" }
-            }
-            div { class: "p-4 space-y-4",
-                for proof in proofs.iter() {
-                    {proof_card(proof)}
-                }
-            }
+        for proof in proofs.iter() {
+            {proof_card(proof)}
         }
     }
 }
 
 fn proof_card(proof: &ProofRecord) -> Element {
     let status_class = match proof.status {
-        ProofStatus::Generated => "text-yellow-400 bg-yellow-500/20",
-        ProofStatus::Pending => "text-blue-400 bg-blue-500/20",
         ProofStatus::Verified => "text-green-400 bg-green-500/20",
         ProofStatus::Invalid => "text-red-400 bg-red-500/20",
+        ProofStatus::Pending => "text-blue-400 bg-blue-500/20",
+        ProofStatus::Generated => "text-yellow-400 bg-yellow-500/20",
     };
-    
     rsx! {
-        div { class: "border border-gray-700 rounded-lg p-4",
+        div { class: "border border-gray-700 rounded-lg p-4 mb-4",
             div { class: "flex items-center justify-between mb-3",
                 h3 { class: "font-medium", "Proof: {proof.proof_type}" }
                 span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {status_class}",

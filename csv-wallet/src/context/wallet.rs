@@ -130,25 +130,21 @@ impl WalletContext {
                 .seals
                 .into_iter()
                 .filter_map(|s_rec| {
+                    // Check if consumed field exists (old format) or use default
+                    let status = if s_rec.consumed {
+                        SealStatus::Consumed
+                    } else {
+                        SealStatus::Active
+                    };
                     Some(SealRecord {
                         seal_ref: s_rec.seal_ref,
                         chain: convert_chain_from_store(s_rec.chain),
                         value: s_rec.value,
-                        right_id: s_rec.right_id,
-                        status: match s_rec.status {
-                            csv_adapter_store::unified::SealStatus::Active => SealStatus::Active,
-                            csv_adapter_store::unified::SealStatus::Locked => SealStatus::Locked,
-                            csv_adapter_store::unified::SealStatus::Consumed => SealStatus::Consumed,
-                            csv_adapter_store::unified::SealStatus::Transferred => SealStatus::Transferred,
-                        },
+                        right_id: String::new(), // Old format doesn't have this
+                        status,
                         created_at: s_rec.created_at,
-                        content: s_rec.content.map(|c| SealContent {
-                            content_hash: c.content_hash,
-                            owner: c.owner,
-                            block_number: c.block_number,
-                            lock_tx_hash: c.lock_tx_hash,
-                        }),
-                        proof_ref: s_rec.proof_ref,
+                        content: None,
+                        proof_ref: None,
                     })
                 })
                 .collect();
@@ -156,38 +152,23 @@ impl WalletContext {
                 .proofs
                 .into_iter()
                 .filter_map(|p| {
+                    // Old format compatibility - use verified flag to determine status
+                    let status = if p.verified {
+                        ProofStatus::Verified
+                    } else {
+                        ProofStatus::Generated
+                    };
                     Some(ProofRecord {
                         chain: convert_chain_from_store(p.chain),
                         right_id: p.right_id,
-                        seal_ref: p.seal_ref,
+                        seal_ref: String::new(), // Old format doesn't have this
                         proof_type: p.proof_type,
-                        status: match p.status {
-                            csv_adapter_store::unified::ProofStatus::Generated => ProofStatus::Generated,
-                            csv_adapter_store::unified::ProofStatus::Pending => ProofStatus::Pending,
-                            csv_adapter_store::unified::ProofStatus::Verified => ProofStatus::Verified,
-                            csv_adapter_store::unified::ProofStatus::Invalid => ProofStatus::Invalid,
-                        },
-                        generated_at: p.generated_at,
-                        verified_at: p.verified_at,
-                        data: p.data.map(|d| match d {
-                            csv_adapter_store::unified::ProofData::Merkle { root, path, leaf_index } => {
-                                ProofData::Merkle { root, path, leaf_index }
-                            }
-                            csv_adapter_store::unified::ProofData::Mpt { root, account_proof, storage_proof } => {
-                                ProofData::Mpt { root, account_proof, storage_proof }
-                            }
-                            csv_adapter_store::unified::ProofData::Checkpoint { sequence, digest, signatures } => {
-                                ProofData::Checkpoint { sequence, digest, signatures }
-                            }
-                            csv_adapter_store::unified::ProofData::Ledger { version, proof } => {
-                                ProofData::Ledger { version, proof }
-                            }
-                            csv_adapter_store::unified::ProofData::Solana { slot, bank_hash, merkle_proof } => {
-                                ProofData::Solana { slot, bank_hash, merkle_proof }
-                            }
-                        }),
-                        target_chain: p.target_chain.map(convert_chain_from_store),
-                        verification_tx_hash: p.verification_tx_hash,
+                        status,
+                        generated_at: 0,
+                        verified_at: if p.verified { Some(0) } else { None },
+                        data: None,
+                        target_chain: None,
+                        verification_tx_hash: None,
                     })
                 })
                 .collect();
@@ -297,21 +278,8 @@ impl WalletContext {
                     seal_ref: s_rec.seal_ref.clone(),
                     chain: convert_chain_to_store(s_rec.chain.clone()),
                     value: s_rec.value,
-                    right_id: s_rec.right_id.clone(),
-                    status: match s_rec.status {
-                        SealStatus::Active => csv_adapter_store::unified::SealStatus::Active,
-                        SealStatus::Locked => csv_adapter_store::unified::SealStatus::Locked,
-                        SealStatus::Consumed => csv_adapter_store::unified::SealStatus::Consumed,
-                        SealStatus::Transferred => csv_adapter_store::unified::SealStatus::Transferred,
-                    },
+                    consumed: s_rec.status == SealStatus::Consumed,
                     created_at: s_rec.created_at,
-                    content: s_rec.content.as_ref().map(|c| csv_adapter_store::unified::SealContent {
-                        content_hash: c.content_hash.clone(),
-                        owner: c.owner.clone(),
-                        block_number: c.block_number,
-                        lock_tx_hash: c.lock_tx_hash.clone(),
-                    }),
-                    proof_ref: s_rec.proof_ref.clone(),
                 })
                 .collect(),
             proofs: s
@@ -320,35 +288,9 @@ impl WalletContext {
                 .map(|p| csv_adapter_store::unified::ProofRecord {
                     chain: convert_chain_to_store(p.chain.clone()),
                     right_id: p.right_id.clone(),
-                    seal_ref: p.seal_ref.clone(),
                     proof_type: p.proof_type.clone(),
-                    status: match p.status {
-                        ProofStatus::Generated => csv_adapter_store::unified::ProofStatus::Generated,
-                        ProofStatus::Pending => csv_adapter_store::unified::ProofStatus::Pending,
-                        ProofStatus::Verified => csv_adapter_store::unified::ProofStatus::Verified,
-                        ProofStatus::Invalid => csv_adapter_store::unified::ProofStatus::Invalid,
-                    },
-                    generated_at: p.generated_at,
-                    verified_at: p.verified_at,
-                    data: p.data.as_ref().map(|d| match d.clone() {
-                        ProofData::Merkle { root, path, leaf_index } => {
-                            csv_adapter_store::unified::ProofData::Merkle { root, path, leaf_index }
-                        }
-                        ProofData::Mpt { root, account_proof, storage_proof } => {
-                            csv_adapter_store::unified::ProofData::Mpt { root, account_proof, storage_proof }
-                        }
-                        ProofData::Checkpoint { sequence, digest, signatures } => {
-                            csv_adapter_store::unified::ProofData::Checkpoint { sequence, digest, signatures }
-                        }
-                        ProofData::Ledger { version, proof } => {
-                            csv_adapter_store::unified::ProofData::Ledger { version, proof }
-                        }
-                        ProofData::Solana { slot, bank_hash, merkle_proof } => {
-                            csv_adapter_store::unified::ProofData::Solana { slot, bank_hash, merkle_proof }
-                        }
-                    }),
-                    target_chain: p.target_chain.map(convert_chain_to_store),
-                    verification_tx_hash: p.verification_tx_hash.clone(),
+                    verified: p.status == ProofStatus::Verified,
+                    proof_data: None,
                 })
                 .collect(),
             contracts: s

@@ -274,7 +274,7 @@ pub fn CrossChainTransfer() -> Element {
                         // Create linked Seal record
                         let seal_ref = format!("seal_{}", &transfer_id[..16]);
                         let seal_content = SealContent {
-                            content_hash: format!("0x{}", hex::encode(&right)),
+                            content_hash: format!("0x{}", &right[..40.min(right.len())]),
                             owner: dest_addr.clone(),
                             block_number: None,
                             lock_tx_hash: Some(transfer_result.lock_tx_hash.clone()),
@@ -282,7 +282,7 @@ pub fn CrossChainTransfer() -> Element {
                         let seal = SealRecord {
                             seal_ref: seal_ref.clone(),
                             chain: from,
-                            value: rights_for_source.get(selected_right_index).map(|r| r.value).unwrap_or(0),
+                            value: rights_for_source.get(*selected_right_index.read()).map(|r| r.value).unwrap_or(0),
                             right_id: right.clone(),
                             status: SealStatus::Locked,
                             created_at: now,

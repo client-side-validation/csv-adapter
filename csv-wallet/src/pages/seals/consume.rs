@@ -1,6 +1,6 @@
 //! Consume seal page.
 
-use crate::context::{use_wallet_context, SealRecord};
+use crate::context::{use_wallet_context, SealRecord, SealStatus};
 use crate::pages::common::*;
 use crate::routes::Route;
 use csv_adapter_core::Chain;
@@ -13,7 +13,7 @@ pub fn ConsumeSeal(seal_ref: Option<String>) -> Element {
     let seals = wallet_ctx.seals();
 
     // Get available (unconsumed) seals
-    let available_seals: Vec<_> = seals.iter().filter(|s| !s.consumed).cloned().collect();
+    let available_seals: Vec<_> = seals.iter().filter(|s| s.status != SealStatus::Consumed && s.status != SealStatus::Transferred).cloned().collect();
 
     // Initialize selected seal from URL parameter or first available
     let initial_seal_ref = seal_ref.clone().or_else(|| available_seals.first().map(|s| s.seal_ref.clone()));

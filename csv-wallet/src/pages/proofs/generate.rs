@@ -1,6 +1,6 @@
 //! Generate proof page.
 
-use crate::context::{use_wallet_context, ProofRecord};
+use crate::context::{use_wallet_context, ProofRecord, ProofStatus};
 use crate::pages::common::*;
 use crate::routes::Route;
 use csv_adapter_core::Chain;
@@ -67,8 +67,14 @@ pub fn GenerateProof() -> Element {
                         wallet_ctx.add_proof(ProofRecord {
                             chain: *selected_chain.read(),
                             right_id: right_id.read().clone(),
+                            seal_ref: format!("seal_{}", &right_id.read()[..16.min(right_id.read().len())]),
                             proof_type: proof_type.to_string(),
-                            verified: false,
+                            status: ProofStatus::Generated,
+                            generated_at: js_sys::Date::now() as u64 / 1000,
+                            verified_at: None,
+                            data: None,
+                            target_chain: None,
+                            verification_tx_hash: None,
                         });
                     },
                     class: "{btn_full_primary_class()}",

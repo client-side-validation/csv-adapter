@@ -47,12 +47,6 @@ pub fn Proofs() -> Element {
                             }
                             tbody { class: "divide-y divide-gray-800",
                                 for (idx, proof) in proofs_owned.iter().enumerate() {
-                                    let status_class = match proof.status {
-                                        ProofStatus::Verified => "text-green-400 bg-green-500/20",
-                                        ProofStatus::Invalid => "text-red-400 bg-red-500/20",
-                                        ProofStatus::Pending => "text-blue-400 bg-blue-500/20",
-                                        ProofStatus::Generated => "text-yellow-400 bg-yellow-500/20",
-                                    };
                                     tr { key: "{idx}-{proof.chain}-{proof.right_id}-{proof.proof_type}", class: "hover:bg-gray-800/50 transition-colors",
                                         td { class: "px-4 py-3", span { class: "{chain_badge_class(&proof.chain)}", "{chain_icon_emoji(&proof.chain)} {chain_name(&proof.chain)}" } }
                                         td { class: "px-4 py-3 font-mono text-xs",
@@ -65,7 +59,7 @@ pub fn Proofs() -> Element {
                                         }
                                         td { class: "px-4 py-3 text-xs", "{proof.proof_type}" }
                                         td { class: "px-4 py-3",
-                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {status_class}",
+                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {proof_status_class(&proof.status)}",
                                                 "{proof.status}"
                                             }
                                         }

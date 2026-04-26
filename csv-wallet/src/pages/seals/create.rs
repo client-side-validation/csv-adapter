@@ -102,7 +102,7 @@ pub fn CreateSeal() -> Element {
                                 status: SealStatus::Active,
                                 created_at: now,
                                 content: Some(SealContent {
-                                    content_hash: format!("0x{}", hex::encode(&right.id)),
+                                    content_hash: format!("0x{}", &right.id[..40.min(right.id.len())]),
                                     owner: right.owner.clone(),
                                     block_number: None,
                                     lock_tx_hash: None,

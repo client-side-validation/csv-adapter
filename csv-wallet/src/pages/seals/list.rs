@@ -76,12 +76,6 @@ pub fn Seals() -> Element {
                             }
                             tbody { class: "divide-y divide-gray-800",
                                 for (i, seal) in filtered.iter().enumerate() {
-                                    let status_class = match seal.status {
-                                        SealStatus::Active => "text-yellow-400 bg-yellow-500/20",
-                                        SealStatus::Locked => "text-orange-400 bg-orange-500/20",
-                                        SealStatus::Consumed => "text-gray-400 bg-gray-500/20",
-                                        SealStatus::Transferred => "text-green-400 bg-green-500/20",
-                                    };
                                     tr { key: "seal-row-{i}", class: "hover:bg-gray-800/50 transition-colors",
                                         td { class: "px-4 py-3 text-gray-400", "{i + 1}" }
                                         td { class: "px-4 py-3 font-mono text-xs", "{truncate_address(&seal.seal_ref, 12)}" }
@@ -93,7 +87,7 @@ pub fn Seals() -> Element {
                                         }
                                         td { class: "px-4 py-3 font-mono text-xs", "{seal.value}" }
                                         td { class: "px-4 py-3",
-                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {status_class}",
+                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {seal_status_class(&seal.status)}",
                                                 "{seal.status}"
                                             }
                                         }
