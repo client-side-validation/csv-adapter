@@ -1,6 +1,6 @@
 //! Seals list page.
 
-use crate::context::{use_wallet_context, SealRecord};
+use crate::context::{use_wallet_context, SealRecord, SealStatus};
 use crate::pages::common::*;
 use crate::routes::Route;
 use csv_adapter_core::Chain;
@@ -68,6 +68,7 @@ pub fn Seals() -> Element {
                                     th { class: "px-4 py-2 font-medium", "#" }
                                     th { class: "px-4 py-2 font-medium", "Seal Ref" }
                                     th { class: "px-4 py-2 font-medium", "Chain" }
+                                    th { class: "px-4 py-2 font-medium", "Protects Right" }
                                     th { class: "px-4 py-2 font-medium", "Value" }
                                     th { class: "px-4 py-2 font-medium", "Status" }
                                     th { class: "px-4 py-2 font-medium", "Actions" }
@@ -75,15 +76,25 @@ pub fn Seals() -> Element {
                             }
                             tbody { class: "divide-y divide-gray-800",
                                 for (i, seal) in filtered.iter().enumerate() {
+                                    let status_class = match seal.status {
+                                        SealStatus::Active => "text-yellow-400 bg-yellow-500/20",
+                                        SealStatus::Locked => "text-orange-400 bg-orange-500/20",
+                                        SealStatus::Consumed => "text-gray-400 bg-gray-500/20",
+                                        SealStatus::Transferred => "text-green-400 bg-green-500/20",
+                                    };
                                     tr { key: "seal-row-{i}", class: "hover:bg-gray-800/50 transition-colors",
                                         td { class: "px-4 py-3 text-gray-400", "{i + 1}" }
                                         td { class: "px-4 py-3 font-mono text-xs", "{truncate_address(&seal.seal_ref, 12)}" }
                                         td { class: "px-4 py-3", span { class: "{chain_badge_class(&seal.chain)}", "{chain_icon_emoji(&seal.chain)} {chain_name(&seal.chain)}" } }
+                                        td { class: "px-4 py-3 font-mono text-xs",
+                                            Link { to: Route::RightJourney { id: seal.right_id.clone() }, class: "text-purple-400 hover:text-purple-300",
+                                                "{truncate_address(&seal.right_id, 8)}"
+                                            }
+                                        }
                                         td { class: "px-4 py-3 font-mono text-xs", "{seal.value}" }
                                         td { class: "px-4 py-3",
-                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
-                                                class: if seal.consumed { "text-gray-400 bg-gray-500/20" } else { "text-green-400 bg-green-500/20" },
-                                                if seal.consumed { "Consumed" } else { "Available" }
+                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {status_class}",
+                                                "{seal.status}"
                                             }
                                         }
                                         td { class: "px-4 py-3",
@@ -98,7 +109,7 @@ pub fn Seals() -> Element {
                                                         }
                                                     }
                                                 }
-                                                if !seal.consumed {
+                                                if seal.status != SealStatus::Consumed && seal.status != SealStatus::Transferred {
                                                     {
                                                         let seal_ref_clone = seal.seal_ref.clone();
                                                         rsx! {
@@ -158,9 +169,16 @@ pub fn Seals() -> Element {
                                     div { class: "space-y-2",
                                         p { class: "text-sm text-gray-400", "Status" }
                                         p { class: "text-sm",
-                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
-                                                class: if seal.consumed { "text-gray-400 bg-gray-500/20" } else { "text-green-400 bg-green-500/20" },
-                                                if seal.consumed { "Consumed" } else { "Available" }
+                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {seal_status_class(&seal.status)}",
+                                                "{seal.status}"
+                                            }
+                                        }
+                                    }
+                                    div { class: "space-y-2",
+                                        p { class: "text-sm text-gray-400", "Protects Right" }
+                                        p { class: "text-sm font-mono break-all",
+                                            Link { to: Route::RightJourney { id: seal.right_id.clone() }, class: "text-purple-400 hover:text-purple-300",
+                                                "{&seal.right_id}"
                                             }
                                         }
                                     }
@@ -198,7 +216,8 @@ pub fn Seals() -> Element {
                                     div { class: "bg-gray-800/50 rounded-lg p-3",
                                         p { class: "text-xs text-gray-500", "Seal Ref: {truncate_address(&seal.seal_ref, 20)}" }
                                         p { class: "text-xs text-gray-500", "Chain: {chain_name(&seal.chain)}" }
-                                        p { class: "text-xs text-gray-500", "Status: ", if seal.consumed { "Consumed" } else { "Available" } }
+                                        p { class: "text-xs text-gray-500", "Status: {seal.status}" }
+                                        p { class: "text-xs text-gray-500", "Right: {truncate_address(&seal.right_id, 12)}" }
                                     }
                                     div { class: "flex gap-3",
                                         button {

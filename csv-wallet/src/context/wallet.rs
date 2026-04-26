@@ -134,8 +134,21 @@ impl WalletContext {
                         seal_ref: s_rec.seal_ref,
                         chain: convert_chain_from_store(s_rec.chain),
                         value: s_rec.value,
-                        consumed: s_rec.consumed,
+                        right_id: s_rec.right_id,
+                        status: match s_rec.status {
+                            csv_adapter_store::unified::SealStatus::Active => SealStatus::Active,
+                            csv_adapter_store::unified::SealStatus::Locked => SealStatus::Locked,
+                            csv_adapter_store::unified::SealStatus::Consumed => SealStatus::Consumed,
+                            csv_adapter_store::unified::SealStatus::Transferred => SealStatus::Transferred,
+                        },
                         created_at: s_rec.created_at,
+                        content: s_rec.content.map(|c| SealContent {
+                            content_hash: c.content_hash,
+                            owner: c.owner,
+                            block_number: c.block_number,
+                            lock_tx_hash: c.lock_tx_hash,
+                        }),
+                        proof_ref: s_rec.proof_ref,
                     })
                 })
                 .collect();
@@ -146,8 +159,35 @@ impl WalletContext {
                     Some(ProofRecord {
                         chain: convert_chain_from_store(p.chain),
                         right_id: p.right_id,
+                        seal_ref: p.seal_ref,
                         proof_type: p.proof_type,
-                        verified: p.verified,
+                        status: match p.status {
+                            csv_adapter_store::unified::ProofStatus::Generated => ProofStatus::Generated,
+                            csv_adapter_store::unified::ProofStatus::Pending => ProofStatus::Pending,
+                            csv_adapter_store::unified::ProofStatus::Verified => ProofStatus::Verified,
+                            csv_adapter_store::unified::ProofStatus::Invalid => ProofStatus::Invalid,
+                        },
+                        generated_at: p.generated_at,
+                        verified_at: p.verified_at,
+                        data: p.data.map(|d| match d {
+                            csv_adapter_store::unified::ProofData::Merkle { root, path, leaf_index } => {
+                                ProofData::Merkle { root, path, leaf_index }
+                            }
+                            csv_adapter_store::unified::ProofData::Mpt { root, account_proof, storage_proof } => {
+                                ProofData::Mpt { root, account_proof, storage_proof }
+                            }
+                            csv_adapter_store::unified::ProofData::Checkpoint { sequence, digest, signatures } => {
+                                ProofData::Checkpoint { sequence, digest, signatures }
+                            }
+                            csv_adapter_store::unified::ProofData::Ledger { version, proof } => {
+                                ProofData::Ledger { version, proof }
+                            }
+                            csv_adapter_store::unified::ProofData::Solana { slot, bank_hash, merkle_proof } => {
+                                ProofData::Solana { slot, bank_hash, merkle_proof }
+                            }
+                        }),
+                        target_chain: p.target_chain.map(convert_chain_from_store),
+                        verification_tx_hash: p.verification_tx_hash,
                     })
                 })
                 .collect();
@@ -253,23 +293,62 @@ impl WalletContext {
             seals: s
                 .seals
                 .iter()
-                .map(|s_rec| SealRecord {
+                .map(|s_rec| csv_adapter_store::unified::SealRecord {
                     seal_ref: s_rec.seal_ref.clone(),
                     chain: convert_chain_to_store(s_rec.chain.clone()),
                     value: s_rec.value,
-                    consumed: s_rec.consumed,
+                    right_id: s_rec.right_id.clone(),
+                    status: match s_rec.status {
+                        SealStatus::Active => csv_adapter_store::unified::SealStatus::Active,
+                        SealStatus::Locked => csv_adapter_store::unified::SealStatus::Locked,
+                        SealStatus::Consumed => csv_adapter_store::unified::SealStatus::Consumed,
+                        SealStatus::Transferred => csv_adapter_store::unified::SealStatus::Transferred,
+                    },
                     created_at: s_rec.created_at,
+                    content: s_rec.content.as_ref().map(|c| csv_adapter_store::unified::SealContent {
+                        content_hash: c.content_hash.clone(),
+                        owner: c.owner.clone(),
+                        block_number: c.block_number,
+                        lock_tx_hash: c.lock_tx_hash.clone(),
+                    }),
+                    proof_ref: s_rec.proof_ref.clone(),
                 })
                 .collect(),
             proofs: s
                 .proofs
                 .iter()
-                .map(|p| ProofRecord {
+                .map(|p| csv_adapter_store::unified::ProofRecord {
                     chain: convert_chain_to_store(p.chain.clone()),
                     right_id: p.right_id.clone(),
+                    seal_ref: p.seal_ref.clone(),
                     proof_type: p.proof_type.clone(),
-                    verified: p.verified,
-                    proof_data: None,
+                    status: match p.status {
+                        ProofStatus::Generated => csv_adapter_store::unified::ProofStatus::Generated,
+                        ProofStatus::Pending => csv_adapter_store::unified::ProofStatus::Pending,
+                        ProofStatus::Verified => csv_adapter_store::unified::ProofStatus::Verified,
+                        ProofStatus::Invalid => csv_adapter_store::unified::ProofStatus::Invalid,
+                    },
+                    generated_at: p.generated_at,
+                    verified_at: p.verified_at,
+                    data: p.data.as_ref().map(|d| match d.clone() {
+                        ProofData::Merkle { root, path, leaf_index } => {
+                            csv_adapter_store::unified::ProofData::Merkle { root, path, leaf_index }
+                        }
+                        ProofData::Mpt { root, account_proof, storage_proof } => {
+                            csv_adapter_store::unified::ProofData::Mpt { root, account_proof, storage_proof }
+                        }
+                        ProofData::Checkpoint { sequence, digest, signatures } => {
+                            csv_adapter_store::unified::ProofData::Checkpoint { sequence, digest, signatures }
+                        }
+                        ProofData::Ledger { version, proof } => {
+                            csv_adapter_store::unified::ProofData::Ledger { version, proof }
+                        }
+                        ProofData::Solana { slot, bank_hash, merkle_proof } => {
+                            csv_adapter_store::unified::ProofData::Solana { slot, bank_hash, merkle_proof }
+                        }
+                    }),
+                    target_chain: p.target_chain.map(convert_chain_to_store),
+                    verification_tx_hash: p.verification_tx_hash.clone(),
                 })
                 .collect(),
             contracts: s
@@ -519,13 +598,31 @@ impl WalletContext {
     pub fn consume_seal(&mut self, seal_ref: &str) -> bool {
         let mut s = self.state.write();
         if let Some(seal) = s.seals.iter_mut().find(|s| s.seal_ref == seal_ref) {
-            seal.consumed = true;
+            seal.status = SealStatus::Consumed;
             drop(s);
             self.save_persisted();
             true
         } else {
             false
         }
+    }
+
+    pub fn lock_seal(&mut self, seal_ref: &str, content: SealContent) -> bool {
+        let mut s = self.state.write();
+        if let Some(seal) = s.seals.iter_mut().find(|s| s.seal_ref == seal_ref) {
+            seal.status = SealStatus::Locked;
+            seal.content = Some(content);
+            drop(s);
+            self.save_persisted();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get seal for a specific right
+    pub fn seal_for_right(&self, right_id: &str) -> Option<SealRecord> {
+        self.state.read().seals.iter().find(|s| s.right_id == right_id).cloned()
     }
 
     pub fn remove_seal(&mut self, seal_ref: &str) -> bool {
@@ -546,13 +643,45 @@ impl WalletContext {
             .seals
             .iter()
             .find(|s| s.seal_ref == seal_ref)
-            .map(|s| s.consumed)
+            .map(|s| s.status == SealStatus::Consumed)
             .unwrap_or(false)
+    }
+
+    pub fn seal_status(&self, seal_ref: &str) -> Option<SealStatus> {
+        self.state
+            .read()
+            .seals
+            .iter()
+            .find(|s| s.seal_ref == seal_ref)
+            .map(|s| s.status.clone())
     }
 
     pub fn add_proof(&mut self, proof: ProofRecord) {
         self.state.write().proofs.push(proof);
         self.save_persisted();
+    }
+
+    /// Link a proof to its seal
+    pub fn link_proof_to_seal(&mut self, seal_ref: &str, proof_ref: &str) -> bool {
+        let mut s = self.state.write();
+        if let Some(seal) = s.seals.iter_mut().find(|s| s.seal_ref == seal_ref) {
+            seal.proof_ref = Some(proof_ref.to_string());
+            drop(s);
+            self.save_persisted();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get proof by reference (seal_ref or generated ID)
+    pub fn proof_for_seal(&self, seal_ref: &str) -> Option<ProofRecord> {
+        self.state.read().proofs.iter().find(|p| p.seal_ref == seal_ref).cloned()
+    }
+
+    /// Get all proofs for a right
+    pub fn proofs_for_right(&self, right_id: &str) -> Vec<ProofRecord> {
+        self.state.read().proofs.iter().filter(|p| p.right_id == right_id).cloned().collect()
     }
 
     pub fn remove_proof(&mut self, right_id: &str, proof_type: &str) -> bool {

@@ -1,6 +1,6 @@
 //! Common UI helpers and styling functions for pages.
 
-use crate::context::types::{RightStatus, SealRecord, TestStatus, TransferStatus};
+use crate::context::types::{RightStatus, SealRecord, SealStatus, TestStatus, TransferStatus};
 use crate::routes::Route;
 use csv_adapter_core::Chain;
 use dioxus::prelude::*;
@@ -103,6 +103,15 @@ pub fn seal_consumed_text_class(consumed: bool) -> &'static str {
         "text-red-300"
     } else {
         "text-green-300"
+    }
+}
+
+pub fn seal_status_class(status: &SealStatus) -> &'static str {
+    match status {
+        SealStatus::Active => "text-yellow-400 bg-yellow-500/20",
+        SealStatus::Locked => "text-orange-400 bg-orange-500/20",
+        SealStatus::Consumed => "text-gray-400 bg-gray-500/20",
+        SealStatus::Transferred => "text-green-400 bg-green-500/20",
     }
 }
 

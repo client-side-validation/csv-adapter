@@ -20,6 +20,8 @@ pub enum Route {
     CreateRight {},
     #[route("/rights/:id")]
     ShowRight { id: String },
+    #[route("/rights/:id/journey")]
+    RightJourney { id: String },
     #[route("/rights/transfer")]
     TransferRight {},
     #[route("/rights/consume")]

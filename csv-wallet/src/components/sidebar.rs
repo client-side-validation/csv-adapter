@@ -55,35 +55,27 @@ pub fn Sidebar(sidebar_open: bool) -> Element {
                         {sidebar_link(Route::Transactions {}, "\u{1F4B8}", "Transactions")}
                     })}
 
-                    {sidebar_section("Rights", rsx! {
+                    {sidebar_section("Rights & Assets", rsx! {
                         {sidebar_link(Route::Rights {}, "\u{1F48E}", "All Rights")}
                         {sidebar_link(Route::CreateRight {}, "\u{2795}", "Create Right")}
                         {sidebar_link(Route::TransferRight {}, "\u{27A1}", "Transfer Right")}
                         {sidebar_link(Route::ConsumeRight {}, "\u{1F525}", "Consume Right")}
                     })}
 
-                    {sidebar_section("Proofs", rsx! {
-                        {sidebar_link(Route::Proofs {}, "\u{1F4C4}", "All Proofs")}
-                        {sidebar_link(Route::GenerateProof {}, "\u{2795}", "Generate Proof")}
-                        {sidebar_link(Route::VerifyProof {}, "\u{2705}", "Verify Proof")}
-                        {sidebar_link(Route::VerifyCrossChainProof {}, "\u{1F504}", "Verify Cross-Chain")}
-                    })}
-
-                    {sidebar_section("Cross-Chain", rsx! {
+                    {sidebar_section("Cross-Chain Transfer", rsx! {
                         {sidebar_link(Route::CrossChain {}, "\u{21C4}", "All Transfers")}
                         {sidebar_link(Route::CrossChainTransfer {}, "\u{2795}", "New Transfer")}
                         {sidebar_link(Route::CrossChainStatus {}, "\u{1F50D}", "Status")}
                     })}
 
+                    {sidebar_section("Seals & Proofs", rsx! {
+                        {sidebar_link(Route::Seals {}, "\u{1F512}", "Seals (Locked Rights)")}
+                        {sidebar_link(Route::Proofs {}, "\u{1F4C4}", "Proofs (Validation)")}
+                    })}
+
                     {sidebar_section("Contracts", rsx! {
                         {sidebar_link(Route::Contracts {}, "\u{1F4DC}", "All Contracts")}
                         {sidebar_link(Route::DeployContract {}, "\u{2795}", "Deploy")}
-                    })}
-
-                    {sidebar_section("Seals", rsx! {
-                        {sidebar_link(Route::Seals {}, "\u{1F512}", "All Seals")}
-                        {sidebar_link(Route::CreateSeal {}, "\u{2795}", "Create Seal")}
-                        {sidebar_link(Route::ConsumeSeal { seal_ref: None }, "\u{1F525}", "Consume Seal")}
                     })}
 
                     {sidebar_section("Test & Validate", rsx! {
@@ -105,6 +97,7 @@ pub fn Sidebar(sidebar_open: bool) -> Element {
                     Link { to: Route::Transactions {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Transactions", "\u{1F4B8}" }
                     Link { to: Route::Rights {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Rights", "\u{1F48E}" }
                     Link { to: Route::Seals {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Seals", "\u{1F512}" }
+                    Link { to: Route::Proofs {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Proofs", "\u{1F4C4}" }
                     Link { to: Route::CrossChain {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Cross-Chain", "\u{21C4}" }
                     Link { to: Route::Settings {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Settings", "\u{2699}\u{FE0F}" }
                 }

@@ -109,23 +109,160 @@ pub struct DeployedContract {
     pub deployed_at: u64,
 }
 
-/// A seal record.
+/// Seal status - shows lifecycle state
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SealStatus {
+    /// Seal created, protecting a Right
+    Active,
+    /// Right locked, seal holding the value
+    Locked,
+    /// Seal consumed, value released
+    Consumed,
+    /// Seal was used in a cross-chain transfer
+    Transferred,
+}
+
+impl std::fmt::Display for SealStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SealStatus::Active => write!(f, "Active"),
+            SealStatus::Locked => write!(f, "Locked"),
+            SealStatus::Consumed => write!(f, "Consumed"),
+            SealStatus::Transferred => write!(f, "Transferred"),
+        }
+    }
+}
+
+/// The cryptographic content sealed for verification
+#[derive(Clone, Debug, PartialEq)]
+pub struct SealContent {
+    /// Hash of the sealed right data
+    pub content_hash: String,
+    /// Owner address who created the seal
+    pub owner: String,
+    /// Block height/number when sealed
+    pub block_number: Option<u64>,
+    /// Transaction hash that created the seal
+    pub lock_tx_hash: Option<String>,
+}
+
+/// A seal record - cryptographically protects a Right.
+/// In the CSV protocol, a Seal is created when a Right is locked for
+/// cross-chain transfer or secure storage.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SealRecord {
     pub seal_ref: String,
     pub chain: Chain,
     pub value: u64,
-    pub consumed: bool,
+    /// Which Right this seal is protecting
+    pub right_id: String,
+    /// Current status in the seal lifecycle
+    pub status: SealStatus,
+    /// When the seal was created
     pub created_at: u64,
+    /// Cryptographic content of the seal
+    pub content: Option<SealContent>,
+    /// Reference to any proof generated from this seal
+    pub proof_ref: Option<String>,
 }
 
-/// A proof record.
+/// Proof status - shows verification state
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ProofStatus {
+    /// Proof generated but not verified
+    Generated,
+    /// Proof submitted for verification
+    Pending,
+    /// Proof verified successfully
+    Verified,
+    /// Proof verification failed
+    Invalid,
+}
+
+impl std::fmt::Display for ProofStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProofStatus::Generated => write!(f, "Generated"),
+            ProofStatus::Pending => write!(f, "Pending"),
+            ProofStatus::Verified => write!(f, "Verified"),
+            ProofStatus::Invalid => write!(f, "Invalid"),
+        }
+    }
+}
+
+/// Specific proof data based on chain type
+#[derive(Clone, Debug, PartialEq)]
+pub enum ProofData {
+    /// Bitcoin-style Merkle proof
+    Merkle {
+        /// Merkle root hash
+        root: String,
+        /// Proof path (sibling hashes)
+        path: Vec<String>,
+        /// Leaf index
+        leaf_index: u64,
+    },
+    /// Ethereum MPT (Merkle Patricia Trie) proof
+    Mpt {
+        /// State root
+        root: String,
+        /// Account proof path
+        account_proof: Vec<String>,
+        /// Storage proof path
+        storage_proof: Vec<String>,
+    },
+    /// Sui checkpoint proof
+    Checkpoint {
+        /// Checkpoint sequence number
+        sequence: u64,
+        /// Checkpoint digest
+        digest: String,
+        /// Validator signatures
+        signatures: Vec<String>,
+    },
+    /// Aptos ledger proof
+    Ledger {
+        /// Ledger version
+        version: u64,
+        /// Proof data
+        proof: String,
+    },
+    /// Solana proof
+    Solana {
+        /// Slot number
+        slot: u64,
+        /// Bank hash
+        bank_hash: String,
+        /// Merkle proof
+        merkle_proof: Vec<String>,
+    },
+}
+
+/// A proof record - cryptographic proof that validates a Seal.
+/// In the CSV protocol, a Proof is generated from a Seal and submitted
+/// to the destination chain to verify the locked value exists.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProofRecord {
+    /// Which chain the proof was generated on (source chain)
     pub chain: Chain,
+    /// Which Right this proof validates
     pub right_id: String,
+    /// Which Seal this proof was generated from
+    pub seal_ref: String,
+    /// Type of proof (merkle, mpt, checkpoint, etc.)
     pub proof_type: String,
-    pub verified: bool,
+    /// Current status in the proof lifecycle
+    pub status: ProofStatus,
+    /// When the proof was generated
+    pub generated_at: u64,
+    /// When the proof was verified (if applicable)
+    pub verified_at: Option<u64>,
+    /// The actual cryptographic proof data
+    pub data: Option<ProofData>,
+    /// Target chain for cross-chain verification
+    pub target_chain: Option<Chain>,
+    /// Verification transaction hash on target chain
+    pub verification_tx_hash: Option<String>,
 }
 
 /// An NFT (Non-Fungible Token) record.

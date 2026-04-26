@@ -1,6 +1,6 @@
 //! Rights list page.
 
-use crate::context::{use_wallet_context, RightStatus};
+use crate::context::{use_wallet_context, RightStatus, SealStatus, ProofStatus};
 use crate::pages::common::*;
 use crate::routes::Route;
 use csv_adapter_core::Chain;
@@ -62,32 +62,63 @@ pub fn Rights() -> Element {
                                     th { class: "px-4 py-2 font-medium", "Chain" }
                                     th { class: "px-4 py-2 font-medium", "Value" }
                                     th { class: "px-4 py-2 font-medium", "Status" }
+                                    th { class: "px-4 py-2 font-medium", "Seal/Proof" }
                                     th { class: "px-4 py-2 font-medium", "Actions" }
                                 }
                             }
                             tbody { class: "divide-y divide-gray-800",
                                 for (idx, right) in filtered.iter().enumerate() {
-                                    tr { key: "{idx}-{right.id}", class: "hover:bg-gray-800/50 transition-colors",
-                                        td { class: "px-4 py-3 font-mono text-xs text-gray-300", "{truncate_address(&right.id, 8)}" }
-                                        td { class: "px-4 py-3", span { class: "{chain_badge_class(&right.chain)}", "{chain_icon_emoji(&right.chain)} {chain_name(&right.chain)}" } }
-                                        td { class: "px-4 py-3 font-mono text-xs", "{right.value}" }
-                                        td { class: "px-4 py-3",
-                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {right_status_class(&right.status)}",
-                                                "{right.status}"
-                                            }
-                                        }
-                                        td { class: "px-4 py-3 flex gap-2",
-                                            Link { to: Route::ShowRight { id: right.id.clone() }, class: "text-blue-400 hover:text-blue-300 text-xs", "View" }
-                                            button {
-                                                onclick: {
-                                                    let mut wallet_ctx = wallet_ctx.clone();
-                                                    let right_id = right.id.clone();
-                                                    move |_| {
-                                                        wallet_ctx.remove_right(&right_id);
+                                    {
+                                        let seal = wallet_ctx.seal_for_right(&right.id);
+                                        let proofs = wallet_ctx.proofs_for_right(&right.id);
+                                        let verified_count = proofs.iter().filter(|p| p.status == ProofStatus::Verified).count();
+                                        rsx! {
+                                            tr { key: "{idx}-{right.id}", class: "hover:bg-gray-800/50 transition-colors",
+                                                td { class: "px-4 py-3 font-mono text-xs text-gray-300", "{truncate_address(&right.id, 8)}" }
+                                                td { class: "px-4 py-3", span { class: "{chain_badge_class(&right.chain)}", "{chain_icon_emoji(&right.chain)} {chain_name(&right.chain)}" } }
+                                                td { class: "px-4 py-3 font-mono text-xs", "{right.value}" }
+                                                td { class: "px-4 py-3",
+                                                    span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {right_status_class(&right.status)}",
+                                                        "{right.status}"
                                                     }
-                                                },
-                                                class: "text-red-400 hover:text-red-300 text-xs",
-                                                "Remove"
+                                                }
+                                                td { class: "px-4 py-3",
+                                                    div { class: "flex gap-1",
+                                                        // Seal indicator
+                                                        if let Some(ref s) = seal {
+                                                            span { class: "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium {seal_status_badge_class(&s.status)}",
+                                                                "\u{1F512}"
+                                                            }
+                                                        }
+                                                        // Proof indicator
+                                                        if !proofs.is_empty() {
+                                                            if verified_count > 0 {
+                                                                span { class: "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium text-green-400 bg-green-500/20",
+                                                                    "\u{1F4C4} {verified_count}"
+                                                                }
+                                                            } else {
+                                                                span { class: "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium text-yellow-400 bg-yellow-500/20",
+                                                                    "\u{1F4C4} {proofs.len()}"
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                td { class: "px-4 py-3 flex gap-2",
+                                                    Link { to: Route::RightJourney { id: right.id.clone() }, class: "text-purple-400 hover:text-purple-300 text-xs font-medium", "Journey" }
+                                                    Link { to: Route::ShowRight { id: right.id.clone() }, class: "text-blue-400 hover:text-blue-300 text-xs", "View" }
+                                                    button {
+                                                        onclick: {
+                                                            let mut wallet_ctx = wallet_ctx.clone();
+                                                            let right_id = right.id.clone();
+                                                            move |_| {
+                                                                wallet_ctx.remove_right(&right_id);
+                                                            }
+                                                        },
+                                                        class: "text-red-400 hover:text-red-300 text-xs",
+                                                        "Remove"
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -98,5 +129,14 @@ pub fn Rights() -> Element {
                 }
             }
         }
+    }
+}
+
+fn seal_status_badge_class(status: &SealStatus) -> &'static str {
+    match status {
+        SealStatus::Active => "text-yellow-400 bg-yellow-500/20",
+        SealStatus::Locked => "text-orange-400 bg-orange-500/20",
+        SealStatus::Consumed => "text-gray-400 bg-gray-500/20",
+        SealStatus::Transferred => "text-green-400 bg-green-500/20",
     }
 }

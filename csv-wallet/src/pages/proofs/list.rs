@@ -1,6 +1,6 @@
 //! Proofs list page.
 
-use crate::context::{use_wallet_context, ProofRecord};
+use crate::context::{use_wallet_context, ProofRecord, ProofStatus};
 use crate::pages::common::*;
 use crate::routes::Route;
 use dioxus::prelude::*;
@@ -39,21 +39,34 @@ pub fn Proofs() -> Element {
                                 tr { class: "text-left text-gray-400 border-b border-gray-800",
                                     th { class: "px-4 py-2 font-medium", "Chain" }
                                     th { class: "px-4 py-2 font-medium", "Right ID" }
+                                    th { class: "px-4 py-2 font-medium", "Seal" }
                                     th { class: "px-4 py-2 font-medium", "Type" }
-                                    th { class: "px-4 py-2 font-medium", "Verified" }
+                                    th { class: "px-4 py-2 font-medium", "Status" }
                                     th { class: "px-4 py-2 font-medium", "Actions" }
                                 }
                             }
                             tbody { class: "divide-y divide-gray-800",
                                 for (idx, proof) in proofs_owned.iter().enumerate() {
+                                    let status_class = match proof.status {
+                                        ProofStatus::Verified => "text-green-400 bg-green-500/20",
+                                        ProofStatus::Invalid => "text-red-400 bg-red-500/20",
+                                        ProofStatus::Pending => "text-blue-400 bg-blue-500/20",
+                                        ProofStatus::Generated => "text-yellow-400 bg-yellow-500/20",
+                                    };
                                     tr { key: "{idx}-{proof.chain}-{proof.right_id}-{proof.proof_type}", class: "hover:bg-gray-800/50 transition-colors",
                                         td { class: "px-4 py-3", span { class: "{chain_badge_class(&proof.chain)}", "{chain_icon_emoji(&proof.chain)} {chain_name(&proof.chain)}" } }
-                                        td { class: "px-4 py-3 font-mono text-xs", "{truncate_address(&proof.right_id, 8)}" }
+                                        td { class: "px-4 py-3 font-mono text-xs",
+                                            Link { to: Route::RightJourney { id: proof.right_id.clone() }, class: "text-purple-400 hover:text-purple-300",
+                                                "{truncate_address(&proof.right_id, 8)}"
+                                            }
+                                        }
+                                        td { class: "px-4 py-3 font-mono text-xs",
+                                            "{truncate_address(&proof.seal_ref, 8)}"
+                                        }
                                         td { class: "px-4 py-3 text-xs", "{proof.proof_type}" }
                                         td { class: "px-4 py-3",
-                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
-                                                class: if proof.verified { "text-green-400 bg-green-500/20" } else { "text-yellow-400 bg-yellow-500/20" },
-                                                if proof.verified { "Verified" } else { "Pending" }
+                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {status_class}",
+                                                "{proof.status}"
                                             }
                                         }
                                         td { class: "px-4 py-3",
@@ -107,7 +120,15 @@ pub fn Proofs() -> Element {
                                     }
                                     div { class: "space-y-2",
                                         p { class: "text-sm text-gray-400", "Right ID" }
-                                        p { class: "text-sm font-mono break-all", "{proof.right_id}" }
+                                        p { class: "text-sm font-mono break-all",
+                                            Link { to: Route::RightJourney { id: proof.right_id.clone() }, class: "text-purple-400 hover:text-purple-300",
+                                                "{&proof.right_id}"
+                                            }
+                                        }
+                                    }
+                                    div { class: "space-y-2",
+                                        p { class: "text-sm text-gray-400", "Seal Reference" }
+                                        p { class: "text-sm font-mono break-all", "{&proof.seal_ref}" }
                                     }
                                     div { class: "space-y-2",
                                         p { class: "text-sm text-gray-400", "Proof Type" }
@@ -116,10 +137,21 @@ pub fn Proofs() -> Element {
                                     div { class: "space-y-2",
                                         p { class: "text-sm text-gray-400", "Status" }
                                         p { class: "text-sm",
-                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
-                                                class: if proof.verified { "text-green-400 bg-green-500/20" } else { "text-yellow-400 bg-yellow-500/20" },
-                                                if proof.verified { "Verified" } else { "Pending" }
+                                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {proof_status_class(&proof.status)}",
+                                                "{proof.status}"
                                             }
+                                        }
+                                    }
+                                    if let Some(ref target) = proof.target_chain {
+                                        div { class: "space-y-2",
+                                            p { class: "text-sm text-gray-400", "Target Chain" }
+                                            p { class: "text-sm", span { class: "{chain_badge_class(target)}", "{chain_icon_emoji(target)} {chain_name(target)}" } }
+                                        }
+                                    }
+                                    if let Some(ref data) = proof.data {
+                                        div { class: "space-y-2 border-t border-gray-700 pt-3 mt-3",
+                                            p { class: "text-sm text-gray-400", "Cryptographic Data" }
+                                            {proof_data_summary(data)}
                                         }
                                     }
                                 }
@@ -149,7 +181,9 @@ pub fn Proofs() -> Element {
                                     }
                                     div { class: "bg-gray-800/50 rounded-lg p-3",
                                         p { class: "text-xs text-gray-500", "Right ID: {truncate_address(&proof.right_id, 20)}" }
+                                        p { class: "text-xs text-gray-500", "Seal: {truncate_address(&proof.seal_ref, 12)}" }
                                         p { class: "text-xs text-gray-500", "Chain: {chain_name(&proof.chain)}" }
+                                        p { class: "text-xs text-gray-500", "Status: {proof.status}" }
                                     }
                                     div { class: "flex gap-3",
                                         button {
@@ -171,6 +205,64 @@ pub fn Proofs() -> Element {
                         }
                     },
                     None => rsx! {}
+                }
+            }
+        }
+    }
+}
+
+fn proof_status_class(status: &ProofStatus) -> &'static str {
+    match status {
+        ProofStatus::Verified => "text-green-400 bg-green-500/20",
+        ProofStatus::Invalid => "text-red-400 bg-red-500/20",
+        ProofStatus::Pending => "text-blue-400 bg-blue-500/20",
+        ProofStatus::Generated => "text-yellow-400 bg-yellow-500/20",
+    }
+}
+
+fn proof_data_summary(data: &crate::context::ProofData) -> Element {
+    match data {
+        crate::context::ProofData::Merkle { root, path, leaf_index } => {
+            rsx! {
+                div { class: "space-y-1 text-xs",
+                    p { span { class: "text-gray-500", "Root: " }, span { class: "font-mono", "{truncate_address(root, 16)}" } }
+                    p { span { class: "text-gray-500", "Path: " }, "{path.len()} nodes" }
+                    p { span { class: "text-gray-500", "Leaf: " }, "#{leaf_index}" }
+                }
+            }
+        }
+        crate::context::ProofData::Mpt { root, account_proof, storage_proof } => {
+            rsx! {
+                div { class: "space-y-1 text-xs",
+                    p { span { class: "text-gray-500", "Root: " }, span { class: "font-mono", "{truncate_address(root, 16)}" } }
+                    p { span { class: "text-gray-500", "Account: " }, "{account_proof.len()} nodes" }
+                    p { span { class: "text-gray-500", "Storage: " }, "{storage_proof.len()} nodes" }
+                }
+            }
+        }
+        crate::context::ProofData::Checkpoint { sequence, digest, signatures } => {
+            rsx! {
+                div { class: "space-y-1 text-xs",
+                    p { span { class: "text-gray-500", "Sequence: " }, "#{sequence}" }
+                    p { span { class: "text-gray-500", "Digest: " }, span { class: "font-mono", "{truncate_address(digest, 16)}" } }
+                    p { span { class: "text-gray-500", "Signatures: " }, "{signatures.len()} validators" }
+                }
+            }
+        }
+        crate::context::ProofData::Ledger { version, proof } => {
+            rsx! {
+                div { class: "space-y-1 text-xs",
+                    p { span { class: "text-gray-500", "Version: " }, "#{version}" }
+                    p { span { class: "text-gray-500", "Proof: " }, span { class: "font-mono", "{truncate_address(proof, 16)}" } }
+                }
+            }
+        }
+        crate::context::ProofData::Solana { slot, bank_hash, merkle_proof } => {
+            rsx! {
+                div { class: "space-y-1 text-xs",
+                    p { span { class: "text-gray-500", "Slot: " }, "#{slot}" }
+                    p { span { class: "text-gray-500", "Bank Hash: " }, span { class: "font-mono", "{truncate_address(bank_hash, 16)}" } }
+                    p { span { class: "text-gray-500", "Proof: " }, "{merkle_proof.len()} nodes" }
                 }
             }
         }

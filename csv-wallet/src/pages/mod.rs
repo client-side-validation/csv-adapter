@@ -45,7 +45,7 @@ pub use accounts::{Dashboard, AccountTransactions};
 // Re-exports from rights module (already migrated)
 pub use rights::{
     Rights, CreateRight, CreateRightForm, ShowRight, 
-    TransferRight, ConsumeRight,
+    TransferRight, ConsumeRight, RightJourney,
 };
 
 // Re-exports from proofs module
@@ -96,6 +96,7 @@ pub use common::{
     truncate_address, chain_options, network_options,
     chain_select, network_select,
     test_status_class, seal_consumed_class, seal_consumed_text_class,
+    seal_status_class,
 };
 
 // Migration complete: old_pages.rs has been removed
