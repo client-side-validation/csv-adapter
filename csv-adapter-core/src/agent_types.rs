@@ -73,6 +73,8 @@ pub mod error_codes {
     pub const CORE_DOMAIN_SEPARATOR_MISMATCH: &str = "CORE_012";
     /// Signature verification failed.
     pub const CORE_SIGNATURE_VERIFICATION_FAILED: &str = "CORE_013";
+    /// Feature not implemented.
+    pub const NOT_IMPLEMENTED: &str = "CORE_014";
     /// Generic core error.
     pub const CORE_GENERIC: &str = "CORE_099";
 
@@ -103,6 +105,12 @@ pub mod error_codes {
     pub const ETH_REORG_DETECTED: &str = "ETH_004";
     /// Insufficient Ethereum confirmations.
     pub const ETH_INSUFFICIENT_CONFIRMATIONS: &str = "ETH_005";
+    /// Ethereum wallet error.
+    pub const ETH_WALLET_ERROR: &str = "ETH_006";
+    /// Ethereum configuration error.
+    pub const ETH_CONFIG_ERROR: &str = "ETH_007";
+    /// Ethereum deployment error.
+    pub const ETH_DEPLOYMENT_ERROR: &str = "ETH_008";
 
     // Sui adapter errors (SUI_001 - SUI_099)
     /// Sui RPC error.

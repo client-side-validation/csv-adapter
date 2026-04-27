@@ -22,7 +22,12 @@ pub mod wallet;
 pub use adapter::SolanaAnchorLayer;
 pub use chain_adapter_impl::{create_solana_adapter, SolanaRpcClient, SolanaWallet};
 pub use config::{Network, SolanaConfig};
-pub use deploy::{deploy_csv_seal_program, ProgramDeployer, ProgramDeployment};
+pub use deploy::{
+    deploy_csv_seal_program, 
+    deploy_csv_program,
+    ProgramDeployer, 
+    ProgramDeployment,
+};
 pub use mint::mint_right_from_hex_key;
 pub use rpc::SolanaRpc;
 pub use types::{SolanaAnchorRef, SolanaFinalityProof, SolanaInclusionProof, SolanaSealRef};

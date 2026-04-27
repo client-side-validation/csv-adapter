@@ -201,6 +201,114 @@ pub async fn deploy_csv_seal_program(
     deployer.deploy_program(program_data, true).await
 }
 
+/// Deploy CSV program on Solana using solana-client
+///
+/// # Arguments
+/// * `rpc_url` - Solana RPC endpoint URL
+/// * `program_keypair` - Keypair for the program account
+/// * `program_data` - Compiled BPF program bytes
+/// * `payer` - Keypair with funds to pay for deployment
+///
+/// # Returns
+/// The program deployment with program ID (Pubkey)
+pub async fn deploy_csv_program(
+    rpc_url: &str,
+    program_keypair: &Keypair,
+    program_data: &[u8],
+    payer: &Keypair,
+) -> SolanaResult<ProgramDeployment> {
+    use solana_rpc_client::rpc_client::RpcClient;
+    use solana_sdk::{
+        bpf_loader_upgradeable,
+        message::Message,
+        system_instruction,
+        transaction::Transaction,
+    };
+    
+    // Create RPC client
+    let rpc_client = RpcClient::new(rpc_url.to_string());
+    
+    // Calculate rent exemption for program data
+    let program_data_len = program_data.len();
+    let program_data_rent = rpc_client
+        .get_minimum_balance_for_rent_exemption(
+            bpf_loader_upgradeable::UpgradeableLoaderState::size_of_programdata(program_data_len),
+        )
+        .map_err(|e| SolanaError::Rpc(format!("Failed to get rent exemption: {}", e)))?;
+    
+    // Calculate rent exemption for buffer
+    let buffer_rent = rpc_client
+        .get_minimum_balance_for_rent_exemption(
+            bpf_loader_upgradeable::UpgradeableLoaderState::size_of_buffer(program_data_len),
+        )
+        .map_err(|e| SolanaError::Rpc(format!("Failed to get buffer rent: {}", e)))?;
+    
+    // Get recent blockhash
+    let blockhash = rpc_client
+        .get_latest_blockhash()
+        .map_err(|e| SolanaError::Rpc(format!("Failed to get blockhash: {}", e)))?;
+    
+    // Create buffer keypair
+    let buffer_keypair = Keypair::new();
+    
+    // Build instructions for deployment
+    let mut instructions = vec![];
+    
+    // 1. Create buffer account
+    instructions.push(system_instruction::create_account(
+        &payer.pubkey(),
+        &buffer_keypair.pubkey(),
+        buffer_rent,
+        bpf_loader_upgradeable::UpgradeableLoaderState::size_of_buffer(program_data_len) as u64,
+        &bpf_loader_upgradeable::id(),
+    ));
+    
+    // 2. Initialize buffer
+    instructions.push(bpf_loader_upgradeable::initialize_buffer(
+        &buffer_keypair.pubkey(),
+        &payer.pubkey(),
+    ));
+    
+    // 3. Write program data to buffer (in chunks if needed)
+    let chunk_size = 900; // Max per instruction
+    for (i, chunk) in program_data.chunks(chunk_size).enumerate() {
+        instructions.push(bpf_loader_upgradeable::write(
+            &buffer_keypair.pubkey(),
+            &payer.pubkey(),
+            (i * chunk_size) as u32,
+            chunk.to_vec(),
+        ));
+    }
+    
+    // 4. Deploy with max data len
+    instructions.push(bpf_loader_upgradeable::deploy_with_max_program_len(
+        &payer.pubkey(),
+        &program_keypair.pubkey(),
+        &buffer_keypair.pubkey(),
+        &payer.pubkey(),
+        program_data_rent,
+        program_data_len as u64,
+    )?);
+    
+    // Build and sign transaction
+    let message = Message::new(&instructions, Some(&payer.pubkey()));
+    let mut tx = Transaction::new_unsigned(message);
+    tx.sign(&[payer, &buffer_keypair, program_keypair], blockhash);
+    
+    // Send and confirm transaction
+    let signature = rpc_client
+        .send_and_confirm_transaction(&tx)
+        .map_err(|e| SolanaError::Rpc(format!("Failed to deploy program: {}", e)))?;
+    
+    Ok(ProgramDeployment {
+        program_id: program_keypair.pubkey(),
+        signature,
+        slot: 0, // Would get from confirmation
+        data_size: program_data_len,
+        upgrade_authority: Some(payer.pubkey()),
+    })
+}
+
 /// Helper functions for building deployment instructions
 pub mod instructions {
     use super::*;

@@ -1,12 +1,22 @@
-//! Ethereum contract deployment via RPC
+//! Ethereum contract deployment via RPC using Alloy
 //!
-//! This module provides RPC-based deployment of Ethereum smart contracts,
-//! replacing the need for CLI commands like `forge create` or direct binary calls.
+//! This module provides RPC-based deployment of Ethereum smart contracts
+//! using the Alloy SDK, replacing CLI commands like `forge create`.
 
-use crate::adapter::EthereumAnchorLayer;
 use crate::config::EthereumConfig;
 use crate::error::{EthereumError, EthereumResult};
-use crate::rpc::EthereumRpc;
+
+// Alloy imports for real contract deployment
+#[cfg(feature = "rpc")]
+use alloy::{
+    network::EthereumWallet,
+    primitives::{Address, Bytes, FixedBytes, U256},
+    providers::{Provider, ProviderBuilder},
+    rpc::types::TransactionRequest,
+    signers::local::PrivateKeySigner,
+};
+#[cfg(feature = "rpc")]
+use std::str::FromStr;
 
 /// Ethereum contract deployment result
 pub struct ContractDeployment {
@@ -140,18 +150,89 @@ impl ContractDeployer {
     }
 }
 
-/// Deploy the CSV seal contract on Ethereum
+/// Deploy the CSV seal contract on Ethereum using Alloy
 ///
 /// This deploys the CSV (Client-Side Validation) seal contract
 /// which manages single-use seals on the Ethereum blockchain.
+///
+/// # Arguments
+/// * `rpc_url` - Ethereum RPC endpoint URL
+/// * `private_key_hex` - Deployer private key (hex string, with or without 0x prefix)
+/// * `bytecode` - Compiled contract bytecode
+///
+/// # Returns
+/// The contract deployment result with address and transaction hash
+#[cfg(feature = "rpc")]
+pub async fn deploy_csv_lock(
+    rpc_url: &str,
+    private_key_hex: &str,
+    bytecode: &[u8],
+) -> EthereumResult<ContractDeployment> {
+    // Parse private key
+    let key_clean = private_key_hex.trim_start_matches("0x");
+    let signer = PrivateKeySigner::from_str(key_clean)
+        .map_err(|e| EthereumError::WalletError(format!("Invalid private key: {}", e)))?;
+    
+    // Create wallet
+    let wallet = EthereumWallet::from(signer.clone());
+    
+    // Create provider
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .wallet(wallet)
+        .on_http(rpc_url.parse().map_err(|e| {
+            EthereumError::ConfigError(format!("Invalid RPC URL: {}", e))
+        })?);
+    
+    // Get sender address and nonce
+    let sender = signer.address();
+    let nonce = provider.get_transaction_count(sender).await
+        .map_err(|e| EthereumError::RpcError(format!("Failed to get nonce: {}", e)))?;
+    
+    // Build deployment transaction
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .nonce(nonce)
+        .input(Bytes::from(bytecode.to_vec()).into())
+        .gas_limit(3_000_000u64); // Estimate or use dynamic gas
+    
+    // Send transaction and wait for receipt
+    let tx_hash = provider.send_transaction(tx).await
+        .map_err(|e| EthereumError::RpcError(format!("Failed to send transaction: {}", e)))?;
+    
+    // Wait for confirmation
+    let receipt = tx_hash.get_receipt().await
+        .map_err(|e| EthereumError::RpcError(format!("Failed to get receipt: {}", e)))?;
+    
+    // Get contract address from receipt
+    let contract_address = receipt.contract_address
+        .ok_or_else(|| EthereumError::DeploymentError("Contract address not found in receipt".to_string()))?;
+    
+    Ok(ContractDeployment {
+        contract_address: contract_address.into_array(),
+        transaction_hash: receipt.transaction_hash.into_array(),
+        block_number: receipt.block_number.unwrap_or(0),
+        gas_used: receipt.gas_used,
+        deployed_bytecode: bytecode.to_vec(),
+        constructor_args: vec![],
+    })
+}
+
+/// Deploy the CSV seal contract on Ethereum (legacy sync version)
+///
+/// This is the legacy placeholder version for non-rpc builds.
+#[cfg(not(feature = "rpc"))]
 pub fn deploy_csv_seal_contract(
     config: &EthereumConfig,
-    rpc: Box<dyn EthereumRpc>,
     bytecode: &[u8],
     from_address: [u8; 20],
 ) -> EthereumResult<ContractDeployment> {
-    let deployer = ContractDeployer::new(config.clone(), rpc);
-    deployer.deploy_contract(bytecode, from_address)
+    let _ = config;
+    let _ = bytecode;
+    let _ = from_address;
+    Err(EthereumError::NotImplemented(
+        "Contract deployment requires 'rpc' feature".to_string()
+    ))
 }
 
 /// Calculate contract address from sender and nonce

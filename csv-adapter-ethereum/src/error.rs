@@ -26,6 +26,22 @@ pub enum EthereumError {
     #[error("Insufficient confirmations: got {got}, need {need}")]
     InsufficientConfirmations { got: u64, need: u64 },
 
+    /// Wallet error
+    #[error("Wallet error: {0}")]
+    WalletError(String),
+
+    /// Configuration error
+    #[error("Config error: {0}")]
+    ConfigError(String),
+
+    /// Deployment error
+    #[error("Deployment error: {0}")]
+    DeploymentError(String),
+
+    /// Feature not implemented
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
+
     /// Wrapper for core adapter errors
     #[error(transparent)]
     CoreError(#[from] csv_adapter_core::AdapterError),
@@ -38,6 +54,10 @@ impl EthereumError {
             EthereumError::RpcError(_) => true,
             EthereumError::InsufficientConfirmations { .. } => true,
             EthereumError::ReorgDetected { .. } => true,
+            EthereumError::WalletError(_) => false,
+            EthereumError::ConfigError(_) => false,
+            EthereumError::DeploymentError(_) => false,
+            EthereumError::NotImplemented(_) => false,
             EthereumError::SlotUsed(_) => false,
             EthereumError::InvalidReceiptProof(_) => false,
             EthereumError::CoreError(_) => false,
@@ -53,6 +73,10 @@ impl HasErrorSuggestion for EthereumError {
             EthereumError::InvalidReceiptProof(_) => error_codes::ETH_INVALID_RECEIPT_PROOF,
             EthereumError::ReorgDetected { .. } => error_codes::ETH_REORG_DETECTED,
             EthereumError::InsufficientConfirmations { .. } => error_codes::ETH_INSUFFICIENT_CONFIRMATIONS,
+            EthereumError::WalletError(_) => error_codes::ETH_WALLET_ERROR,
+            EthereumError::ConfigError(_) => error_codes::ETH_CONFIG_ERROR,
+            EthereumError::DeploymentError(_) => error_codes::ETH_DEPLOYMENT_ERROR,
+            EthereumError::NotImplemented(_) => error_codes::NOT_IMPLEMENTED,
             EthereumError::CoreError(e) => e.error_code(),
         }
     }

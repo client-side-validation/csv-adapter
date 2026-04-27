@@ -33,7 +33,12 @@ pub use real_rpc::{
 pub use adapter::EthereumAnchorLayer;
 pub use chain_adapter_impl::{create_ethereum_adapter, EthereumRpcClient, EthereumWallet};
 pub use deploy::{
-    calculate_contract_address, deploy_csv_seal_contract, ContractDeployer, ContractDeployment,
+    calculate_contract_address, 
+    #[cfg(feature = "rpc")]
+    deploy_csv_lock,
+    deploy_csv_seal_contract, 
+    ContractDeployer, 
+    ContractDeployment,
 };
 pub use config::EthereumConfig;
 pub use finality::{FinalityChecker, FinalityConfig};

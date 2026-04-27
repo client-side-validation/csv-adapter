@@ -34,12 +34,13 @@ ed25519-dalek = { version = "2.0", features = ["rand_core"] }
 aptos-sdk = { version = "0.4", optional = true }
 tokio = { version = "1", features = ["rt", "time"], optional = true }
 reqwest = { version = "0.12", features = ["blocking", "json"], optional = true }
+bcs = { version = "0.1", optional = true }
 
 [features]
 default = []
 # Enables real RPC client (aptos-sdk, real RPC calls)
-rpc = ["aptos-sdk", "tokio", "reqwest"]
-aptos-sdk = ["dep:aptos-sdk"]
+rpc = ["aptos-sdk", "tokio", "reqwest", "bcs"]
+aptos-sdk = ["dep:aptos-sdk", "bcs"]
 
 [dev-dependencies]
 rand = "0.8"

@@ -1,14 +1,11 @@
 //! Chain API service for querying balances from different blockchains.
 //!
 //! This module provides a unified interface to query on-chain balances
-//! across Bitcoin, Ethereum, Sui, Aptos, and Solana.
-//!
-//! Two implementations are available:
-//! - `ChainAdapterApi`: Uses csv-adapter-core chain adapters (preferred for native builds)
-//! - `ChainHttpApi`: Uses raw HTTP requests (fallback for WASM/browser)
+//! across Bitcoin, Ethereum, Sui, and Aptos using wasm-compatible HTTP requests.
 
 use csv_adapter_core::Chain;
 use csv_adapter_core::agent_types::{HasErrorSuggestion, FixAction, error_codes};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::services::network::NetworkType;
@@ -16,7 +13,7 @@ use crate::services::network::NetworkType;
 /// Configuration for a chain API endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainConfig {
-    /// API base URL for the chain (RPC endpoint).
+    /// API base URL for the chain.
     pub api_url: String,
     /// Whether this is a testnet connection.
     pub is_testnet: bool,
@@ -98,10 +95,6 @@ pub enum ChainApiError {
     /// API returned an error.
     #[error("Chain API error: {0}")]
     ApiError(String),
-
-    /// Adapter error.
-    #[error("Chain adapter error: {0}")]
-    AdapterError(String),
 }
 
 impl HasErrorSuggestion for ChainApiError {
@@ -111,7 +104,6 @@ impl HasErrorSuggestion for ChainApiError {
             ChainApiError::JsonError(_) => error_codes::WALLET_CHAIN_API_JSON,
             ChainApiError::InvalidAddress(_) => error_codes::WALLET_CHAIN_API_INVALID_ADDRESS,
             ChainApiError::ApiError(_) => error_codes::WALLET_CHAIN_API_ERROR,
-            ChainApiError::AdapterError(_) => error_codes::WALLET_CHAIN_API_ERROR,
         }
     }
 
@@ -147,13 +139,6 @@ impl HasErrorSuggestion for ChainApiError {
                     msg
                 )
             }
-            ChainApiError::AdapterError(msg) => {
-                format!(
-                    "Chain adapter error: {}. \
-                     The adapter may not be properly configured for this chain.",
-                    msg
-                )
-            }
         }
     }
 
@@ -182,83 +167,52 @@ impl HasErrorSuggestion for ChainApiError {
                     what: "Verify address format for target chain".to_string(),
                 })
             }
-            ChainApiError::AdapterError(_) => {
-                Some(FixAction::CheckState {
-                    url: "https://docs.csv.dev/adapters".to_string(),
-                    what: "Verify chain adapter configuration".to_string(),
-                })
-            }
         }
     }
 }
 
-/// Unified Chain API that uses adapters when available, HTTP as fallback.
+/// Service for querying chain balances via external APIs.
 pub struct ChainApi {
-    /// HTTP-based implementation for WASM/browser compatibility.
-    http_impl: ChainHttpApi,
+    /// HTTP client for requests.
+    client: Client,
+    /// Chain configurations.
+    configs: std::collections::HashMap<Chain, ChainConfig>,
 }
 
 impl ChainApi {
     /// Create a new ChainApi with default configurations.
     pub fn new() -> Result<Self, ChainApiError> {
-        Ok(Self {
-            http_impl: ChainHttpApi::new()?,
-        })
-    }
-
-    /// Create with custom HTTP client.
-    pub fn with_client(client: reqwest::Client) -> Self {
-        Self {
-            http_impl: ChainHttpApi::with_client(client),
-        }
-    }
-
-    /// Get balance for an address on a specific chain.
-    ///
-    /// Uses chain adapters when available, falls back to HTTP for WASM.
-    pub async fn get_balance(&self, chain: Chain, address: &str) -> Result<f64, ChainApiError> {
-        // Currently uses HTTP implementation for all chains
-        // Future: Use chain adapters when WASM-compatible
-        self.http_impl.get_balance(chain, address).await
-    }
-
-    /// Update the configuration for a chain.
-    pub fn set_config(&mut self, chain: Chain, config: ChainConfig) {
-        self.http_impl.set_config(chain, config);
-    }
-
-    /// Get the configuration for a chain.
-    pub fn get_config(&self, chain: Chain) -> Option<&ChainConfig> {
-        self.http_impl.get_config(chain)
-    }
-}
-
-impl Default for ChainApi {
-    fn default() -> Self {
-        Self::with_client(reqwest::Client::new())
-    }
-}
-
-/// HTTP-based chain API implementation (WASM-compatible).
-pub struct ChainHttpApi {
-    /// HTTP client for requests.
-    client: reqwest::Client,
-    /// Chain configurations.
-    configs: std::collections::HashMap<Chain, ChainConfig>,
-}
-
-impl ChainHttpApi {
-    /// Create a new ChainHttpApi with default configurations.
-    pub fn new() -> Result<Self, ChainApiError> {
-        let client = reqwest::Client::builder()
+        let client = Client::builder()
             .build()
             .map_err(ChainApiError::HttpError)?;
 
-        Ok(Self::with_client(client))
+        let mut configs = std::collections::HashMap::new();
+        configs.insert(
+            Chain::Bitcoin,
+            ChainConfig::for_chain(Chain::Bitcoin, NetworkType::Testnet),
+        );
+        configs.insert(
+            Chain::Ethereum,
+            ChainConfig::for_chain(Chain::Ethereum, NetworkType::Testnet),
+        );
+        configs.insert(
+            Chain::Sui,
+            ChainConfig::for_chain(Chain::Sui, NetworkType::Testnet),
+        );
+        configs.insert(
+            Chain::Aptos,
+            ChainConfig::for_chain(Chain::Aptos, NetworkType::Testnet),
+        );
+        configs.insert(
+            Chain::Solana,
+            ChainConfig::for_chain(Chain::Solana, NetworkType::Testnet),
+        );
+
+        Ok(Self { client, configs })
     }
 
-    /// Create a new ChainHttpApi with a custom HTTP client.
-    pub fn with_client(client: reqwest::Client) -> Self {
+    /// Create a new ChainApi with a custom HTTP client.
+    pub fn with_client(client: Client) -> Self {
         let mut configs = std::collections::HashMap::new();
         configs.insert(
             Chain::Bitcoin,
@@ -296,7 +250,7 @@ impl ChainHttpApi {
 
     /// Get balance for an address on a specific chain.
     ///
-    /// Returns the balance as a float (BTC, ETH, SUI, APT, or SOL depending on chain).
+    /// Returns the balance as a float (BTC, ETH, SUI, or APT depending on chain).
     pub async fn get_balance(&self, chain: Chain, address: &str) -> Result<f64, ChainApiError> {
         match chain {
             Chain::Bitcoin => self.get_bitcoin_balance(address).await,
@@ -406,6 +360,7 @@ impl ChainHttpApi {
             .ok_or_else(|| ChainApiError::ApiError("Missing result in response".to_string()))?;
 
         // Parse hex balance (in wei) to f64 (in ETH).
+        // Use u128 to avoid overflow for balances > 18.4 ETH.
         let balance_wei = u128::from_str_radix(balance_hex.trim_start_matches("0x"), 16)
             .map_err(|e| ChainApiError::ApiError(format!("Invalid hex balance: {}", e)))?;
 
@@ -460,7 +415,7 @@ impl ChainHttpApi {
             .get(&Chain::Aptos)
             .ok_or_else(|| ChainApiError::ApiError("Aptos config not found".to_string()))?;
 
-        // Use the balance endpoint
+        // Use the balance endpoint (same as csv-cli)
         let url = format!(
             "{}/accounts/{}/balance/0x1::aptos_coin::AptosCoin",
             config.api_url.trim_end_matches('/'),
@@ -539,6 +494,12 @@ impl ChainHttpApi {
     }
 }
 
+impl Default for ChainApi {
+    fn default() -> Self {
+        Self::with_client(Client::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -547,7 +508,7 @@ mod tests {
     fn test_chain_config_for_chain() {
         let btc_testnet = ChainConfig::for_chain(Chain::Bitcoin, NetworkType::Testnet);
         assert!(btc_testnet.is_testnet);
-        assert!(btc_testnet.api_url.contains("testnet") || btc_testnet.api_url.contains("signet"));
+        assert!(btc_testnet.api_url.contains("testnet"));
 
         let btc_mainnet = ChainConfig::for_chain(Chain::Bitcoin, NetworkType::Mainnet);
         assert!(!btc_mainnet.is_testnet);

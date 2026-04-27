@@ -53,7 +53,13 @@ pub mod real_rpc;
 
 pub use adapter::SuiAnchorLayer;
 pub use chain_adapter_impl::{create_sui_adapter, SuiRpcClient, SuiWallet};
-pub use deploy::{deploy_csv_seal_package, PackageDeployer, PackageDeployment};
+pub use deploy::{
+    deploy_csv_seal_package, 
+    #[cfg(feature = "sui-sdk-deploy")]
+    publish_csv_package,
+    PackageDeployer, 
+    PackageDeployment,
+};
 pub use checkpoint::CheckpointVerifier;
 pub use config::{CheckpointConfig, SealContractConfig, SuiConfig, SuiNetwork, TransactionConfig};
 pub use error::SuiError;

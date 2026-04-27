@@ -4,11 +4,15 @@
 //! replacing the need for CLI commands like `aptos move publish`.
 
 use ed25519_dalek::SigningKey;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::adapter::AptosAnchorLayer;
 use crate::config::AptosConfig;
 use crate::error::{AptosError, AptosResult};
 use crate::rpc::AptosRpc;
+
+// Aptos SDK imports for real deployment
+#[cfg(feature = "aptos-sdk")]
+use aptos_sdk::types::LocalAccount;
 
 /// Aptos module deployment result
 pub struct ModuleDeployment {
@@ -248,6 +252,93 @@ pub async fn deploy_csv_seal_module(
 ) -> AptosResult<ModuleDeployment> {
     let deployer = ModuleDeployer::new(config.clone(), signing_key, rpc);
     deployer.deploy_module(module_bytes, "csv_seal").await
+}
+
+/// Publish CSV module on Aptos using the Aptos SDK
+///
+/// # Arguments
+/// * `rpc_url` - Aptos RPC endpoint URL
+/// * `module_bytes` - Compiled Move module bytecode
+/// * `signer` - LocalAccount with private key for signing
+///
+/// # Returns
+/// The module deployment with transaction hash
+#[cfg(feature = "aptos-sdk")]
+pub async fn publish_csv_module(
+    rpc_url: &str,
+    module_bytes: Vec<u8>,
+    signer: &aptos_sdk::types::LocalAccount,
+) -> AptosResult<ModuleDeployment> {
+    use aptos_sdk::{
+        rest_client::Client,
+        transaction_builder::TransactionBuilder,
+        types::transaction::{EntryFunction, TransactionPayload},
+    };
+    
+    // Create REST client
+    let client = Client::new(rpc_url.parse().map_err(|e| {
+        AptosError::SerializationError(format!("Invalid RPC URL: {}", e))
+    })?);
+    
+    // Get chain ID and account sequence
+    let account_info = client
+        .get_account(signer.address())
+        .await
+        .map_err(|e| AptosError::RpcError(format!("Failed to get account: {}", e)))?;
+    let sequence_number = account_info.inner().sequence_number;
+    
+    // Build publish transaction using 0x1::code::publish_package_txn
+    let code_payload = TransactionPayload::EntryFunction(EntryFunction::new(
+        aptos_sdk::move_types::language_storage::ModuleId::new(
+            aptos_sdk::types::account_address::AccountAddress::ONE,
+            aptos_sdk::move_types::ident_str!("code").to_owned(),
+        ),
+        aptos_sdk::move_types::ident_str!("publish_package_txn").to_owned(),
+        vec![], // type arguments
+        vec![
+            // metadata bytes (empty for now)
+            bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|e| {
+                AptosError::SerializationError(format!("Failed to serialize metadata: {}", e))
+            })?,
+            // code bytes
+            bcs::to_bytes::<Vec<Vec<u8>>>(&vec![module_bytes]).map_err(|e| {
+                AptosError::SerializationError(format!("Failed to serialize code: {}", e))
+            })?,
+        ],
+    ));
+    
+    // Build transaction
+    let tx_builder = TransactionBuilder::new(
+        code_payload,
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 600,
+        aptos_sdk::types::chain_id::ChainId::testnet(), // Would detect from network
+    )
+    .sender(signer.address())
+    .sequence_number(sequence_number)
+    .max_gas_amount(100000)
+    .gas_unit_price(100);
+    
+    // Sign transaction
+    let signed_tx = signer.sign_with_transaction_builder(tx_builder);
+    
+    // Submit and wait
+    let response = client
+        .submit_and_wait(&signed_tx)
+        .await
+        .map_err(|e| AptosError::RpcError(format!("Failed to submit transaction: {}", e)))?;
+    
+    Ok(ModuleDeployment {
+        account_address: signer.address().into_bytes(),
+        module_name: "csv_seal".to_string(),
+        version: response.version,
+        transaction_hash: response.hash.to_string(),
+        gas_used: response.gas_used.unwrap_or(0),
+        success: response.success,
+    })
 }
 
 #[cfg(test)]

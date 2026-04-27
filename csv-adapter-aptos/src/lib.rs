@@ -53,7 +53,13 @@ pub mod real_rpc;
 
 pub use adapter::AptosAnchorLayer;
 pub use chain_adapter_impl::{create_aptos_adapter, AptosRpcClient, AptosWallet};
-pub use deploy::{deploy_csv_seal_module, ModuleDeployer, ModuleDeployment};
+pub use deploy::{
+    deploy_csv_seal_module,
+    #[cfg(feature = "aptos-sdk")]
+    publish_csv_module,
+    ModuleDeployer, 
+    ModuleDeployment,
+};
 pub use checkpoint::CheckpointVerifier;
 pub use config::{AptosConfig, AptosNetwork, CheckpointConfig};
 pub use error::AptosError;

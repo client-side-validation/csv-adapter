@@ -35,10 +35,18 @@ reqwest = { version = "0.12", features = ["json", "blocking"], optional = true }
 tokio = { version = "1", features = ["rt", "time"], optional = true }
 base64 = { version = "0.22", optional = true }
 
+# Sui SDK for contract deployment (optional)
+sui-sdk = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.28.0", optional = true }
+sui-keys = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.28.0", optional = true }
+shared-crypto = { git = "https://github.com/MystenLabs/sui", tag = "testnet-v1.28.0", optional = true }
+bcs = { version = "0.1", optional = true }
+
 [features]
 default = []
 # Enables real RPC client (real JSON-RPC calls over HTTP)
 rpc = ["reqwest", "tokio", "base64"]
+# Enables Sui SDK for contract deployment
+sui-sdk-deploy = ["sui-sdk", "sui-keys", "shared-crypto", "bcs", "tokio"]
 
 [dev-dependencies]
 rand = "0.8"
