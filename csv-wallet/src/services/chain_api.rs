@@ -1,7 +1,11 @@
 //! Chain API service for querying balances from different blockchains.
 //!
 //! This module provides a unified interface to query on-chain balances
-//! across Bitcoin, Ethereum, Sui, Aptos, and Solana.
+//! across Bitcoin, Ethereum, Sui, Aptos, and Solana using wasm-compatible HTTP requests.
+//!
+//! NOTE: This is a browser-compatible async HTTP implementation required for WASM targets.
+//! The adapter crates provide blocking RPC clients for native builds. This module
+//! bridges the gap for browser-based wallet usage. Future: merge into unified CsvClient.
 //!
 //! Two implementations are available:
 //! - `ChainAdapterApi`: Uses csv-adapter-core chain adapters (preferred for native builds)

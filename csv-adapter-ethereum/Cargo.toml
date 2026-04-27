@@ -47,5 +47,8 @@ default = []
 rpc = ["alloy", "alloy-sol-types", "alloy-contract", "tokio", "csv-adapter-store", "reqwest", "url"]
 production = ["rpc"]
 
+[build-dependencies]
+serde_json = "1.0"
+
 [dev-dependencies]
 rand = "0.8"

@@ -66,6 +66,13 @@ aptos = ["dep:csv-adapter-aptos"]
 solana = ["dep:csv-adapter-solana"]
 all-chains = ["bitcoin", "ethereum", "sui", "aptos", "solana"]
 
+# Deployment features (enable SDK-based contract deployment)
+deploy-ethereum = ["ethereum", "csv-adapter-ethereum/rpc"]
+deploy-sui = ["sui", "csv-adapter-sui/sui-sdk-deploy"]
+deploy-aptos = ["aptos", "csv-adapter-aptos/aptos-sdk"]
+deploy-solana = ["solana"]
+deploy-all = ["deploy-ethereum", "deploy-sui", "deploy-aptos", "deploy-solana"]
+
 # Runtime features
 tokio = ["dep:tokio"]
 async-std = ["dep:async-std"]

@@ -78,6 +78,10 @@ pub enum CsvError {
     #[error("Builder validation error: {0}")]
     BuilderError(String),
 
+    /// A deployment error (contract/program deployment failed).
+    #[error("Deployment error: {0}")]
+    DeploymentError(String),
+
     /// An event stream error.
     #[error("Event stream error: {0}")]
     EventStreamError(String),
@@ -128,6 +132,7 @@ impl HasErrorSuggestion for CsvError {
             Self::ConfigError(_) => error_codes::CSV_CONFIG_ERROR,
             Self::StoreError(_) => error_codes::CSV_STORE_ERROR,
             Self::BuilderError(_) => error_codes::CSV_BUILDER_ERROR,
+            Self::DeploymentError(_) => error_codes::CSV_DEPLOYMENT_ERROR,
             Self::EventStreamError(_) => error_codes::CSV_EVENT_STREAM_ERROR,
             Self::AdapterError { .. } => error_codes::CSV_ADAPTER_ERROR,
             Self::Generic(_) => error_codes::CSV_GENERIC,

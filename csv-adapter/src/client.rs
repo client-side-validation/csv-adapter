@@ -37,6 +37,7 @@ use tokio::sync::broadcast;
 
 use crate::builder::ClientBuilder;
 use crate::config::Config;
+use crate::deploy::DeploymentManager;
 use crate::errors::CsvError;
 use crate::events::EventStream;
 use crate::proofs::ProofManager;
@@ -152,6 +153,34 @@ impl CsvClient {
                     "No wallet attached. Use .with_wallet() when building the client.".to_string(),
                 )
             })
+    }
+
+    /// Get a [`DeploymentManager`] for deploying CSV contracts.
+    ///
+    /// Provides a unified interface for deploying CSV seal contracts
+    /// across all supported blockchains using their respective SDKs.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use csv_adapter::prelude::*;
+    ///
+    /// # async fn example() -> Result<()> {
+    /// let client = CsvClient::builder()
+    ///     .with_chain(Chain::Ethereum)
+    ///     .build()?;
+    ///
+    /// // Deploy a CSV Lock contract on Ethereum
+    /// let deployment = client.deploy()
+    ///     .deploy_csv_lock("https://rpc.example.com", "0x...", &bytecode)
+    ///     .await?;
+    ///
+    /// println!("Deployed at: {:?}", deployment.address);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn deploy(&self) -> DeploymentManager {
+        DeploymentManager::new(Arc::new(self.clone_ref()))
     }
 
     /// Get an [`EventStream`] for watching CSV events.

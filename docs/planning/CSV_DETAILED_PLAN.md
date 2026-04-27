@@ -9,6 +9,7 @@
 ## Part 0: Where You Are Right Now (Honest Diagnosis)
 
 ### What Works
+
 - `csv-adapter-core` — solid protocol primitives (seals, rights, commitments, proofs, cross-chain)
 - Chain adapters (bitcoin/ethereum/sui/aptos/solana) — RPC integration working
 - `csv-cli` — functional for local operations
@@ -16,6 +17,7 @@
 - `csv-explorer` — indexer + REST/GraphQL + Dioxus UI
 
 ### What Is Broken or Dangerous
+
 | Problem | Location | Severity |
 |---|---|---|
 | CLI shells out to `forge`, `sui`, `aptos`, `anchor` binaries | `csv-cli/src/commands/contracts.rs` | 🔴 Critical |
@@ -30,6 +32,7 @@
 | TypeScript SDK: only spec, no code | `docs/planning/PLAN.md` | 🟡 Medium |
 
 ### The Core Confusion
+
 Your `csv-cli` and `csv-wallet` both try to interact with chains **independently** of the adapter crates.  
 `contracts.rs` calls `forge deploy`, `sui client publish`, `aptos move publish`, `anchor deploy` as subprocesses.  
 `chain_api.rs` in the wallet hard-codes raw JSON-RPC calls that already exist in `csv-adapter-{chain}/src/real_rpc.rs`.
@@ -43,6 +46,7 @@ This is why adding a new chain requires changes in 5 places instead of 1.
 No logic changes. Just cleanup. This restores confidence in the codebase.
 
 ### Delete These Files Immediately
+
 ```
 csv-wallet/src/pages/dashboard.rs.tmp          # .tmp = committed mistake
 csv-wallet/src/pages/nft_page_broken.rs        # explicitly named broken
@@ -54,6 +58,7 @@ csv-wallet/src/services/solana_tx.rs           # duplicates adapter logic
 ```
 
 ### Verify Before Deleting
+
 ```bash
 # Check if a file is actually imported anywhere
 grep -r "native_signer\|sdk_tx\|bitcoin_tx\|solana_tx\|nft_page_broken\|dashboard.rs.tmp" \
@@ -61,6 +66,7 @@ grep -r "native_signer\|sdk_tx\|bitcoin_tx\|solana_tx\|nft_page_broken\|dashboar
 ```
 
 ### Clean up csv-adapter-core/src/adapters/
+
 `csv-adapter-core/src/adapters/` contains `aptos_adapter.rs`, `bitcoin_adapter.rs`, etc.  
 These are mock/stub implementations that shadow the real crates.  
 **Decision required**: if `csv-adapter-core/src/adapters/mock.rs` is used in tests, keep only mock.rs.  
@@ -72,6 +78,7 @@ grep -r "use csv_adapter_core::adapters::" . --include="*.rs"
 ```
 
 ### Remove from Cargo workspace if unused
+
 Check `csv-adapter-store` — `unified.rs` is 650 lines implementing a storage layer  
 that `csv-wallet` also duplicates in `csv-wallet/src/storage.rs` (another 300 lines).  
 Pick one. The wallet should use `csv-adapter-store`.
@@ -85,6 +92,7 @@ This is the most important phase. Everything else depends on it.
 ### The Problem in Detail
 
 `csv-cli/src/commands/contracts.rs` (lines 97733–99076) does:
+
 ```rust
 // THIS IS WRONG — calling external binaries is not maintainable
 Command::new("forge").arg("build")...
@@ -93,6 +101,7 @@ Command::new(&deploy_script).arg("testnet")...
 ```
 
 `csv-wallet/src/services/chain_api.rs` does:
+
 ```rust
 // THIS IS ALSO WRONG — duplicating what real_rpc.rs already does
 let url = format!("{}/address/{}", config.api_url, address);
@@ -118,6 +127,7 @@ csv-wallet/              ← calls csv-adapter crate ONLY, no direct chain IO
 Replace `contracts.rs` subprocess calls with Rust crate calls.
 
 **`csv-adapter-ethereum/src/deploy.rs`** — use `ethers-rs` or `alloy` to deploy:
+
 ```rust
 pub async fn deploy_csv_lock(
     rpc_url: &str,
@@ -130,6 +140,7 @@ pub async fn deploy_csv_lock(
 ```
 
 **`csv-adapter-sui/src/deploy.rs`** — use `sui-sdk`:
+
 ```rust
 pub async fn publish_csv_package(
     rpc_url: &str,
@@ -142,6 +153,7 @@ pub async fn publish_csv_package(
 ```
 
 **`csv-adapter-aptos/src/deploy.rs`** — use `aptos-sdk`:
+
 ```rust
 pub async fn publish_csv_module(
     rpc_url: &str,
@@ -153,6 +165,7 @@ pub async fn publish_csv_module(
 ```
 
 **`csv-adapter-solana/src/deploy.rs`** — use `anchor-client` or raw `solana-client`:
+
 ```rust
 pub async fn deploy_csv_program(
     rpc_url: &str,
@@ -170,6 +183,7 @@ Move contracts should be compiled to bytecode once and embedded.
 Use `build.rs` in each adapter crate.
 
 **`csv-adapter-sui/build.rs`** — extend the existing one:
+
 ```rust
 // In build.rs: invoke sui Move compiler as build dependency
 // Embed compiled bytecode as &[u8] constant
@@ -187,6 +201,7 @@ For Ethereum, Solidity compilation can use `solc-rust` or pre-compiled bytecode 
 ### Step 2.3: Refactor `csv-cli/src/commands/contracts.rs`
 
 Before (~1343 lines):
+
 ```
 contracts.rs
   fn deploy_ethereum() → runs forge, parses stdout
@@ -196,6 +211,7 @@ contracts.rs
 ```
 
 After (target ~200 lines):
+
 ```
 contracts.rs
   fn deploy_ethereum() → calls csv_adapter_ethereum::deploy::deploy_csv_lock()
@@ -210,6 +226,7 @@ contracts.rs
 This already exists in `csv-adapter-bitcoin/src/real_rpc.rs`.
 
 Replace with a thin wrapper calling the adapter:
+
 ```
 csv-wallet/src/services/
   chain_api.rs   → DELETE
@@ -217,6 +234,7 @@ csv-wallet/src/services/
 ```
 
 Add `real-rpc` feature to adapter crates if not already gated:
+
 ```toml
 # csv-wallet/Cargo.toml
 csv-adapter-bitcoin = { path = "../csv-adapter-bitcoin", features = ["real-rpc"] }
@@ -224,6 +242,7 @@ csv-adapter-ethereum = { path = "../csv-adapter-ethereum", features = ["real-rpc
 ```
 
 Then in wallet hooks:
+
 ```rust
 // csv-wallet/src/hooks/use_balance.rs
 // BEFORE: calls chain_api.rs (duplicate HTTP)
@@ -254,6 +273,7 @@ Each extracted module should be under 150 lines.
 ## Part 3: Phase 2 — BIP-39 + Encrypted Key Storage (1 Week)
 
 ### Current State
+
 - `csv-cli/src/state.rs` (line 83632): `state.json` stores private keys as plaintext hex
 - `csv-wallet/src/wallet_core.rs`: `ChainAccount.private_key: String` — plaintext in memory
 - No BIP-39 mnemonic generation anywhere
@@ -274,6 +294,7 @@ csv-adapter-keystore/
 ```
 
 Key types:
+
 ```rust
 // csv-adapter-keystore/src/memory.rs
 use zeroize::ZeroizeOnDrop;
@@ -285,6 +306,7 @@ pub struct SecretKey(pub(crate) [u8; 32]);
 ```
 
 BIP-44 paths per chain:
+
 ```rust
 // csv-adapter-keystore/src/bip44.rs
 pub fn derivation_path(chain: Chain, account: u32) -> DerivationPath {
@@ -299,6 +321,7 @@ pub fn derivation_path(chain: Chain, account: u32) -> DerivationPath {
 ```
 
 Keystore file format (ETH-compatible):
+
 ```rust
 // csv-adapter-keystore/src/keystore.rs
 pub struct KeystoreFile {
@@ -359,6 +382,7 @@ pub struct ChainAccount {
 ```
 
 Signing flow:
+
 ```
 User action → unlock keystore (passphrase or device PIN)
            → derive SecretKey (zeroize-on-drop)  
@@ -396,6 +420,7 @@ A component that shows a seal's current state with a visual state machine:
 ```
 
 States to display clearly:
+
 - `SealState::Open` — green dot, "Available to spend"
 - `SealState::Locked { confirmations, required }` — orange, progress bar
 - `SealState::Consumed { tx_hash, proof_bundle }` — checkmark, "Proof ready"
@@ -408,6 +433,7 @@ The component should make it viscerally obvious: **this seal can only be used on
 Create `csv-wallet/src/components/proof_inspector.rs`:
 
 When a user has a proof bundle, show:
+
 ```
 ╔═══════════════════════════════════╗
 ║  PROOF BUNDLE — Portable          ║
@@ -472,6 +498,7 @@ This is NOT a new feature — just making the existing multi-step process visibl
 ### Step 4.5: Right Detail Page Enhancement
 
 `csv-wallet/src/pages/rights/show.rs` — add:
+
 - Commitment hash display with "What's this?" tooltip explaining client-side validation
 - Commitment chain history (all previous states)
 - "Verify this Right" button that runs local proof verification
@@ -495,6 +522,7 @@ csv-cli/src/commands/wallet/
 ```
 
 Dispatch in `mod.rs`:
+
 ```rust
 pub fn execute(action: WalletAction, ...) -> Result<()> {
     match action {
@@ -520,6 +548,7 @@ csv-cli/src/commands/contracts/
 ### `csv-wallet/src/services/blockchain/service.rs` (1199 lines → split)
 
 Already described in Phase 1:
+
 ```
 service.rs      → ~200 lines (orchestrator)
 signer.rs       → ~200 lines (sign per chain)
@@ -694,6 +723,7 @@ pub async fn claim(
 ### DEX UI in `csv-wallet`
 
 Add to `csv-wallet/src/pages/`:
+
 ```
 dex/
   mod.rs
@@ -787,6 +817,7 @@ until Phases 0–2 are done. They will inherit the architecture bugs.
 ## Part 10: Files to Touch in Priority Order
 
 ### Week 1 (Phase 0 + start Phase 1)
+
 ```
 DELETE:  csv-wallet/src/pages/dashboard.rs.tmp
 DELETE:  csv-wallet/src/pages/nft_page_broken.rs
@@ -801,6 +832,7 @@ MODIFY:  csv-cli/src/commands/contracts.rs → call adapter deploy fns
 ```
 
 ### Week 2 (Phase 1 continued + Phase 2 start)
+
 ```
 DELETE:  csv-wallet/src/services/chain_api.rs
 MODIFY:  csv-wallet/src/hooks/use_balance.rs → use adapter real_rpc
@@ -810,6 +842,7 @@ MODIFY:  Cargo.toml → add csv-adapter-keystore to workspace
 ```
 
 ### Week 3 (Phase 2 continued + Phase 3 start)
+
 ```
 MODIFY:  csv-wallet/src/wallet_core.rs → remove private_key: String
 MODIFY:  csv-cli/src/state.rs → add keystore migration
@@ -820,6 +853,7 @@ MODIFY:  csv-wallet/src/pages/seals/list.rs → use SealLifecycle component
 ```
 
 ### Week 4 (Phase 4 + Phase 5)
+
 ```
 SPLIT:   csv-cli/src/commands/wallet.rs → wallet/ directory
 SPLIT:   csv-cli/src/commands/contracts.rs → contracts/ directory
@@ -836,26 +870,32 @@ MODIFY:  csv-wallet/src/components/sidebar.rs → CSV-concept nav
 These prevent the current situation from recurring.
 
 ### Rule 1: No `std::process::Command` for chain interaction
+
 CLI tools interact with chains exclusively through `csv-adapter-{chain}` crates.  
 If a chain operation isn't in an adapter crate, it doesn't exist.
 
 ### Rule 2: No raw HTTP to chain RPCs in `csv-wallet`
+
 All RPC calls go through the adapter's `real_rpc.rs` module.  
 The wallet makes zero direct HTTP calls to chain endpoints.
 
 ### Rule 3: Private keys never touch `String` or `Vec<u8>` in production paths
+
 All key material uses `SecretKey(pub(crate) [u8; 32])` with `zeroize::ZeroizeOnDrop`.
 
 ### Rule 4: New chain = new `csv-adapter-{chain}` crate only
+
 Adding Cosmos/Polkadot does not touch `csv-cli`, `csv-wallet`, or `csv-adapter-core`.  
 Only `csv-adapter/Cargo.toml` gains a new optional dependency.
 
 ### Rule 5: UI components must not contain business logic
+
 Dioxus components: display only. All state lives in context (`csv-wallet/src/context/`).  
 All chain operations live in services (`csv-wallet/src/services/`).  
 Services call adapter crates. Never the other way.
 
 ### Rule 6: File size limit — 400 lines
+
 Any file over 400 lines must be split before merging. No exceptions.
 
 ---
@@ -871,6 +911,7 @@ Production-level work on security (BIP-39), chain interaction (no subprocess), a
 The Temporary.md items (DeFi apps, TypeScript SDK, ZK proofs) are all **Q1 aspirations** that cannot start until the foundation issues are resolved.
 
 Current completion by category:
+
 - Protocol core (`csv-adapter-core`): **85%** — solid, some experimental modules
 - Chain adapters (RPC integration): **70%** — working but not unified with wallet
 - CLI (functional): **60%** — works but shells out, needs split
@@ -896,6 +937,7 @@ It is **not currently** because `csv-cli/src/commands/contracts.rs` has chain-sp
 and `csv-wallet/src/services/blockchain/service.rs` has chain-specific match arms for HTTP calls.
 
 After Phase 1, adding Cosmos as a chain means:
+
 1. Create `csv-adapter-cosmos/` with `AnchorLayer` impl
 2. Add `csv-adapter-cosmos = { optional = true }` to `csv-adapter/Cargo.toml`
 3. Zero changes to `csv-cli` or `csv-wallet`

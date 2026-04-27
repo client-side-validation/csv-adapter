@@ -19,6 +19,7 @@ name = "csv"
 path = "src/main.rs"
 
 [dependencies]
+csv-adapter = { version = "0.3.0", path = "../csv-adapter", features = ["all-chains"] }
 csv-adapter-core = { version = "0.3.0", path = "../csv-adapter-core" }
 csv-adapter-bitcoin = { version = "0.3.0", path = "../csv-adapter-bitcoin", features = ["signet-rest"] }
 csv-adapter-ethereum = { version = "0.3.0", path = "../csv-adapter-ethereum" }

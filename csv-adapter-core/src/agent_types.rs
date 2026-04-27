@@ -293,10 +293,12 @@ pub mod error_codes {
     pub const CSV_STORE_ERROR: &str = "CSV_013";
     /// CSV builder error.
     pub const CSV_BUILDER_ERROR: &str = "CSV_014";
+    /// CSV deployment error.
+    pub const CSV_DEPLOYMENT_ERROR: &str = "CSV_015";
     /// CSV event stream error.
-    pub const CSV_EVENT_STREAM_ERROR: &str = "CSV_015";
+    pub const CSV_EVENT_STREAM_ERROR: &str = "CSV_016";
     /// CSV adapter error.
-    pub const CSV_ADAPTER_ERROR: &str = "CSV_016";
+    pub const CSV_ADAPTER_ERROR: &str = "CSV_017";
     /// CSV generic error.
     pub const CSV_GENERIC: &str = "CSV_099";
 

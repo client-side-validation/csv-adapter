@@ -68,6 +68,7 @@
 pub mod builder;
 pub mod client;
 pub mod config;
+pub mod deploy;
 pub mod errors;
 pub mod events;
 pub mod prelude;
@@ -113,7 +114,26 @@ pub mod experimental {
 /// Re-export error types
 pub use errors::CsvError;
 
+/// Re-export deployment types
+pub use deploy::{ContractDeployment, DeploymentError, DeploymentManager, DeploymentResult};
+
 /// Unified result type alias.
 ///
 /// Equivalent to `Result<T, CsvError>`.
 pub type Result<T> = core::result::Result<T, CsvError>;
+
+// ===========================================================================
+// Chain-specific deployment re-exports
+// ===========================================================================
+
+#[cfg(feature = "deploy-ethereum")]
+pub use csv_adapter_ethereum::deploy::deploy_csv_lock;
+
+#[cfg(feature = "deploy-sui")]
+pub use csv_adapter_sui::deploy::publish_csv_package;
+
+#[cfg(feature = "deploy-aptos")]
+pub use csv_adapter_aptos::deploy::publish_csv_module;
+
+#[cfg(feature = "deploy-solana")]
+pub use csv_adapter_solana::deploy::deploy_csv_program;
