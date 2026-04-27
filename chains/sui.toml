@@ -8,7 +8,7 @@ rpc_endpoints = [
     "https://sui-mainnet.rpc.explorerum.com",
     "https://sui-mainnet.blockvision.org"
 ]
-program_id = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+program_id = "0xe6bebcddf851db0d08ebaa9672476c8bfbe8e95c036d4a9a5d8cb6b4e7238910"
 block_explorer_urls = [
     "https://explorer.sui.io",
     "https://suivision.xyz",

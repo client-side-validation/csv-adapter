@@ -27,6 +27,9 @@ fi
 
 cd "$(dirname "$0")/.."
 
+# Initialize variables
+PACKAGE_ID=""
+
 # Check if sui config exists
 SUI_CONFIG_DIR="${SUI_CONFIG_DIR:-$HOME/.sui}"
 if [ ! -f "$SUI_CONFIG_DIR/client.yaml" ]; then
@@ -40,28 +43,60 @@ fi
 # Handle csv-cli wallet if specified
 if [ -n "${CSV_SUI_PRIVATE_KEY:-}" ]; then
     echo "Using csv-cli wallet for deployment..."
-    # Create temp keypair file
-    KEYPAIR_FILE=$(mktemp)
-    echo "{\"privateKey\": \"$CSV_SUI_PRIVATE_KEY\", \"scheme\": \"ed25519\"}" > "$KEYPAIR_FILE"
-    echo "Created keypair file: $KEYPAIR_FILE"
-    cat "$KEYPAIR_FILE"
-    # Import the keypair
-    IMPORT_OUTPUT=$("$SUI" client import --keypair-file "$KEYPAIR_FILE" --alias csv-deploy --json 2>&1)
-    IMPORT_EXIT=$?
-    echo "Import exit code: $IMPORT_EXIT"
-    echo "Import output: $IMPORT_OUTPUT"
-    if [ $IMPORT_EXIT -ne 0 ]; then
-        echo "Failed to import private key: $IMPORT_OUTPUT"
+    
+    # First check if address already exists in Sui client
+    set +e
+    ADDRESS_CHECK=$("$SUI" client addresses 2>&1 | grep "$CSV_SUI_ADDRESS")
+    set -e
+    
+    if [ -n "$ADDRESS_CHECK" ]; then
+        echo "Address already exists in Sui client, switching to it..."
+    else
+        # Address not found, need to import the key
+        echo "Address not found in Sui client, importing key..."
+        # Create temp keypair file
+        KEYPAIR_FILE=$(mktemp)
+        echo "{\"privateKey\": \"$CSV_SUI_PRIVATE_KEY\", \"scheme\": \"ed25519\"}" > "$KEYPAIR_FILE"
+        echo "Created keypair file: $KEYPAIR_FILE"
+        
+        # Try to add address using keypair file (modern Sui CLI uses new-address)
+        set +e
+        IMPORT_OUTPUT=$("$SUI" client new-address --keypair-file "$KEYPAIR_FILE" --alias csv-deploy 2>&1)
+        IMPORT_EXIT=$?
+        set -e
+        
         rm "$KEYPAIR_FILE"
-        exit 1
+        echo "Import output: $IMPORT_OUTPUT"
+        
+        if [ $IMPORT_EXIT -ne 0 ]; then
+            # Check if it's because address already exists
+            if echo "$IMPORT_OUTPUT" | grep -qi "already\|exists"; then
+                echo "Key already imported, continuing..."
+            else
+                echo "Failed to import key: $IMPORT_OUTPUT"
+                echo "Please manually import the key first:"
+                echo "  sui keytool convert $CSV_SUI_PRIVATE_KEY"
+                echo "  sui keytool import '<bech32-output>' ed25519"
+                exit 1
+            fi
+        fi
     fi
-    # Switch to the imported address
+    
+    # Switch to the address
+    set +e
     SWITCH_OUTPUT=$("$SUI" client switch --address "$CSV_SUI_ADDRESS" 2>&1)
     SWITCH_EXIT=$?
-    echo "Switch exit code: $SWITCH_EXIT"
-    echo "Switch output: $SWITCH_OUTPUT"
-    rm "$KEYPAIR_FILE"
-    echo "Switched to csv-cli wallet: $CSV_SUI_ADDRESS"
+    set -e
+    
+    if [ $SWITCH_EXIT -ne 0 ]; then
+        if echo "$SWITCH_OUTPUT" | grep -qi "already active\|same"; then
+            echo "Address already active, continuing..."
+        else
+            echo "Failed to switch address: $SWITCH_OUTPUT"
+            exit 1
+        fi
+    fi
+    echo "Using csv-cli wallet: $CSV_SUI_ADDRESS"
 else
     echo "Using Sui CLI active wallet"
 fi
@@ -87,27 +122,110 @@ echo ""
 
 # Publish to testnet
 echo "Publishing to ${NETWORK}..."
-PUBLISH_OUTPUT=$("$SUI" client publish contracts \
-    --gas-budget 500000000 \
-    --json 2>&1)
+
+# Check if already published - offer to upgrade or use --with-unpublished-dependencies
+if [ -f "contracts/Published.toml" ] && grep -q "\[published.${NETWORK}\]" "contracts/Published.toml" 2>/dev/null; then
+    echo "Package already published to ${NETWORK}. Options:"
+    echo "  1. Upgrade existing package (keeps same Package ID)"
+    echo "  2. Force fresh publish (removes publication tracking, creates new Package ID)"
+    echo ""
+    # Default to upgrade for safety
+    echo "Upgrading existing package..."
+    PUBLISH_CMD="upgrade"
+else
+    PUBLISH_CMD="publish"
+fi
+
+set +e
+if [ "$PUBLISH_CMD" = "upgrade" ]; then
+    PUBLISH_OUTPUT=$("$SUI" client upgrade contracts \
+        --gas-budget 500000000 \
+        --json 2>&1)
+else
+    PUBLISH_OUTPUT=$("$SUI" client publish contracts \
+        --gas-budget 500000000 \
+        --json 2>&1)
+fi
+PUBLISH_EXIT=$?
+set -e
 
 echo "$PUBLISH_OUTPUT" > "scripts/deploy-output-${NETWORK}.json"
 
-# Extract package ID from output
-PACKAGE_ID=$(echo "$PUBLISH_OUTPUT" | python3 -c "
+# Check if publish succeeded
+if [ $PUBLISH_EXIT -ne 0 ]; then
+    # Check if it's an authorization error (not owner of upgrade capability)
+    # Match: "was not signed by" or "not owned by" or "correct sender" or "not signed"
+    if echo "$PUBLISH_OUTPUT" | grep -qiE "(was not signed|not signed by|not owned by|correct sender)"; then
+        echo ""
+        echo "============================================================"
+        echo "UPGRADE FAILED: Only the original publisher can upgrade this package."
+        echo ""
+        echo "The package was published by a different address."
+        echo "Options:"
+        echo ""
+        echo "1. USE EXISTING PACKAGE (recommended for testing)"
+        echo "   The package is already deployed and functional."
+        echo "   Package ID: $(grep 'published-at' contracts/Published.toml | head -1 | cut -d'"' -f2)"
+        echo ""
+        echo "2. FORCE FRESH PUBLISH (creates new package ID)"
+        echo "   rm contracts/Published.toml"
+        echo "   csv contract deploy sui"
+        echo ""
+        echo "3. USE ORIGINAL PUBLISHER"
+        echo "   Import the original publisher's key and deploy with that address"
+        echo "============================================================"
+        echo ""
+        # For now, extract and use the existing package ID
+        if [ -f "contracts/Published.toml" ]; then
+            EXISTING_PACKAGE=$(grep 'published-at' contracts/Published.toml 2>/dev/null | head -1 | cut -d'"' -f2)
+            if [ -n "$EXISTING_PACKAGE" ]; then
+                echo "Using existing published package: $EXISTING_PACKAGE"
+                PACKAGE_ID="$EXISTING_PACKAGE"
+                # Skip registry init - we can't upgrade anyway
+                echo ""
+                echo "=== DEPLOYMENT SUMMARY ==="
+                echo "Package ID: ${PACKAGE_ID}"
+                echo "Network: ${NETWORK}"
+                echo "Module: csv_seal::csv_seal"
+                echo "Status: Already published (cannot upgrade - different owner)"
+                echo "=========================="
+                echo ""
+                echo "The package is already deployed and can be used."
+                echo "To deploy a fresh instance: rm contracts/Published.toml"
+                exit 0
+            fi
+        fi
+    else
+        echo "ERROR: Publish command failed with exit code $PUBLISH_EXIT"
+        echo ""
+        echo "Raw output:"
+        echo "$PUBLISH_OUTPUT"
+        exit 1
+    fi
+fi
+
+# Extract package ID from output (if not already set from fallback)
+if [ -z "$PACKAGE_ID" ]; then
+    # Filter out log lines (starting with timestamp) to get clean JSON
+    CLEAN_JSON=$(echo "$PUBLISH_OUTPUT" | grep -v '^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T' 2>/dev/null || echo "$PUBLISH_OUTPUT")
+    PACKAGE_ID=$(echo "$CLEAN_JSON" | python3 -c "
 import sys, json
-data = json.load(sys.stdin)
-for event in data.get('events', []):
-    if event.get('type') == 'published':
-        print(event['packageId'])
-        sys.exit(0)
-# Fallback: parse from objectChanges
-for change in data.get('objectChanges', []):
-    if change.get('type') == 'published':
-        print(change.get('packageId', ''))
-        sys.exit(0)
+try:
+    data = json.load(sys.stdin)
+    for event in data.get('events', []):
+        if event.get('type') == 'published':
+            print(event['packageId'])
+            sys.exit(0)
+    # Fallback: parse from objectChanges
+    for change in data.get('objectChanges', []):
+        if change.get('type') == 'published':
+            print(change.get('packageId', ''))
+            sys.exit(0)
+except json.JSONDecodeError as e:
+    sys.stderr.write(f'JSON parse error: {e}\\n')
 print('')
 " 2>/dev/null || echo "")
+fi
 
 if [ -z "$PACKAGE_ID" ]; then
     echo "WARNING: Could not extract package ID from output."

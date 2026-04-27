@@ -3269,6 +3269,7 @@ name = "csv-cli"
 version = "0.3.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "bip32",
  "bitcoin 0.32.8",
  "bitcoin_hashes 0.12.0",

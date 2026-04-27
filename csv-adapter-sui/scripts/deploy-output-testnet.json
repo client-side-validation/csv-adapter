@@ -1,0 +1,507 @@
+[NOTE] Dependencies on Sui, MoveStdlib, Bridge, DeepBook, and SuiSystem are automatically added, but this feature is disabled for your package because you have explicitly included dependencies on Sui. Consider removing these dependencies from `Move.toml`.
+[Note]: Dependency sources are no longer verified automatically during publication and upgrade. You can pass the `--verify-deps` option if you would like to verify them as part of publication or upgrade.
+INCLUDING DEPENDENCY MoveStdlib
+INCLUDING DEPENDENCY Sui
+BUILDING csv-seal
+2026-04-27T00:09:11.066238Z  INFO sui::client_commands: Dependency ids before tree shaking PackageDependencies { published: {"MoveStdlib": 0x0000000000000000000000000000000000000000000000000000000000000001, "Sui": 0x0000000000000000000000000000000000000000000000000000000000000002}, unpublished: {}, invalid: {}, conflicting: {} }
+2026-04-27T00:09:11.066353Z  INFO sui::client_commands: Module 0000000000000000000000000000000000000000000000000000000000000000::csv_seal immediate deps: [ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("event") }, ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("object") }, ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("table") }, ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("transfer") }, ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("tx_context") }]
+2026-04-27T00:09:11.066366Z  INFO sui::client_commands: Pkgs to keep {
+    "Sui",
+}
+2026-04-27T00:09:11.066367Z  INFO sui::client_commands: Immediate dep packages {"Sui": 0x0000000000000000000000000000000000000000000000000000000000000002}
+2026-04-27T00:09:11.066373Z  INFO sui::client_commands: Pkg name to orig id {
+    "MoveStdlib": 0x0000000000000000000000000000000000000000000000000000000000000001,
+    "Sui": 0x0000000000000000000000000000000000000000000000000000000000000002,
+}
+2026-04-27T00:09:11.272088Z  INFO sui::client_commands: Trans deps orig ids {0x0000000000000000000000000000000000000000000000000000000000000001}
+2026-04-27T00:09:11.272093Z  INFO sui::client_commands: Deps ids after tree shaking PackageDependencies { published: {"MoveStdlib": 0x0000000000000000000000000000000000000000000000000000000000000001, "Sui": 0x0000000000000000000000000000000000000000000000000000000000000002}, unpublished: {}, invalid: {}, conflicting: {} }
+{
+  "digest": "3Evmp37UUaa5SupANQBTxkHQr9SxZyENzq2gpy7PqeFS",
+  "transaction": {
+    "data": {
+      "messageVersion": "v1",
+      "transaction": {
+        "kind": "ProgrammableTransaction",
+        "inputs": [
+          {
+            "type": "object",
+            "objectType": "immOrOwnedObject",
+            "objectId": "0xea71f415566b90121ce5ef910d9d1692baebab4c7d4553bab8e0c0af48722145",
+            "version": "349181589",
+            "digest": "B3NgdCg5AcXgNmXYEE2M1Gk1VAf9tYWLyEuD1meAMqdZ"
+          },
+          {
+            "type": "pure",
+            "valueType": null,
+            "value": [
+              0
+            ]
+          },
+          {
+            "type": "pure",
+            "valueType": null,
+            "value": [
+              32,
+              250,
+              47,
+              102,
+              173,
+              136,
+              85,
+              30,
+              191,
+              161,
+              4,
+              230,
+              162,
+              127,
+              135,
+              67,
+              43,
+              19,
+              191,
+              84,
+              169,
+              18,
+              6,
+              201,
+              194,
+              215,
+              251,
+              46,
+              67,
+              104,
+              131,
+              3,
+              30
+            ]
+          }
+        ],
+        "transactions": [
+          {
+            "MoveCall": {
+              "package": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "module": "package",
+              "function": "authorize_upgrade",
+              "arguments": [
+                {
+                  "Input": 0
+                },
+                {
+                  "Input": 1
+                },
+                {
+                  "Input": 2
+                }
+              ]
+            }
+          },
+          {
+            "Upgrade": [
+              [
+                "0x0000000000000000000000000000000000000000000000000000000000000001",
+                "0x0000000000000000000000000000000000000000000000000000000000000002"
+              ],
+              "0x97c861ae681ad4453a077654889d709fee8b183051e8060f903f733d3eac598c",
+              {
+                "Result": 0
+              }
+            ]
+          },
+          {
+            "MoveCall": {
+              "package": "0x0000000000000000000000000000000000000000000000000000000000000002",
+              "module": "package",
+              "function": "commit_upgrade",
+              "arguments": [
+                {
+                  "Input": 0
+                },
+                {
+                  "Result": 1
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "sender": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1",
+      "gasData": {
+        "payment": [
+          {
+            "objectId": "0xc3613b7c71a5abd3955b6dc8d16f81908d6483251d8dd7f5cdf7d4d9e11a8194",
+            "version": 349181589,
+            "digest": "2Mfhiuvi3QS6TtjpxbrDBJ9LrqNG2VfYApC85fe7Txhd"
+          }
+        ],
+        "owner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1",
+        "price": "1000",
+        "budget": "500000000"
+      }
+    },
+    "txSignatures": [
+      "AIkAICK7TfQicqordEYR5dlW/V92f0Pj7cUyJSI6maxBVJDDwPWVi0lubZCQCaoc0+heFU+PAqjQf1nRPv2/SQuHVdc8lmzxb5OZ5LU07raEvF0Tek2VsQ1YEONYezIBUA=="
+    ]
+  },
+  "effects": {
+    "messageVersion": "v1",
+    "status": {
+      "status": "success"
+    },
+    "executedEpoch": "1082",
+    "gasUsed": {
+      "computationCost": "1000000",
+      "storageCost": "22359200",
+      "storageRebate": "2595780",
+      "nonRefundableStorageFee": "26220"
+    },
+    "modifiedAtVersions": [
+      {
+        "objectId": "0xc3613b7c71a5abd3955b6dc8d16f81908d6483251d8dd7f5cdf7d4d9e11a8194",
+        "sequenceNumber": "349181589"
+      },
+      {
+        "objectId": "0xea71f415566b90121ce5ef910d9d1692baebab4c7d4553bab8e0c0af48722145",
+        "sequenceNumber": "349181589"
+      }
+    ],
+    "transactionDigest": "3Evmp37UUaa5SupANQBTxkHQr9SxZyENzq2gpy7PqeFS",
+    "created": [
+      {
+        "owner": "Immutable",
+        "reference": {
+          "objectId": "0xe6bebcddf851db0d08ebaa9672476c8bfbe8e95c036d4a9a5d8cb6b4e7238910",
+          "version": 6,
+          "digest": "CEPriC7t9tMZ4SqkVf5mFHFzMbR53n7TPb8gQ5JfsMPK"
+        }
+      }
+    ],
+    "mutated": [
+      {
+        "owner": {
+          "AddressOwner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1"
+        },
+        "reference": {
+          "objectId": "0xc3613b7c71a5abd3955b6dc8d16f81908d6483251d8dd7f5cdf7d4d9e11a8194",
+          "version": 349181590,
+          "digest": "889q2g25mhubaL8B9E9WDdHxZaeonW7Vncybv9f9K1wb"
+        }
+      },
+      {
+        "owner": {
+          "AddressOwner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1"
+        },
+        "reference": {
+2026-04-27T00:09:13.317447Z  INFO sui::client_commands: {
+          "objectId": "0xea71f415566b90121ce5ef910d9d1692baebab4c7d4553bab8e0c0af48722145",
+          "version": 349181590,
+          "digest": "9aCgJ5YiHGaefHyWSCt4nFQGWFnXE3c8AxiMp37Zjwji"
+        }
+      }
+2026-04-27T00:09:13.317456Z  INFO sui::client_commands:   "digest": "3Evmp37UUaa5SupANQBTxkHQr9SxZyENzq2gpy7PqeFS",
+    ],
+    "gasObject": {
+2026-04-27T00:09:13.317457Z  INFO sui::client_commands:   "transaction": {
+      "owner": {
+        "AddressOwner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1"
+2026-04-27T00:09:13.317458Z  INFO sui::client_commands:     "data": {
+      },
+      "reference": {
+2026-04-27T00:09:13.317458Z  INFO sui::client_commands:       "messageVersion": "v1",
+        "objectId": "0xc3613b7c71a5abd3955b6dc8d16f81908d6483251d8dd7f5cdf7d4d9e11a8194",
+        "version": 349181590,
+2026-04-27T00:09:13.317459Z  INFO sui::client_commands:       "transaction": {
+        "digest": "889q2g25mhubaL8B9E9WDdHxZaeonW7Vncybv9f9K1wb"
+      }
+2026-04-27T00:09:13.317460Z  INFO sui::client_commands:         "kind": "ProgrammableTransaction",
+    },
+    "dependencies": [
+2026-04-27T00:09:13.317460Z  INFO sui::client_commands:         "inputs": [
+      "8S9jg7PzZg1y2pA48f4wpW4xBGVpaRGbonRPJkxQ5Hyy",
+      "A4jGof4yF4PwXTRX7hupGVE6MKBhown5pTC2wcwzrhKW"
+2026-04-27T00:09:13.317461Z  INFO sui::client_commands:           {
+    ]
+  },
+2026-04-27T00:09:13.317462Z  INFO sui::client_commands:             "type": "object",
+  "objectChanges": [
+    {
+2026-04-27T00:09:13.317462Z  INFO sui::client_commands:             "objectType": "immOrOwnedObject",
+      "type": "mutated",
+      "sender": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1",
+2026-04-27T00:09:13.317463Z  INFO sui::client_commands:             "objectId": "0xea71f415566b90121ce5ef910d9d1692baebab4c7d4553bab8e0c0af48722145",
+      "owner": {
+        "AddressOwner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1"
+2026-04-27T00:09:13.317464Z  INFO sui::client_commands:             "version": "349181589",
+      },
+2026-04-27T00:09:13.317464Z  INFO sui::client_commands:             "digest": "B3NgdCg5AcXgNmXYEE2M1Gk1VAf9tYWLyEuD1meAMqdZ"
+      "objectType": "0x2::coin::Coin<0x2::sui::SUI>",
+      "objectId": "0xc3613b7c71a5abd3955b6dc8d16f81908d6483251d8dd7f5cdf7d4d9e11a8194",
+2026-04-27T00:09:13.317465Z  INFO sui::client_commands:           },
+      "version": "349181590",
+2026-04-27T00:09:13.317466Z  INFO sui::client_commands:           {
+      "previousVersion": "349181589",
+      "digest": "889q2g25mhubaL8B9E9WDdHxZaeonW7Vncybv9f9K1wb"
+2026-04-27T00:09:13.317466Z  INFO sui::client_commands:             "type": "pure",
+    },
+    {
+2026-04-27T00:09:13.317467Z  INFO sui::client_commands:             "valueType": null,
+      "type": "published",
+      "packageId": "0xe6bebcddf851db0d08ebaa9672476c8bfbe8e95c036d4a9a5d8cb6b4e7238910",
+2026-04-27T00:09:13.317468Z  INFO sui::client_commands:             "value": [
+2026-04-27T00:09:13.317468Z  INFO sui::client_commands:               0
+      "version": "6",
+2026-04-27T00:09:13.317469Z  INFO sui::client_commands:             ]
+      "digest": "CEPriC7t9tMZ4SqkVf5mFHFzMbR53n7TPb8gQ5JfsMPK",
+2026-04-27T00:09:13.317469Z  INFO sui::client_commands:           },
+      "modules": [
+2026-04-27T00:09:13.317470Z  INFO sui::client_commands:           {
+2026-04-27T00:09:13.317470Z  INFO sui::client_commands:             "type": "pure",
+2026-04-27T00:09:13.317471Z  INFO sui::client_commands:             "valueType": null,
+2026-04-27T00:09:13.317472Z  INFO sui::client_commands:             "value": [
+2026-04-27T00:09:13.317473Z  INFO sui::client_commands:               32,
+2026-04-27T00:09:13.317473Z  INFO sui::client_commands:               250,
+2026-04-27T00:09:13.317474Z  INFO sui::client_commands:               47,
+2026-04-27T00:09:13.317474Z  INFO sui::client_commands:               102,
+2026-04-27T00:09:13.317475Z  INFO sui::client_commands:               173,
+        "csv_seal"
+2026-04-27T00:09:13.317476Z  INFO sui::client_commands:               136,
+      ]
+2026-04-27T00:09:13.317476Z  INFO sui::client_commands:               85,
+    },
+2026-04-27T00:09:13.317477Z  INFO sui::client_commands:               30,
+    {
+2026-04-27T00:09:13.317478Z  INFO sui::client_commands:               191,
+      "type": "mutated",
+2026-04-27T00:09:13.317478Z  INFO sui::client_commands:               161,
+      "sender": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1",
+2026-04-27T00:09:13.317479Z  INFO sui::client_commands:               4,
+2026-04-27T00:09:13.317479Z  INFO sui::client_commands:               230,
+      "owner": {
+2026-04-27T00:09:13.317480Z  INFO sui::client_commands:               162,
+2026-04-27T00:09:13.317480Z  INFO sui::client_commands:               127,
+        "AddressOwner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1"
+2026-04-27T00:09:13.317481Z  INFO sui::client_commands:               135,
+2026-04-27T00:09:13.317481Z  INFO sui::client_commands:               67,
+      },
+2026-04-27T00:09:13.317482Z  INFO sui::client_commands:               43,
+2026-04-27T00:09:13.317483Z  INFO sui::client_commands:               19,
+      "objectType": "0x2::package::UpgradeCap",
+2026-04-27T00:09:13.317483Z  INFO sui::client_commands:               191,
+2026-04-27T00:09:13.317484Z  INFO sui::client_commands:               84,
+      "objectId": "0xea71f415566b90121ce5ef910d9d1692baebab4c7d4553bab8e0c0af48722145",
+2026-04-27T00:09:13.317484Z  INFO sui::client_commands:               169,
+2026-04-27T00:09:13.317485Z  INFO sui::client_commands:               18,
+      "version": "349181590",
+2026-04-27T00:09:13.317485Z  INFO sui::client_commands:               6,
+2026-04-27T00:09:13.317486Z  INFO sui::client_commands:               201,
+      "previousVersion": "349181589",
+      "digest": "9aCgJ5YiHGaefHyWSCt4nFQGWFnXE3c8AxiMp37Zjwji"
+    }
+  ],
+2026-04-27T00:09:13.317486Z  INFO sui::client_commands:               194,
+  "balanceChanges": [
+2026-04-27T00:09:13.317487Z  INFO sui::client_commands:               215,
+2026-04-27T00:09:13.317488Z  INFO sui::client_commands:               251,
+    {
+2026-04-27T00:09:13.317489Z  INFO sui::client_commands:               46,
+      "owner": {
+2026-04-27T00:09:13.317490Z  INFO sui::client_commands:               67,
+2026-04-27T00:09:13.317490Z  INFO sui::client_commands:               104,
+        "AddressOwner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1"
+2026-04-27T00:09:13.317491Z  INFO sui::client_commands:               131,
+2026-04-27T00:09:13.317491Z  INFO sui::client_commands:               3,
+2026-04-27T00:09:13.317492Z  INFO sui::client_commands:               30
+      },
+2026-04-27T00:09:13.317492Z  INFO sui::client_commands:             ]
+2026-04-27T00:09:13.317493Z  INFO sui::client_commands:           }
+      "coinType": "0x2::sui::SUI",
+2026-04-27T00:09:13.317493Z  INFO sui::client_commands:         ],
+2026-04-27T00:09:13.317494Z  INFO sui::client_commands:         "transactions": [
+      "amount": "-20763420"
+2026-04-27T00:09:13.317495Z  INFO sui::client_commands:           {
+2026-04-27T00:09:13.317495Z  INFO sui::client_commands:             "MoveCall": {
+    }
+2026-04-27T00:09:13.317496Z  INFO sui::client_commands:               "package": "0x0000000000000000000000000000000000000000000000000000000000000002",
+2026-04-27T00:09:13.317497Z  INFO sui::client_commands:               "module": "package",
+  ],
+2026-04-27T00:09:13.317497Z  INFO sui::client_commands:               "function": "authorize_upgrade",
+2026-04-27T00:09:13.317498Z  INFO sui::client_commands:               "arguments": [
+  "timestampMs": "1777248552814",
+2026-04-27T00:09:13.317499Z  INFO sui::client_commands:                 {
+2026-04-27T00:09:13.317499Z  INFO sui::client_commands:                   "Input": 0
+  "checkpoint": "330306798"
+2026-04-27T00:09:13.317500Z  INFO sui::client_commands:                 },
+2026-04-27T00:09:13.317500Z  INFO sui::client_commands:                 {
+}
+2026-04-27T00:09:13.317501Z  INFO sui::client_commands:                   "Input": 1
+2026-04-27T00:09:13.317502Z  INFO sui::client_commands:                 },
+2026-04-27T00:09:13.317503Z  INFO sui::client_commands:                 {
+2026-04-27T00:09:13.317503Z  INFO sui::client_commands:                   "Input": 2
+2026-04-27T00:09:13.317504Z  INFO sui::client_commands:                 }
+2026-04-27T00:09:13.317505Z  INFO sui::client_commands:               ]
+2026-04-27T00:09:13.317505Z  INFO sui::client_commands:             }
+2026-04-27T00:09:13.317506Z  INFO sui::client_commands:           },
+2026-04-27T00:09:13.317506Z  INFO sui::client_commands:           {
+2026-04-27T00:09:13.317507Z  INFO sui::client_commands:             "Upgrade": [
+2026-04-27T00:09:13.317508Z  INFO sui::client_commands:               [
+2026-04-27T00:09:13.317508Z  INFO sui::client_commands:                 "0x0000000000000000000000000000000000000000000000000000000000000001",
+2026-04-27T00:09:13.317509Z  INFO sui::client_commands:                 "0x0000000000000000000000000000000000000000000000000000000000000002"
+2026-04-27T00:09:13.317510Z  INFO sui::client_commands:               ],
+2026-04-27T00:09:13.317511Z  INFO sui::client_commands:               "0x97c861ae681ad4453a077654889d709fee8b183051e8060f903f733d3eac598c",
+2026-04-27T00:09:13.317511Z  INFO sui::client_commands:               {
+2026-04-27T00:09:13.317512Z  INFO sui::client_commands:                 "Result": 0
+2026-04-27T00:09:13.317513Z  INFO sui::client_commands:               }
+2026-04-27T00:09:13.317513Z  INFO sui::client_commands:             ]
+2026-04-27T00:09:13.317514Z  INFO sui::client_commands:           },
+2026-04-27T00:09:13.317515Z  INFO sui::client_commands:           {
+2026-04-27T00:09:13.317515Z  INFO sui::client_commands:             "MoveCall": {
+2026-04-27T00:09:13.317516Z  INFO sui::client_commands:               "package": "0x0000000000000000000000000000000000000000000000000000000000000002",
+2026-04-27T00:09:13.317517Z  INFO sui::client_commands:               "module": "package",
+2026-04-27T00:09:13.317518Z  INFO sui::client_commands:               "function": "commit_upgrade",
+2026-04-27T00:09:13.317518Z  INFO sui::client_commands:               "arguments": [
+2026-04-27T00:09:13.317519Z  INFO sui::client_commands:                 {
+2026-04-27T00:09:13.317520Z  INFO sui::client_commands:                   "Input": 0
+2026-04-27T00:09:13.317520Z  INFO sui::client_commands:                 },
+2026-04-27T00:09:13.317521Z  INFO sui::client_commands:                 {
+2026-04-27T00:09:13.317522Z  INFO sui::client_commands:                   "Result": 1
+2026-04-27T00:09:13.317522Z  INFO sui::client_commands:                 }
+2026-04-27T00:09:13.317523Z  INFO sui::client_commands:               ]
+2026-04-27T00:09:13.317524Z  INFO sui::client_commands:             }
+2026-04-27T00:09:13.317525Z  INFO sui::client_commands:           }
+2026-04-27T00:09:13.317525Z  INFO sui::client_commands:         ]
+2026-04-27T00:09:13.317526Z  INFO sui::client_commands:       },
+2026-04-27T00:09:13.317527Z  INFO sui::client_commands:       "sender": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1",
+2026-04-27T00:09:13.317527Z  INFO sui::client_commands:       "gasData": {
+2026-04-27T00:09:13.317528Z  INFO sui::client_commands:         "payment": [
+2026-04-27T00:09:13.317529Z  INFO sui::client_commands:           {
+2026-04-27T00:09:13.317529Z  INFO sui::client_commands:             "objectId": "0xc3613b7c71a5abd3955b6dc8d16f81908d6483251d8dd7f5cdf7d4d9e11a8194",
+2026-04-27T00:09:13.317530Z  INFO sui::client_commands:             "version": 349181589,
+2026-04-27T00:09:13.317531Z  INFO sui::client_commands:             "digest": "2Mfhiuvi3QS6TtjpxbrDBJ9LrqNG2VfYApC85fe7Txhd"
+2026-04-27T00:09:13.317532Z  INFO sui::client_commands:           }
+2026-04-27T00:09:13.317532Z  INFO sui::client_commands:         ],
+2026-04-27T00:09:13.317533Z  INFO sui::client_commands:         "owner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1",
+2026-04-27T00:09:13.317534Z  INFO sui::client_commands:         "price": "1000",
+2026-04-27T00:09:13.317534Z  INFO sui::client_commands:         "budget": "500000000"
+2026-04-27T00:09:13.317535Z  INFO sui::client_commands:       }
+2026-04-27T00:09:13.317536Z  INFO sui::client_commands:     },
+2026-04-27T00:09:13.317536Z  INFO sui::client_commands:     "txSignatures": [
+2026-04-27T00:09:13.317537Z  INFO sui::client_commands:       "AIkAICK7TfQicqordEYR5dlW/V92f0Pj7cUyJSI6maxBVJDDwPWVi0lubZCQCaoc0+heFU+PAqjQf1nRPv2/SQuHVdc8lmzxb5OZ5LU07raEvF0Tek2VsQ1YEONYezIBUA=="
+2026-04-27T00:09:13.317538Z  INFO sui::client_commands:     ]
+2026-04-27T00:09:13.317539Z  INFO sui::client_commands:   },
+2026-04-27T00:09:13.317539Z  INFO sui::client_commands:   "effects": {
+2026-04-27T00:09:13.317540Z  INFO sui::client_commands:     "messageVersion": "v1",
+2026-04-27T00:09:13.317541Z  INFO sui::client_commands:     "status": {
+2026-04-27T00:09:13.317541Z  INFO sui::client_commands:       "status": "success"
+2026-04-27T00:09:13.317542Z  INFO sui::client_commands:     },
+2026-04-27T00:09:13.317543Z  INFO sui::client_commands:     "executedEpoch": "1082",
+2026-04-27T00:09:13.317543Z  INFO sui::client_commands:     "gasUsed": {
+2026-04-27T00:09:13.317544Z  INFO sui::client_commands:       "computationCost": "1000000",
+2026-04-27T00:09:13.317545Z  INFO sui::client_commands:       "storageCost": "22359200",
+2026-04-27T00:09:13.317545Z  INFO sui::client_commands:       "storageRebate": "2595780",
+2026-04-27T00:09:13.317546Z  INFO sui::client_commands:       "nonRefundableStorageFee": "26220"
+2026-04-27T00:09:13.317547Z  INFO sui::client_commands:     },
+2026-04-27T00:09:13.317547Z  INFO sui::client_commands:     "modifiedAtVersions": [
+2026-04-27T00:09:13.317548Z  INFO sui::client_commands:       {
+2026-04-27T00:09:13.317548Z  INFO sui::client_commands:         "objectId": "0xc3613b7c71a5abd3955b6dc8d16f81908d6483251d8dd7f5cdf7d4d9e11a8194",
+2026-04-27T00:09:13.317551Z  INFO sui::client_commands:         "sequenceNumber": "349181589"
+2026-04-27T00:09:13.317552Z  INFO sui::client_commands:       },
+2026-04-27T00:09:13.317552Z  INFO sui::client_commands:       {
+2026-04-27T00:09:13.317553Z  INFO sui::client_commands:         "objectId": "0xea71f415566b90121ce5ef910d9d1692baebab4c7d4553bab8e0c0af48722145",
+2026-04-27T00:09:13.317556Z  INFO sui::client_commands:         "sequenceNumber": "349181589"
+2026-04-27T00:09:13.317557Z  INFO sui::client_commands:       }
+2026-04-27T00:09:13.317558Z  INFO sui::client_commands:     ],
+2026-04-27T00:09:13.317558Z  INFO sui::client_commands:     "transactionDigest": "3Evmp37UUaa5SupANQBTxkHQr9SxZyENzq2gpy7PqeFS",
+2026-04-27T00:09:13.317559Z  INFO sui::client_commands:     "created": [
+2026-04-27T00:09:13.317560Z  INFO sui::client_commands:       {
+2026-04-27T00:09:13.317560Z  INFO sui::client_commands:         "owner": "Immutable",
+2026-04-27T00:09:13.317561Z  INFO sui::client_commands:         "reference": {
+2026-04-27T00:09:13.317562Z  INFO sui::client_commands:           "objectId": "0xe6bebcddf851db0d08ebaa9672476c8bfbe8e95c036d4a9a5d8cb6b4e7238910",
+2026-04-27T00:09:13.317562Z  INFO sui::client_commands:           "version": 6,
+2026-04-27T00:09:13.317563Z  INFO sui::client_commands:           "digest": "CEPriC7t9tMZ4SqkVf5mFHFzMbR53n7TPb8gQ5JfsMPK"
+2026-04-27T00:09:13.317564Z  INFO sui::client_commands:         }
+2026-04-27T00:09:13.317564Z  INFO sui::client_commands:       }
+2026-04-27T00:09:13.317565Z  INFO sui::client_commands:     ],
+2026-04-27T00:09:13.317566Z  INFO sui::client_commands:     "mutated": [
+2026-04-27T00:09:13.317567Z  INFO sui::client_commands:       {
+2026-04-27T00:09:13.317567Z  INFO sui::client_commands:         "owner": {
+2026-04-27T00:09:13.317568Z  INFO sui::client_commands:           "AddressOwner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1"
+2026-04-27T00:09:13.317569Z  INFO sui::client_commands:         },
+2026-04-27T00:09:13.317569Z  INFO sui::client_commands:         "reference": {
+2026-04-27T00:09:13.317570Z  INFO sui::client_commands:           "objectId": "0xc3613b7c71a5abd3955b6dc8d16f81908d6483251d8dd7f5cdf7d4d9e11a8194",
+2026-04-27T00:09:13.317571Z  INFO sui::client_commands:           "version": 349181590,
+2026-04-27T00:09:13.317572Z  INFO sui::client_commands:           "digest": "889q2g25mhubaL8B9E9WDdHxZaeonW7Vncybv9f9K1wb"
+2026-04-27T00:09:13.317572Z  INFO sui::client_commands:         }
+2026-04-27T00:09:13.317573Z  INFO sui::client_commands:       },
+2026-04-27T00:09:13.317574Z  INFO sui::client_commands:       {
+2026-04-27T00:09:13.317574Z  INFO sui::client_commands:         "owner": {
+2026-04-27T00:09:13.317575Z  INFO sui::client_commands:           "AddressOwner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1"
+2026-04-27T00:09:13.317576Z  INFO sui::client_commands:         },
+2026-04-27T00:09:13.317576Z  INFO sui::client_commands:         "reference": {
+2026-04-27T00:09:13.317578Z  INFO sui::client_commands:           "objectId": "0xea71f415566b90121ce5ef910d9d1692baebab4c7d4553bab8e0c0af48722145",
+2026-04-27T00:09:13.317579Z  INFO sui::client_commands:           "version": 349181590,
+2026-04-27T00:09:13.317580Z  INFO sui::client_commands:           "digest": "9aCgJ5YiHGaefHyWSCt4nFQGWFnXE3c8AxiMp37Zjwji"
+2026-04-27T00:09:13.317580Z  INFO sui::client_commands:         }
+2026-04-27T00:09:13.317581Z  INFO sui::client_commands:       }
+2026-04-27T00:09:13.317582Z  INFO sui::client_commands:     ],
+2026-04-27T00:09:13.317583Z  INFO sui::client_commands:     "gasObject": {
+2026-04-27T00:09:13.317584Z  INFO sui::client_commands:       "owner": {
+2026-04-27T00:09:13.317585Z  INFO sui::client_commands:         "AddressOwner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1"
+2026-04-27T00:09:13.317587Z  INFO sui::client_commands:       },
+2026-04-27T00:09:13.317587Z  INFO sui::client_commands:       "reference": {
+2026-04-27T00:09:13.317589Z  INFO sui::client_commands:         "objectId": "0xc3613b7c71a5abd3955b6dc8d16f81908d6483251d8dd7f5cdf7d4d9e11a8194",
+2026-04-27T00:09:13.317589Z  INFO sui::client_commands:         "version": 349181590,
+2026-04-27T00:09:13.317590Z  INFO sui::client_commands:         "digest": "889q2g25mhubaL8B9E9WDdHxZaeonW7Vncybv9f9K1wb"
+2026-04-27T00:09:13.317591Z  INFO sui::client_commands:       }
+2026-04-27T00:09:13.317592Z  INFO sui::client_commands:     },
+2026-04-27T00:09:13.317593Z  INFO sui::client_commands:     "dependencies": [
+2026-04-27T00:09:13.317594Z  INFO sui::client_commands:       "8S9jg7PzZg1y2pA48f4wpW4xBGVpaRGbonRPJkxQ5Hyy",
+2026-04-27T00:09:13.317594Z  INFO sui::client_commands:       "A4jGof4yF4PwXTRX7hupGVE6MKBhown5pTC2wcwzrhKW"
+2026-04-27T00:09:13.317596Z  INFO sui::client_commands:     ]
+2026-04-27T00:09:13.317596Z  INFO sui::client_commands:   },
+2026-04-27T00:09:13.317598Z  INFO sui::client_commands:   "objectChanges": [
+2026-04-27T00:09:13.317599Z  INFO sui::client_commands:     {
+2026-04-27T00:09:13.317600Z  INFO sui::client_commands:       "type": "mutated",
+2026-04-27T00:09:13.317600Z  INFO sui::client_commands:       "sender": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1",
+2026-04-27T00:09:13.317601Z  INFO sui::client_commands:       "owner": {
+2026-04-27T00:09:13.317602Z  INFO sui::client_commands:         "AddressOwner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1"
+2026-04-27T00:09:13.317603Z  INFO sui::client_commands:       },
+2026-04-27T00:09:13.317604Z  INFO sui::client_commands:       "objectType": "0x2::coin::Coin<0x2::sui::SUI>",
+2026-04-27T00:09:13.317605Z  INFO sui::client_commands:       "objectId": "0xc3613b7c71a5abd3955b6dc8d16f81908d6483251d8dd7f5cdf7d4d9e11a8194",
+2026-04-27T00:09:13.317606Z  INFO sui::client_commands:       "version": "349181590",
+2026-04-27T00:09:13.317608Z  INFO sui::client_commands:       "previousVersion": "349181589",
+2026-04-27T00:09:13.317609Z  INFO sui::client_commands:       "digest": "889q2g25mhubaL8B9E9WDdHxZaeonW7Vncybv9f9K1wb"
+2026-04-27T00:09:13.317610Z  INFO sui::client_commands:     },
+2026-04-27T00:09:13.317611Z  INFO sui::client_commands:     {
+2026-04-27T00:09:13.317613Z  INFO sui::client_commands:       "type": "published",
+2026-04-27T00:09:13.317616Z  INFO sui::client_commands:       "packageId": "0xe6bebcddf851db0d08ebaa9672476c8bfbe8e95c036d4a9a5d8cb6b4e7238910",
+2026-04-27T00:09:13.317617Z  INFO sui::client_commands:       "version": "6",
+2026-04-27T00:09:13.317618Z  INFO sui::client_commands:       "digest": "CEPriC7t9tMZ4SqkVf5mFHFzMbR53n7TPb8gQ5JfsMPK",
+2026-04-27T00:09:13.317619Z  INFO sui::client_commands:       "modules": [
+2026-04-27T00:09:13.317623Z  INFO sui::client_commands:         "csv_seal"
+2026-04-27T00:09:13.317625Z  INFO sui::client_commands:       ]
+2026-04-27T00:09:13.317626Z  INFO sui::client_commands:     },
+2026-04-27T00:09:13.317627Z  INFO sui::client_commands:     {
+2026-04-27T00:09:13.317628Z  INFO sui::client_commands:       "type": "mutated",
+2026-04-27T00:09:13.317629Z  INFO sui::client_commands:       "sender": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1",
+2026-04-27T00:09:13.317630Z  INFO sui::client_commands:       "owner": {
+2026-04-27T00:09:13.317631Z  INFO sui::client_commands:         "AddressOwner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1"
+2026-04-27T00:09:13.317632Z  INFO sui::client_commands:       },
+2026-04-27T00:09:13.317632Z  INFO sui::client_commands:       "objectType": "0x2::package::UpgradeCap",
+2026-04-27T00:09:13.317633Z  INFO sui::client_commands:       "objectId": "0xea71f415566b90121ce5ef910d9d1692baebab4c7d4553bab8e0c0af48722145",
+2026-04-27T00:09:13.317634Z  INFO sui::client_commands:       "version": "349181590",
+2026-04-27T00:09:13.317639Z  INFO sui::client_commands:       "previousVersion": "349181589",
+2026-04-27T00:09:13.317640Z  INFO sui::client_commands:       "digest": "9aCgJ5YiHGaefHyWSCt4nFQGWFnXE3c8AxiMp37Zjwji"
+2026-04-27T00:09:13.317641Z  INFO sui::client_commands:     }
+2026-04-27T00:09:13.317641Z  INFO sui::client_commands:   ],
+2026-04-27T00:09:13.317642Z  INFO sui::client_commands:   "balanceChanges": [
+2026-04-27T00:09:13.317643Z  INFO sui::client_commands:     {
+2026-04-27T00:09:13.317644Z  INFO sui::client_commands:       "owner": {
+2026-04-27T00:09:13.317644Z  INFO sui::client_commands:         "AddressOwner": "0x6cc73fe3fb68a2592e43d551cc6792019434405bdaa922413cbc82ac7f9a08f1"
+2026-04-27T00:09:13.317645Z  INFO sui::client_commands:       },
+2026-04-27T00:09:13.317646Z  INFO sui::client_commands:       "coinType": "0x2::sui::SUI",
+2026-04-27T00:09:13.317647Z  INFO sui::client_commands:       "amount": "-20763420"
+2026-04-27T00:09:13.317648Z  INFO sui::client_commands:     }
+2026-04-27T00:09:13.317648Z  INFO sui::client_commands:   ],
+2026-04-27T00:09:13.317649Z  INFO sui::client_commands:   "timestampMs": "1777248552814",
+2026-04-27T00:09:13.317650Z  INFO sui::client_commands:   "checkpoint": "330306798"
+2026-04-27T00:09:13.317651Z  INFO sui::client_commands: }

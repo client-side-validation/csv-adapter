@@ -378,8 +378,20 @@ fn deploy_sui(config: &Config, state: &mut UnifiedStateManager, account: Option<
             use ed25519_dalek::SigningKey;
             use typenum::U32;
 
-            let seed = hex::decode(pk)
-                .map_err(|_| anyhow::anyhow!("Invalid private key hex for Sui account"))?;
+            // Strip 0x prefix if present
+            let pk_clean = pk.strip_prefix("0x").unwrap_or(pk);
+            
+            // Try hex first (64 hex chars = 32 bytes), then base64
+            let seed = if pk_clean.len() == 64 && pk_clean.chars().all(|c| c.is_ascii_hexdigit()) {
+                hex::decode(pk_clean)
+                    .map_err(|_| anyhow::anyhow!("Invalid private key hex for Sui account"))?
+            } else {
+                // Try base64 (Sui keystore format - produces ~44 chars with padding)
+                use base64::Engine;
+                base64::engine::general_purpose::STANDARD
+                    .decode(pk_clean)
+                    .map_err(|_| anyhow::anyhow!("Invalid private key format for Sui account: expected hex (64 chars) or base64, got {} chars", pk.len()))?
+            };
             if seed.len() != 32 {
                 return Err(anyhow::anyhow!("Invalid private key length for Sui account"));
             }
