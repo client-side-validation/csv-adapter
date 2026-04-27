@@ -6,10 +6,10 @@
 use csv_adapter_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
 use serde::{Deserialize, Serialize};
 
-use crate::unified::{
+use crate::state::{
     Chain, ChainConfig, ContractRecord, Network, ProofRecord, RightRecord, RightStatus,
-    TransactionRecord, TransactionStatus, TransactionType, TransferRecord, TransferStatus,
-    UnifiedStorage, UnifiedStorageError, WalletAccount, WalletConfig,
+    StateStorage, StorageError, TransactionRecord, TransactionStatus, TransactionType,
+    TransferRecord, TransferStatus, WalletAccount, WalletConfig,
 };
 
 /// Storage error for browser storage operations.
@@ -26,9 +26,9 @@ pub enum BrowserStorageError {
     NotFound(String),
 }
 
-impl From<BrowserStorageError> for UnifiedStorageError {
+impl From<BrowserStorageError> for StorageError {
     fn from(e: BrowserStorageError) -> Self {
-        UnifiedStorageError::StorageError(e.to_string())
+        StorageError::SerializeError(e.to_string())
     }
 }
 
@@ -191,38 +191,38 @@ pub fn asset_storage() -> Result<LocalStorageManager, BrowserStorageError> {
     LocalStorageManager::new("csv-assets")
 }
 
-/// Unified storage manager for browser environments.
-/// 
+/// State storage manager for browser environments.
+///
 /// This provides a high-level interface for loading/saving the complete
-/// unified storage format to browser localStorage.
-pub struct BrowserUnifiedStorage {
+/// application state to browser localStorage.
+pub struct BrowserStateStorage {
     storage: LocalStorageManager,
 }
 
-impl BrowserUnifiedStorage {
-    /// Create new browser unified storage manager.
+impl BrowserStateStorage {
+    /// Create new browser state storage manager.
     pub fn new() -> Result<Self, BrowserStorageError> {
         Ok(Self {
             storage: wallet_storage()?,
         })
     }
 
-    /// Load unified storage from localStorage.
-    pub fn load(&self) -> Result<UnifiedStorage, BrowserStorageError> {
+    /// Load state from localStorage.
+    pub fn load(&self) -> Result<StateStorage, BrowserStorageError> {
         self.storage
-            .try_load::<UnifiedStorage>(UNIFIED_STORAGE_KEY)
+            .try_load::<StateStorage>(UNIFIED_STORAGE_KEY)
             .ok_or_else(|| BrowserStorageError::NotFound(UNIFIED_STORAGE_KEY.to_string()))
     }
 
-    /// Load or create default unified storage.
-    pub fn load_or_default(&self) -> UnifiedStorage {
+    /// Load or create default state.
+    pub fn load_or_default(&self) -> StateStorage {
         self.storage
-            .try_load::<UnifiedStorage>(UNIFIED_STORAGE_KEY)
+            .try_load::<StateStorage>(UNIFIED_STORAGE_KEY)
             .unwrap_or_default()
     }
 
-    /// Save unified storage to localStorage.
-    pub fn save(&self, storage: &UnifiedStorage) -> Result<(), BrowserStorageError> {
+    /// Save state to localStorage.
+    pub fn save(&self, storage: &StateStorage) -> Result<(), BrowserStorageError> {
         self.storage.save(UNIFIED_STORAGE_KEY, storage)
     }
 
@@ -237,12 +237,12 @@ impl BrowserUnifiedStorage {
     }
 }
 
-// Re-export unified types for convenience
-pub use crate::unified::{
+// Re-export state types for convenience
+pub use crate::state::{
     Chain, ChainConfig, ContractRecord, FaucetConfig, GasAccount, Network,
-    ProofRecord, RightRecord, RightStatus, TransactionRecord, TransactionStatus,
-    TransactionType, TransferRecord, TransferStatus, UnifiedStorage,
-    UnifiedStorageError, WalletAccount, WalletConfig,
+    ProofRecord, RightRecord, RightStatus, StateStorage, StorageError, TransactionRecord,
+    TransactionStatus, TransactionType, TransferRecord, TransferStatus, WalletAccount,
+    WalletConfig,
 };
 
 #[cfg(test)]

@@ -35,5 +35,5 @@ target/
 **/Move.lock
 **/build/
 
-# wallet
-wallet/
+# Chain specific
+.aptos/

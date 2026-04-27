@@ -10,21 +10,23 @@ use rusqlite::{params, Connection};
 #[cfg(feature = "sqlite")]
 use std::sync::Mutex;
 
-pub mod unified;
+/// Application state module (formerly unified).
+pub mod state;
 
 #[cfg(feature = "browser-storage")]
 pub mod browser_storage;
 
-pub use unified::{
-    Chain, ChainConfig, ContractRecord, FaucetConfig, GasAccount, Network,
-    ProofRecord, RightRecord, RightStatus, SealRecord as UnifiedSealRecord,
+// Re-exports from state module
+pub use state::{
+    Chain, ChainConfig, ContractRecord, FaucetConfig, FileStorage, GasAccount, Network,
+    ProofRecord, RightRecord, RightStatus, SealRecord, StateStorage, StorageBackend, StorageError,
     TransactionRecord, TransactionStatus, TransactionType, TransferRecord, TransferStatus,
-    UnifiedStorage, UnifiedStorageError, WalletAccount, WalletConfig,
+    WalletAccount, WalletConfig,
 };
 
 #[cfg(feature = "browser-storage")]
 pub use browser_storage::{
-    asset_storage, seal_storage, wallet_storage, BrowserStorageError, BrowserUnifiedStorage,
+    asset_storage, seal_storage, wallet_storage, BrowserStateStorage, BrowserStorageError,
     LocalStorageManager, UNIFIED_STORAGE_KEY, WALLET_MNEMONIC_KEY,
 };
 

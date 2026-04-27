@@ -6,19 +6,37 @@ CSV Adapter treats a blockchain as the place where single-use is enforced, not w
 
 ## What the codebase contains
 
-The repository is a multi-package project with a Rust workspace at its core and several adjacent tools:
+This repository is organized as a **monorepo** with a Rust workspace:
 
-| Area | Purpose |
+### Core Infrastructure (`csv-adapter-*`)
+
+| Crate | Purpose |
+|-------|---------|
+| `csv-adapter-core` | Protocol types, proofs, validation logic, state machine, `AnchorLayer` trait |
+| `csv-adapter-store` | State storage for seals, rights, and wallet metadata |
+| `csv-adapter-keystore` | **BIP-39/BIP-44** key derivation, **AES-256-GCM** encrypted storage |
+| `csv-adapter-bitcoin` | Bitcoin chain adapter with UTXO seal model |
+| `csv-adapter-ethereum` | Ethereum chain adapter with nullifier registration |
+| `csv-adapter-sui` | Sui chain adapter with object deletion seals |
+| `csv-adapter-aptos` | Aptos chain adapter with resource destruction |
+| `csv-adapter-solana` | Solana chain adapter with program-derived address seals |
+| `csv-adapter` | Unified Rust meta-crate re-exporting all adapters |
+
+### Applications
+
+| Application | Purpose |
+|-------------|---------|
+| `csv-cli` | Command-line tool for wallets, rights, proofs, cross-chain flows |
+| `csv-wallet` | **Web wallet UI** with seal visualizer, proof inspector, onboarding |
+| `csv-explorer` | Block explorer, API, indexer |
+
+### Supporting Tools
+
+| Tool | Purpose |
 |------|---------|
-| `csv-adapter-core` | Protocol types, proofs, validation logic, state machine, and the `AnchorLayer` trait |
-| `csv-adapter-*` | Chain adapters for Bitcoin, Ethereum, Sui, and Aptos |
-| `csv-adapter` | Unified Rust meta-crate and client API |
-| `csv-cli` | Command-line entry point for wallets, rights, proofs, and cross-chain flows |
-| `csv-wallet` | Wallet UI and supporting services |
-| `typescript-sdk` | TypeScript SDK package |
-| `csv-mcp-server` | MCP server for agent-oriented workflows |
-| `csv-local-dev` | Local chain simulator and developer environment |
-| `csv-explorer` | Explorer, API, indexer, and storage stack |
+| `typescript-sdk` | TypeScript/JavaScript SDK |
+| `csv-mcp-server` | Model Context Protocol server for AI agents |
+| `csv-local-dev` | Local chain simulator for development |
 
 ## Core idea
 
@@ -153,16 +171,19 @@ The MCP server provides self-describing errors with actionable suggestions:
 ### Real-World Applications
 
 **Cross-Chain Subscriptions**
+
 - Move subscriptions to user's preferred chain
 - 96-97% cost savings vs traditional bridges
 - One-command setup and management
 
 **Gaming Assets**
+
 - Transfer in-game items between chains
 - Preserve ownership across ecosystems
 - No bridge operator fees
 
 **API Access Tokens**
+
 - Move tokens based on usage patterns
 - Optimize for cost and performance
 - Cryptographic guarantee of uniqueness

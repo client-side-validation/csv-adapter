@@ -33,6 +33,8 @@ toml = { version = "0.8", features = ["parse"] }
 aws-lc-sys = "0.39"
 
 csv-adapter-core = { path = "csv-adapter-core" }
+csv-adapter-keystore = { path = "csv-adapter-keystore" }
+csv-adapter-store = { path = "csv-adapter-store" }
 
 # csv-explorer dependencies
 tokio = { version = "1", features = ["full"] }
@@ -59,6 +61,20 @@ anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 config = "0.14"
+
+# Crypto & security
+sha2 = "0.10"
+hmac = "0.12"
+pbkdf2 = "0.12"
+aes-gcm = "0.10"
+scrypt = { version = "0.11", default-features = false }
+bip39 = { version = "2.0", features = ["rand"] }
+zeroize = { version = "1.7", features = ["derive"] }
+
+# Web & WASM
+web-sys = { version = "0.3", features = ["Storage", "Window"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
 dioxus = "0.5"
 dioxus-web = "0.5"
 dioxus-desktop = "0.5"

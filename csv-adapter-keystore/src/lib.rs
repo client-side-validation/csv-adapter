@@ -44,6 +44,7 @@
 
 pub mod bip39;
 pub mod bip44;
+pub mod browser_keystore;
 pub mod keystore;
 pub mod memory;
 
