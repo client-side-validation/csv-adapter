@@ -105,8 +105,16 @@ impl ChainIndexer for SuiIndexer {
             .json()
             .await?;
 
-        if let Some(result) = resp.get("result").and_then(|v| v.as_str()) {
-            Ok(result.parse::<u64>().unwrap_or(0))
+        if let Some(result) = resp.get("result") {
+            // Handle both string and number formats from Sui RPC
+            let checkpoint_num = if let Some(s) = result.as_str() {
+                s.parse::<u64>().unwrap_or(0)
+            } else if let Some(n) = result.as_u64() {
+                n
+            } else {
+                0
+            };
+            Ok(checkpoint_num)
         } else {
             Err(ExplorerError::RpcError {
                 chain: "sui".to_string(),
