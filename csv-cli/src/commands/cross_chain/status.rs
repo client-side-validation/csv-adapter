@@ -4,11 +4,11 @@ use anyhow::Result;
 
 use csv_adapter_core::hash::Hash;
 
-use crate::config::Config;
+use crate::config::{Chain, Config};
 use crate::output;
 use crate::state::{UnifiedStateManager, TransferStatus};
 
-fn cmd_status(transfer_id: String, state: &UnifiedStateManager) -> Result<()> {
+pub fn cmd_status(transfer_id: String, state: &UnifiedStateManager) -> Result<()> {
     let bytes = hex::decode(transfer_id.trim_start_matches("0x"))
         .map_err(|e| anyhow::anyhow!("Invalid Transfer ID: {}", e))?;
     let mut hash_bytes = [0u8; 32];
@@ -62,7 +62,7 @@ fn cmd_status(transfer_id: String, state: &UnifiedStateManager) -> Result<()> {
     Ok(())
 }
 
-fn cmd_list(from: Option<Chain>, to: Option<Chain>, state: &UnifiedStateManager) -> Result<()> {
+pub fn cmd_list(from: Option<Chain>, to: Option<Chain>, state: &UnifiedStateManager) -> Result<()> {
     output::header("Cross-Chain Transfers");
 
     let headers = vec!["Transfer ID", "From", "To", "Right ID", "Status"];
@@ -104,7 +104,7 @@ fn cmd_list(from: Option<Chain>, to: Option<Chain>, state: &UnifiedStateManager)
     Ok(())
 }
 
-fn cmd_retry(transfer_id: String, _config: &Config, state: &mut UnifiedStateManager) -> Result<()> {
+pub fn cmd_retry(transfer_id: String, _config: &Config, state: &mut UnifiedStateManager) -> Result<()> {
     output::header("Retrying Transfer");
     output::kv("Transfer ID", &transfer_id);
 
@@ -150,5 +150,3 @@ fn cmd_retry(transfer_id: String, _config: &Config, state: &mut UnifiedStateMana
     Ok(())
 }
 
-/// Get the current block/checkpoint height for a chain via RPC.
-/// Makes actual HTTP RPC calls to configured endpoints.

@@ -66,12 +66,13 @@ pub fn cmd_import_csv_wallet(path: Option<String>, _config: &Config, state: &mut
         let was_same = existing.as_ref().map(|e| e.address == account.address).unwrap_or(false);
         
         // Create wallet account with all imported data
+        // Note: private keys are no longer stored in WalletAccount directly
+        // They should be stored in the keystore and referenced via keystore_ref
         let wallet_account = WalletAccount {
             id: account.id.clone(),
             chain: chain.clone(),
             name: account.name.clone(),
             address: account.address.clone(),
-            private_key: Some(account.private_key.clone()),
             xpub: None,
             derivation_path: None,
             keystore_ref: None,
@@ -118,7 +119,9 @@ pub fn cmd_export_csv_wallet(output: Option<String>, _config: &Config, state: &U
     
     for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana] {
         if let Some(account) = state.get_account(&chain) {
-            if let Some(private_key) = &account.private_key {
+            // Note: private keys are no longer stored in WalletAccount
+            // Use keystore or DEPLOYER_KEY env var for key access
+            if account.keystore_ref.is_some() || !account.address.is_empty() {
                 accounts.push(CsvWalletAccount {
                     id: format!("{}-cli-{}", chain, &account.address[..8.min(account.address.len())]),
                     chain: chain.to_string().to_lowercase(),

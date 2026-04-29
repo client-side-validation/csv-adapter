@@ -74,14 +74,10 @@ fn deploy_ethereum_csv_client(
     // Get deployer key
     let deployer_key = deployer_key
         .or_else(|| std::env::var("DEPLOYER_KEY").ok())
-        .or_else(|| {
-            state
-                .get_account(&Chain::Ethereum)
-                .and_then(|acc| acc.private_key.clone())
-        })
+        // Note: private keys are no longer stored in WalletAccount. Use keystore or env var.
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "DEPLOYER_KEY not found. Options:\n  1. Pass --deployer-key <hex>\n  2. Set DEPLOYER_KEY env var\n  3. Store wallet account with 'csv wallet generate ethereum'"
+                "DEPLOYER_KEY not found. Options:\n  1. Pass --deployer-key <hex>\n  2. Set DEPLOYER_KEY env var"
             )
         })?;
 

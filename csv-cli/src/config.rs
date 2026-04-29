@@ -341,7 +341,6 @@ impl Config {
                 chain: chain.clone(),
                 name: format!("{} Legacy", chain),
                 address: String::new(), // Will be derived from private key
-                private_key: legacy.private_key.clone(),
                 xpub: legacy.xpub.clone(),
                 derivation_path: legacy.derivation_path.clone(),
                 keystore_ref: None,
@@ -382,8 +381,9 @@ fn get_cached_wallet_config(chain: &Chain, account: &CsvAccount) -> Option<Legac
     let mut cache = cache.lock().ok()?;
 
     // Insert if not exists
+    // Note: private keys are no longer stored in WalletAccount
     cache.entry(chain.clone()).or_insert_with(|| LegacyWalletConfig {
-        private_key: Some(account.private_key.clone()),
+        private_key: None,
         xpub: None,
         mnemonic: None,
         mnemonic_passphrase: None,

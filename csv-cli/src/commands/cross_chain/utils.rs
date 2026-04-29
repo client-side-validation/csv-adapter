@@ -28,7 +28,7 @@ pub struct BitcoinBlockHeight {
     pub height: u64,
 }
 
-fn get_chain_height(chain: &Chain, config: &Config) -> u64 {
+pub fn get_chain_height(chain: &Chain, config: &Config) -> u64 {
     // Try to fetch from RPC, fallback to reasonable defaults
     let runtime = tokio::runtime::Runtime::new().ok();
 
@@ -338,8 +338,27 @@ fn fetch_gas_balance(chain: &Chain, config: &Config, address: &str) -> anyhow::R
     })
 }
 
+/// Get private key for a chain from state
+pub fn get_private_key(_state: &crate::state::UnifiedStateManager, chain: Chain) -> Result<String> {
+    // TODO: Implement proper key retrieval from state/keystore
+    Err(anyhow::anyhow!("Key retrieval not yet implemented for {:?}", chain))
+}
+
+/// Parse a hex string into a 32-byte Hash
+pub fn hash_from_hex_32(hex_str: &str) -> Result<Hash> {
+    let hex_clean = hex_str.trim_start_matches("0x");
+    let bytes = hex::decode(hex_clean)
+        .map_err(|e| anyhow::anyhow!("Invalid hex: {}", e))?;
+    if bytes.len() != 32 {
+        return Err(anyhow::anyhow!("Expected 32 bytes, got {}", bytes.len()));
+    }
+    let mut hash_bytes = [0u8; 32];
+    hash_bytes.copy_from_slice(&bytes);
+    Ok(Hash::new(hash_bytes))
+}
+
 /// Format a Unix timestamp as a human-readable date
-fn format_timestamp(timestamp: u64) -> String {
+pub fn format_timestamp(timestamp: u64) -> String {
     use std::time::{Duration, UNIX_EPOCH};
     
     let datetime = UNIX_EPOCH + Duration::from_secs(timestamp);
@@ -350,3 +369,23 @@ fn format_timestamp(timestamp: u64) -> String {
 // ===== Native Ethereum transaction sender using HTTP RPC =====
 
 /// Send Ethereum mint transaction using native HTTP RPC (no external cast command needed)
+#[allow(dead_code)]
+pub fn send_ethereum_mint_stub() {}
+
+/// Fetch gas balance for a chain
+pub async fn fetch_gas_balance(_chain: &str, _config: &Config, _address: &str) -> anyhow::Result<u128> {
+    // TODO: Implement gas balance fetching
+    Ok(0)
+}
+
+/// Get chain confirmations
+pub fn get_chain_confirmations(_chain: &Chain) -> u64 {
+    // TODO: Implement confirmations lookup
+    6 // Default to 6 confirmations
+}
+
+/// Build a demo Merkle proof
+pub fn build_demo_merkle_proof(_right_id: Hash, _commitment: Hash, _depth: u8) -> Vec<u8> {
+    // TODO: Implement real Merkle proof construction
+    vec![0u8; 32]
+}

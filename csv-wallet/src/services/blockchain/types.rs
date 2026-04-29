@@ -136,3 +136,39 @@ pub struct SignedTransaction {
     pub tx_hash: String,
     pub raw_bytes: Vec<u8>,
 }
+
+/// Solana transaction (stub for deleted solana_tx module)
+#[derive(Clone, Debug)]
+pub struct SolanaTransaction {
+    pub message: SolanaMessage,
+    pub signatures: Vec<Vec<u8>>,
+}
+
+/// Solana message structure
+#[derive(Clone, Debug)]
+pub struct SolanaMessage {
+    pub data: Vec<u8>,
+}
+
+impl SolanaMessage {
+    pub fn serialize(&self) -> Vec<u8> {
+        self.data.clone()
+    }
+}
+
+/// Solana account metadata
+#[derive(Clone, Debug)]
+pub struct SolanaAccountMeta {
+    pub pubkey: String,
+    pub is_signer: bool,
+    pub is_writable: bool,
+}
+
+/// Bitcoin UTXO (stub for deleted bitcoin_tx module)
+#[derive(Clone, Debug)]
+pub struct Utxo {
+    pub txid: String,
+    pub vout: u32,
+    pub value: u64,
+    pub script_pubkey: Vec<u8>,
+}

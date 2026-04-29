@@ -154,127 +154,35 @@ impl BlockchainService {
     }
 
     /// Lock a right on Sui using BCS-encoded transactions
+    /// TODO: Reimplement without sdk_tx module
     async fn lock_sui_right(
         &self,
-        right_id: &str,
-        owner: &str,
-        contract_address: &str,
-        signer: &NativeWallet,
+        _right_id: &str,
+        _owner: &str,
+        _contract_address: &str,
+        _signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
-        // TODO: Reimplement without sdk_tx module
-        // TODO: Reimplement without native_signer module
-        
-        // Fetch gas objects for the sender
-        let gas_objects = fetch_sui_gas_objects(owner, &self.config.sui_rpc).await?;
-        
-        if gas_objects.is_empty() {
-            return Err(BlockchainError {
-                message: format!(
-                    "No SUI gas objects found for address {}. \
-                    Please fund this address with testnet SUI first.",
-                    owner
-                ),
-                chain: Some(Chain::Sui),
-                code: None,
-            });
-        }
-        
-        // Use the first gas object
-        let (gas_id, _balance, gas_digest) = &gas_objects[0];
-        
-        // Build BCS-encoded transaction
-        let tx_data = build_sui_transaction(
-            owner,
-            contract_address,
-            "csv",
-            "lock",
-            vec![hex::decode(right_id.trim_start_matches("0x")).unwrap_or_default()],
-            gas_id,
-            1, // version - would fetch real version
-            gas_digest,
-            100000, // gas budget
-        )?;
-        
-        // Create UnsignedTransaction wrapper for signing
-        let unsigned_tx = UnsignedTransaction {
-            chain: Chain::Sui,
-            from: owner.to_string(),
-            to: contract_address.to_string(),
-            value: 0,
-            data: tx_data,
-            nonce: None,
-            gas_price: None,
-            gas_limit: Some(100000),
-        };
-        
-        // Sign the transaction
-        let signature = NativeSigner::sign_sui(&unsigned_tx, &signer.private_key()?)
-            .map_err(|e| BlockchainError {
-                message: format!("Signing failed: {}", e),
-                chain: Some(Chain::Sui),
-                code: None,
-            })?;
-        
-        // Broadcast via Sui RPC
-        // For now, return a simulated hash
-        // Real implementation would call sui_executeTransactionBlock
-        let tx_hash = format!("0x{}", hex::encode(&signature.raw_bytes[..32.min(signature.raw_bytes.len())]));
-        
-        Ok(tx_hash)
+        Err(BlockchainError {
+            message: "lock_sui_right not yet reimplemented - sdk_tx module deleted".to_string(),
+            chain: Some(Chain::Sui),
+            code: None,
+        })
     }
 
     /// Lock a right on Aptos using BCS-encoded transactions
+    /// TODO: Reimplement without sdk_tx module
     async fn lock_aptos_right(
         &self,
-        right_id: &str,
-        owner: &str,
-        contract_address: &str,
-        signer: &NativeWallet,
+        _right_id: &str,
+        _owner: &str,
+        _contract_address: &str,
+        _signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
-        // TODO: Reimplement without sdk_tx module
-        // TODO: Reimplement without native_signer module
-        
-        // Fetch sequence number for the sender
-        let sequence_number = fetch_aptos_sequence(owner, &self.config.aptos_rpc).await?;
-        
-        // Build BCS-encoded transaction
-        let tx_data = build_aptos_transaction(
-            owner,
-            contract_address,
-            "csv",
-            "lock",
-            vec![hex::decode(right_id.trim_start_matches("0x")).unwrap_or_default()],
-            sequence_number,
-            5000, // max_gas_amount
-            100,  // gas_unit_price
-        )?;
-        
-        // Create UnsignedTransaction wrapper for signing
-        let unsigned_tx = UnsignedTransaction {
-            chain: Chain::Aptos,
-            from: owner.to_string(),
-            to: contract_address.to_string(),
-            value: 0,
-            data: tx_data,
-            nonce: Some(sequence_number),
-            gas_price: Some(100),
-            gas_limit: Some(5000),
-        };
-        
-        // Sign the transaction
-        let signature = NativeSigner::sign_aptos(&unsigned_tx, &signer.private_key()?)
-            .map_err(|e| BlockchainError {
-                message: format!("Signing failed: {}", e),
-                chain: Some(Chain::Aptos),
-                code: None,
-            })?;
-        
-        // Broadcast via Aptos RPC
-        // For now, return a simulated hash
-        // Real implementation would call transactions/batch_submit
-        let tx_hash = format!("0x{}", hex::encode(&signature.raw_bytes[..32.min(signature.raw_bytes.len())]));
-        
-        Ok(tx_hash)
+        Err(BlockchainError {
+            message: "lock_aptos_right not yet reimplemented - sdk_tx module deleted".to_string(),
+            chain: Some(Chain::Aptos),
+            code: None,
+        })
     }
 
     /// Lock a right on Solana using native transaction format
@@ -823,33 +731,12 @@ impl BlockchainService {
 
         let data = match chain {
             Chain::Sui => {
-                // Sui uses proper BCS-encoded transactions with gas objects
-                use crate::services::sdk_tx::{fetch_sui_gas_objects, build_sui_transaction};
-
-                // For Sui, use the derived signer_addr as the owner (32-byte address format)
-                let owner_bytes = hex::decode(signer_addr.trim_start_matches("0x")).unwrap_or_default();
-
-                let gas_objects = fetch_sui_gas_objects(&signer_addr, &self.config.sui_rpc).await?;
-                if gas_objects.is_empty() {
-                    return Err(BlockchainError {
-                        message: format!("No SUI gas objects for {}", signer_addr),
-                        chain: Some(Chain::Sui),
-                        code: None,
-                    });
-                }
-                let (gas_id, _balance, gas_digest) = &gas_objects[0];
-
-                build_sui_transaction(
-                    &signer_addr,
-                    contract_address,
-                    "csv",
-                    "mint",
-                    vec![right_bytes, owner_bytes],
-                    gas_id,
-                    1, // version - will be updated by RPC
-                    gas_digest,
-                    10000000, // gas budget
-                )?
+                // TODO: Reimplement without sdk_tx module
+                return Err(BlockchainError {
+                    message: "Sui mint not yet reimplemented - sdk_tx module deleted".to_string(),
+                    chain: Some(Chain::Sui),
+                    code: None,
+                });
             }
             Chain::Aptos => {
                 // Aptos uses BCS-encoded transactions
@@ -1305,4 +1192,114 @@ async fn build_evm_lock_transaction(
         gas_price: None,
         gas_limit: Some(100000),
     })
+}
+
+// ===== Stubs for deleted module functions =====
+
+/// Stub for fetch_sui_gas_objects (from deleted sdk_tx module)
+async fn fetch_sui_gas_objects(_owner: &str, _rpc_url: &str) -> Result<Vec<(String, u64, String)>, BlockchainError> {
+    Err(BlockchainError {
+        message: "fetch_sui_gas_objects not yet reimplemented".to_string(),
+        chain: Some(Chain::Sui),
+        code: None,
+    })
+}
+
+/// Stub for fetch_aptos_sequence (from deleted sdk_tx module)
+async fn fetch_aptos_sequence(_owner: &str, _rpc_url: &str) -> Result<u64, BlockchainError> {
+    Err(BlockchainError {
+        message: "fetch_aptos_sequence not yet reimplemented".to_string(),
+        chain: Some(Chain::Aptos),
+        code: None,
+    })
+}
+
+/// Stub for build_solana_transaction (from deleted solana_tx module)
+async fn build_solana_transaction(
+    _payer: &str,
+    _program_id: &str,
+    _accounts: Vec<crate::services::blockchain::types::SolanaAccountMeta>,
+    _instruction_data: Vec<u8>,
+    _rpc_url: &str,
+) -> Result<crate::services::blockchain::types::SolanaTransaction, BlockchainError> {
+    Err(BlockchainError {
+        message: "build_solana_transaction not yet reimplemented".to_string(),
+        chain: Some(Chain::Solana),
+        code: None,
+    })
+}
+
+/// Stub for broadcast_solana_transaction (from deleted solana_tx module)
+async fn broadcast_solana_transaction(
+    _tx: &crate::services::blockchain::types::SolanaTransaction,
+    _rpc_url: &str,
+) -> Result<String, BlockchainError> {
+    Err(BlockchainError {
+        message: "broadcast_solana_transaction not yet reimplemented".to_string(),
+        chain: Some(Chain::Solana),
+        code: None,
+    })
+}
+
+/// Stub module for bitcoin_tx (deleted module)
+mod bitcoin_tx {
+    use super::*;
+    use crate::services::blockchain::types::{BlockchainError};
+
+    pub async fn build_anchor_transaction(
+        _sender_address: &str,
+        _lock_data: &[u8],
+        _rpc_url: &str,
+    ) -> Result<(Vec<u8>, crate::services::blockchain::types::Utxo), BlockchainError> {
+        Err(BlockchainError {
+            message: "bitcoin_tx::build_anchor_transaction not yet reimplemented".to_string(),
+            chain: Some(Chain::Bitcoin),
+            code: None,
+        })
+    }
+
+    pub fn sign_bitcoin_transaction(
+        _unsigned_tx: &[u8],
+        _private_key_hex: &str,
+        _utxo: &crate::services::blockchain::types::Utxo,
+        _sender_address: &str,
+    ) -> Result<Vec<u8>, BlockchainError> {
+        Err(BlockchainError {
+            message: "bitcoin_tx::sign_bitcoin_transaction not yet reimplemented".to_string(),
+            chain: Some(Chain::Bitcoin),
+            code: None,
+        })
+    }
+
+    pub async fn broadcast_transaction(
+        _signed_tx: &[u8],
+        _rpc_url: &str,
+    ) -> Result<String, BlockchainError> {
+        Err(BlockchainError {
+            message: "bitcoin_tx::broadcast_transaction not yet reimplemented".to_string(),
+            chain: Some(Chain::Bitcoin),
+            code: None,
+        })
+    }
+}
+
+/// Stub NativeSigner (from deleted native_signer module)
+pub struct NativeSigner;
+
+impl NativeSigner {
+    pub fn sign_sui(_tx: &UnsignedTransaction, _private_key: &str) -> Result<SignedTransaction, BlockchainError> {
+        Err(BlockchainError {
+            message: "NativeSigner::sign_sui not yet reimplemented".to_string(),
+            chain: Some(Chain::Sui),
+            code: None,
+        })
+    }
+
+    pub fn sign_aptos(_tx: &UnsignedTransaction, _private_key: &str) -> Result<SignedTransaction, BlockchainError> {
+        Err(BlockchainError {
+            message: "NativeSigner::sign_aptos not yet reimplemented".to_string(),
+            chain: Some(Chain::Aptos),
+            code: None,
+        })
+    }
 }

@@ -6,7 +6,7 @@ use csv_adapter_core::hash::Hash;
 use crate::config::Config;
 use crate::output;
 
-fn send_aptos_mint_via_cli(
+pub fn send_aptos_mint_via_cli(
     module_address: &str,
     rpc_url: &str,
     private_key_hex: &str,

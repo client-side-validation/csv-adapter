@@ -6,6 +6,22 @@ use csv_adapter_core::hash::Hash;
 use crate::config::Config;
 use crate::output;
 
+/// Encode a value as a variable-length integer (varint) for Bitcoin transactions
+fn encode_varint(buf: &mut Vec<u8>, value: u64) {
+    if value < 253 {
+        buf.push(value as u8);
+    } else if value <= u16::MAX as u64 {
+        buf.push(0xFD);
+        buf.extend_from_slice(&(value as u16).to_le_bytes());
+    } else if value <= u32::MAX as u64 {
+        buf.push(0xFE);
+        buf.extend_from_slice(&(value as u32).to_le_bytes());
+    } else {
+        buf.push(0xFF);
+        buf.extend_from_slice(&value.to_le_bytes());
+    }
+}
+
 /// UTXO reference for Bitcoin transactions
 #[derive(Debug, Clone)]
 pub struct UtxoRef {
@@ -15,7 +31,8 @@ pub struct UtxoRef {
     pub script_pubkey: String,
 }
 
-fn publish_bitcoin_lock(address: &str, lock_data: &[u8], rpc_url: &str, private_key_hex: &str) -> Result<String> {
+/// Publish a Bitcoin lock transaction
+pub fn publish_bitcoin_lock(address: &str, lock_data: &[u8], rpc_url: &str, private_key_hex: &str) -> Result<String> {
     // Verify the private key matches the address before attempting to spend
     let derived_address = derive_bitcoin_address_from_key(private_key_hex)?;
     if derived_address != address {

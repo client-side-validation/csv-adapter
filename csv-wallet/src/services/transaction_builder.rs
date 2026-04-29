@@ -126,7 +126,7 @@ fn encode_rlp_bytes(bytes: &[u8]) -> Vec<u8> {
 /// - Sender (32 bytes)
 /// - GasData
 /// - TransactionExpiration
-fn build_sui_transaction(
+pub fn build_sui_transaction(
     sender: &str,
     contract: &str,
     _data: Vec<u8>,

@@ -27,7 +27,7 @@ fn make_seal_ref(data: &[u8]) -> SealRef {
 /// Implement LockProvider for Bitcoin
 pub struct BitcoinLockProvider {
     // In production: reference to BitcoinAnchorLayer
-    pub _chain_id: ChainId,
+    pub chain_id: ChainId,
 }
 
 impl LockProvider for BitcoinLockProvider {
@@ -56,7 +56,7 @@ impl LockProvider for BitcoinLockProvider {
             right_id,
             commitment,
             owner,
-            source_chain: self._chain_id,
+            source_chain: self.chain_id,
             destination_chain,
             destination_owner,
             source_seal: make_seal_ref(&tx_hash_bytes),
@@ -83,7 +83,7 @@ impl LockProvider for BitcoinLockProvider {
 
 /// Implement LockProvider for Sui
 pub struct SuiLockProvider {
-    pub _chain_id: ChainId,
+    pub chain_id: ChainId,
 }
 
 impl LockProvider for SuiLockProvider {
@@ -108,7 +108,7 @@ impl LockProvider for SuiLockProvider {
             right_id,
             commitment,
             owner,
-            source_chain: self._chain_id,
+            source_chain: self.chain_id,
             destination_chain,
             destination_owner,
             source_seal: SealRef::new(vec![0x03; 40], None).unwrap(),
@@ -133,7 +133,7 @@ impl LockProvider for SuiLockProvider {
 
 /// Implement LockProvider for Aptos
 pub struct AptosLockProvider {
-    pub _chain_id: ChainId,
+    pub chain_id: ChainId,
 }
 
 impl LockProvider for AptosLockProvider {
@@ -158,7 +158,7 @@ impl LockProvider for AptosLockProvider {
             right_id,
             commitment,
             owner,
-            source_chain: self._chain_id,
+            source_chain: self.chain_id,
             destination_chain,
             destination_owner,
             source_seal: SealRef::new(vec![0x04; 32], None).unwrap(),
@@ -182,12 +182,12 @@ impl LockProvider for AptosLockProvider {
 
 /// Implement LockProvider for Ethereum
 pub struct EthereumLockProvider {
-    pub _chain_id: ChainId,
+    pub chain_id: ChainId,
 }
 
 /// Implement LockProvider for Solana
 pub struct SolanaLockProvider {
-    pub _chain_id: ChainId,
+    pub chain_id: ChainId,
 }
 
 impl LockProvider for SolanaLockProvider {
@@ -211,7 +211,7 @@ impl LockProvider for SolanaLockProvider {
             right_id,
             commitment,
             owner,
-            source_chain: self._chain_id,
+            source_chain: self.chain_id,
             destination_chain,
             destination_owner,
             source_seal: SealRef::new(vec![0x05; 32], None).unwrap(),
@@ -258,7 +258,7 @@ impl LockProvider for EthereumLockProvider {
             right_id,
             commitment,
             owner,
-            source_chain: self._chain_id,
+            source_chain: self.chain_id,
             destination_chain,
             destination_owner,
             source_seal: SealRef::new(vec![0x02; 52], None).unwrap(),

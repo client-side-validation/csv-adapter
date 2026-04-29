@@ -14,10 +14,14 @@ use csv_adapter_core::seal::SealRef;
 
 use crate::config::{Chain, Config};
 use crate::output;
-use crate::state::{UnifiedStateManager, TransferStatus};
+use crate::state::{UnifiedStateManager, TransferRecord, TransferStatus};
 
 use super::super::cross_chain_impl::*;
 use super::utils::*;
+use super::ethereum::{
+    EthTransaction, get_ethereum_nonce, get_ethereum_gas_price, 
+    get_ethereum_balance, sign_ethereum_transaction, send_raw_ethereum_transaction
+};
 
 /// Make a seal reference from bytes
 fn make_seal_ref(data: &[u8]) -> SealRef {
@@ -27,11 +31,11 @@ fn make_seal_ref(data: &[u8]) -> SealRef {
 /// Create lock provider for a chain
 fn create_lock_provider(chain: &Chain, chain_id: ChainId) -> Box<dyn LockProvider> {
     match chain {
-        Chain::Bitcoin => Box::new(BitcoinLockProvider { _chain_id: chain_id }),
-        Chain::Ethereum => Box::new(EthereumLockProvider { _chain_id: chain_id }),
-        Chain::Sui => Box::new(SuiLockProvider { _chain_id: chain_id }),
-        Chain::Aptos => Box::new(AptosLockProvider { _chain_id: chain_id }),
-        Chain::Solana => Box::new(SolanaLockProvider { _chain_id: chain_id }),
+        Chain::Bitcoin => Box::new(BitcoinLockProvider { chain_id }),
+        Chain::Ethereum => Box::new(EthereumLockProvider { chain_id }),
+        Chain::Sui => Box::new(SuiLockProvider { chain_id }),
+        Chain::Aptos => Box::new(AptosLockProvider { chain_id }),
+        Chain::Solana => Box::new(SolanaLockProvider { chain_id }),
         _ => panic!("Unsupported chain for locking: {:?}", chain),
     }
 }
@@ -40,10 +44,10 @@ fn create_lock_provider(chain: &Chain, chain_id: ChainId) -> Box<dyn LockProvide
 fn create_mint_provider(chain: &Chain, chain_id: ChainId) -> Result<Box<dyn MintProvider>, String> {
     match chain {
         Chain::Bitcoin => Err("Bitcoin cannot be a destination for minting".to_string()),
-        Chain::Ethereum => Ok(Box::new(EthereumMintProvider { _chain_id: chain_id })),
-        Chain::Sui => Ok(Box::new(SuiMintProvider { _chain_id: chain_id })),
-        Chain::Aptos => Ok(Box::new(AptosMintProvider { _chain_id: chain_id })),
-        Chain::Solana => Ok(Box::new(SolanaMintProvider { _chain_id: chain_id })),
+        Chain::Ethereum => Ok(Box::new(EthereumMintProvider { chain_id })),
+        Chain::Sui => Ok(Box::new(SuiMintProvider { chain_id })),
+        Chain::Aptos => Ok(Box::new(AptosMintProvider { chain_id })),
+        Chain::Solana => Ok(Box::new(SolanaMintProvider { chain_id })),
         _ => Err(format!("Unsupported chain for minting: {:?}", chain)),
     }
 }
@@ -56,7 +60,7 @@ fn chain_to_chain_id(chain: &Chain) -> ChainId {
         Chain::Sui => ChainId::Sui,
         Chain::Aptos => ChainId::Aptos,
         Chain::Solana => ChainId::Solana,
-        _ => ChainId::Custom(999),
+        _ => ChainId::Custom("unknown".to_string()),
     }
 }
 
@@ -72,7 +76,7 @@ fn current_timestamp() -> u64 {
 fn is_placeholder_tx_hash(hash: &Hash) -> bool {
     hash.as_bytes().iter().all(|&b| b == 0)
 }
-fn cmd_transfer(
+pub(crate) fn cmd_transfer(
     from: Chain,
     to: Chain,
     right_id: String,
@@ -525,6 +529,14 @@ Use --simulation for demo output, or wire real lock/mint providers first."
 
     Ok(())
 }
+
+/// Run real Bitcoin to Aptos transfer
+async fn run_real_bitcoin_to_aptos(
+    right_id_hash: Hash,
+    transfer_id: String,
+    transfer_id_bytes: [u8; 32],
+    from_str: &str,
+    to_str: &str,
     destination_contract: String,
     dest_owner_str: Option<String>,
     dest_owner_bytes: Vec<u8>,

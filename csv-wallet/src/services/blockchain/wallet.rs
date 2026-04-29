@@ -1,7 +1,6 @@
 //! Wallet abstractions - native and browser wallets.
 
-use crate::services::native_signer::{NativeSigner, SignedTransaction, UnsignedTransaction};
-use crate::services::blockchain::types::BlockchainError;
+use crate::services::blockchain::types::{BlockchainError, SignedTransaction, UnsignedTransaction};
 use crate::wallet_core::ChainAccount;
 use csv_adapter_core::Chain;
 
@@ -42,14 +41,13 @@ impl NativeWallet {
     }
 
     /// Sign a transaction using the native signer.
-    pub fn sign_transaction(&self, tx: &UnsignedTransaction) -> Result<SignedTransaction, BlockchainError> {
-        let pk = self.private_key()?;
-        NativeSigner::sign_transaction(tx, &pk)
-            .map_err(|e| BlockchainError {
-                message: e.to_string(),
-                chain: Some(self.chain),
-                code: None,
-            })
+    /// TODO: Reimplement without native_signer module
+    pub fn sign_transaction(&self, _tx: &UnsignedTransaction) -> Result<SignedTransaction, BlockchainError> {
+        Err(BlockchainError {
+            message: "Native signing not yet reimplemented".to_string(),
+            chain: Some(self.chain),
+            code: None,
+        })
     }
 }
 

@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-pub use csv_adapter_store::unified::{
+pub use csv_adapter_store::state::{
     Chain, ContractRecord, GasAccount, RightRecord, RightStatus, SealRecord, 
     TransactionRecord, TransactionStatus, TransactionType,
     TransferRecord, TransferStatus, UnifiedStorage, WalletAccount,
@@ -175,7 +175,6 @@ impl UnifiedStateManager {
             chain: chain.clone(),
             name: format!("{} CLI Account", chain),
             address,
-            private_key: None,
             xpub: None,
             derivation_path: None,
             keystore_ref: None,
@@ -289,7 +288,6 @@ impl UnifiedStateManager {
             chain: chain.clone(),
             name: format!("{} CLI Account", chain),
             address,
-            private_key: None,
             xpub: None,
             derivation_path,
             keystore_ref: None,

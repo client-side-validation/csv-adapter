@@ -8,7 +8,8 @@ use crate::config::{Chain, Config};
 use crate::output;
 use crate::state::UnifiedStateManager;
 
-fn send_ethereum_mint_via_cast(
+/// Send Ethereum mint transaction
+pub fn send_ethereum_mint_via_cast(
     contract_address: &str,
     rpc_url: &str,
     private_key: &str,
@@ -138,7 +139,8 @@ fn encode_u256(value: u64) -> [u8; 32] {
     bytes
 }
 
-struct EthTransaction {
+/// Ethereum transaction structure
+pub struct EthTransaction {
     nonce: u64,
     gas_price: u64,
     gas_limit: u64,
@@ -148,7 +150,8 @@ struct EthTransaction {
     chain_id: u64,
 }
 
-fn get_ethereum_nonce(address: &str, rpc_url: &str) -> Result<u64> {
+/// Get Ethereum nonce for an address
+pub fn get_ethereum_nonce(address: &str, rpc_url: &str) -> Result<u64> {
     let client = reqwest::blocking::Client::new();
     let resp = client
         .post(rpc_url)
@@ -166,7 +169,8 @@ fn get_ethereum_nonce(address: &str, rpc_url: &str) -> Result<u64> {
     Ok(u64::from_str_radix(count_hex.trim_start_matches("0x"), 16).unwrap_or(0))
 }
 
-fn get_ethereum_gas_price(rpc_url: &str) -> Result<u64> {
+/// Get current Ethereum gas price
+pub fn get_ethereum_gas_price(rpc_url: &str) -> Result<u64> {
     let client = reqwest::blocking::Client::new();
     let resp = client
         .post(rpc_url)
@@ -184,7 +188,8 @@ fn get_ethereum_gas_price(rpc_url: &str) -> Result<u64> {
     Ok(u64::from_str_radix(price_hex.trim_start_matches("0x"), 16).unwrap_or(20000000000))
 }
 
-fn get_ethereum_balance(address: &str, rpc_url: &str) -> Result<u128> {
+/// Get Ethereum balance for an address
+pub fn get_ethereum_balance(address: &str, rpc_url: &str) -> Result<u128> {
     let client = reqwest::blocking::Client::new();
     let resp = client
         .post(rpc_url)
@@ -202,7 +207,8 @@ fn get_ethereum_balance(address: &str, rpc_url: &str) -> Result<u128> {
     Ok(u128::from_str_radix(balance_hex.trim_start_matches("0x"), 16).unwrap_or(0))
 }
 
-fn sign_ethereum_transaction(tx: &EthTransaction, secret_key: &secp256k1::SecretKey) -> Result<String> {
+/// Sign an Ethereum transaction
+pub fn sign_ethereum_transaction(tx: &EthTransaction, secret_key: &secp256k1::SecretKey) -> Result<String> {
     use sha3::{Digest, Keccak256};
     use secp256k1::{Message, Secp256k1};
     
@@ -339,7 +345,8 @@ fn encode_length_bytes(len: usize) -> Vec<u8> {
     bytes
 }
 
-fn send_raw_ethereum_transaction(signed_tx_hex: &str, rpc_url: &str) -> Result<String> {
+/// Send a raw Ethereum transaction
+pub fn send_raw_ethereum_transaction(signed_tx_hex: &str, rpc_url: &str) -> Result<String> {
     let client = reqwest::blocking::Client::new();
     let resp = client
         .post(rpc_url)
