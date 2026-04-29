@@ -6,9 +6,9 @@
 use crate::services::blockchain::config::BlockchainConfig;
 use crate::services::blockchain::types::{
     BlockchainError, ContractDeployment, ContractType, CrossChainProof, CrossChainStatus,
-    CrossChainTransferResult, ProofData, TransactionReceipt, TransactionStatus,
+    CrossChainTransferResult, ProofData, SignedTransaction, TransactionReceipt, TransactionStatus,
+    UnsignedTransaction,
 };
-use crate::services::native_signer::{SignedTransaction, UnsignedTransaction};
 use crate::services::blockchain::wallet::NativeWallet;
 use crate::wallet_core::ChainAccount;
 use crate::services::blockchain::signer::TransactionSigner;
@@ -161,8 +161,8 @@ impl BlockchainService {
         contract_address: &str,
         signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
-        use crate::services::sdk_tx::{build_sui_transaction, fetch_sui_gas_objects};
-        use crate::services::native_signer::NativeSigner;
+        // TODO: Reimplement without sdk_tx module
+        // TODO: Reimplement without native_signer module
         
         // Fetch gas objects for the sender
         let gas_objects = fetch_sui_gas_objects(owner, &self.config.sui_rpc).await?;
@@ -231,8 +231,8 @@ impl BlockchainService {
         contract_address: &str,
         signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
-        use crate::services::sdk_tx::{build_aptos_transaction, fetch_aptos_sequence};
-        use crate::services::native_signer::NativeSigner;
+        // TODO: Reimplement without sdk_tx module
+        // TODO: Reimplement without native_signer module
         
         // Fetch sequence number for the sender
         let sequence_number = fetch_aptos_sequence(owner, &self.config.aptos_rpc).await?;
@@ -285,7 +285,7 @@ impl BlockchainService {
         program_id: &str,
         signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
-        use crate::services::solana_tx::{build_solana_transaction, broadcast_solana_transaction};
+        // TODO: Reimplement without solana_tx module
         use ed25519_dalek::{Signer, SigningKey};
         
         // Build instruction data (simplified - just the right_id as bytes)
@@ -342,7 +342,7 @@ impl BlockchainService {
         _owner: &str,
         signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
-        use crate::services::bitcoin_tx;
+        // TODO: Reimplement without bitcoin_tx module
         use crate::wallet_core::ChainAccount;
         
         // Derive Bitcoin address from signer's private key
@@ -1009,7 +1009,7 @@ impl BlockchainService {
         let tx_hash = match chain {
             Chain::Bitcoin => {
                 // For Bitcoin we use OP_RETURN anchor with TRANSFER opcode
-                use crate::services::bitcoin_tx;
+                // TODO: Reimplement without bitcoin_tx module
                 
                 let bitcoin_address = ChainAccount::derive_address(
                     Chain::Bitcoin,

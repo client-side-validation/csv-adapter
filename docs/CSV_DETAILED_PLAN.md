@@ -51,10 +51,6 @@ No logic changes. Just cleanup. This restores confidence in the codebase.
 csv-wallet/src/pages/dashboard.rs.tmp          # .tmp = committed mistake
 csv-wallet/src/pages/nft_page_broken.rs        # explicitly named broken
 csv-wallet/src/assets/valuation.rs             # check if used; likely dead
-csv-wallet/src/services/native_signer.rs       # superseded by wallet_core.rs
-csv-wallet/src/services/sdk_tx.rs              # empty or stub
-csv-wallet/src/services/bitcoin_tx.rs          # duplicates adapter logic
-csv-wallet/src/services/solana_tx.rs           # duplicates adapter logic
 ```
 
 ### Verify Before Deleting

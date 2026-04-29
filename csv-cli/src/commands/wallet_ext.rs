@@ -1,7 +1,7 @@
 //! Extension commands for csv-wallet integration
 
 use anyhow::Result;
-use csv_adapter_store::unified::WalletAccount;
+use csv_adapter_store::state::WalletAccount;
 
 use crate::config::{Chain, Config};
 use crate::state::UnifiedStateManager;

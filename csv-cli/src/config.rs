@@ -9,7 +9,7 @@ use std::sync::{Mutex, OnceLock};
 use serde::{Deserialize, Serialize};
 
 // Re-export unified types from csv-adapter-store
-pub use csv_adapter_store::unified::{
+pub use csv_adapter_store::state::{
     Chain, ChainConfig, FaucetConfig, Network, WalletAccount,
 };
 
@@ -85,7 +85,7 @@ pub fn parse_network(s: &str) -> anyhow::Result<Network> {
 
 /// Full CLI configuration using unified storage types
 /// 
-/// Note: New code should use UnifiedStorage from csv_adapter_store::unified
+/// Note: New code should use UnifiedStorage from csv_adapter_store::state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Chain configurations

@@ -10,7 +10,7 @@ use csv_adapter_keystore::{
     memory::{Passphrase, SecretKey, Seed},
 };
 use csv_adapter_core::Chain;
-use csv_adapter_store::unified::{WalletAccount, WalletConfig, UnifiedStorage};
+use csv_adapter_store::state::{WalletAccount, WalletConfig, UnifiedStorage};
 use std::path::Path;
 use thiserror::Error;
 

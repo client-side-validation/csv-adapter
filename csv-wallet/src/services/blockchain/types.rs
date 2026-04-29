@@ -115,3 +115,24 @@ pub struct CrossChainTransferResult {
 
 /// Map of deployed contracts by chain.
 pub type ContractDeployments = std::collections::HashMap<Chain, ContractDeployment>;
+
+/// Transaction to be signed.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UnsignedTransaction {
+    pub chain: Chain,
+    pub from: String,
+    pub to: String,
+    pub value: u64,
+    pub data: Vec<u8>,
+    pub nonce: Option<u64>,
+    pub gas_price: Option<u64>,
+    pub gas_limit: Option<u64>,
+}
+
+/// Signed transaction ready for broadcast.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SignedTransaction {
+    pub chain: Chain,
+    pub tx_hash: String,
+    pub raw_bytes: Vec<u8>,
+}

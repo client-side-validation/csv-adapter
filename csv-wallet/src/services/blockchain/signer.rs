@@ -2,9 +2,8 @@
 //!
 //! Provides chain-specific transaction signing for cross-chain transfers.
 
-use crate::services::blockchain::types::BlockchainError;
+use crate::services::blockchain::types::{BlockchainError, SignedTransaction, UnsignedTransaction};
 use crate::services::blockchain::wallet::NativeWallet;
-use crate::services::native_signer::{SignedTransaction, UnsignedTransaction};
 use csv_adapter_core::Chain;
 
 /// Transaction signer for different chains.

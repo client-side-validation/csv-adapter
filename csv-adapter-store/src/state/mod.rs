@@ -50,6 +50,8 @@ pub use domain::{
     TransferStatus,
 };
 pub use storage::StateStorage;
+/// Backward compatibility alias
+pub type UnifiedStorage = StateStorage;
 pub use wallet::{FaucetConfig, GasAccount, WalletAccount, WalletConfig};
 
 /// Version of the state format.

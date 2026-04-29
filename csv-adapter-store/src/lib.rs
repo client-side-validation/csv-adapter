@@ -10,11 +10,8 @@ use rusqlite::{params, Connection};
 #[cfg(feature = "sqlite")]
 use std::sync::Mutex;
 
-/// Application state module (formerly unified).
+/// Application state module (unified storage).
 pub mod state;
-
-/// Unified storage types.
-pub mod unified;
 
 #[cfg(feature = "browser-storage")]
 pub mod browser_storage;

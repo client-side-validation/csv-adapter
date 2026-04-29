@@ -15,7 +15,6 @@ use csv_adapter_core::agent_types::{HasErrorSuggestion, FixAction, error_codes};
 use serde::{Deserialize, Serialize};
 
 use crate::services::network::NetworkType;
-use crate::services::solana_tx::Pubkey as SolanaPubkey;
 
 /// Configuration for a chain API endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
