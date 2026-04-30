@@ -14,6 +14,7 @@ pub fn cmd_init(
     network: Network,
     words: u8,
     fund: bool,
+    account: u32,
     config: &Config,
     state: &mut UnifiedStateManager,
 ) -> Result<()> {
@@ -36,7 +37,7 @@ pub fn cmd_init(
         Chain::Solana,
     ] {
         output::info(&format!("Generating {} wallet...", chain));
-        let address = generate_wallet_for_chain(&chain, &network, &mnemonic, state)?;
+        let address = generate_wallet_for_chain(&chain, &network, &mnemonic, account, state)?;
         addresses.insert(chain.clone(), address.clone());
         output::success(&format!("{} wallet generated", chain));
     }
@@ -58,6 +59,10 @@ pub fn cmd_init(
     output::info("Your wallet addresses:");
     for (chain, address) in &addresses {
         output::info(&format!("  {}: {}", chain, address));
+    }
+
+    if account > 0 {
+        output::info(&format!("Bitcoin account index: {} (BIP-86 path: m/86'/coin_type'/{}'/0/0)", account, account));
     }
 
     if fund {
@@ -103,10 +108,11 @@ fn generate_wallet_for_chain(
     chain: &Chain,
     network: &Network,
     mnemonic: &str,
+    account: u32,
     state: &mut UnifiedStateManager,
 ) -> Result<String> {
     match chain {
-        Chain::Bitcoin => generate_bitcoin_from_mnemonic(network, mnemonic, state),
+        Chain::Bitcoin => generate_bitcoin_from_mnemonic(network, mnemonic, account, state),
         Chain::Ethereum => generate_ethereum_from_mnemonic(mnemonic, state),
         Chain::Sui => generate_sui_from_mnemonic(mnemonic, state),
         Chain::Aptos => generate_aptos_from_mnemonic(mnemonic, state),
@@ -117,6 +123,7 @@ fn generate_wallet_for_chain(
 fn generate_bitcoin_from_mnemonic(
     network: &Network,
     mnemonic: &str,
+    account: u32,
     state: &mut UnifiedStateManager,
 ) -> Result<String> {
     use bitcoin::Network as BtcNetwork;
@@ -138,13 +145,17 @@ fn generate_bitcoin_from_mnemonic(
     let wallet = csv_adapter_bitcoin::wallet::SealWallet::from_seed(&seed, btc_network)
         .map_err(|e| anyhow::anyhow!("Failed to create Bitcoin wallet: {}", e))?;
 
-    let path = csv_adapter_bitcoin::wallet::Bip86Path::external(0, 0);
+    let path = csv_adapter_bitcoin::wallet::Bip86Path::external(account, 0);
     let key = wallet
         .derive_key(&path)
         .map_err(|e| anyhow::anyhow!("Failed to derive key: {}", e))?;
 
     let address = key.address.to_string();
-    let derivation_path = format!("m/86'/0'/0'/0/0");
+    let coin_type = match btc_network {
+        BtcNetwork::Bitcoin => 0,
+        _ => 1,
+    };
+    let derivation_path = format!("m/86'/{}/{}'/0/0", coin_type, account);
 
     // Store in unified state
     state.store_address_with_derivation(Chain::Bitcoin, address.clone(), Some(derivation_path));

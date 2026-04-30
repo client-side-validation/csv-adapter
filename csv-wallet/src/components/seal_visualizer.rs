@@ -10,7 +10,7 @@ use dioxus::prelude::*;
 use crate::components::{
     design_tokens::SealState,
     hash_display::{HashDisplay, TxHashDisplay},
-    seal_status::{SealLifecycle, SealStatusBadge, Size, StateTransition},
+    seal_status::{SealStatusBadge, Size},
 };
 
 /// Seal event for the timeline.

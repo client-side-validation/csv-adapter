@@ -12,8 +12,14 @@ pub fn TransferDetail(id: String) -> Element {
         let id = id.clone();
         move || {
             spawn(async move {
-                // TODO: Fetch from API when endpoint is available
-                transfer.set(None);
+                // Fetch transfer details from API
+                match fetch_transfer(&id).await {
+                    Ok(transfer_data) => transfer.set(Some(transfer_data)),
+                    Err(e) => {
+                        tracing::error!("Failed to fetch transfer {}: {}", id, e);
+                        transfer.set(None);
+                    }
+                }
             });
         }
     });
@@ -230,4 +236,27 @@ fn format_duration(duration_ms: u64) -> String {
     } else {
         format!("{}s", seconds)
     }
+}
+
+/// Fetch transfer details from the API
+async fn fetch_transfer(id: &str) -> Result<csv_explorer_shared::TransferRecord, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&format!("/api/transfers/{}", id))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect: {}", e))?;
+    
+    if response.status() == 404 {
+        return Err(format!("Transfer {} not found", id));
+    }
+    
+    if !response.status().is_success() {
+        return Err(format!("API error: {}", response.status()));
+    }
+    
+    response
+        .json::<csv_explorer_shared::TransferRecord>()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
 }

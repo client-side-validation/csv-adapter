@@ -172,3 +172,23 @@ pub struct Utxo {
     pub value: u64,
     pub script_pubkey: Vec<u8>,
 }
+
+/// Bitcoin UTXO from mempool.space API
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct BitcoinUtxo {
+    pub txid: String,
+    pub vout: u32,
+    #[serde(rename = "value")]
+    pub value: u64,
+    #[serde(skip)]
+    pub address: String,
+    pub status: Option<BitcoinUtxoStatus>,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct BitcoinUtxoStatus {
+    pub confirmed: bool,
+    pub block_height: Option<u64>,
+    pub block_hash: Option<String>,
+    pub block_time: Option<u64>,
+}

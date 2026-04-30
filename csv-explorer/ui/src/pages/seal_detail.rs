@@ -12,8 +12,14 @@ pub fn SealDetail(id: String) -> Element {
         let id = id.clone();
         move || {
             spawn(async move {
-                // TODO: Fetch from API when endpoint is available
-                seal.set(None);
+                // Fetch seal details from API
+                match fetch_seal(&id).await {
+                    Ok(seal_data) => seal.set(Some(seal_data)),
+                    Err(e) => {
+                        tracing::error!("Failed to fetch seal {}: {}", id, e);
+                        seal.set(None);
+                    }
+                }
             });
         }
     });
@@ -155,4 +161,27 @@ fn SealTypeInfo(seal_type: String) -> Element {
             }
         }
     }
+}
+
+/// Fetch seal details from the API
+async fn fetch_seal(id: &str) -> Result<csv_explorer_shared::SealRecord, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&format!("/api/seals/{}", id))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect: {}", e))?;
+    
+    if response.status() == 404 {
+        return Err(format!("Seal {} not found", id));
+    }
+    
+    if !response.status().is_success() {
+        return Err(format!("API error: {}", response.status()));
+    }
+    
+    response
+        .json::<csv_explorer_shared::SealRecord>()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
 }

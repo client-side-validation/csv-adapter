@@ -62,6 +62,7 @@ pub struct ConfirmationInfo {
 }
 
 /// Display a seal status badge with visual indicators.
+#[allow(non_snake_case)]
 pub fn SealStatusBadge(props: SealStatusBadgeProps) -> Element {
     let state_class = match props.state {
         SealState::Active => "seal-active",
@@ -130,6 +131,7 @@ pub struct StateTransition {
 }
 
 /// Display seal lifecycle as a timeline.
+#[allow(non_snake_case)]
 pub fn SealLifecycle(props: SealLifecycleProps) -> Element {
     let all_states = vec![
         SealState::Active,
@@ -194,6 +196,7 @@ pub struct SealIndicatorProps {
 }
 
 /// Compact seal state indicator (just dot + optional text).
+#[allow(non_snake_case)]
 pub fn SealIndicator(props: SealIndicatorProps) -> Element {
     let class = if props.compact {
         "seal-indicator-compact"

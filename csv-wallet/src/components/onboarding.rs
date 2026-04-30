@@ -100,6 +100,7 @@ pub struct OnboardingFlowProps {
 }
 
 /// Main onboarding flow component.
+#[allow(non_snake_case)]
 pub fn OnboardingFlow(props: OnboardingFlowProps) -> Element {
     let mut current_step = use_signal(|| OnboardingStep::Welcome);
     let completed_steps = use_signal(|| std::collections::HashSet::<OnboardingStep>::new());
@@ -254,6 +255,7 @@ struct WelcomeStepProps {
     on_next: EventHandler<()>,
 }
 
+#[allow(non_snake_case)]
 fn WelcomeStep(props: WelcomeStepProps) -> Element {
     rsx! {
         div { class: "onboarding-step welcome",
@@ -299,6 +301,7 @@ struct WhatIsSealStepProps {
     on_next: EventHandler<()>,
 }
 
+#[allow(non_snake_case)]
 fn WhatIsSealStep(props: WhatIsSealStepProps) -> Element {
     rsx! {
         div { class: "onboarding-step seal-intro",
@@ -387,6 +390,7 @@ struct WalletSetupStepProps {
     on_import_wallet: Option<EventHandler<()>>,
 }
 
+#[allow(non_snake_case)]
 fn WalletSetupStep(props: WalletSetupStepProps) -> Element {
     rsx! {
         div { class: "onboarding-step wallet-setup",
@@ -444,6 +448,7 @@ struct CreateRightStepProps {
     on_next: EventHandler<()>,
 }
 
+#[allow(non_snake_case)]
 fn CreateRightStep(props: CreateRightStepProps) -> Element {
     rsx! {
         div { class: "onboarding-step create-right",
@@ -515,6 +520,7 @@ struct SecurityTipsStepProps {
     on_next: EventHandler<()>,
 }
 
+#[allow(non_snake_case)]
 fn SecurityTipsStep(props: SecurityTipsStepProps) -> Element {
     rsx! {
         div { class: "onboarding-step security-tips",
@@ -577,6 +583,7 @@ struct CompleteStepProps {
     on_finish: EventHandler<()>,
 }
 
+#[allow(non_snake_case)]
 fn CompleteStep(props: CompleteStepProps) -> Element {
     rsx! {
         div { class: "onboarding-step complete",
@@ -639,6 +646,7 @@ pub struct OnboardingChecklistProps {
 }
 
 /// Quick checklist for remaining onboarding tasks.
+#[allow(non_snake_case)]
 pub fn OnboardingChecklist(props: OnboardingChecklistProps) -> Element {
     if !props.visible {
         return rsx! {};

@@ -403,15 +403,101 @@ impl DeploymentManager {
     /// This checks if the deployed contract/program exists on-chain.
     pub async fn verify_deployment(
         &self,
-        _chain: Chain,
-        _address: &[u8],
+        chain: Chain,
+        address: &[u8],
     ) -> DeploymentResult<bool> {
-        // TODO: Implement verification using chain adapters
-        // This would use the adapter's RPC client to check if the
-        // contract/program exists on-chain
-        Err(DeploymentError::Generic(
-            "Verification not yet implemented".to_string(),
-        ))
+        use csv_adapter_core::adapter_factory::create_adapter;
+        
+        // Convert chain to chain_id string
+        let chain_id = match chain {
+            Chain::Bitcoin => "bitcoin",
+            Chain::Ethereum => "ethereum",
+            Chain::Sui => "sui",
+            Chain::Aptos => "aptos",
+            Chain::Solana => "solana",
+            _ => return Err(DeploymentError::UnsupportedChain(chain)),
+        };
+        
+        // Create adapter for the chain
+        let adapter = create_adapter(chain_id)
+            .ok_or_else(|| DeploymentError::Generic(
+                format!("No adapter available for {:?}", chain)
+            ))?;
+        
+        // Create a basic config for the adapter
+        let config = csv_adapter_core::chain_config::ChainConfig {
+            chain_id: chain_id.to_string(),
+            rpc_url: self.rpc_client.url().to_string(),
+            network: adapter.default_network().to_string(),
+            ..Default::default()
+        };
+        
+        // Create RPC client
+        let mut client = adapter.create_client(&config).await
+            .map_err(|e| DeploymentError::Generic(
+                format!("Failed to create RPC client: {:?}", e)
+            ))?;
+        
+        // Verify deployment based on chain type
+        let exists = match chain {
+            Chain::Ethereum | Chain::Sui | Chain::Aptos => {
+                // For smart contract chains, check if code exists at address
+                let address_hex = format!("0x{}", hex::encode(address));
+                self.verify_contract_exists(&mut client, &address_hex).await?
+            }
+            Chain::Solana => {
+                // For Solana, check if program account exists
+                let address_b58 = bs58::encode(address).into_string();
+                self.verify_program_exists(&mut client, &address_b58).await?
+            }
+            Chain::Bitcoin => {
+                // For Bitcoin, verification is different - check if UTXO exists
+                // This would require a different approach
+                false
+            }
+            _ => false,
+        };
+        
+        Ok(exists)
+    }
+    
+    /// Verify if a smart contract exists at the given address.
+    async fn verify_contract_exists(
+        &self,
+        client: &mut Box<dyn csv_adapter_core::chain_adapter::RpcClient>,
+        address: &str,
+    ) -> DeploymentResult<bool> {
+        // Call eth_getCode or equivalent
+        let result = client.call("eth_getCode", vec![address.to_string(), "latest".to_string()])
+            .await
+            .map_err(|e| DeploymentError::RpcError(format!("{:?}", e)))?;
+        
+        // If code is not "0x", contract exists
+        let code = result.as_str().unwrap_or("0x");
+        Ok(code != "0x" && code.len() > 2)
+    }
+    
+    /// Verify if a Solana program exists.
+    async fn verify_program_exists(
+        &self,
+        client: &mut Box<dyn csv_adapter_core::chain_adapter::RpcClient>,
+        program_id: &str,
+    ) -> DeploymentResult<bool> {
+        // Call getAccountInfo
+        let result = client.call("getAccountInfo", vec![program_id.to_string()])
+            .await
+            .map_err(|e| DeploymentError::RpcError(format!("{:?}", e)))?;
+        
+        // If account exists and has executable flag, program exists
+        if let Some(value) = result.get("value") {
+            if !value.is_null() {
+                if let Some(executable) = value.get("executable") {
+                    return Ok(executable.as_bool().unwrap_or(false));
+                }
+            }
+        }
+        
+        Ok(false)
     }
 
     /// Get deployment cost estimate.

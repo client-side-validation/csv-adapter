@@ -246,6 +246,111 @@ pub fn derive_all_chain_keys(
     keys
 }
 
+/// Derive an address from a raw 32-byte private key for a specific chain.
+///
+/// # Arguments
+/// * `key_bytes` - 32-byte private key
+/// * `chain` - Target blockchain
+///
+/// # Returns
+/// The derived address as a string.
+pub fn derive_address_from_key(key_bytes: &[u8], chain: Chain) -> Result<String, Bip44Error> {
+    if key_bytes.len() != 32 {
+        return Err(Bip44Error::InvalidSeedLength(key_bytes.len()));
+    }
+    
+    match chain {
+        Chain::Bitcoin => derive_bitcoin_address_from_key(key_bytes),
+        Chain::Ethereum => derive_ethereum_address_from_key(key_bytes),
+        Chain::Sui => derive_sui_address_from_key(key_bytes),
+        Chain::Aptos => derive_aptos_address_from_key(key_bytes),
+        Chain::Solana => derive_solana_address_from_key(key_bytes),
+        _ => Err(Bip44Error::UnsupportedChain(chain)),
+    }
+}
+
+fn derive_bitcoin_address_from_key(key_bytes: &[u8]) -> Result<String, Bip44Error> {
+    use secp256k1::{Secp256k1, SecretKey, Keypair, XOnlyPublicKey};
+    use bitcoin::key::TapTweak;
+    use bitcoin::Address;
+    
+    let secret_key = SecretKey::from_slice(key_bytes)
+        .map_err(|e| Bip44Error::DerivationFailed(format!("Invalid secp256k1 key: {}", e)))?;
+    
+    let secp = Secp256k1::new();
+    let keypair = Keypair::from_secret_key(&secp, &secret_key);
+    let (xonly_pubkey, _parity) = XOnlyPublicKey::from_keypair(&keypair);
+    let (tweaked_pubkey, _parity) = xonly_pubkey.tap_tweak(&secp, None);
+    
+    let address = Address::p2tr_tweaked(tweaked_pubkey, bitcoin::Network::Testnet);
+    Ok(address.to_string())
+}
+
+fn derive_ethereum_address_from_key(key_bytes: &[u8]) -> Result<String, Bip44Error> {
+    use secp256k1::{Secp256k1, SecretKey, PublicKey};
+    use sha3::{Keccak256, Digest};
+    
+    let secret_key = SecretKey::from_slice(key_bytes)
+        .map_err(|e| Bip44Error::DerivationFailed(format!("Invalid secp256k1 key: {}", e)))?;
+    
+    let secp = Secp256k1::new();
+    let public_key = secret_key.public_key(&secp);
+    let pubkey_bytes = public_key.serialize_uncompressed();
+    
+    let mut hasher = Keccak256::new();
+    hasher.update(&pubkey_bytes[1..]); // Skip the 0x04 prefix
+    let hash = hasher.finalize();
+    
+    // Ethereum address is the last 20 bytes
+    Ok(format!("0x{}", hex::encode(&hash[12..])))
+}
+
+fn derive_sui_address_from_key(key_bytes: &[u8]) -> Result<String, Bip44Error> {
+    use ed25519_dalek::{SigningKey, VerifyingKey};
+    use blake2::{Blake2b, Digest};
+    
+    let mut key_array = [0u8; 32];
+    key_array.copy_from_slice(key_bytes);
+    let signing_key = SigningKey::from_bytes(&key_array);
+    let verifying_key: VerifyingKey = signing_key.verifying_key();
+    
+    let mut hasher = Blake2b::new();
+    hasher.update([0x00]); // Sui address prefix
+    hasher.update(verifying_key.as_bytes());
+    let hash: [u8; 32] = hasher.finalize().into();
+    
+    Ok(format!("0x{}", hex::encode(&hash[..])))
+}
+
+fn derive_aptos_address_from_key(key_bytes: &[u8]) -> Result<String, Bip44Error> {
+    use ed25519_dalek::{SigningKey, VerifyingKey};
+    use sha3::{Sha3_256, Digest};
+    
+    let mut key_array = [0u8; 32];
+    key_array.copy_from_slice(key_bytes);
+    let signing_key = SigningKey::from_bytes(&key_array);
+    let verifying_key: VerifyingKey = signing_key.verifying_key();
+    
+    let mut hasher = Sha3_256::new();
+    hasher.update(verifying_key.as_bytes());
+    hasher.update([0x00]); // Aptos address suffix
+    let hash: [u8; 32] = hasher.finalize().into();
+    
+    Ok(format!("0x{}", hex::encode(&hash[..])))
+}
+
+fn derive_solana_address_from_key(key_bytes: &[u8]) -> Result<String, Bip44Error> {
+    use ed25519_dalek::{SigningKey, VerifyingKey};
+    
+    let mut key_array = [0u8; 32];
+    key_array.copy_from_slice(key_bytes);
+    let signing_key = SigningKey::from_bytes(&key_array);
+    let verifying_key: VerifyingKey = signing_key.verifying_key();
+    
+    // Solana address is the base58-encoded public key
+    Ok(bs58::encode(verifying_key.as_bytes()).into_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

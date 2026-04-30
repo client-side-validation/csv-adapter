@@ -109,6 +109,7 @@ pub struct ProofInspectorProps {
 }
 
 /// Interactive proof inspector component.
+#[allow(non_snake_case)]
 pub fn ProofInspector(props: ProofInspectorProps) -> Element {
     let mut active_tab = use_signal(|| Tab::Overview);
     let expanded_nodes = use_signal(|| std::collections::HashSet::<usize>::new());
@@ -215,6 +216,7 @@ struct ProofOverviewProps {
     on_verify: Option<EventHandler<()>>,
 }
 
+#[allow(non_snake_case)]
 fn ProofOverview(props: ProofOverviewProps) -> Element {
     rsx! {
         div { class: "proof-overview",
@@ -320,6 +322,7 @@ struct MerkleTreeViewProps {
     expanded_nodes: Signal<std::collections::HashSet<usize>>,
 }
 
+#[allow(non_snake_case)]
 fn MerkleTreeView(mut props: MerkleTreeViewProps) -> Element {
     let total_levels = props.proof.merkle_path.len() + 1;
     
@@ -440,6 +443,7 @@ struct SignaturesViewProps {
     signatures: Vec<ValidatorSignature>,
 }
 
+#[allow(non_snake_case)]
 fn SignaturesView(props: SignaturesViewProps) -> Element {
     let valid_count = props.signatures.iter().filter(|s| s.is_valid).count();
     let threshold = (props.signatures.len() as f32 * 0.66).ceil() as usize;
@@ -502,6 +506,7 @@ struct RawDataViewProps {
     raw_data: Vec<u8>,
 }
 
+#[allow(non_snake_case)]
 fn RawDataView(props: RawDataViewProps) -> Element {
     let hex_string = props.raw_data
         .chunks(16)

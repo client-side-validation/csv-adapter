@@ -19,6 +19,9 @@ pub enum WalletAction {
         /// Auto-fund from faucets
         #[arg(long, default_value = "true")]
         fund: bool,
+        /// Bitcoin account index (BIP-86 derivation path account)
+        #[arg(long, default_value = "0")]
+        account: u32,
     },
     /// Generate a new wallet
     Generate {

@@ -55,38 +55,37 @@ impl ContractDeployer {
     ///
     /// # Returns
     /// The contract deployment details
+    ///
+    /// # Note
+    /// This synchronous method provides deployment configuration and validation.
+    /// For actual deployment with transaction broadcasting, use `deploy_csv_lock()` 
+    /// which uses Alloy for async RPC-based deployment with proper signing.
     pub fn deploy_contract(
         &self,
         bytecode: &[u8],
         from_address: [u8; 20],
     ) -> EthereumResult<ContractDeployment> {
-        // Build deployment transaction
-        // This is a transaction with:
-        // - to: null (contract creation)
-        // - data: bytecode
-        // - value: 0 (unless payable constructor)
-        // - gas: estimated
-
-        // Estimate gas
+        // Estimate gas for deployment
         let gas_limit = self.estimate_deployment_gas(bytecode.len())?;
 
-        // Get current nonce
-        let _nonce = self
+        // Get current nonce for address calculation
+        let nonce = self
             .rpc
             .get_transaction_count(from_address)
             .map_err(|e| EthereumError::RpcError(format!("Failed to get nonce: {:?}", e)))?;
 
-        // Build and sign transaction (would need private key)
-        // For now, placeholder
-        let _ = bytecode;
-        let _ = from_address;
-        let _ = gas_limit;
+        // Calculate the contract address that would be created
+        // Contract address = keccak256(rlp_encode([sender, nonce]))[12:]
+        let contract_address = calculate_contract_address(from_address, nonce);
 
-        // Placeholder deployment
+        // Note: Full deployment with transaction signing requires async RPC
+        // The synchronous API provides configuration and address prediction
+        // Use deploy_csv_lock() for complete deployment with signing
+
         Ok(ContractDeployment {
-            contract_address: [0u8; 20], // Would be calculated from sender + nonce
-            transaction_hash: [0u8; 32], // Would be actual tx hash
-            block_number: 0,              // Would be actual block
+            contract_address,
+            transaction_hash: [0u8; 32], // Would be set after broadcast
+            block_number: 0,             // Would be set after confirmation
             gas_used: gas_limit,
             deployed_bytecode: bytecode.to_vec(),
             constructor_args: vec![],
@@ -218,9 +217,10 @@ pub async fn deploy_csv_lock(
     })
 }
 
-/// Deploy the CSV seal contract on Ethereum (legacy sync version)
+/// Deploy the CSV seal contract on Ethereum (non-RPC fallback)
 ///
-/// This is the legacy placeholder version for non-rpc builds.
+/// When the `rpc` feature is not enabled, this returns an error directing
+/// users to enable the feature for full deployment capabilities.
 #[cfg(not(feature = "rpc"))]
 pub fn deploy_csv_seal_contract(
     config: &EthereumConfig,
@@ -231,7 +231,7 @@ pub fn deploy_csv_seal_contract(
     let _ = bytecode;
     let _ = from_address;
     Err(EthereumError::NotImplemented(
-        "Contract deployment requires 'rpc' feature".to_string()
+        "Contract deployment requires the 'rpc' feature. Enable it in Cargo.toml: csv-adapter-ethereum = { features = [\"rpc\"] }".to_string()
     ))
 }
 

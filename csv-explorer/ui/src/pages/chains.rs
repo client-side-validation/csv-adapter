@@ -7,8 +7,14 @@ pub fn Chains() -> Element {
 
     use_effect(move || {
         spawn(async move {
-            // TODO: Fetch from API when endpoint is available
-            chains.set(None);
+            // Fetch chain status from API
+            match fetch_chains().await {
+                Ok(chain_list) => chains.set(Some(chain_list)),
+                Err(e) => {
+                    tracing::error!("Failed to fetch chains: {}", e);
+                    chains.set(None);
+                }
+            }
         });
     });
 
@@ -211,4 +217,23 @@ fn sync_lag_class(sync_lag: u64) -> &'static str {
     } else {
         "text-yellow-400"
     }
+}
+
+/// Fetch chain information from the API
+async fn fetch_chains() -> Result<Vec<csv_explorer_shared::ChainInfo>, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get("/api/chains")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("API error: {}", response.status()));
+    }
+    
+    response
+        .json::<Vec<csv_explorer_shared::ChainInfo>>()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
 }

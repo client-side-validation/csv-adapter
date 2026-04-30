@@ -1,4 +1,5 @@
 //! UI components module.
+#![allow(unused_imports)] // Intentional re-exports for public API
 
 pub mod card;
 pub mod chain_display;

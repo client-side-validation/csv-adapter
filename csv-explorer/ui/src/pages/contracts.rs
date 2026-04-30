@@ -10,8 +10,14 @@ pub fn ContractsList() -> Element {
 
     use_effect(move || {
         spawn(async move {
-            // TODO: Fetch from API when endpoint is available
-            contracts.set(None);
+            // Fetch contracts from API
+            match fetch_contracts().await {
+                Ok(contract_list) => contracts.set(Some(contract_list)),
+                Err(e) => {
+                    tracing::error!("Failed to fetch contracts: {}", e);
+                    contracts.set(None);
+                }
+            }
         });
     });
 
@@ -174,4 +180,23 @@ fn StatusBadge(status: String) -> Element {
             "{status}"
         }
     }
+}
+
+/// Fetch contracts from the API
+async fn fetch_contracts() -> Result<Vec<csv_explorer_shared::CsvContract>, String> {
+    let client = reqwest::Client::new();
+    let response = client
+        .get("/api/contracts")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("API error: {}", response.status()));
+    }
+    
+    response
+        .json::<Vec<csv_explorer_shared::CsvContract>>()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
 }

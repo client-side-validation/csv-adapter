@@ -20,7 +20,7 @@ struct CsvWalletAccount {
     id: String,
     chain: String,
     name: String,
-    private_key: String,
+    private_key: Option<String>,
     address: String,
 }
 
@@ -126,7 +126,7 @@ pub fn cmd_export_csv_wallet(output: Option<String>, _config: &Config, state: &U
                     id: format!("{}-cli-{}", chain, &account.address[..8.min(account.address.len())]),
                     chain: chain.to_string().to_lowercase(),
                     name: format!("CSV CLI {} Account", chain),
-                    private_key: private_key.clone(),
+                    private_key: None, // Private keys no longer stored in WalletAccount
                     address: account.address.clone(),
                 });
                 output::success(&format!("Exported {} account", chain));

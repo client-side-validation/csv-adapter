@@ -42,7 +42,8 @@ pub fn execute(
             network,
             words,
             fund,
-        } => generate::cmd_init(network, words, fund, config, state),
+            account,
+        } => generate::cmd_init(network, words, fund, account, config, state),
         WalletAction::Generate { chain, network } => {
             generate::cmd_generate(chain, network, config, state)
         }

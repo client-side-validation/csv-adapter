@@ -30,7 +30,12 @@ csv --help
 ## Quick Start
 
 ```bash
-# 1. Generate wallets for all chains
+# 1. One-command setup: Generate wallets for all chains
+csv wallet init                    # Uses default account 0
+csv wallet init --account 1        # Use Bitcoin account index 1 (BIP-86)
+csv wallet init --network test     # Testnet setup
+
+# Or generate wallets individually:
 csv wallet generate bitcoin test
 csv wallet generate ethereum
 csv wallet generate sui test
@@ -126,6 +131,20 @@ csv chain set-contract sui 0x5678...ef01
 ---
 
 ### Wallet Operations
+
+**Initialize all wallets (one-command setup):**
+
+```bash
+# Generate wallets for all chains with default Bitcoin account 0
+csv wallet init
+
+# Use a specific Bitcoin account index (BIP-86 multi-account support)
+csv wallet init --account 1
+csv wallet init --account 2 --network test
+
+# Full example: 24-word mnemonic, testnet, account 5, with faucet funding
+csv wallet init --words 24 --network test --account 5 --fund true
+```
 
 **Generate a new wallet:**
 

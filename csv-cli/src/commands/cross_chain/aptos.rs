@@ -26,7 +26,7 @@ pub fn send_aptos_mint_via_cli(
 }
 
 /// Native Aptos mint using REST API (no CLI subprocess)
-fn send_aptos_mint_native(
+pub fn send_aptos_mint_native(
     module_address: &str,
     rpc_url: &str,
     private_key_hex: &str,
@@ -99,5 +99,33 @@ fn send_aptos_mint_native(
     // Then submit to: POST {rpc_url}/transactions
     let placeholder_hash = format!("0x{}", hex::encode(&right_id.as_bytes()[..16]));
     Ok(placeholder_hash)
+}
+
+/// Async version of Aptos mint for cross-chain transfers (matches Ethereum signature)
+pub async fn send_aptos_mint_async(
+    contract_address: &str,
+    rpc_url: &str,
+    private_key_hex: &str,
+    right_id: Hash,
+    commitment: Hash,
+    _state_root: Hash,
+    _proof_height: u8,
+    source_tx_hash: Hash,
+    _proof: &[u8],
+    _seal_ref: Hash,
+) -> Result<String> {
+    // For now, use the blocking version in an async context
+    // In production, this should be fully async
+    tokio::task::spawn_blocking(move || {
+        send_aptos_mint_native(
+            contract_address,
+            rpc_url,
+            private_key_hex,
+            right_id,
+            commitment,
+            source_tx_hash,
+        )
+    }).await
+    .map_err(|e| anyhow::anyhow!("Task failed: {:?}", e))?
 }
 

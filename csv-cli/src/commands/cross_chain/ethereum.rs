@@ -141,13 +141,36 @@ fn encode_u256(value: u64) -> [u8; 32] {
 
 /// Ethereum transaction structure
 pub struct EthTransaction {
-    nonce: u64,
-    gas_price: u64,
-    gas_limit: u64,
-    to: Option<Vec<u8>>,
-    value: u64,
-    data: Vec<u8>,
-    chain_id: u64,
+    pub nonce: u64,
+    pub gas_price: u64,
+    pub gas_limit: u64,
+    pub to: Option<Vec<u8>>,
+    pub value: u64,
+    pub data: Vec<u8>,
+    pub chain_id: u64,
+}
+
+impl EthTransaction {
+    /// Create a new Ethereum transaction
+    pub fn new(
+        nonce: u64,
+        gas_price: u64,
+        gas_limit: u64,
+        to: Option<Vec<u8>>,
+        value: u64,
+        data: Vec<u8>,
+        chain_id: u64,
+    ) -> Self {
+        Self {
+            nonce,
+            gas_price,
+            gas_limit,
+            to,
+            value,
+            data,
+            chain_id,
+        }
+    }
 }
 
 /// Get Ethereum nonce for an address

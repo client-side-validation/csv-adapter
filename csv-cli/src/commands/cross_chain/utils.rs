@@ -189,7 +189,7 @@ async fn fetch_chain_height_rpc(chain: &Chain, config: &Config) -> anyhow::Resul
 }
 
 /// Get the required confirmation depth for a chain.
-fn get_chain_confirmations(chain: &Chain) -> u64 {
+pub fn get_chain_confirmations(chain: &Chain) -> u64 {
     match chain {
         Chain::Bitcoin => 6,   // ~1 hour on signet
         Chain::Ethereum => 15, // ~3 minutes
@@ -200,7 +200,7 @@ fn get_chain_confirmations(chain: &Chain) -> u64 {
 }
 
 /// Fetch actual gas balance from chain RPC
-fn fetch_gas_balance(chain: &Chain, config: &Config, address: &str) -> anyhow::Result<u64> {
+pub fn fetch_gas_balance(chain: &Chain, config: &Config, address: &str) -> anyhow::Result<u64> {
     let chain_config = config
         .chains
         .get(chain)
@@ -339,9 +339,43 @@ fn fetch_gas_balance(chain: &Chain, config: &Config, address: &str) -> anyhow::R
 }
 
 /// Get private key for a chain from state
-pub fn get_private_key(_state: &crate::state::UnifiedStateManager, chain: Chain) -> Result<String> {
-    // TODO: Implement proper key retrieval from state/keystore
-    Err(anyhow::anyhow!("Key retrieval not yet implemented for {:?}", chain))
+pub fn get_private_key(state: &crate::state::UnifiedStateManager, chain: Chain) -> Result<String> {
+    // First try to get from gas account configuration
+    if let Some(gas_account) = state.config.gas_accounts.get(&chain) {
+        if let Some(key) = &gas_account.private_key {
+            return Ok(key.clone());
+        }
+    }
+    
+    // If no gas account configured, check chain defaults
+    // Try to load from environment variable or secure keystore file
+    let env_var_name = format!("{}_PRIVATE_KEY", chain.to_string().to_uppercase());
+    if let Ok(key) = std::env::var(&env_var_name) {
+        return Ok(key);
+    }
+    
+    // Try to load from keystore file if available
+    let keystore_path = dirs::home_dir()
+        .map(|h| h.join(".csv").join("keystore").join(format!("{}.json", chain.to_string().to_lowercase())));
+    
+    if let Some(path) = keystore_path {
+        if path.exists() {
+            // Try to load keystore - would need password in real implementation
+            tracing::debug!("Found keystore at {:?}", path);
+            // For now, prompt user that keystore exists but password is needed
+            return Err(anyhow::anyhow!(
+                "Keystore found at {:?} but password is required. Use --password flag or set {}_PRIVATE_KEY environment variable",
+                path,
+                chain.to_string().to_uppercase()
+            ));
+        }
+    }
+    
+    Err(anyhow::anyhow!(
+        "No private key found for {:?}. Configure a gas account, set {}_PRIVATE_KEY environment variable, or create a keystore.",
+        chain,
+        chain.to_string().to_uppercase()
+    ))
 }
 
 /// Parse a hex string into a 32-byte Hash
@@ -372,20 +406,49 @@ pub fn format_timestamp(timestamp: u64) -> String {
 #[allow(dead_code)]
 pub fn send_ethereum_mint_stub() {}
 
-/// Fetch gas balance for a chain
-pub async fn fetch_gas_balance(_chain: &str, _config: &Config, _address: &str) -> anyhow::Result<u128> {
-    // TODO: Implement gas balance fetching
-    Ok(0)
-}
-
-/// Get chain confirmations
-pub fn get_chain_confirmations(_chain: &Chain) -> u64 {
-    // TODO: Implement confirmations lookup
-    6 // Default to 6 confirmations
-}
 
 /// Build a demo Merkle proof
-pub fn build_demo_merkle_proof(_right_id: Hash, _commitment: Hash, _depth: u8) -> Vec<u8> {
-    // TODO: Implement real Merkle proof construction
-    vec![0u8; 32]
+/// 
+/// In a real implementation, this would:
+/// 1. Fetch the transaction receipt for the right_id
+/// 2. Get the block containing the transaction
+/// 3. Compute the Merkle path from the transaction to the block root
+/// 4. Return the proof with the root, path, and leaf
+///
+/// For now, this builds a placeholder proof with proper structure.
+pub fn build_demo_merkle_proof(right_id: Hash, commitment: Hash, depth: u8) -> Vec<u8> {
+    use sha2::{Sha256, Digest};
+    
+    // Build a simple Merkle tree structure
+    // The proof consists of:
+    // - 4 bytes: depth
+    // - 32 bytes: root hash
+    // - 32 bytes: leaf hash (commitment)
+    // - depth * 32 bytes: sibling hashes
+    
+    let mut proof = Vec::new();
+    
+    // Add depth
+    proof.extend_from_slice(&depth.to_le_bytes());
+    
+    // Compute root as hash of right_id + commitment
+    let mut hasher = Sha256::new();
+    hasher.update(right_id.as_bytes());
+    hasher.update(commitment.as_bytes());
+    let root = hasher.finalize();
+    proof.extend_from_slice(&root);
+    
+    // Add leaf (commitment)
+    proof.extend_from_slice(commitment.as_bytes());
+    
+    // Generate placeholder sibling hashes
+    // In a real implementation, these would be actual sibling nodes
+    for i in 0..depth {
+        let mut sibling_hasher = Sha256::new();
+        sibling_hasher.update(&[i]); // Use index as unique input
+        let sibling = sibling_hasher.finalize();
+        proof.extend_from_slice(&sibling);
+    }
+    
+    proof
 }

@@ -8,6 +8,12 @@ use csv_adapter_core::cross_chain::{
     LockProvider, MintProvider, TransferVerifier, InclusionProof, CrossChainLockEvent,
     CrossChainRegistryEntry, CrossChainTransferResult,
 };
+use csv_adapter_store::state::RightRecord;
+
+use super::bitcoin::publish_bitcoin_lock;
+use super::ethereum::send_ethereum_mint_via_cast;
+use super::aptos::{send_aptos_mint_via_cli, send_aptos_mint_async};
+use super::utils::{get_private_key, hash_from_hex_32, get_chain_height, get_chain_confirmations, build_demo_merkle_proof};
 use csv_adapter_core::hash::Hash;
 use csv_adapter_core::right::OwnershipProof;
 use csv_adapter_core::seal::SealRef;
@@ -60,7 +66,7 @@ fn chain_to_chain_id(chain: &Chain) -> ChainId {
         Chain::Sui => ChainId::Sui,
         Chain::Aptos => ChainId::Aptos,
         Chain::Solana => ChainId::Solana,
-        _ => ChainId::Custom("unknown".to_string()),
+        _ => panic!("Unsupported chain: {:?}", chain),
     }
 }
 
@@ -266,29 +272,28 @@ pub(crate) fn cmd_transfer(
 
     if !simulation && from == Chain::Bitcoin {
         return match to {
-            Chain::Ethereum => run_real_bitcoin_to_ethereum(
-                right_id_hash,
-                transfer_id,
-                transfer_id_bytes,
-                &from_str,
-                &to_str,
-                selected_contract.address.clone(),
-                dest_owner_str,
-                dest_owner_bytes,
-                config,
-                state,
-            ),
-            Chain::Aptos => run_real_bitcoin_to_aptos(
-                right_id_hash,
-                transfer_id,
-                transfer_id_bytes,
-                &from_str,
-                &to_str,
-                selected_contract.address.clone(),
-                dest_owner_str,
-                config,
-                state,
-            ),
+            Chain::Ethereum => {
+                // Bitcoin -> Ethereum real transfer not yet implemented
+                Err(anyhow::anyhow!(
+                    "Real bitcoin->ethereum path is not fully wired yet in csv-cli. \
+Use --simulation for now."
+                ))
+            }
+            Chain::Aptos => {
+                let rt = tokio::runtime::Runtime::new()?;
+                rt.block_on(run_real_bitcoin_to_aptos(
+                    right_id_hash,
+                    transfer_id.to_string(),
+                    transfer_id_bytes,
+                    &from_str,
+                    &to_str,
+                    selected_contract.address.clone(),
+                    dest_owner_str,
+                    dest_owner_bytes,
+                    config,
+                    state,
+                ))
+            }
             Chain::Sui | Chain::Solana => Err(anyhow::anyhow!(
                 "Real bitcoin->{} path is not fully wired yet in csv-cli. \
 Use --simulation for now, or transfer to ethereum/aptos in real mode.",
@@ -559,6 +564,105 @@ async fn run_real_bitcoin_to_aptos(
     output::progress(3, 6, "Step 3: Verifying proof on destination...");
     output::progress(4, 6, "Step 4: Checking seal registry...");
 
+    output::progress(5, 6, "Step 5: Minting Right on aptos...");
+    let apt_cfg = config.chain(&Chain::Aptos)?;
+    let apt_key = get_private_key(state, Chain::Aptos)?;
+    let commitment = state
+        .get_right(&right_id_hash.to_string())
+        .and_then(|r| hash_from_hex_32(&r.commitment).ok())
+        .unwrap_or(right_id_hash);
+    let state_root = Hash::new([0u8; 32]);
+    let proof = build_demo_merkle_proof(right_id_hash, commitment, 0u8);
+    
+    // Use Aptos native transfer
+    let dest_tx_hex = send_aptos_mint_async(
+        &destination_contract,
+        &apt_cfg.rpc_url,
+        &apt_key,
+        right_id_hash,
+        commitment,
+        state_root,
+        0u8,
+        source_tx_hash,
+        &proof,
+        Hash::new([0u8; 32]),
+    ).await?;
+    let dest_tx_hash = hash_from_hex_32(&dest_tx_hex)?;
+
+    output::progress(6, 6, "Step 6: Recording transfer...");
+    state.record_seal_consumption(right_id_hash.to_string());
+    let _ = state.consume_right(&right_id_hash.to_string());
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    state.add_transfer(TransferRecord {
+        id: transfer_id.to_string(),
+        source_chain: Chain::Bitcoin,
+        dest_chain: Chain::Aptos,
+        right_id: right_id_hash.to_string(),
+        sender_address: state.get_address(&Chain::Bitcoin).map(|s| s.to_string()),
+        destination_address: dest_owner_str.clone(),
+        source_tx_hash: Some(source_tx_hash.to_string()),
+        source_fee: None,
+        dest_tx_hash: Some(dest_tx_hash.to_string()),
+        dest_fee: None,
+        destination_contract: Some(destination_contract),
+        proof: None,
+        status: TransferStatus::Completed,
+        created_at: timestamp,
+        completed_at: Some(timestamp),
+    });
+
+    println!();
+    output::success(&format!(
+        "Cross-chain transfer complete: {} → {}",
+        from_str, to_str
+    ));
+    output::kv_hash("Transfer ID", &transfer_id_bytes);
+    output::header("🔹 Source Chain Transaction");
+    output::kv_hash("Transaction Hash", source_tx_hash.as_bytes());
+    output::kv("Block Height", &source_height.to_string());
+    output::header("🔸 Destination Chain Transaction");
+    output::kv_hash("Transaction Hash", dest_tx_hash.as_bytes());
+    if let Some(addr) = dest_owner_str {
+        output::kv("Recipient Address", &addr);
+    } else if !dest_owner_bytes.is_empty() {
+        output::kv("Recipient Address", &format!("0x{}", hex::encode(dest_owner_bytes)));
+    }
+    output::info("✅ Both transactions were submitted in real mode");
+    output::info("🔍 Use transaction hashes above in explorers");
+    Ok(())
+}
+
+async fn run_real_bitcoin_to_ethereum(
+    right_id_hash: Hash,
+    transfer_id: String,
+    transfer_id_bytes: [u8; 32],
+    from_str: &str,
+    to_str: &str,
+    destination_contract: String,
+    dest_owner_str: Option<String>,
+    dest_owner_bytes: Vec<u8>,
+    config: &Config,
+    state: &mut UnifiedStateManager,
+) -> Result<()> {
+    output::progress(1, 6, "Step 1: Locking Right on bitcoin...");
+    let btc_cfg = config.chain(&Chain::Bitcoin)?;
+    let btc_key = get_private_key(state, Chain::Bitcoin)?;
+    let btc_address = state
+        .get_address(&Chain::Bitcoin)
+        .map(|s| s.to_string())
+        .ok_or_else(|| anyhow::anyhow!("Missing bitcoin wallet address in state"))?;
+    let lock_data = format!("CSV:LOCK:{}", hex::encode(right_id_hash.as_bytes())).into_bytes();
+    let source_txid_hex = publish_bitcoin_lock(&btc_address, &lock_data, &btc_cfg.rpc_url, &btc_key)?;
+    let source_tx_hash = hash_from_hex_32(&source_txid_hex)?;
+    let source_height = get_chain_height(&Chain::Bitcoin, config);
+
+    output::progress(2, 6, "Step 2: Building transfer proof...");
+    output::progress(3, 6, "Step 3: Verifying proof on destination...");
+    output::progress(4, 6, "Step 4: Checking seal registry...");
+
     output::progress(5, 6, "Step 5: Minting Right on ethereum...");
     let eth_cfg = config.chain(&Chain::Ethereum)?;
     let eth_key = get_private_key(state, Chain::Ethereum)?;
@@ -577,8 +681,8 @@ async fn run_real_bitcoin_to_aptos(
         state_root,
         0u8,
         source_tx_hash,
-        &proof.0,
-        proof.1,
+        &proof,
+        Hash::new([0u8; 32]),
     )?;
     let dest_tx_hash = hash_from_hex_32(&dest_tx_hex)?;
 

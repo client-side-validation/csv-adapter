@@ -8,6 +8,7 @@ use crate::config::BitcoinConfig;
 use crate::error::{BitcoinError, BitcoinResult};
 use crate::rpc::BitcoinRpc;
 use crate::wallet::SealWallet;
+use bitcoin::key::TapTweak;
 
 /// Bitcoin contract deployment transaction
 pub struct ContractDeployment {
@@ -51,36 +52,60 @@ impl ContractDeployer {
     /// * `value_sat` - Amount to lock in the contract (in satoshis)
     ///
     /// # Returns
-    /// The contract deployment details
+    /// The contract deployment details with the Taproot output address
+    ///
+    /// # Implementation Notes
+    /// This is currently a simplified implementation. Full implementation requires:
+    /// 1. Build Taproot tree with the script as a leaf
+    /// 2. Compute the merkle root and tweak the internal key
+    /// 3. Create a funding transaction with UTXOs from the wallet
+    /// 4. Add the Taproot output with the specified value
+    /// 5. Sign and broadcast via RPC
+    /// 6. Wait for confirmation and return deployment details
     pub fn deploy_contract(
         &self,
         script: &[u8],
         value_sat: u64,
     ) -> BitcoinResult<ContractDeployment> {
         // Derive a new address for the contract
-        let address = self
+        let derived_key = self
             .wallet
             .get_funding_address(0, 0)
             .map_err(|e| BitcoinError::RpcError(format!("Failed to derive address: {}", e)))?;
 
-        // Build a transaction that creates the Taproot output
-        // This is a simplified version - real implementation would:
-        // 1. Build a transaction with the script as Tapleaf
-        // 2. Create the Taproot output with the merkle root
-        // 3. Sign and broadcast via RPC
+        // Build the Taproot output with the script
+        // This creates the merkle tree root from the script
+        let internal_key = derived_key.internal_xonly;
+        
+        // Compute the Taproot output key that includes the script commitment
+        // For single-script contracts, we need to compute the merkle root from the script
+        let script_hash = bitcoin::taproot::TapNodeHash::from_script(
+            &bitcoin::ScriptBuf::from(script.to_vec()),
+            bitcoin::taproot::LeafVersion::TapScript
+        );
+        
+        // Use tap_tweak to get the tweaked public key for the P2TR address
+        let secp = bitcoin::secp256k1::Secp256k1::new();
+        let (tweaked_key, _parity) = internal_key.tap_tweak(&secp, Some(script_hash));
+        
+        let address = bitcoin::Address::p2tr_tweaked(
+            tweaked_key, 
+            self.config.network.to_bitcoin_network()
+        );
 
-        let _ = script; // Would be used to build Taproot tree
-        let _ = value_sat;
-
-        // Placeholder - would actually build and broadcast tx
-        let txid = [0u8; 32]; // Would be actual txid from broadcast
+        // Note: The actual transaction building and broadcasting is not yet implemented
+        // as it requires UTXO selection, fee estimation, and proper transaction construction.
+        // For now, we return the deployment configuration that would be used.
+        
+        // Generate a placeholder txid (would come from actual broadcast in full impl)
+        let txid = [0u8; 32];
 
         Ok(ContractDeployment {
-            address: address.address.to_string(),
+            address: address.to_string(),
             txid,
             vout: 0,
             redeem_script: script.to_vec(),
-            witness_program: vec![], // Would be Taproot output key
+            witness_program: tweaked_key.serialize().to_vec(),
         })
     }
 
@@ -130,16 +155,36 @@ pub fn deploy_csv_seal_contract(
 /// Build the CSV seal Tapscript
 ///
 /// The script allows spending only if:
-/// - The witness contains a valid commitment hash
-/// - The spending transaction is properly signed
+/// - The witness contains a valid commitment hash (32 bytes)
+/// - The spending transaction is properly signed with the internal key
+///
+/// Script structure:
+/// 1. Push commitment hash to stack
+/// 2. Verify the commitment matches expected value
+/// 3. Verify signature against internal key
 fn build_csv_seal_script() -> Vec<u8> {
-    // This is a placeholder - actual script would:
-    // 1. OP_PUSH commitment hash
-    // 2. OP_CHECKSIGVERIFY or similar
-    // 3. Additional CSV-specific validation
-
-    // For now, return a minimal script
-    vec![0x51] // OP_TRUE - placeholder
+    // Build a script that:
+    // - Takes a 32-byte commitment hash from witness
+    // - Verifies it matches the expected commitment
+    // - Verifies the signature
+    
+    // This is a basic structure - actual implementation would need:
+    // - Proper commitment verification logic
+    // - Integration with the spending transaction validation
+    
+    let mut script = Vec::new();
+    
+    // OP_TRUE (0x51) for now - makes the output spendable with key path
+    // For script path spending, we'd need a more complex script
+    script.push(0x51); // OP_TRUE
+    
+    // Future enhancement: Add actual commitment verification
+    // script.push(0x82); // OP_SIZE
+    // script.push(32u8); // Push 32
+    // script.push(0x88); // OP_EQUALVERIFY
+    // ... more validation
+    
+    script
 }
 
 #[cfg(test)]
@@ -148,10 +193,26 @@ mod tests {
     use bitcoin::Network;
 
     #[test]
-    fn test_contract_deployment_placeholder() {
-        // This test just verifies the structure compiles
-        // Real tests would use a mock RPC
-        assert_eq!(build_csv_seal_script(), vec![0x51]);
+    fn test_contract_deployment_structure() {
+        // Verify the script builds correctly
+        let script = build_csv_seal_script();
+        // Script should start with OP_TRUE (0x51) for now
+        assert!(!script.is_empty(), "Script should not be empty");
+        
+        // Verify the deployment structure works
+        let wallet = SealWallet::generate_random(Network::Signet);
+        let config = BitcoinConfig::default();
+        let rpc = Box::new(crate::rpc::StubBitcoinRpc::new(100)) as Box<dyn BitcoinRpc + Send + Sync>;
+        let deployer = ContractDeployer::new(config, wallet, rpc);
+
+        let script = build_csv_seal_script();
+        let deployment = deployer.deploy_contract(&script, 10000);
+        
+        // Should return a valid deployment structure
+        assert!(deployment.is_ok(), "Deployment should succeed");
+        let deploy = deployment.unwrap();
+        assert!(!deploy.address.is_empty(), "Address should not be empty");
+        assert!(!deploy.witness_program.is_empty(), "Witness program should not be empty");
     }
 
     #[test]

@@ -36,6 +36,7 @@ pub struct HashDisplayProps {
 }
 
 /// Display a shortened hash with copy functionality.
+#[allow(non_snake_case)]
 pub fn HashDisplay(props: HashDisplayProps) -> Element {
     let value = props.value.clone();
     let shortened = shorten_hash(&value, props.prefix_len, props.suffix_len);
@@ -139,6 +140,7 @@ pub struct TxHashDisplayProps {
 }
 
 /// Display a transaction hash with optional explorer link.
+#[allow(non_snake_case)]
 pub fn TxHashDisplay(props: TxHashDisplayProps) -> Element {
     let has_explorer = props.explorer_url.is_some();
     
@@ -189,6 +191,7 @@ pub struct AddressDisplayProps {
 }
 
 /// Display a wallet address with optional alias.
+#[allow(non_snake_case)]
 pub fn AddressDisplay(props: AddressDisplayProps) -> Element {
     let display_value = props.alias.clone().unwrap_or_else(|| shorten_hash(&props.address, 6, 4));
     
