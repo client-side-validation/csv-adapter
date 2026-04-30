@@ -22,6 +22,7 @@ pub mod wallet;
 pub use adapter::SolanaAnchorLayer;
 pub use chain_adapter_impl::{create_solana_adapter, SolanaRpcClient, SolanaWallet};
 pub use config::{Network, SolanaConfig};
+pub use error::SolanaError;
 pub use deploy::{
     deploy_csv_seal_program, 
     deploy_csv_program,

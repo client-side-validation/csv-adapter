@@ -26,14 +26,15 @@ pub mod estimator;
 pub use types::{
     BlockchainError,
     ContractDeployment, ContractType,
-    TransactionReceipt, TransactionStatus,
-    CrossChainTransferResult, CrossChainStatus,
 };
 pub use wallet::{NativeWallet, BrowserWallet, WalletType};
 pub use wallet::wallet_connection;
 pub use config::BlockchainConfig;
+#[allow(unused_imports)]
 pub use signer::TransactionSigner;
+#[allow(unused_imports)]
 pub use submitter::TransactionSubmitter;
+#[allow(unused_imports)]
 pub use estimator::{FeeEstimator, FeePriority};
 
 // Re-export main service

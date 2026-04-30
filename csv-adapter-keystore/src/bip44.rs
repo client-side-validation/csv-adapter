@@ -287,7 +287,7 @@ fn derive_bitcoin_address_from_key(key_bytes: &[u8]) -> Result<String, Bip44Erro
 }
 
 fn derive_ethereum_address_from_key(key_bytes: &[u8]) -> Result<String, Bip44Error> {
-    use secp256k1::{Secp256k1, SecretKey, PublicKey};
+    use secp256k1::{Secp256k1, SecretKey};
     use sha3::{Keccak256, Digest};
     
     let secret_key = SecretKey::from_slice(key_bytes)

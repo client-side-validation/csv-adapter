@@ -48,8 +48,8 @@ rand = "0.8"
 default = []
 # Enables real RPC client (real JSON-RPC calls over HTTP)
 rpc = ["reqwest", "tokio", "base64"]
-# Enables Sui SDK for contract deployment (temporarily disabled due to core2 dependency issue)
-# sui-sdk-deploy = ["sui-sdk", "sui-keys", "shared-crypto", "bcs", "tokio"]
+# Sui SDK deployment feature (placeholder - SDK temporarily disabled due to core2 dependency issue)
+sui-sdk-deploy = []
 
 [dev-dependencies]
 rand = "0.8"

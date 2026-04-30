@@ -140,7 +140,7 @@ fn ChainAccountsSection(chain: Chain) -> Element {
 #[component]
 fn ChainAccountRow(account: ChainAccount, mut wallet_ctx: WalletContext) -> Element {
     let mut show_key = use_signal(|| false);
-    let account_clone = account.clone();
+    let _account_clone = account.clone();
     let is_bitcoin = account.chain == Chain::Bitcoin;
     
     rsx! {

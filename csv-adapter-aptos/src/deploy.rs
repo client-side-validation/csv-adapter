@@ -4,7 +4,6 @@
 //! replacing the need for CLI commands like `aptos move publish`.
 
 use ed25519_dalek::SigningKey;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::config::AptosConfig;
 use crate::error::{AptosError, AptosResult};

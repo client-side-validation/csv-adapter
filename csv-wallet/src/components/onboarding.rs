@@ -226,7 +226,7 @@ pub fn OnboardingFlow(props: OnboardingFlowProps) -> Element {
                     }
                 }
                 
-                if let Some(next) = current_step().next() {
+                if let Some(_next) = current_step().next() {
                     button {
                         class: "onboarding-btn next",
                         onclick: move |_| go_next(),
@@ -302,7 +302,7 @@ struct WhatIsSealStepProps {
 }
 
 #[allow(non_snake_case)]
-fn WhatIsSealStep(props: WhatIsSealStepProps) -> Element {
+fn WhatIsSealStep(_props: WhatIsSealStepProps) -> Element {
     rsx! {
         div { class: "onboarding-step seal-intro",
             h2 { class: "step-title", "What is a Seal?" }

@@ -8,6 +8,7 @@ use crate::error::{SuiError, SuiResult};
 /// Mint a right on Sui using direct JSON-RPC transaction submission
 /// 
 /// This uses Sui's transaction building and execution via JSON-RPC.
+#[cfg(feature = "rpc")]
 pub fn mint_right(
     rpc_url: &str,
     package_id: &str,

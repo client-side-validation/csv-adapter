@@ -338,11 +338,11 @@ pub fn fetch_gas_balance(chain: &Chain, config: &Config, address: &str) -> anyho
     })
 }
 
-/// Get private key for a chain from state
-pub fn get_private_key(state: &crate::state::UnifiedStateManager, chain: Chain) -> Result<String> {
-    // First try to get from gas account configuration
-    if let Some(gas_account) = state.config.gas_accounts.get(&chain) {
-        if let Some(key) = &gas_account.private_key {
+/// Get private key for a chain from config
+pub fn get_private_key(config: &crate::config::Config, _state: &crate::state::UnifiedStateManager, chain: Chain) -> Result<String> {
+    // First try to get from wallet configuration
+    if let Some(wallet) = config.wallets.get(&chain) {
+        if let Some(key) = &wallet.private_key {
             return Ok(key.clone());
         }
     }

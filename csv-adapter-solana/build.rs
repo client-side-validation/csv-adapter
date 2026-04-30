@@ -88,10 +88,11 @@ fn read_program_bytecode(contracts_dir: &Path) -> String {
             }
         }
     }
-    
-    // Return placeholder if compilation not available
-    println!("cargo:warning=Solana program bytecode not found, using placeholder");
-    "0u8; 0 // Placeholder - compile with 'anchor build' in contracts/".to_string()
+
+    panic!(
+        "Solana program bytecode not found under {:?}. Run `anchor build` in csv-adapter-solana/contracts or commit precompiled .so artifacts.",
+        deploy_dir
+    );
 }
 
 fn bytes_to_array_literal(bytes: &[u8]) -> String {

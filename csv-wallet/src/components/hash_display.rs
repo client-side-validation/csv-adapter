@@ -43,7 +43,7 @@ pub fn HashDisplay(props: HashDisplayProps) -> Element {
     let mut copied = use_signal(|| false);
     
     let mut copy_to_clipboard = {
-        let value = value.clone();
+        let _value = value.clone();
         move || {
             #[cfg(target_arch = "wasm32")]
             {

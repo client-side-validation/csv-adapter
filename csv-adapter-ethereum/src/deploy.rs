@@ -11,7 +11,7 @@ use crate::rpc::EthereumRpc;
 #[cfg(feature = "rpc")]
 use alloy::{
     network::EthereumWallet,
-    primitives::{Address, Bytes, FixedBytes, U256},
+    primitives::Bytes,
     providers::{Provider, ProviderBuilder},
     rpc::types::TransactionRequest,
     signers::local::PrivateKeySigner,

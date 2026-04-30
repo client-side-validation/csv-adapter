@@ -324,7 +324,7 @@ struct MerkleTreeViewProps {
 
 #[allow(non_snake_case)]
 fn MerkleTreeView(mut props: MerkleTreeViewProps) -> Element {
-    let total_levels = props.proof.merkle_path.len() + 1;
+    let _total_levels = props.proof.merkle_path.len() + 1;
     
     rsx! {
         div { class: "merkle-tree-view",

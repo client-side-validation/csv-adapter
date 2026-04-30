@@ -3,6 +3,7 @@
 #![allow(missing_docs)]
 #![allow(dead_code)]
 
+#[cfg(feature = "sqlite")]
 use csv_adapter_core::{AnchorRecord, Hash, SealStore, StoreError};
 
 #[cfg(feature = "sqlite")]

@@ -10,7 +10,7 @@ use csv_adapter_core::chain_adapter::{
 use csv_adapter_core::chain_config::ChainConfig;
 use csv_adapter_core::Chain;
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::signature::Signature;
+use solana_sdk::signature::{Signature, Signer};
 use std::str::FromStr;
 
 use crate::adapter::SolanaAnchorLayer;
@@ -200,7 +200,7 @@ impl Wallet for SolanaWallet {
             .map_err(|_| ChainError::InvalidInput("Failed to convert to key array".to_string()))?;
         
         // Verify we can create a valid Solana keypair
-        let _keypair = solana_sdk::signature::Keypair::from_bytes(&key_array)
+        let _keypair = solana_sdk::signature::Keypair::try_from(&key_array[..])
             .map_err(|e| ChainError::InvalidInput(format!("Invalid Solana keypair: {}", e)))?;
         
         // Key is valid - store it in the adapter's wallet

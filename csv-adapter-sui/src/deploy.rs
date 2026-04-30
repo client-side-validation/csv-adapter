@@ -7,24 +7,24 @@ use crate::config::SuiConfig;
 use crate::error::{SuiError, SuiResult};
 use crate::rpc::SuiRpc;
 
-// Sui SDK imports for real deployment (optional feature)
-#[cfg(feature = "sui-sdk-deploy")]
-use sui_sdk::{
-    SuiClientBuilder,
-    rpc_types::SuiTransactionBlockResponse,
-    types::{
-        base_types::ObjectID,
-        crypto::SignatureScheme,
-        messages::TransactionData,
-        transaction::Transaction,
-    },
-};
-#[cfg(feature = "sui-sdk-deploy")]
-use sui_keys::keystore::{AccountKeystore, FileBasedKeystore};
-#[cfg(feature = "sui-sdk-deploy")]
-use shared_crypto::intent::Intent;
-#[cfg(feature = "sui-sdk-deploy")]
-use std::str::FromStr;
+// Sui SDK imports for real deployment (temporarily disabled due to core2 dependency issue)
+// #[cfg(feature = "sui-sdk-deploy")]
+// use sui_sdk::{
+//     SuiClientBuilder,
+//     rpc_types::SuiTransactionBlockResponse,
+//     types::{
+//         base_types::ObjectID,
+//         crypto::SignatureScheme,
+//         messages::TransactionData,
+//         transaction::Transaction,
+//     },
+// };
+// #[cfg(feature = "sui-sdk-deploy")]
+// use sui_keys::keystore::{AccountKeystore, FileBasedKeystore};
+// #[cfg(feature = "sui-sdk-deploy")]
+// use shared_crypto::intent::Intent;
+// #[cfg(feature = "sui-sdk-deploy")]
+// use std::str::FromStr;
 
 /// Sui package deployment result
 pub struct PackageDeployment {
@@ -179,13 +179,14 @@ pub async fn deploy_csv_seal_package(
 ///
 /// # Returns
 /// The package deployment with ObjectID
+#[cfg(feature = "rpc")]
 pub async fn publish_csv_package(
     rpc_url: &str,
     compiled_modules: Vec<Vec<u8>>,
     signer_address: &str,
     signer_keypair: &ed25519_dalek::SigningKey,
 ) -> SuiResult<PackageDeployment> {
-    use ed25519_dalek::{Signer, VerifyingKey};
+    use ed25519_dalek::Signer;
     use serde_json::json;
     
     // 1. Get gas coins for the sender
@@ -212,7 +213,7 @@ pub async fn publish_csv_package(
     
     // 3. Sign the transaction
     let signature = signer_keypair.sign(&tx_data);
-    let public_key = signer_keypair.verifying_key();
+    let _public_key = signer_keypair.verifying_key();
     
     // 4. Submit the transaction via JSON-RPC
     let client = reqwest::Client::new();
@@ -221,8 +222,8 @@ pub async fn publish_csv_package(
         "id": 1,
         "method": "sui_executeTransactionBlock",
         "params": [
-            base64::encode(&tx_data),
-            [base64::encode(signature.to_bytes())],
+            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &tx_data),
+            [base64::Engine::encode(&base64::engine::general_purpose::STANDARD, signature.to_bytes())],
             {
                 "showEffects": true,
                 "showEvents": true,
@@ -275,6 +276,7 @@ pub async fn publish_csv_package(
 }
 
 /// Fetch gas coins for an address
+#[cfg(feature = "rpc")]
 async fn fetch_gas_coins(rpc_url: &str, address: &str) -> SuiResult<Vec<GasCoin>> {
     let client = reqwest::Client::new();
     let payload = serde_json::json!({
@@ -337,6 +339,7 @@ pub struct GasCoin {
 }
 
 /// Build BCS-encoded publish transaction data
+#[cfg(feature = "rpc")]
 async fn build_publish_transaction_data(
     sender: &str,
     modules: &[Vec<u8>],
@@ -348,14 +351,14 @@ async fn build_publish_transaction_data(
 ) -> SuiResult<Vec<u8>> {
     // For a pure HTTP implementation, we use the transaction builder API
     // to get the BCS bytes, then we sign them
-    let client = reqwest::Client::new();
+    let _client = reqwest::Client::new();
     
     // Convert modules to base64
     let modules_b64: Vec<String> = modules.iter()
-        .map(|m| base64::encode(m))
+        .map(|m| base64::Engine::encode(&base64::engine::general_purpose::STANDARD, m))
         .collect();
     
-    let payload = serde_json::json!({
+    let _payload = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "sui_publish",

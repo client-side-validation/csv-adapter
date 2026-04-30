@@ -3,6 +3,7 @@
 //! Provides import/export for wallets including CSV wallet format.
 
 use crate::config::{Chain, Config};
+use csv_adapter_core::Chain as CoreChain;
 use crate::output;
 use crate::state::UnifiedStateManager;
 use anyhow::Result;
@@ -28,7 +29,7 @@ pub fn cmd_export(
             }
             ExportFormat::Xpub => {
                 // Derive xpub from stored key data or keystore
-                match export_extended_public_key(&chain, state) {
+                match export_extended_public_key(_config, &chain, state) {
                     Ok(xpub) => {
                         output::success(&format!("Extended Public Key: {}", xpub));
                         output::info("This can be used to derive all addresses but cannot spend funds");
@@ -56,7 +57,7 @@ pub fn cmd_export(
                 output::danger("⚠️  DANGER: Exporting private key exposes your funds!");
                 output::danger("Only export private keys for backup or migration purposes.");
                 
-                match export_private_key(&chain, state) {
+                match export_private_key(_config, &chain, state) {
                     Ok(key) => {
                         output::warning(&format!("Private Key: 0x{}", key));
                         output::danger("Store this securely and NEVER share it!");
@@ -146,17 +147,23 @@ fn derive_address_from_private_key(chain: &Chain, private_key: &str) -> Result<S
     }
     
     // Use the keystore crate's address derivation
-    let address = derive_address_from_key(&key_bytes, *chain)
+    let address = derive_address_from_key(&key_bytes, match *chain {
+        Chain::Bitcoin => CoreChain::Bitcoin,
+        Chain::Ethereum => CoreChain::Ethereum,
+        Chain::Sui => CoreChain::Sui,
+        Chain::Aptos => CoreChain::Aptos,
+        Chain::Solana => CoreChain::Solana,
+    })
         .map_err(|e| anyhow::anyhow!("Failed to derive address: {}", e))?;
     
     Ok(address)
 }
 
 /// Export extended public key for a chain.
-fn export_extended_public_key(chain: &Chain, state: &UnifiedStateManager) -> Result<String> {
+fn export_extended_public_key(config: &Config, chain: &Chain, _state: &UnifiedStateManager) -> Result<String> {
     // First check if we have a stored xpub
-    if let Some(wallet_data) = state.wallet_data.get(chain) {
-        if let Some(xpub) = &wallet_data.xpub {
+    if let Some(wallet) = config.wallets.get(chain) {
+        if let Some(xpub) = &wallet.xpub {
             return Ok(xpub.clone());
         }
     }
@@ -168,7 +175,7 @@ fn export_extended_public_key(chain: &Chain, state: &UnifiedStateManager) -> Res
     // 3. Return the serialized xpub
     
     // For now, check if we have an address we can use as a base
-    if let Some(address) = state.get_address(chain) {
+    if let Some(address) = _state.get_address(chain) {
         // Generate a placeholder xpub format (this would be real in production)
         let placeholder_xpub = format!("xpub{}_{}", chain.to_string(), &address[..8.min(address.len())]);
         return Ok(placeholder_xpub);
@@ -208,11 +215,11 @@ fn export_mnemonic(_state: &UnifiedStateManager) -> Result<String> {
 }
 
 /// Export private key for a chain.
-fn export_private_key(chain: &Chain, state: &UnifiedStateManager) -> Result<String> {
+fn export_private_key(config: &Config, chain: &Chain, state: &UnifiedStateManager) -> Result<String> {
     use crate::commands::cross_chain::utils::get_private_key;
     
     // Get the private key using the utility function
-    let private_key = get_private_key(state, chain.clone())?;
+    let private_key = get_private_key(config, state, chain.clone())?;
     
     // Validate it's a proper hex key
     let key_hex = private_key.trim_start_matches("0x");

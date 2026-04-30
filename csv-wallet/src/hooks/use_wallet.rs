@@ -51,11 +51,11 @@ impl WalletContext {
     }
     
     /// Create wallet accounts from a seed.
-    fn create_wallet_from_seed(&self, seed: &Seed, password: &str) -> Result<Wallet, String> {
+    fn create_wallet_from_seed(&mut self, seed: &Seed, password: &str) -> Result<Wallet, String> {
         let mut wallet = Wallet::default();
         
         // Initialize browser keystore
-        let mut keystore = BrowserKeystore::new()
+        let keystore = BrowserKeystore::new()
             .map_err(|e| format!("Failed to initialize keystore: {}", e))?;
         
         // Derive keys for all supported chains

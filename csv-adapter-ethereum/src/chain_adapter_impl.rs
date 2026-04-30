@@ -155,7 +155,20 @@ impl Wallet for EthereumWallet {
     async fn sign_transaction(&self, data: &[u8]) -> ChainResult<Vec<u8>> {
         if let Some(signing_key) = &self.signing_key {
             let secp = secp256k1::Secp256k1::new();
-            let message = secp256k1::Message::from_slice(&data[..32.min(data.len())])
+            // Use from_digest_slice for 32-byte data, fall back to hash if needed
+            let message_bytes: [u8; 32] = if data.len() == 32 {
+                data.try_into().unwrap_or_else(|_| {
+                    let mut arr = [0u8; 32];
+                    arr.copy_from_slice(&data[..32.min(data.len())]);
+                    arr
+                })
+            } else {
+                // Hash the data if not exactly 32 bytes
+                use sha2::{Sha256, Digest};
+                let hash = Sha256::digest(data);
+                hash.into()
+            };
+            let message = secp256k1::Message::from_digest_slice(&message_bytes)
                 .map_err(|e| ChainError::WalletError(format!("Invalid message: {}", e)))?;
 
             let signature = secp.sign_ecdsa(&message, signing_key);
@@ -175,7 +188,7 @@ impl Wallet for EthereumWallet {
     fn generate_address(&self) -> ChainResult<String> {
         // Generate new keypair
         let secp = secp256k1::Secp256k1::new();
-        let (secret_key, public_key) = secp.generate_keypair(&mut rand::thread_rng());
+        let (_secret_key, public_key) = secp.generate_keypair(&mut rand::thread_rng());
 
         // Address is last 20 bytes of keccak256(pubkey)
         use sha3::{Digest, Keccak256};

@@ -173,7 +173,7 @@ impl NativeWallet {
         use secp256k1::{Secp256k1, Message, SecretKey};
         
         // Hash the transaction data (RLP-encoded transaction)
-        use sha3::Keccak256;
+        use sha3::{Keccak256, Digest};
         let mut hasher = Keccak256::new();
         hasher.update(&tx.data);
         let message_hash = hasher.finalize();

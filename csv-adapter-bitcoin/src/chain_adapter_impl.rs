@@ -184,7 +184,7 @@ impl ChainAdapter for BitcoinAnchorLayer {
 
     async fn create_client(&self, _config: &ChainConfig) -> ChainResult<Box<dyn RpcClient>> {
         // If RPC is configured, use it
-        if let Some(rpc) = self.rpc.as_ref() {
+        if let Some(_rpc) = self.rpc.as_ref() {
             // We need to clone the RPC somehow - for now, indicate that
             // a fresh RPC client should be created from config
         }

@@ -23,7 +23,7 @@ impl TransactionSigner {
         signer: &NativeWallet,
     ) -> Result<SignedTransaction, BlockchainError> {
         web_sys::console::log_1(&format!("Signing transaction for {:?}", chain).into());
-        signer.sign_transaction(tx_data)
+        signer.sign_transaction(tx_data, "")
     }
 
     /// Sign a Bitcoin anchor transaction.
@@ -52,7 +52,7 @@ impl TransactionSigner {
         signer: &NativeWallet,
     ) -> Result<SignedTransaction, BlockchainError> {
         web_sys::console::log_1(&"Signing EVM transaction...".into());
-        signer.sign_transaction(_tx_data)
+        signer.sign_transaction(_tx_data, "")
     }
 
     /// Sign a Sui transaction.
@@ -64,7 +64,7 @@ impl TransactionSigner {
         web_sys::console::log_1(&"Signing Sui transaction...".into());
         
         // Sui uses BCS-encoded transactions with Ed25519 signatures
-        let _private_key = signer.private_key();
+        let _private_key = signer.private_key("");
         
         // Placeholder - would use ed25519-dalek for signing
         Err(BlockchainError {
@@ -82,7 +82,7 @@ impl TransactionSigner {
     ) -> Result<Vec<u8>, BlockchainError> {
         web_sys::console::log_1(&"Signing Aptos transaction...".into());
         
-        let _private_key = signer.private_key();
+        let _private_key = signer.private_key("");
         
         // Placeholder - would use ed25519-dalek for signing
         Err(BlockchainError {
@@ -100,7 +100,7 @@ impl TransactionSigner {
     ) -> Result<Vec<u8>, BlockchainError> {
         web_sys::console::log_1(&"Signing Solana transaction...".into());
         
-        let _private_key = signer.private_key();
+        let _private_key = signer.private_key("");
         
         // Placeholder - would use ed25519-dalek for signing
         Err(BlockchainError {

@@ -45,6 +45,7 @@ pub use deploy::deploy_csv_seal_contract;
 #[cfg(feature = "rpc")]
 pub use deploy::deploy_csv_lock;
 pub use config::EthereumConfig;
+pub use error::EthereumError;
 pub use finality::{FinalityChecker, FinalityConfig};
 pub use rpc::EthereumRpc;
 #[cfg(debug_assertions)]

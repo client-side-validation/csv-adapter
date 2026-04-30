@@ -56,12 +56,13 @@ pub use chain_adapter_impl::{create_sui_adapter, SuiWallet};
 pub use deploy::deploy_csv_seal_package;
 pub use deploy::{PackageDeployer, PackageDeployment};
 
-#[cfg(feature = "sui-sdk-deploy")]
+#[cfg(feature = "rpc")]
 pub use deploy::publish_csv_package;
+#[cfg(feature = "rpc")]
+pub use mint::mint_right;
 pub use checkpoint::CheckpointVerifier;
 pub use config::{CheckpointConfig, SealContractConfig, SuiConfig, SuiNetwork, TransactionConfig};
 pub use error::SuiError;
-pub use mint::mint_right;
 pub use proofs::{
     CommitmentEventBuilder, EventProof, EventProofVerifier, StateProof, StateProofVerifier,
     TransactionProof,

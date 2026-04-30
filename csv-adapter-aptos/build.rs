@@ -74,25 +74,32 @@ fn generate_bytecode_constants(bytecode_out: &Path, contracts_dir: &Path) {
 }
 
 fn read_move_bytecode(contracts_dir: &Path) -> String {
-    // Look for compiled bytecode in build directory
     let build_dir = contracts_dir.join("build");
-    if build_dir.exists() {
-        // Try to find .mv files
-        if let Ok(entries) = fs::read_dir(&build_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().map_or(false, |e| e == "mv") {
-                    if let Ok(bytes) = fs::read(&path) {
-                        return bytes_to_array_literal(&bytes);
-                    }
-                }
+    if let Some(path) = find_first_file_with_extension(&build_dir, "mv") {
+        let bytes = fs::read(&path)
+            .unwrap_or_else(|err| panic!("Failed to read Aptos Move bytecode {:?}: {}", path, err));
+        return bytes_to_array_literal(&bytes);
+    }
+
+    panic!(
+        "Aptos Move bytecode not found under {:?}. Run `aptos move compile` in csv-adapter-aptos/contracts or commit precompiled .mv artifacts.",
+        build_dir
+    );
+}
+
+fn find_first_file_with_extension(dir: &Path, extension: &str) -> Option<PathBuf> {
+    let entries = fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(found) = find_first_file_with_extension(&path, extension) {
+                return Some(found);
             }
+        } else if path.extension().map_or(false, |e| e == extension) {
+            return Some(path);
         }
     }
-    
-    // Return placeholder if compilation not available
-    println!("cargo:warning=Aptos bytecode not found, using placeholder");
-    "0u8; 0 // Placeholder - compile with 'aptos move compile' in contracts/".to_string()
+    None
 }
 
 fn bytes_to_array_literal(bytes: &[u8]) -> String {

@@ -550,7 +550,7 @@ async fn run_real_bitcoin_to_aptos(
 ) -> Result<()> {
     output::progress(1, 6, "Step 1: Locking Right on bitcoin...");
     let btc_cfg = config.chain(&Chain::Bitcoin)?;
-    let btc_key = get_private_key(state, Chain::Bitcoin)?;
+    let btc_key = get_private_key(config, state, Chain::Bitcoin)?;
     let btc_address = state
         .get_address(&Chain::Bitcoin)
         .map(|s| s.to_string())
@@ -566,7 +566,7 @@ async fn run_real_bitcoin_to_aptos(
 
     output::progress(5, 6, "Step 5: Minting Right on aptos...");
     let apt_cfg = config.chain(&Chain::Aptos)?;
-    let apt_key = get_private_key(state, Chain::Aptos)?;
+    let apt_key = get_private_key(config, state, Chain::Aptos)?;
     let commitment = state
         .get_right(&right_id_hash.to_string())
         .and_then(|r| hash_from_hex_32(&r.commitment).ok())
@@ -649,7 +649,7 @@ async fn run_real_bitcoin_to_ethereum(
 ) -> Result<()> {
     output::progress(1, 6, "Step 1: Locking Right on bitcoin...");
     let btc_cfg = config.chain(&Chain::Bitcoin)?;
-    let btc_key = get_private_key(state, Chain::Bitcoin)?;
+    let btc_key = get_private_key(config, state, Chain::Bitcoin)?;
     let btc_address = state
         .get_address(&Chain::Bitcoin)
         .map(|s| s.to_string())
@@ -665,7 +665,7 @@ async fn run_real_bitcoin_to_ethereum(
 
     output::progress(5, 6, "Step 5: Minting Right on ethereum...");
     let eth_cfg = config.chain(&Chain::Ethereum)?;
-    let eth_key = get_private_key(state, Chain::Ethereum)?;
+    let eth_key = get_private_key(config, state, Chain::Ethereum)?;
     let commitment = state
         .get_right(&right_id_hash.to_string())
         .and_then(|r| hash_from_hex_32(&r.commitment).ok())
@@ -747,7 +747,7 @@ fn run_real_ethereum_to_sui(
 ) -> Result<()> {
     output::progress(1, 6, "Step 1: Locking Right on ethereum...");
     let eth_cfg = config.chain(&Chain::Ethereum)?;
-    let eth_key = get_private_key(state, Chain::Ethereum)?;
+    let eth_key = get_private_key(config, state, Chain::Ethereum)?;
     let eth_address = state
         .get_address(&Chain::Ethereum)
         .map(|s| s.to_string())
@@ -768,7 +768,7 @@ fn run_real_ethereum_to_sui(
 
     output::progress(5, 6, "Step 5: Minting Right on sui...");
     let sui_cfg = config.chain(&Chain::Sui)?;
-    let sui_key = get_private_key(state, Chain::Sui)?;
+    let sui_key = get_private_key(config, state, Chain::Sui)?;
     let commitment = state
         .get_right(&right_id_hash.to_string())
         .and_then(|r| hash_from_hex_32(&r.commitment).ok())
@@ -843,7 +843,7 @@ fn run_real_ethereum_to_aptos(
 ) -> Result<()> {
     output::progress(1, 6, "Step 1: Locking Right on ethereum...");
     let eth_cfg = config.chain(&Chain::Ethereum)?;
-    let eth_key = get_private_key(state, Chain::Ethereum)?;
+    let eth_key = get_private_key(config, state, Chain::Ethereum)?;
     let eth_address = state
         .get_address(&Chain::Ethereum)
         .map(|s| s.to_string())
@@ -864,7 +864,7 @@ fn run_real_ethereum_to_aptos(
 
     output::progress(5, 6, "Step 5: Minting Right on aptos...");
     let aptos_cfg = config.chain(&Chain::Aptos)?;
-    let aptos_key = get_private_key(state, Chain::Aptos)?;
+    let aptos_key = get_private_key(config, state, Chain::Aptos)?;
     let commitment = state
         .get_right(&right_id_hash.to_string())
         .and_then(|r| hash_from_hex_32(&r.commitment).ok())
@@ -935,7 +935,7 @@ fn run_real_ethereum_to_solana(
 ) -> Result<()> {
     output::progress(1, 6, "Step 1: Locking Right on ethereum...");
     let eth_cfg = config.chain(&Chain::Ethereum)?;
-    let eth_key = get_private_key(state, Chain::Ethereum)?;
+    let eth_key = get_private_key(config, state, Chain::Ethereum)?;
     let eth_address = state
         .get_address(&Chain::Ethereum)
         .map(|s| s.to_string())
@@ -956,7 +956,7 @@ fn run_real_ethereum_to_solana(
 
     output::progress(5, 6, "Step 5: Minting Right on solana...");
     let sol_cfg = config.chain(&Chain::Solana)?;
-    let sol_key = get_private_key(state, Chain::Solana)?;
+    let sol_key = get_private_key(config, state, Chain::Solana)?;
     let commitment = state
         .get_right(&right_id_hash.to_string())
         .and_then(|r| hash_from_hex_32(&r.commitment).ok())

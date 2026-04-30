@@ -5,7 +5,7 @@
 
 use crate::services::blockchain::config::BlockchainConfig;
 use crate::services::blockchain::types::{
-    BlockchainError, ContractDeployment, ContractType, CrossChainProof, CrossChainStatus,
+    BitcoinUtxo, BlockchainError, ContractDeployment, ContractType, CrossChainProof, CrossChainStatus,
     CrossChainTransferResult, ProofData, SignedTransaction, TransactionReceipt, TransactionStatus,
     UnsignedTransaction,
 };
@@ -15,6 +15,7 @@ use crate::services::blockchain::signer::TransactionSigner;
 use crate::services::blockchain::submitter::TransactionSubmitter;
 use crate::services::blockchain::estimator::{FeeEstimator, FeePriority};
 use csv_adapter_core::Chain;
+use bitcoin::hashes::Hash;
 
 /// Main blockchain service.
 pub struct BlockchainService {
@@ -80,7 +81,7 @@ impl BlockchainService {
                 // Bitcoin uses UTXO model - sign anchor transaction
                 let _signature = tx_signer.sign_bitcoin_anchor(
                     right_id.as_bytes(),
-                    &hex::decode(&signer.private_key()?).unwrap_or_default(),
+                    &hex::decode(&signer.private_key("")?).unwrap_or_default(),
                     &[], // UTXO would be fetched
                     owner,
                 ).await?;
@@ -190,9 +191,9 @@ impl BlockchainService {
         };
         
         // Sign the transaction (need password - use session if available)
-        let signed_tx = if let Ok(pk) = signer.private_key_with_session() {
+        let signed_tx = if let Ok(_pk) = signer.private_key_with_session() {
             // Have session, sign with the retrieved key
-            let mut wallet_clone = signer.clone();
+            let wallet_clone = signer.clone();
             // Create a temporary wallet with the retrieved key for signing
             wallet_clone.sign_transaction(&unsigned_tx, "")
         } else {
@@ -281,7 +282,7 @@ impl BlockchainService {
         ).await?;
         
         // Sign the transaction message
-        let key_bytes = hex::decode(signer.private_key()?.trim_start_matches("0x"))
+        let key_bytes = hex::decode(signer.private_key("")?.trim_start_matches("0x"))
             .map_err(|e| BlockchainError {
                 message: format!("Invalid private key: {}", e),
                 chain: Some(Chain::Solana),
@@ -421,30 +422,34 @@ impl BlockchainService {
         lock_data: &str,
     ) -> Result<Vec<u8>, BlockchainError> {
         // Use the bitcoin crate to build a proper transaction
+        use bitcoin::absolute::LockTime;
+        use bitcoin::hex::FromHex;
         use bitcoin::{Transaction, TxIn, TxOut, OutPoint, ScriptBuf, Sequence, Witness, Amount};
-        use bitcoin::opcodes;
-        use bitcoin::hashes::Hash;
+        use bitcoin::opcodes::all::OP_RETURN;
         
         // Create input from UTXO
+        let txid_bytes = Vec::<u8>::from_hex(&utxo.txid).map_err(|e| BlockchainError {
+            message: format!("Invalid txid: {}", e),
+            chain: Some(Chain::Bitcoin),
+            code: None,
+        })?;
+        let txid = bitcoin::Txid::from_slice(&txid_bytes[..32]).map_err(|_| BlockchainError {
+            message: "Invalid txid length".to_string(),
+            chain: Some(Chain::Bitcoin),
+            code: None,
+        })?;
+        
         let input = TxIn {
-            previous_output: OutPoint::new(
-                bitcoin::Txid::from_hex(&utxo.txid).map_err(|e| BlockchainError {
-                    message: format!("Invalid txid: {}", e),
-                    chain: Some(Chain::Bitcoin),
-                    code: None,
-                })?,
-                utxo.vout,
-            ),
+            previous_output: OutPoint::new(txid, utxo.vout),
             script_sig: ScriptBuf::new(),
             sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
             witness: Witness::new(),
         };
         
         // Create OP_RETURN output with lock data
-        let op_return_script = ScriptBuf::new_builder()
-            .push_opcode(opcodes::OP_RETURN)
-            .push_slice(lock_data.as_bytes())
-            .into_script();
+        let mut script_bytes = vec![OP_RETURN.to_u8()];
+        script_bytes.extend_from_slice(lock_data.as_bytes());
+        let op_return_script = ScriptBuf::from(script_bytes);
         
         let op_return_output = TxOut {
             value: Amount::from_sat(0),
@@ -466,7 +471,7 @@ impl BlockchainService {
         // Build transaction
         let tx = Transaction {
             version: bitcoin::transaction::Version(2),
-            lock_time: bitcoin::locktime::absolute::LockTime::Blocks(bitcoin::BlockHeight::from_consensus(0).unwrap()),
+            lock_time: LockTime::from_consensus(0),
             input: vec![input],
             output: vec![op_return_output, change_output],
         };
@@ -475,7 +480,7 @@ impl BlockchainService {
     }
     
     /// Convert a Bitcoin address string to ScriptPubkey
-    fn address_to_script_pubkey(&self, address: &str) -> Result<ScriptBuf, BlockchainError> {
+    fn address_to_script_pubkey(&self, address: &str) -> Result<bitcoin::ScriptBuf, BlockchainError> {
         use bitcoin::Address;
         
         let addr: Address<_> = address.parse().map_err(|e| BlockchainError {
@@ -483,6 +488,8 @@ impl BlockchainService {
             chain: Some(Chain::Bitcoin),
             code: None,
         })?;
+        
+        let addr = addr.assume_checked();
         
         Ok(addr.script_pubkey())
     }
@@ -495,7 +502,7 @@ impl BlockchainService {
         utxo: &BitcoinUtxo,
     ) -> Result<Vec<u8>, BlockchainError> {
         use secp256k1::{Secp256k1, SecretKey};
-        use bitcoin::sighash::{SighashCache, EcdsaSighashType};
+        use bitcoin::sighash::SighashCache;
         
         let mut tx: bitcoin::Transaction = bitcoin::consensus::encode::deserialize(tx_bytes)
             .map_err(|e| BlockchainError {
@@ -503,6 +510,9 @@ impl BlockchainService {
                 chain: Some(Chain::Bitcoin),
                 code: None,
             })?;
+        
+        // Get the UTXO script pubkey for sighash calculation
+        let utxo_script = self.address_to_script_pubkey(&utxo.address)?;
         
         // Decode private key
         let key_bytes = hex::decode(private_key_hex.trim_start_matches("0x"))
@@ -520,28 +530,29 @@ impl BlockchainService {
                 code: None,
             })?;
         
-        // Compute sighash for the first input
+        // Compute sighash for P2PKH input
         let mut sighasher = SighashCache::new(&tx);
-        let sighash = sighasher.p2tr_key_spend_sighash(
-            0,
-            bitcoin::TxOut {
-                value: bitcoin::Amount::from_sat(utxo.value),
-                script_pubkey: self.address_to_script_pubkey(&utxo.address)?,
-            },
-            bitcoin::sighash::TapSighashType::All,
-        ).map_err(|e| BlockchainError {
-            message: format!("Sighash failed: {}", e),
-            chain: Some(Chain::Bitcoin),
-            code: None,
-        })?;
+        let sighash = sighasher
+            .p2wpkh_signature_hash(0, &utxo_script, bitcoin::Amount::from_sat(utxo.value), bitcoin::sighash::EcdsaSighashType::All)
+            .map_err(|e| BlockchainError {
+                message: format!("Sighash failed: {}", e),
+                chain: Some(Chain::Bitcoin),
+                code: None,
+            })?;
         
         // Sign
-        let message = secp256k1::Message::from_digest(sighash.to_byte_array());
+        let message = secp256k1::Message::from_digest_slice(sighash.as_byte_array())
+            .map_err(|e| BlockchainError {
+                message: format!("Failed to create message: {}", e),
+                chain: Some(Chain::Bitcoin),
+                code: None,
+            })?;
         let signature = secp.sign_ecdsa(&message, &secret_key);
         
-        // Add signature to witness
-        tx.input[0].witness.push(signature.serialize_der().to_vec());
-        tx.input[0].witness.push(vec![EcdsaSighashType::All as u8]);
+        // Add signature and sighash type to witness
+        let mut sig_der = signature.serialize_der().to_vec();
+        sig_der.push(bitcoin::sighash::EcdsaSighashType::All as u8);
+        tx.input[0].witness.push(sig_der);
         
         Ok(bitcoin::consensus::encode::serialize(&tx))
     }
@@ -953,10 +964,10 @@ impl BlockchainService {
         );
 
         // Build mint transaction data (pass private key for address derivation on Sui/Aptos)
-        let tx_data = self.build_mint_transaction_data(chain, right_id, owner, contract_address, &signer.private_key()?).await?;
+        let tx_data = self.build_mint_transaction_data(chain, right_id, owner, contract_address, &signer.private_key("")?).await?;
 
         // Sign the transaction
-        let signed_tx = signer.sign_transaction(&tx_data)?;
+        let signed_tx = signer.sign_transaction(&tx_data, "")?;
 
         // Broadcast the transaction
         let tx_hash = self.broadcast_transaction(chain, &signed_tx).await?;
@@ -1164,7 +1175,7 @@ impl BlockchainService {
                 
                 let bitcoin_address = ChainAccount::derive_address(
                     Chain::Bitcoin,
-                    &signer.private_key()?
+                    &signer.private_key("")?
                 ).map_err(|e| BlockchainError {
                     message: format!("Failed to derive Bitcoin address: {}", e),
                     chain: Some(Chain::Bitcoin),
@@ -1183,7 +1194,7 @@ impl BlockchainService {
                 
                 let signed_tx = bitcoin_tx::sign_bitcoin_transaction(
                     &unsigned_tx,
-                    &signer.private_key()?,
+                    &signer.private_key("")?,
                     &utxo,
                     &bitcoin_address,
                 )?;
@@ -1195,7 +1206,7 @@ impl BlockchainService {
                 let contract_address = ""; // TODO: Get deployed contract for this chain
                 
                 let tx_data = self.build_transfer_transaction_data(chain, right_id, new_owner, contract_address).await?;
-                let signed_tx = signer.sign_transaction(&tx_data)?;
+                let signed_tx = signer.sign_transaction(&tx_data, "")?;
                 self.broadcast_transaction(chain, &signed_tx).await?
             }
             _ => {

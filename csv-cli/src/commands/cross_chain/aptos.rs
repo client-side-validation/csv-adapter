@@ -114,13 +114,18 @@ pub async fn send_aptos_mint_async(
     _proof: &[u8],
     _seal_ref: Hash,
 ) -> Result<String> {
+    // Clone the strings to move into the blocking task
+    let contract_address = contract_address.to_string();
+    let rpc_url = rpc_url.to_string();
+    let private_key_hex = private_key_hex.to_string();
+    
     // For now, use the blocking version in an async context
     // In production, this should be fully async
     tokio::task::spawn_blocking(move || {
         send_aptos_mint_native(
-            contract_address,
-            rpc_url,
-            private_key_hex,
+            &contract_address,
+            &rpc_url,
+            &private_key_hex,
             right_id,
             commitment,
             source_tx_hash,

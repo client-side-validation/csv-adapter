@@ -2,7 +2,7 @@
 //!
 //! Handles submitting signed transactions to different chains.
 
-use crate::services::blockchain::types::{BlockchainError, SignedTransaction, TransactionReceipt, TransactionStatus};
+use crate::services::blockchain::types::{BlockchainError, SignedTransaction, TransactionReceipt};
 use csv_adapter_core::Chain;
 
 /// Transaction submitter for broadcasting to chains.

@@ -65,7 +65,7 @@ impl ContractDeployer {
     pub fn deploy_contract(
         &self,
         script: &[u8],
-        value_sat: u64,
+        _value_sat: u64,
     ) -> BitcoinResult<ContractDeployment> {
         // Derive a new address for the contract
         let derived_key = self
