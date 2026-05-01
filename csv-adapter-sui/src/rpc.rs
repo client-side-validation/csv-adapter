@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 /// Trait for Sui RPC operations
-pub trait SuiRpc: Send + Sync {
+pub trait SuiRpc: Send + Sync + 'static {
     /// Get object by ID
     fn get_object(
         &self,
@@ -69,8 +69,11 @@ pub trait SuiRpc: Send + Sync {
     fn get_ledger_info(&self) -> Result<SuiLedgerInfo, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Downcast to Any for feature-gated real implementations
-    fn as_any(&self) -> &dyn std::any::Any {
-        unimplemented!("as_any() must be implemented by concrete types")
+    fn as_any(&self) -> &dyn std::any::Any
+    where
+        Self: Sized,
+    {
+        self
     }
 }
 

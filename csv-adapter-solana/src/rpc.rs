@@ -49,66 +49,92 @@ pub trait SolanaRpc: Send + Sync {
     async fn get_minimum_balance_for_rent_exemption(&self, data_len: usize) -> SolanaResult<u64>;
 }
 
-/// Real RPC client implementation
+/// Real RPC client implementation using solana-rpc-client
 #[cfg(feature = "rpc")]
 pub struct RealSolanaRpc {
-    rpc_url: String,
-    timeout: Duration,
+    client: solana_rpc_client::rpc_client::RpcClient,
 }
 
 #[cfg(feature = "rpc")]
 impl RealSolanaRpc {
-    /// Create new RPC client
-    pub fn new(rpc_url: &str, timeout_seconds: u64) -> Self {
-        Self {
-            rpc_url: rpc_url.to_string(),
-            timeout: Duration::from_secs(timeout_seconds),
-        }
+    /// Create new RPC client with default commitment
+    pub fn new(rpc_url: &str) -> Self {
+        let client = solana_rpc_client::rpc_client::RpcClient::new(rpc_url.to_string());
+        Self { client }
     }
 
-    /// Create with commitment
-    pub fn with_commitment(rpc_url: &str, _commitment: &str, timeout_seconds: u64) -> Self {
-        Self {
-            rpc_url: rpc_url.to_string(),
-            timeout: Duration::from_secs(timeout_seconds),
-        }
+    /// Create with specific commitment level
+    pub fn with_commitment(rpc_url: &str, commitment: &str) -> Self {
+        let commitment_config = match commitment {
+            "processed" => solana_sdk::commitment_config::CommitmentConfig::processed(),
+            "confirmed" => solana_sdk::commitment_config::CommitmentConfig::confirmed(),
+            "finalized" => solana_sdk::commitment_config::CommitmentConfig::finalized(),
+            _ => solana_sdk::commitment_config::CommitmentConfig::confirmed(),
+        };
+        let client = solana_rpc_client::rpc_client::RpcClient::new_with_commitment(
+            rpc_url.to_string(),
+            commitment_config,
+        );
+        Self { client }
+    }
+
+    /// Get the underlying RPC client for advanced operations
+    pub fn underlying_client(&self) -> &solana_rpc_client::rpc_client::RpcClient {
+        &self.client
     }
 }
 
 #[cfg(feature = "rpc")]
 #[async_trait::async_trait]
 impl SolanaRpc for RealSolanaRpc {
-    async fn get_account(&self, _pubkey: &Pubkey) -> SolanaResult<Account> {
-        // Simplified implementation - would need actual RPC client
-        Err(SolanaError::Rpc("RPC client not implemented".to_string()))
+    async fn get_account(&self, pubkey: &Pubkey) -> SolanaResult<Account> {
+        self.client
+            .get_account(pubkey)
+            .map_err(|e| SolanaError::Rpc(format!("Failed to get account {}: {}", pubkey, e)))
     }
 
     async fn get_multiple_accounts(
         &self,
-        _pubkeys: &[Pubkey],
+        pubkeys: &[Pubkey],
     ) -> SolanaResult<Vec<Option<Account>>> {
-        // Simplified implementation - would need actual RPC client
-        Err(SolanaError::Rpc("RPC client not implemented".to_string()))
+        self.client
+            .get_multiple_accounts(pubkeys)
+            .map_err(|e| SolanaError::Rpc(format!("Failed to get multiple accounts: {}", e)))
     }
 
-    async fn get_transaction(&self, _signature: &Signature) -> SolanaResult<String> {
-        // Simplified implementation - would need actual RPC client
-        Err(SolanaError::Rpc("RPC client not implemented".to_string()))
+    async fn get_transaction(&self, signature: &Signature) -> SolanaResult<String> {
+        let tx = self
+            .client
+            .get_transaction(signature, solana_sdk::commitment_config::UiTransactionEncoding::Json)
+            .map_err(|e| SolanaError::Rpc(format!("Failed to get transaction: {}", e)))?;
+
+        serde_json::to_string(&tx)
+            .map_err(|e| SolanaError::Serialization(format!("Failed to serialize transaction: {}", e)))
     }
 
-    async fn send_transaction(&self, _transaction: &Transaction) -> SolanaResult<Signature> {
-        // Simplified implementation - would need actual RPC client
-        Err(SolanaError::Rpc("RPC client not implemented".to_string()))
+    async fn send_transaction(&self, transaction: &Transaction) -> SolanaResult<Signature> {
+        self.client
+            .send_transaction(transaction)
+            .map_err(|e| SolanaError::Rpc(format!("Failed to send transaction: {}", e)))
     }
 
     async fn get_latest_slot(&self) -> SolanaResult<u64> {
-        // Simplified implementation - would need actual RPC client
-        Err(SolanaError::Rpc("RPC client not implemented".to_string()))
+        self.client
+            .get_slot()
+            .map_err(|e| SolanaError::Rpc(format!("Failed to get slot: {}", e)))
     }
 
-    async fn get_slot_with_commitment(&self, _commitment: &str) -> SolanaResult<u64> {
-        // Simplified implementation - would need actual RPC client
-        Err(SolanaError::Rpc("RPC client not implemented".to_string()))
+    async fn get_slot_with_commitment(&self, commitment: &str) -> SolanaResult<u64> {
+        let commitment_config = match commitment {
+            "processed" => solana_sdk::commitment_config::CommitmentConfig::processed(),
+            "confirmed" => solana_sdk::commitment_config::CommitmentConfig::confirmed(),
+            "finalized" => solana_sdk::commitment_config::CommitmentConfig::finalized(),
+            _ => solana_sdk::commitment_config::CommitmentConfig::confirmed(),
+        };
+
+        self.client
+            .get_slot_with_commitment(commitment_config)
+            .map_err(|e| SolanaError::Rpc(format!("Failed to get slot with commitment: {}", e)))
     }
 
     async fn get_account_changes(
@@ -116,22 +142,55 @@ impl SolanaRpc for RealSolanaRpc {
         _from_slot: u64,
         _to_slot: u64,
     ) -> SolanaResult<Vec<AccountChange>> {
-        // Simplified implementation - would need actual RPC client
+        // Account changes tracking requires more complex logic with
+        // pre/post balance tracking. Returning empty for now - this
+        // should be implemented with proper account state diffing.
+        // TODO: Implement full account change tracking using get_block
+        // with pre/post balance metadata.
         Ok(vec![])
     }
 
     async fn wait_for_confirmation(
         &self,
-        _signature: &Signature,
+        signature: &Signature,
     ) -> SolanaResult<ConfirmationStatus> {
-        // Simplified implementation - would need actual RPC client
-        Ok(ConfirmationStatus::Confirmed)
+        // Poll for confirmation with exponential backoff
+        let mut retries = 0;
+        let max_retries = 30;
+
+        while retries < max_retries {
+            match self.client.get_signature_statuses(&[*signature]) {
+                Ok(response) => {
+                    if let Some(Some(status)) = response.value.get(0) {
+                        if status.confirmation_status.is_some() {
+                            let conf_status = status.confirmation_status.as_ref().unwrap();
+                            return Ok(match conf_status {
+                                solana_rpc_client::rpc_client::TransactionConfirmationStatus::Processed => ConfirmationStatus::Processed,
+                                solana_rpc_client::rpc_client::TransactionConfirmationStatus::Confirmed => ConfirmationStatus::Confirmed,
+                                solana_rpc_client::rpc_client::TransactionConfirmationStatus::Finalized => ConfirmationStatus::Finalized,
+                            });
+                        }
+                        if status.err.is_some() {
+                            return Err(SolanaError::TransactionFailed(
+                                status.err.as_ref().unwrap().to_string()
+                            ));
+                        }
+                    }
+                }
+                Err(_) => {}
+            }
+
+            retries += 1;
+            tokio::time::sleep(tokio::time::Duration::from_millis(500 * retries.min(10))).await;
+        }
+
+        Err(SolanaError::Timeout("Transaction confirmation timeout".to_string()))
     }
 
-    async fn get_minimum_balance_for_rent_exemption(&self, _data_len: usize) -> SolanaResult<u64> {
-        // Simplified implementation - would need actual RPC client
-        // Returns a placeholder value (rent exemption for 1MB is roughly 6.9 SOL)
-        Ok(6_900_000_000)
+    async fn get_minimum_balance_for_rent_exemption(&self, data_len: usize) -> SolanaResult<u64> {
+        self.client
+            .get_minimum_balance_for_rent_exemption(data_len)
+            .map_err(|e| SolanaError::Rpc(format!("Failed to get rent exemption: {}", e)))
     }
 }
 

@@ -1,7 +1,7 @@
 //! Aptos RPC trait and mock implementation
 
 /// Trait for Aptos RPC operations
-pub trait AptosRpc: Send + Sync {
+pub trait AptosRpc: Send + Sync + 'static {
     fn get_ledger_info(&self) -> Result<AptosLedgerInfo, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get the sender's account address
@@ -84,8 +84,11 @@ pub trait AptosRpc: Send + Sync {
         sequence_number: u64,
     ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>>;
 
-    fn as_any(&self) -> &dyn std::any::Any {
-        unimplemented!("as_any() must be implemented by concrete types")
+    fn as_any(&self) -> &dyn std::any::Any
+    where
+        Self: Sized,
+    {
+        self
     }
 }
 
