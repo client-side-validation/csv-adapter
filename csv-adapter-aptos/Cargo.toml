@@ -46,6 +46,8 @@ rand = "0.8"
 default = []
 # Enables real RPC client (HTTP client for network calls)
 rpc = ["tokio", "reqwest"]
+# Enables aptos-sdk integration
+aptos-sdk = []
 
 [dev-dependencies]
 rand = "0.8"

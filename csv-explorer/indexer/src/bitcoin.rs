@@ -478,7 +478,7 @@ impl BitcoinIndexer {
         // FIX: compare against actual protocol magic bytes.
         // csv-adapter-core defines `csv_adapter_core::protocol_version::PROTOCOL_VERSION`
         // as a human-readable tag. Real check should use the first 4 bytes of the
-        // SHA256 tag. Using "CSV-" prefix as placeholder until core type is confirmed.
+        // SHA256 tag. Using "CSV-" prefix as temporary until core type is confirmed.
         const CSV_MAGIC: &[u8; 4] = b"CSV-";
         if &protocol_id[0..4] != CSV_MAGIC {
             return None;

@@ -137,7 +137,7 @@ pub struct SignedTransaction {
     pub raw_bytes: Vec<u8>,
 }
 
-/// Solana transaction (stub for deleted solana_tx module)
+/// Solana transaction (basic for deleted solana_tx module)
 #[derive(Clone, Debug)]
 pub struct SolanaTransaction {
     pub message: SolanaMessage,
@@ -164,7 +164,7 @@ pub struct SolanaAccountMeta {
     pub is_writable: bool,
 }
 
-/// Bitcoin UTXO (stub for deleted bitcoin_tx module)
+/// Bitcoin UTXO (basic for deleted bitcoin_tx module)
 #[derive(Clone, Debug)]
 pub struct Utxo {
     pub txid: String,

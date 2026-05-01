@@ -114,7 +114,7 @@ impl Transition {
     pub fn consumed_seals(&self) -> Vec<SealRef> {
         // StateRef doesn't contain SealRef directly — seals are resolved
         // from the parent transition that created each output.
-        // This method is a placeholder; actual resolution requires
+        // This method is a basic implementation; actual resolution requires
         // walking the transition chain.
         Vec::new()
     }

@@ -314,7 +314,7 @@ mod tests {
     #[test]
     fn test_verify_object_consumed() {
         let rpc = MockSuiRpc::new(1000);
-        // Object not in mock means it's "consumed"
+        // Object not in test data means it's "consumed"
         assert!(StateProofVerifier::verify_object_consumed([99u8; 32], &rpc).unwrap());
     }
 

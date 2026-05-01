@@ -13,9 +13,9 @@ pub use super::chain_adapter::{
 };
 pub use super::chain_config::{AccountModel, ChainCapabilities, ChainConfig};
 
-// Mock adapters for testing
+// Test adapters for testing
 #[cfg(test)]
-pub mod mock;
+pub mod test;
 
 #[cfg(test)]
-pub use mock::MockAdapter;
+pub use test::MockAdapter;

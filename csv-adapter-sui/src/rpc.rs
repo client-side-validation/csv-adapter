@@ -1,4 +1,4 @@
-//! Sui RPC trait and mock implementation
+//! Sui RPC trait and test implementation
 
 #[cfg(test)]
 use std::collections::HashMap;
@@ -154,7 +154,7 @@ pub struct MockSuiRpc {
     transactions: Mutex<HashMap<[u8; 32], SuiTransactionBlock>>,
     checkpoints: Mutex<HashMap<u64, SuiCheckpoint>>,
     latest_checkpoint: u64,
-    mock_address: [u8; 32],
+    test_address: [u8; 32],
     tx_counter: std::sync::atomic::AtomicU64,
 }
 
@@ -166,7 +166,7 @@ impl MockSuiRpc {
             transactions: Mutex::new(HashMap::new()),
             checkpoints: Mutex::new(HashMap::new()),
             latest_checkpoint,
-            mock_address: [0x42; 32],
+            test_address: [0x42; 32],
             tx_counter: std::sync::atomic::AtomicU64::new(0),
         }
     }
@@ -177,7 +177,7 @@ impl MockSuiRpc {
             transactions: Mutex::new(HashMap::new()),
             checkpoints: Mutex::new(HashMap::new()),
             latest_checkpoint,
-            mock_address: address,
+            test_address: address,
             tx_counter: std::sync::atomic::AtomicU64::new(0),
         }
     }
@@ -243,18 +243,18 @@ impl SuiRpc for MockSuiRpc {
     }
 
     fn sender_address(&self) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
-        Ok(self.mock_address)
+        Ok(self.test_address)
     }
 
     fn get_gas_objects(
         &self,
         _owner: [u8; 32],
     ) -> Result<Vec<SuiObject>, Box<dyn std::error::Error + Send + Sync>> {
-        // Return mock gas objects
+        // Return test gas objects
         Ok(vec![SuiObject {
             object_id: [0x01; 32],
             version: 1,
-            owner: self.mock_address.to_vec(),
+            owner: self.test_address.to_vec(),
             object_type: "0x2::coin::Coin<0x2::sui::SUI>".to_string(),
             has_public_transfer: true,
         }])
@@ -266,12 +266,12 @@ impl SuiRpc for MockSuiRpc {
         _signature: Vec<u8>,
         _public_key: Vec<u8>,
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
-        // Mock: return a deterministic digest with incrementing counter
+        // Test: return a deterministic digest with incrementing counter
         let counter = self
             .tx_counter
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let mut digest = [0u8; 32];
-        digest[..4].copy_from_slice(b"mock");
+        digest[..4].copy_from_slice(b"test");
         digest[4..12].copy_from_slice(&counter.to_le_bytes());
         Ok(digest)
     }
@@ -301,7 +301,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_mock_object() {
+    fn test_object() {
         let rpc = MockSuiRpc::new(1000);
         let obj = SuiObject {
             object_id: [1u8; 32],
@@ -317,7 +317,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mock_checkpoint() {
+    fn test_checkpoint() {
         let rpc = MockSuiRpc::new(1000);
         let cp = SuiCheckpoint {
             sequence_number: 500,

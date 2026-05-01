@@ -377,6 +377,30 @@ impl Config {
         unified.save()?;
         Ok(())
     }
+
+    /// Get RPC URL for a chain
+    pub fn get_rpc_url(&self, chain: &Chain) -> String {
+        // First check if chain config has an RPC URL
+        if let Ok(chain_config) = self.chain(chain) {
+            if !chain_config.rpc_url.is_empty() {
+                return chain_config.rpc_url.clone();
+            }
+        }
+
+        // Fall back to environment variables
+        match chain {
+            Chain::Bitcoin => std::env::var("BTC_RPC_URL")
+                .unwrap_or_else(|_| "https://signet.bc-2.jp".to_string()),
+            Chain::Ethereum => std::env::var("ETH_RPC_URL")
+                .unwrap_or_else(|_| "https://sepolia.infura.io/v3/YOUR_API_KEY".to_string()),
+            Chain::Solana => std::env::var("SOL_RPC_URL")
+                .unwrap_or_else(|_| "https://api.devnet.solana.com".to_string()),
+            Chain::Sui => std::env::var("SUI_RPC_URL")
+                .unwrap_or_else(|_| "https://fullnode.testnet.sui.io:443".to_string()),
+            Chain::Aptos => std::env::var("APTOS_RPC_URL")
+                .unwrap_or_else(|_| "https://fullnode.testnet.aptoslabs.com/v1".to_string()),
+        }
+    }
 }
 
 /// Get cached wallet config from csv-wallet data (internal helper, legacy format)

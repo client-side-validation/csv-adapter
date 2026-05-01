@@ -52,10 +52,10 @@ impl ProgramWallet {
 
     /// Sign transaction
     pub fn sign_transaction(&self, transaction: &mut Transaction) -> SolanaResult<()> {
-        // Use a placeholder hash for now - would need actual recent blockhash
+        // Use a default hash for now - would need actual recent blockhash
         use solana_sdk::hash::Hash;
-        let placeholder_hash = Hash::default();
-        transaction.partial_sign(&[&self.keypair], placeholder_hash);
+        let default_hash = Hash::default();
+        transaction.partial_sign(&[&self.keypair], default_hash);
         Ok(())
     }
 

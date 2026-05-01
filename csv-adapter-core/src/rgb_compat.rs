@@ -371,7 +371,7 @@ mod tests {
     use crate::seal::{AnchorRef, SealRef};
     use crate::state::StateAssignment;
 
-    fn mock_consignment() -> Consignment {
+    fn test_consignment() -> Consignment {
         Consignment {
             version: 1,
             genesis: Genesis {
@@ -390,7 +390,7 @@ mod tests {
 
     #[test]
     fn test_rgb_validation_empty_consignment() {
-        let consignment = mock_consignment();
+        let consignment = test_consignment();
         let result = RgbConsignmentValidator::validate(&consignment, None);
         assert!(result.is_valid);
         assert!(result.errors.is_empty());
@@ -398,7 +398,7 @@ mod tests {
 
     #[test]
     fn test_consignment_id_computation() {
-        let consignment = mock_consignment();
+        let consignment = test_consignment();
         let id = RgbConsignmentValidator::compute_consignment_id(&consignment);
         // ID should be non-zero
         assert_ne!(id.as_bytes(), &[0u8; 32]);
@@ -406,14 +406,14 @@ mod tests {
 
     #[test]
     fn test_contract_id_from_genesis() {
-        let consignment = mock_consignment();
+        let consignment = test_consignment();
         let contract_id = RgbConsignmentValidator::compute_contract_id(&consignment.genesis);
         assert_eq!(contract_id, Hash::new([0x01; 32]));
     }
 
     #[test]
     fn test_seal_double_spend_detection() {
-        let mut consignment = mock_consignment();
+        let mut consignment = test_consignment();
 
         // Add duplicate seal assignments
         let seal = SealRef::new(vec![0xAB; 32], Some(0)).unwrap();

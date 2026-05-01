@@ -46,7 +46,7 @@ pub fn Stats() -> Element {
                     }
                 }
 
-                // Rights by chain (bar chart placeholder)
+                // Rights by chain (bar chart area)
                 div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
                     h2 { class: "text-lg font-semibold mb-4", "Rights by Chain" }
                     if let Some(ref s) = *stats.read() {

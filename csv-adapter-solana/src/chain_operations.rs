@@ -699,7 +699,7 @@ mod tests {
 
     #[test]
     fn test_solana_address_validation() {
-        // Can't easily test without mock RPC, but we can test address validation
-        // This is a placeholder - real tests would use MockSolanaRpc
+        // Can't easily test without test RPC, but we can test address validation
+        // This is a basic test - real tests would use MockSolanaRpc
     }
 }

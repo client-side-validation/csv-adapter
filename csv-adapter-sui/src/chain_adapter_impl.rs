@@ -287,7 +287,7 @@ pub fn create_sui_adapter(config: &ChainConfig) -> ChainResult<SuiAnchorLayer> {
 
     let sui_config = SuiConfig::new(network);
 
-    // In test builds, use mock RPC
+    // In test builds, use test RPC
     #[cfg(test)]
     {
         use crate::rpc::MockSuiRpc;
@@ -322,7 +322,7 @@ mod tests {
 
     #[test]
     fn test_sui_adapter_chain_id() {
-        let adapter = SuiAnchorLayer::with_mock().unwrap();
+        let adapter = SuiAnchorLayer::with_test().unwrap();
         assert_eq!(adapter.chain_id(), "sui");
         assert_eq!(adapter.chain_name(), "Sui");
     }

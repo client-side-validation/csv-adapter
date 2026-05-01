@@ -565,7 +565,7 @@ mod tests {
         );
     }
     #[test]
-    fn test_mock_wallet() {
+    fn test_wallet_with_sample_data() {
         let mut w = MockSealWallet::new();
         w.add_utxo([1u8; 32], 0, 100_000);
         assert_eq!(w.utxos.len(), 1);

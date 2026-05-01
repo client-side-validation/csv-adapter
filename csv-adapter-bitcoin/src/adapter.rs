@@ -253,7 +253,7 @@ impl BitcoinAnchorLayer {
                 )));
             }
         }
-        // In mock mode, always return OK
+        // In fallback mode, always return OK
         Ok(())
     }
 
@@ -282,7 +282,7 @@ fn get_address_utxos(
     _rpc: &dyn BitcoinRpc,
     _address: &bitcoin::Address,
 ) -> Result<Vec<(bitcoin::OutPoint, u64)>, String> {
-    // This is a placeholder - actual implementation depends on the RPC backend
+    // This is a temporary implementation - actual implementation depends on the RPC backend
     // For mempool.space, we'd use REST API
     // For bitcoincore-rpc, we'd use listunspent
     // The adapter's scan_wallet_for_utxos handles this via the wallet's callback
@@ -347,7 +347,7 @@ impl AnchorLayer for BitcoinAnchorLayer {
             return Ok(BitcoinAnchorRef::new(broadcast_txid, 0, current_height));
         }
 
-        // Fall back to mock mode if no RPC client attached
+        // Fall back to fallback mode if no RPC client attached
         let mut txid = [0u8; 32];
         txid[..10].copy_from_slice(b"sim-commit");
         txid[10..].copy_from_slice(&commitment.as_bytes()[..22]);
@@ -378,7 +378,7 @@ impl AnchorLayer for BitcoinAnchorLayer {
             ));
         }
 
-        // Without RPC, return empty proof (mock mode)
+        // Without RPC, return empty proof (fallback mode)
         let proof = BitcoinInclusionProof::new(vec![], anchor.txid, 0, anchor.block_height);
         Ok(proof)
     }

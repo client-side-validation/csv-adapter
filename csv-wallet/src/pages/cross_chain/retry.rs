@@ -24,7 +24,7 @@ pub fn CrossChainRetry() -> Element {
                         value: "{transfer_id.read()}",
                         oninput: move |evt| { transfer_id.set(evt.value()); },
                         class: "{input_mono_class()}",
-                        placeholder: "0x..."
+                        r#type: "text"
                     }
                 })}
 

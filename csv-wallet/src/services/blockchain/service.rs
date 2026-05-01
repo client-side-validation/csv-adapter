@@ -944,7 +944,7 @@ impl BlockchainService {
                 Ok(hash)
             }
             Chain::Solana => {
-                // Solana uses different format, placeholder for now
+                // Solana uses different format, basic implementation for now
                 Ok(signed_tx.tx_hash.clone())
             }
             _ => Err(BlockchainError {

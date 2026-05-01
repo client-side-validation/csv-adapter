@@ -643,7 +643,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_dashboard_server_creation() {
-        // This test would require a mock IndexingManager
+        // This test would require a test IndexingManager
         // For now, we only need this async harness to type-check.
     }
 }

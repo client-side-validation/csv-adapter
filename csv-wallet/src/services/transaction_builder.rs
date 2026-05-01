@@ -339,9 +339,9 @@ pub fn build_sui_transaction(
     // === GasData ===
     // payment: Vec<ObjectRef>
     encode_uleb128(&mut tx, 1); // 1 gas object
-    tx.extend_from_slice(&[0u8; 32]); // object_id placeholder
+    tx.extend_from_slice(&[0u8; 32]); // object_id field
     tx.extend_from_slice(&1u64.to_le_bytes()); // version
-    tx.extend_from_slice(&[0u8; 32]); // digest placeholder
+    tx.extend_from_slice(&[0u8; 32]); // digest field
 
     // owner: SuiAddress (32 bytes)
     tx.extend_from_slice(&sender_bytes);

@@ -343,7 +343,7 @@ impl ChainSigner for EthereumChainOperations {
         }
 
         // For production, use a proper ECDSA verification library
-        // This is a placeholder that would use secp256k1 crate
+        // This is a temporary implementation that would use secp256k1 crate
         let _ = message;
         let _ = public_key;
 

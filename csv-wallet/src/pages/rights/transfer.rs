@@ -77,7 +77,7 @@ pub fn TransferRight() -> Element {
                         value: "{to_address.read()}",
                         oninput: move |evt| { to_address.set(evt.value()); },
                         class: "{input_mono_class()}",
-                        placeholder: "Recipient address"
+                        r#type: "text"
                     }
                 })}
 

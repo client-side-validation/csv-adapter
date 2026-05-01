@@ -217,7 +217,7 @@ pub struct RightOperationResult {
 /// Trait for querying chain state
 ///
 /// Implementors must provide real RPC-backed implementations.
-/// No mock or simulated data is allowed in production.
+/// No test or artificial data is allowed in production.
 #[async_trait]
 pub trait ChainQuery: Send + Sync {
     /// Get the balance for an address
@@ -276,7 +276,7 @@ pub trait ChainSigner: Send + Sync {
 /// Trait for broadcasting transactions
 ///
 /// Implementors must submit to real chain networks.
-/// No simulated transaction acceptance is allowed.
+/// No artificial transaction acceptance is allowed.
 #[async_trait]
 pub trait ChainBroadcaster: Send + Sync {
     /// Submit a signed transaction to the chain
@@ -298,17 +298,17 @@ pub trait ChainBroadcaster: Send + Sync {
     /// Get the current recommended fee/gas price
     async fn get_fee_estimate(&self) -> ChainOpResult<u64>;
 
-    /// Validate a transaction before submission (simulation where supported)
+    /// Validate a transaction before submission (dry-run where supported)
     ///
-    /// This should perform a real simulation on the chain when available,
-    /// not a local mock validation.
+    /// This should perform a real dry-run on the chain when available,
+    /// not a local test validation.
     async fn validate_transaction(&self, tx_data: &[u8]) -> ChainOpResult<()>;
 }
 
 /// Trait for deploying contracts and programs
 ///
 /// All deployments must happen on real chains.
-/// No mock deployments or placeholder addresses allowed.
+/// No test deployments or temporary addresses allowed.
 #[async_trait]
 pub trait ChainDeployer: Send + Sync {
     /// Deploy a lock contract for cross-chain rights
@@ -400,7 +400,7 @@ pub trait ChainProofProvider: Send + Sync {
 /// Trait for right operations
 ///
 /// All operations must be backed by real chain transactions.
-/// No simulated right state changes allowed.
+/// No artificial right state changes allowed.
 #[async_trait]
 pub trait ChainRightOps: Send + Sync {
     /// Create a new right on this chain

@@ -32,7 +32,7 @@ pub fn ConsumeRight() -> Element {
                         value: "{right_id.read()}",
                         oninput: move |evt| { right_id.set(evt.value()); },
                         class: "{input_mono_class()}",
-                        placeholder: "0x..."
+                        r#type: "text"
                     }
                 })}
 

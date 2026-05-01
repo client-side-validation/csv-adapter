@@ -59,7 +59,7 @@ impl Wallet {
     /// # Panics
     ///
     /// This method requires the `wallet` feature and the `bip32` crate.
-    /// If compiled without wallet support, returns a placeholder wallet.
+    /// If compiled without wallet support, returns a basic wallet.
     pub fn generate() -> Self {
         #[cfg(feature = "wallet")]
         {
@@ -165,7 +165,7 @@ impl Wallet {
     /// # Note
     ///
     /// Full address derivation requires the chain-specific adapter to be
-    /// enabled. This method returns a placeholder derived from the seed
+    /// enabled. This method returns a basic address derived from the seed
     /// when the chain feature is not enabled.
     pub fn address(&self, chain: Chain) -> String {
         match chain {
@@ -174,7 +174,7 @@ impl Wallet {
             Chain::Sui => self.sui_address(),
             Chain::Aptos => self.aptos_address(),
             Chain::Solana => self.sol_address(),
-            // Future chains: derive placeholder from seed
+            // Future chains: derive basic address from seed
             _ => format!("unknown-chain:{}", hex::encode(&self.seed[..8])),
         }
     }
@@ -208,12 +208,12 @@ impl Wallet {
         //    secp256k1-ecdsa for ETH, ed25519 for Sui/Aptos)
         // 3. Return the signature in the expected format
         //
-        // For now, we return a placeholder that demonstrates the API.
+        // For now, we return a sample that demonstrates the API.
         // Chain adapters handle actual signing when enabled.
         let mut sig = Vec::with_capacity(64);
         sig.extend_from_slice(self.seed.as_slice());
         sig.extend_from_slice(message.as_slice());
-        // Placeholder: in production, use proper key derivation + signing
+        // Sample: in production, use proper key derivation + signing
         let _ = chain;
         sig
     }

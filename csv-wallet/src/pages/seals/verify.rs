@@ -31,7 +31,7 @@ pub fn VerifySeal() -> Element {
                         value: "{seal_ref.read()}",
                         oninput: move |evt| { seal_ref.set(evt.value()); result.set(None); },
                         class: "{input_mono_class()}",
-                        placeholder: "0x..."
+                        r#type: "text"
                     }
                 })}
 

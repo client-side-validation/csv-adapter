@@ -302,7 +302,7 @@ pub fn create_ethereum_adapter(config: &ChainConfig) -> ChainResult<EthereumAnch
         ..Default::default()
     };
 
-    // In test builds, use mock RPC
+    // In test builds, use test RPC
     #[cfg(test)]
     {
         use crate::rpc::MockEthereumRpc;
@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn test_ethereum_adapter_chain_id() {
-        let adapter = EthereumAnchorLayer::with_mock().unwrap();
+        let adapter = EthereumAnchorLayer::with_test().unwrap();
         assert_eq!(adapter.chain_id(), "ethereum");
         assert_eq!(adapter.chain_name(), "Ethereum");
     }

@@ -14,8 +14,8 @@
 //! ```no_run
 //! use csv_adapter_aptos::{AptosAnchorLayer, AptosConfig, AptosNetwork};
 //!
-//! // Create adapter with mock RPC for testing
-//! let adapter = AptosAnchorLayer::with_mock().unwrap();
+//! // Create adapter with test RPC for testing
+//! let adapter = AptosAnchorLayer::with_test().unwrap();
 //!
 //! // Or with configuration
 //! let config = AptosConfig::new(AptosNetwork::Devnet);

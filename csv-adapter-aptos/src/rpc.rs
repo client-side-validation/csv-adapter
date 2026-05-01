@@ -1,4 +1,4 @@
-//! Aptos RPC trait and mock implementation
+//! Aptos RPC trait and test implementation
 
 /// Trait for Aptos RPC operations
 pub trait AptosRpc: Send + Sync + 'static {
@@ -155,7 +155,7 @@ pub struct AptosBlockInfo {
 pub struct MockAptosRpc {
     pub latest_version: u64,
     pub chain_id: u64,
-    pub mock_address: [u8; 32],
+    pub test_address: [u8; 32],
     pub tx_counter: std::sync::atomic::AtomicU64,
     pub resources: std::sync::Mutex<std::collections::HashMap<([u8; 32], String), AptosResource>>,
     pub transactions: std::sync::Mutex<std::collections::HashMap<u64, AptosTransaction>>,
@@ -171,7 +171,7 @@ impl MockAptosRpc {
         Self {
             latest_version,
             chain_id: 1,
-            mock_address: [0x42; 32],
+            test_address: [0x42; 32],
             tx_counter: std::sync::atomic::AtomicU64::new(0),
             resources: std::sync::Mutex::new(std::collections::HashMap::new()),
             transactions: std::sync::Mutex::new(std::collections::HashMap::new()),
@@ -239,7 +239,7 @@ impl AptosRpc for MockAptosRpc {
     }
 
     fn sender_address(&self) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
-        Ok(self.mock_address)
+        Ok(self.test_address)
     }
 
     fn get_account_sequence_number(
@@ -314,11 +314,11 @@ impl AptosRpc for MockAptosRpc {
         &self,
         signed_tx_json: serde_json::Value,
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
-        // Store the JSON and return a mock hash
+        // Store the JSON and return a test hash
         let tx_bytes = serde_json::to_vec(&signed_tx_json).unwrap_or_default();
         self.sent_transactions.lock().unwrap().push(tx_bytes);
 
-        // Extract payload arguments to build mock event data
+        // Extract payload arguments to build test event data
         // New format: consume_seal only takes commitment (seal is at signer's address)
         if let Some(payload) = signed_tx_json.get("payload") {
             if let Some(args) = payload.get("arguments").and_then(|a| a.as_array()) {
@@ -332,12 +332,12 @@ impl AptosRpc for MockAptosRpc {
                         hex::decode(commit_str).unwrap_or_default()
                     };
 
-                    // Build event data: module_address (32) + seal_address (mock) + commitment (32)
+                    // Build event data: module_address (32) + seal_address (test) + commitment (32)
                     let mut event_data = vec![0u8; 96];
                     // module_address (0x1 padded to 32)
                     event_data[31] = 0x01;
-                    // seal_address (use mock_address)
-                    event_data[32..64].copy_from_slice(&self.mock_address);
+                    // seal_address (use test_address)
+                    event_data[32..64].copy_from_slice(&self.test_address);
                     // commitment
                     event_data[64..96].copy_from_slice(&commitment[..32.min(commitment.len())]);
 
@@ -356,7 +356,7 @@ impl AptosRpc for MockAptosRpc {
             .tx_counter
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let mut hash = [0u8; 32];
-        hash[..4].copy_from_slice(b"mock");
+        hash[..4].copy_from_slice(b"test");
         hash[4..12].copy_from_slice(&counter.to_le_bytes());
         Ok(hash)
     }
@@ -448,7 +448,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_mock_ledger_info() {
+    fn test_ledger_info() {
         let rpc = MockAptosRpc::new(1000);
         let info = rpc.get_ledger_info().unwrap();
         assert_eq!(info.chain_id, 1);
@@ -456,7 +456,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mock_resource() {
+    fn test_resource() {
         let rpc = MockAptosRpc::new(1000);
         let address = [1u8; 32];
         let resource = AptosResource {
@@ -469,7 +469,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mock_transaction() {
+    fn test_transaction() {
         let rpc = MockAptosRpc::new(1000);
         let tx = AptosTransaction {
             version: 500,
@@ -493,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mock_events() {
+    fn test_events() {
         let rpc = MockAptosRpc::new(1000);
         let event = AptosEvent {
             event_sequence_number: 1,
@@ -508,14 +508,14 @@ mod tests {
     }
 
     #[test]
-    fn test_mock_submit_transaction() {
+    fn test_submit_transaction() {
         let rpc = MockAptosRpc::new(1000);
         let tx_hash = rpc.submit_transaction(vec![0x01, 0x02]).unwrap();
         assert_eq!(tx_hash, [0xAB; 32]);
     }
 
     #[test]
-    fn test_mock_wait_for_transaction() {
+    fn test_wait_for_transaction() {
         let rpc = MockAptosRpc::new(1000);
         let tx_hash = [1u8; 32];
         let tx = rpc.wait_for_transaction(tx_hash).unwrap();

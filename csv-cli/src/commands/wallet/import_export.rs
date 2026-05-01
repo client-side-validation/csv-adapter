@@ -119,13 +119,53 @@ fn import_from_mnemonic(
         &mnemonic[..20.min(mnemonic.len())]
     ));
 
-    // For now, just store a placeholder
-    state.store_address(
-        chain.clone(),
-        format!("imported_{}", chain.to_string().to_lowercase()),
-    );
+    // Derive the actual address from the mnemonic
+    let address = derive_address_from_mnemonic(&chain, mnemonic)
+        .map_err(|e| anyhow::anyhow!("Failed to derive address from mnemonic: {}", e))?;
+
+    state.store_address(chain.clone(), address.clone());
+    output::success(&format!("Derived {} address: {}", chain, address));
 
     Ok(())
+}
+
+/// Derive address from mnemonic phrase for a specific chain.
+fn derive_address_from_mnemonic(chain: &Chain, mnemonic: &str) -> Result<String> {
+    use csv_adapter_core::Chain as CoreChain;
+    use csv_adapter_keystore::bip39::Mnemonic;
+    use csv_adapter_keystore::bip44::{derive_key, derive_address_from_key};
+
+    // Use the keystore crate for derivation
+    let core_chain = match chain {
+        Chain::Bitcoin => CoreChain::Bitcoin,
+        Chain::Ethereum => CoreChain::Ethereum,
+        Chain::Sui => CoreChain::Sui,
+        Chain::Aptos => CoreChain::Aptos,
+        Chain::Solana => CoreChain::Solana,
+    };
+
+    // Parse mnemonic and derive seed
+    let mnemonic = Mnemonic::from_phrase(mnemonic)
+        .map_err(|e| anyhow::anyhow!("Invalid mnemonic: {}", e))?;
+    let seed = mnemonic.to_seed(None);
+    let seed_bytes = seed.as_bytes();
+
+    // Ensure seed is exactly 64 bytes
+    if seed_bytes.len() != 64 {
+        return Err(anyhow::anyhow!("Invalid seed length: expected 64, got {}", seed_bytes.len()));
+    }
+    let mut seed_array = [0u8; 64];
+    seed_array.copy_from_slice(seed_bytes);
+
+    // Derive the key
+    let secret_key = derive_key(&seed_array, core_chain, 0, 0)
+        .map_err(|e| anyhow::anyhow!("Failed to derive key: {}", e))?;
+
+    // Derive address from key
+    let address = derive_address_from_key(secret_key.as_bytes(), core_chain)
+        .map_err(|e| anyhow::anyhow!("Failed to derive address: {}", e))?;
+
+    Ok(address)
 }
 
 fn import_from_private_key(

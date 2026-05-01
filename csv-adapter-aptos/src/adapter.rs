@@ -93,9 +93,9 @@ impl AptosAnchorLayer {
         })
     }
 
-    /// Create a new adapter with mock RPC for testing (only in test builds).
+    /// Create a new adapter with test RPC for testing (only in test builds).
     #[cfg(test)]
-    pub fn with_mock() -> AptosResult<Self> {
+    pub fn with_test() -> AptosResult<Self> {
         let config = AptosConfig::default();
         let rpc = Box::new(crate::rpc::MockAptosRpc::new(5000));
         Self::from_config(config, rpc)
@@ -170,6 +170,64 @@ impl AptosAnchorLayer {
         }
 
         Ok(())
+    }
+
+    /// Build a raw transaction for BCS serialization using aptos-sdk types.
+    #[cfg(feature = "rpc")]
+    fn build_raw_transaction(
+        &self,
+        sender: [u8; 32],
+        sequence_number: u64,
+        expiration_secs: u64,
+        module_address: &str,
+        commitment: [u8; 32],
+    ) -> Result<aptos_sdk::types::transaction::RawTransaction, Box<dyn std::error::Error + Send + Sync>> {
+        use aptos_sdk::types::transaction::{EntryFunction, RawTransaction, TransactionPayload};
+        use aptos_sdk::bcs;
+        use aptos_sdk::move_types::identifier::Identifier;
+        use aptos_sdk::move_types::language_storage::{ModuleId, TypeTag};
+        use std::str::FromStr;
+
+        // Parse module address
+        let module_addr = aptos_sdk::types::AccountAddress::from_hex_literal(module_address)
+            .map_err(|e| format!("Invalid module address: {}", e))?;
+
+        // Build the EntryFunction for consume_seal
+        let module_id = ModuleId::new(
+            module_addr,
+            Identifier::new("csv_seal").map_err(|e| format!("Invalid module name: {}", e))?,
+        );
+
+        let function_id = Identifier::new("consume_seal")
+            .map_err(|e| format!("Invalid function name: {}", e))?;
+
+        // Convert commitment to Move value (hex string)
+        let commitment_arg = bcs::to_bytes(&format!("0x{}", hex::encode(commitment)))
+            .map_err(|e| format!("Failed to serialize commitment: {}", e))?;
+
+        let entry_function = EntryFunction::new(
+            module_id,
+            function_id,
+            vec![], // type arguments
+            vec![commitment_arg], // arguments
+        );
+
+        // Build raw transaction
+        let sender_addr = aptos_sdk::types::AccountAddress::new(sender);
+        let payload = TransactionPayload::EntryFunction(entry_function);
+        let max_gas = self.config.transaction.max_gas;
+
+        let chain_id = aptos_sdk::types::chain_id::ChainId::new(self.config.network.chain_id());
+
+        Ok(RawTransaction::new(
+            sender_addr,
+            sequence_number,
+            payload,
+            max_gas,
+            100, // gas_unit_price
+            expiration_secs,
+            chain_id,
+        ))
     }
 
     /// Build an Entry Function payload for CSVSeal.consume_seal() and sign it.
@@ -258,19 +316,22 @@ impl AptosAnchorLayer {
             }
         });
 
-        // The raw transaction bytes to sign (BCS serialization of the transaction)
-        // In production, use aptos-sdk's BCS serialization
-        // For now, use the JSON payload hash as the message to sign
-        let tx_json_str = serde_json::to_string(&tx_payload).unwrap_or_default();
-        let message = {
-            use sha2::Digest as _;
-            let mut hasher = sha2::Sha256::new();
-            hasher.update(tx_json_str.as_bytes());
-            hasher.finalize()
-        };
+        // Build proper BCS-serialized transaction for signing
+        // Using aptos-sdk types for correct serialization
+        let raw_transaction = self.build_raw_transaction(
+            sender,
+            sequence_number,
+            expiration_secs,
+            module_address,
+            commitment,
+        ).map_err(|e| format!("Failed to build raw transaction: {}", e))?;
 
-        // Sign with Ed25519
-        let signature = signing_key.sign(&message);
+        // Serialize to BCS format for signing
+        let signing_bytes = bcs::to_bytes(&raw_transaction)
+            .map_err(|e| format!("BCS serialization failed: {}", e))?;
+
+        // Sign with Ed25519 using the BCS-serialized transaction bytes
+        let signature = signing_key.sign(&signing_bytes);
         let public_key = signing_key.verifying_key().to_bytes();
 
         // Build the final signed transaction JSON
@@ -420,7 +481,7 @@ impl AnchorLayer for AptosAnchorLayer {
                 .event_builder
                 .build(*commitment.as_bytes(), seal.account_address);
 
-            // Return simulated anchor
+            // Return fallback anchor
             Ok(AptosAnchorRef::new(0, seal.account_address, 0))
         }
     }
@@ -639,7 +700,7 @@ mod tests {
     use super::*;
 
     fn test_adapter() -> AptosAnchorLayer {
-        AptosAnchorLayer::with_mock().unwrap()
+        AptosAnchorLayer::with_test().unwrap()
     }
 
     #[test]
@@ -678,20 +739,20 @@ mod tests {
         use ed25519_dalek::SigningKey;
 
         let config = AptosConfig::default();
-        let mock = crate::rpc::MockAptosRpc::new(5000);
+        let test_rpc = crate::rpc::MockAptosRpc::new(5000);
 
-        // Register the seal resource in the mock so verify_seal_available finds it
+        // Register the seal resource in the test RPC so verify_seal_available finds it
         let resource_type = format!(
             "{}::csv_seal::{}",
             config.seal_contract.module_address, config.seal_contract.seal_resource
         );
-        mock.set_resource(
+        test_rpc.set_resource(
             [1u8; 32],
             resource_type.as_str(),
             crate::rpc::AptosResource { data: vec![0u8; 8] },
         );
 
-        let rpc = Box::new(mock);
+        let rpc = Box::new(test_rpc);
         let signing_key = SigningKey::from_bytes(&[1u8; 32]);
         let adapter = AptosAnchorLayer::from_config(config.clone(), rpc)
             .unwrap()
@@ -710,20 +771,20 @@ mod tests {
         use ed25519_dalek::SigningKey;
 
         let config = AptosConfig::default();
-        let mock = crate::rpc::MockAptosRpc::new(5000);
+        let test_rpc = crate::rpc::MockAptosRpc::new(5000);
 
-        // Register the seal resource in the mock
+        // Register the seal resource in the test RPC
         let resource_type = format!(
             "{}::csv_seal::{}",
             config.seal_contract.module_address, config.seal_contract.seal_resource
         );
-        mock.set_resource(
+        test_rpc.set_resource(
             [1u8; 32],
             resource_type.as_str(),
             crate::rpc::AptosResource { data: vec![0u8; 8] },
         );
 
-        let rpc = Box::new(mock);
+        let rpc = Box::new(test_rpc);
         let signing_key = SigningKey::from_bytes(&[1u8; 32]);
         let adapter = AptosAnchorLayer::from_config(config.clone(), rpc)
             .unwrap()

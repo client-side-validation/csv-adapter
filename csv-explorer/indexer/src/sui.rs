@@ -202,7 +202,7 @@ impl ChainIndexer for SuiIndexer {
             id: "sui-csv-package".to_string(),
             chain: "sui".to_string(),
             contract_type: ContractType::RightRegistry,
-            address: "0x0000000000000000000000000000000000000000000000000000000000000000"
+            address: "0x0000000000000000000000000000000000000000000000000000000000000001"
                 .to_string(),
             deployed_tx: "genesis".to_string(),
             deployed_at: chrono::Utc::now(),

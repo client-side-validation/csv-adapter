@@ -246,7 +246,7 @@ fn AddAccountTab() -> Element {
                             value: "{name_input.read()}",
                             oninput: move |evt| name_input.set(evt.value()),
                             class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500",
-                            placeholder: "e.g., My BTC Wallet"
+                            r#type: "text"
                         }
                     }
 
@@ -257,7 +257,7 @@ fn AddAccountTab() -> Element {
                             oninput: move |evt| { pk_input.set(evt.value()); error.set(None); },
                             class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-gray-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none",
                             rows: 3,
-                            placeholder: "Enter hex-encoded private key or generate one..."
+                            r#type: "text"
                         }
                         button {
                             onclick: move |_| {

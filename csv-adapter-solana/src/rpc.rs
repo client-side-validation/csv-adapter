@@ -47,6 +47,12 @@ pub trait SolanaRpc: Send + Sync {
 
     /// Get minimum balance for rent exemption
     async fn get_minimum_balance_for_rent_exemption(&self, data_len: usize) -> SolanaResult<u64>;
+
+    /// Get recent blockhash for transaction
+    async fn get_recent_blockhash(&self) -> SolanaResult<solana_sdk::hash::Hash>;
+
+    /// Get balance for account
+    async fn get_balance(&self, pubkey: &Pubkey) -> SolanaResult<u64>;
 }
 
 /// Real RPC client implementation using solana-rpc-client
@@ -190,6 +196,18 @@ impl SolanaRpc for RealSolanaRpc {
             .get_minimum_balance_for_rent_exemption(data_len)
             .map_err(|e| SolanaError::Rpc(format!("Failed to get rent exemption: {}", e)))
     }
+
+    async fn get_recent_blockhash(&self) -> SolanaResult<solana_sdk::hash::Hash> {
+        self.client
+            .get_latest_blockhash()
+            .map_err(|e| SolanaError::Rpc(format!("Failed to get recent blockhash: {}", e)))
+    }
+
+    async fn get_balance(&self, pubkey: &Pubkey) -> SolanaResult<u64> {
+        self.client
+            .get_balance(pubkey)
+            .map_err(|e| SolanaError::Rpc(format!("Failed to get balance for {}: {}", pubkey, e)))
+    }
 }
 
 /// Mock RPC client for testing
@@ -207,14 +225,14 @@ impl Default for MockSolanaRpc {
 
 #[cfg(test)]
 impl MockSolanaRpc {
-    /// Create new mock RPC
+    /// Create new test RPC
     pub fn new() -> Self {
         Self {
             accounts: std::collections::HashMap::new(),
         }
     }
 
-    /// Add account to mock
+    /// Add account to test RPC
     pub fn add_account(&mut self, pubkey: Pubkey, account: Account) {
         self.accounts.insert(pubkey, account);
     }
@@ -276,5 +294,14 @@ impl SolanaRpc for MockSolanaRpc {
     async fn get_minimum_balance_for_rent_exemption(&self, _data_len: usize) -> SolanaResult<u64> {
         // Mock value - rent exemption for typical program size
         Ok(6_900_000_000)
+    }
+
+    async fn get_recent_blockhash(&self) -> SolanaResult<solana_sdk::hash::Hash> {
+        Ok(solana_sdk::hash::Hash::default())
+    }
+
+    async fn get_balance(&self, pubkey: &Pubkey) -> SolanaResult<u64> {
+        // Return mock balance from accounts or default
+        Ok(self.accounts.get(pubkey).map(|a| a.lamports).unwrap_or(1_000_000_000))
     }
 }

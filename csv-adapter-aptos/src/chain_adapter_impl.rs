@@ -338,7 +338,7 @@ pub fn create_aptos_adapter(config: &ChainConfig) -> ChainResult<AptosAnchorLaye
 
     let aptos_config = AptosConfig::new(network);
 
-    // In test builds, use mock RPC
+    // In test builds, use test RPC
     #[cfg(test)]
     {
         use crate::rpc::MockAptosRpc;
@@ -373,7 +373,7 @@ mod tests {
 
     #[test]
     fn test_aptos_adapter_chain_id() {
-        let adapter = AptosAnchorLayer::with_mock().unwrap();
+        let adapter = AptosAnchorLayer::with_test().unwrap();
         assert_eq!(adapter.chain_id(), "aptos");
         assert_eq!(adapter.chain_name(), "Aptos");
     }

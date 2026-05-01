@@ -265,7 +265,7 @@ impl ChainBroadcaster for BitcoinChainBroadcaster {
 
     async fn validate_transaction(&self, _tx_data: &[u8]) -> ChainOpResult<()> {
         // Validate a transaction before submission
-        // Bitcoin doesn't support transaction simulation
+        // Bitcoin doesn't support transaction pre-validation
         Ok(())
     }
 }

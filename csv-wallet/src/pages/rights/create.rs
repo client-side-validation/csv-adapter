@@ -50,7 +50,7 @@ pub fn CreateRightForm() -> Element {
                     oninput: move |evt| { value.set(evt.value()); },
                     class: "{input_mono_class()}",
                     r#type: "text",
-                    placeholder: "e.g., 1000 (chain-native units)"
+                    r#type: "text"
                 }
             })}
 

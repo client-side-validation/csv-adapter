@@ -315,10 +315,10 @@ mod tests {
     #[async_trait]
     impl ChainIndexer for MockIndexer {
         fn chain_id(&self) -> &str {
-            "mock"
+            "test"
         }
         fn chain_name(&self) -> &str {
-            "Mock Chain"
+            "Test Chain"
         }
         async fn initialize(&self) -> ChainResult<()> {
             Ok(())
@@ -398,9 +398,9 @@ mod tests {
     fn test_registry_register_and_create() {
         let mut registry = IndexerPluginRegistry::new();
 
-        registry.register("mock", |_config, _rpc| Box::new(MockIndexer));
+        registry.register("test", |_config, _rpc| Box::new(MockIndexer));
 
-        assert!(registry.is_registered("mock"));
+        assert!(registry.is_registered("test"));
         assert_eq!(registry.indexer_count(), 1);
     }
 
@@ -408,9 +408,9 @@ mod tests {
     fn test_registry_unregister() {
         let mut registry = IndexerPluginRegistry::new();
 
-        registry.register("mock", |_config, _rpc| Box::new(MockIndexer));
-        assert!(registry.unregister("mock"));
-        assert!(!registry.is_registered("mock"));
-        assert!(!registry.unregister("mock")); // Already removed
+        registry.register("test", |_config, _rpc| Box::new(MockIndexer));
+        assert!(registry.unregister("test"));
+        assert!(!registry.is_registered("test"));
+        assert!(!registry.unregister("test")); // Already removed
     }
 }

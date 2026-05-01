@@ -45,7 +45,7 @@ pub fn AddContract() -> Element {
                         value: "{contract_address.read()}",
                         oninput: move |evt| { contract_address.set(evt.value()); error.set(None); },
                         class: "{input_mono_class()}",
-                        placeholder: "0x..."
+                        r#type: "text"
                     }
                 })}
 
@@ -54,7 +54,7 @@ pub fn AddContract() -> Element {
                         value: "{tx_hash.read()}",
                         oninput: move |evt| { tx_hash.set(evt.value()); },
                         class: "{input_mono_class()}",
-                        placeholder: "0x..."
+                        r#type: "text"
                     }
                 })}
 

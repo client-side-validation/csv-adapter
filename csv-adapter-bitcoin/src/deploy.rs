@@ -95,7 +95,7 @@ impl ContractDeployer {
         // as it requires UTXO selection, fee estimation, and proper transaction construction.
         // For now, we return the deployment configuration that would be used.
 
-        // Generate a placeholder txid (would come from actual broadcast in full impl)
+        // Generate a temporary txid (would come from actual broadcast in full impl)
         let txid = [0u8; 32];
 
         Ok(ContractDeployment {

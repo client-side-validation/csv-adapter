@@ -72,39 +72,47 @@ fn cmd_create(
         .build()
         .map_err(|e| anyhow::anyhow!("Failed to create CSV client: {}", e))?;
 
-    // Create a seal by creating a placeholder Right (which creates a seal)
+    // Create a seal by creating a basic Right (which creates a seal)
     let rights = client.rights();
 
-    // Generate a dummy commitment for seal creation
-    let commitment = csv_adapter_core::Hash::zero();
+    // Generate a commitment for seal creation
+    let commitment = csv_adapter_core::Hash::new(generate_commitment());
 
     // Create the right (which internally creates a seal via the facade)
-    // Note: This is a simplified implementation - full implementation would
-    // expose seal creation directly in the facade API
-    output::info(&format!("Creating seal on {:?} via facade...", core_chain));
-    output::info("Seal creation requires chain adapter integration.");
+    match rights.create(commitment, core_chain) {
+        Ok(right) => {
+            let seal_id = hex::encode(right.id.as_bytes());
+            let value_sat = value.unwrap_or(100_000);
 
-    // Store placeholder seal reference
-    let seal_id = format!("seal_{}_{}", chain, chrono::Utc::now().timestamp());
-    let seal_hex = hex::encode(&seal_id);
+            output::kv("Chain", &chain.to_string());
+            output::kv("Seal ID", &seal_id[..16.min(seal_id.len())]);
+            output::kv("Value", &format!("{} satoshis", value_sat));
+            output::kv("Right ID", &hex::encode(right.id.as_bytes())[..16]);
+            output::success("Seal created successfully via facade");
 
-    let value_sat = value.unwrap_or(100_000);
-
-    output::kv("Chain", &chain.to_string());
-    output::kv("Seal ID", &seal_hex[..16.min(seal_hex.len())]);
-    output::kv("Value", &format!("{} satoshis", value_sat));
-    output::info("Seal recorded (facade integration pending)");
-
-    // Record in state
-    state.storage.seals.push(SealRecord {
-        seal_ref: seal_hex,
-        chain,
-        value: value_sat,
-        consumed: false,
-        created_at: chrono::Utc::now().timestamp() as u64,
-    });
+            // Record in state
+            state.storage.seals.push(SealRecord {
+                seal_ref: seal_id,
+                chain,
+                value: value_sat,
+                consumed: false,
+                created_at: chrono::Utc::now().timestamp() as u64,
+            });
+        }
+        Err(e) => {
+            return Err(anyhow::anyhow!("Failed to create seal via facade: {}", e));
+        }
+    }
 
     Ok(())
+}
+
+/// Generate a random 32-byte commitment for seal creation.
+fn generate_commitment() -> [u8; 32] {
+    use rand::RngCore;
+    let mut bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    bytes
 }
 
 fn cmd_consume(
@@ -116,17 +124,47 @@ fn cmd_consume(
 
     let seal_bytes = hex::decode(seal_ref.trim_start_matches("0x"))
         .map_err(|e| anyhow::anyhow!("Invalid seal reference: {}", e))?;
+    let seal_hex = hex::encode(&seal_bytes);
 
-    if state.is_seal_consumed(&hex::encode(&seal_bytes)) {
+    if state.is_seal_consumed(&seal_hex) {
         output::error("Seal already consumed");
         return Err(anyhow::anyhow!("Seal replay detected"));
     }
 
-    state.record_seal_consumption(hex::encode(&seal_bytes));
+    let core_chain = to_core_chain(chain);
 
-    output::kv("Chain", &chain.to_string());
-    output::kv_hash("Seal", &seal_bytes);
-    output::success("Seal consumed");
+    // Use facade to consume the seal
+    let client = CsvClient::builder()
+        .with_chain(core_chain)
+        .build()
+        .map_err(|e| anyhow::anyhow!("Failed to create CSV client: {}", e))?;
+
+    // Find the right associated with this seal and burn it (consuming the seal)
+    let rights = client.rights();
+
+    // Create a RightId from the seal reference
+    let right_id_bytes: [u8; 32] = seal_bytes[..32.min(seal_bytes.len())]
+        .try_into()
+        .unwrap_or_else(|_| {
+            let mut padded = [0u8; 32];
+            padded[..seal_bytes.len().min(32)].copy_from_slice(&seal_bytes[..seal_bytes.len().min(32)]);
+            padded
+        });
+    let right_id = csv_adapter_core::RightId::new(right_id_bytes);
+
+    // Burn the right, which consumes the seal
+    match rights.burn(&right_id) {
+        Ok(()) => {
+            state.record_seal_consumption(seal_hex.clone());
+
+            output::kv("Chain", &chain.to_string());
+            output::kv_hash("Seal", &seal_bytes);
+            output::success("Seal consumed via facade");
+        }
+        Err(e) => {
+            return Err(anyhow::anyhow!("Failed to consume seal via facade: {}", e));
+        }
+    }
 
     Ok(())
 }
@@ -141,14 +179,62 @@ fn cmd_verify(
     let seal_bytes = hex::decode(seal_ref.trim_start_matches("0x"))
         .map_err(|e| anyhow::anyhow!("Invalid seal reference: {}", e))?;
 
-    let consumed = state.is_seal_consumed(&hex::encode(&seal_bytes));
+    let core_chain = to_core_chain(chain);
 
-    output::kv("Chain", &chain.to_string());
-    output::kv_hash("Seal", &seal_bytes);
-    output::kv("Status", if consumed { "Consumed" } else { "Unconsumed" });
+    // Use facade to verify seal status
+    let client = CsvClient::builder()
+        .with_chain(core_chain)
+        .build()
+        .map_err(|e| anyhow::anyhow!("Failed to create CSV client: {}", e))?;
 
-    if !consumed {
-        output::info("Seal is available for use");
+    // Query the right status via the rights manager
+    let rights = client.rights();
+
+    // Create a RightId from the seal reference
+    let right_id_bytes: [u8; 32] = seal_bytes[..32.min(seal_bytes.len())]
+        .try_into()
+        .unwrap_or_else(|_| {
+            let mut padded = [0u8; 32];
+            padded[..seal_bytes.len().min(32)].copy_from_slice(&seal_bytes[..seal_bytes.len().min(32)]);
+            padded
+        });
+    let right_id = csv_adapter_core::RightId::new(right_id_bytes);
+
+    // Check if the right exists and get its status
+    let local_consumed = state.is_seal_consumed(&hex::encode(&seal_bytes));
+
+    match rights.get(&right_id) {
+        Ok(Some(right)) => {
+            // Right exists in the system
+            let status = if local_consumed || right.consumed { "Consumed" } else { "Unconsumed" };
+            output::kv("Chain", &chain.to_string());
+            output::kv_hash("Seal", &seal_bytes);
+            output::kv("Status", status);
+            output::kv("Right ID", &hex::encode(right.id.as_bytes())[..16]);
+
+            if !local_consumed && !right.consumed {
+                output::info("Seal is available for use");
+            }
+        }
+        Ok(None) => {
+            // Right not found in the system
+            output::kv("Chain", &chain.to_string());
+            output::kv_hash("Seal", &seal_bytes);
+            output::kv("Status", if local_consumed { "Consumed" } else { "Unknown" });
+
+            if local_consumed {
+                output::info("Seal was consumed locally but not found in facade");
+            } else {
+                output::warning("Seal not found in the system");
+            }
+        }
+        Err(e) => {
+            // Query failed, fall back to local state
+            output::warning(&format!("Facade query failed: {}", e));
+            output::kv("Chain", &chain.to_string());
+            output::kv_hash("Seal", &seal_bytes);
+            output::kv("Status", if local_consumed { "Consumed" } else { "Unconsumed" });
+        }
     }
 
     Ok(())

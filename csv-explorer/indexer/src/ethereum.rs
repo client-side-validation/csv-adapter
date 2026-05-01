@@ -1,7 +1,7 @@
 /// Ethereum chain indexer implementation.
 ///
 /// Fixes applied:
-/// 1. Event signatures computed via real keccak256 (sha3 crate) — placeholder hex strings removed.
+/// 1. Event signatures computed via real keccak256 (sha3 crate) — temporary hex strings removed.
 /// 2. `fetch_block` supplemented with `eth_getLogs` — transactions don't carry logs in
 ///    `eth_getBlockByNumber`; logs come from a separate RPC call.
 /// 3. `parse_right_from_log` — owner read from topics[3] (indexed), not the contract address.

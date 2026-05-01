@@ -423,7 +423,7 @@ impl WalletContext {
             .find(|a| a.id == account_id)
         {
             // Generate a new address for the account
-            // For now, this is a placeholder - actual implementation would derive a new address
+            // For now, this is a basic implementation - actual implementation would derive a new address
             // based on the chain type and account's keys
             let _new_address = format!("{}_refreshed", &account.address[..8]);
             // account.address = new_address;

@@ -436,7 +436,7 @@ impl Schema {
                     vec![],
                     vec![10],
                     vec![1],
-                    vec![0x01], // placeholder script
+                    vec![0x01], // initial script
                 ),
                 // Transfer: consumes asset, produces asset outputs
                 TransitionDef::new(
@@ -445,7 +445,7 @@ impl Schema {
                     vec![10],
                     vec![10],
                     vec![],
-                    vec![0x02], // placeholder script
+                    vec![0x02], // initial script
                 ),
                 // Burn: consumes asset, no outputs
                 TransitionDef::new(
@@ -454,7 +454,7 @@ impl Schema {
                     vec![10],
                     vec![],
                     vec![1],    // updates supply
-                    vec![0x03], // placeholder script
+                    vec![0x03], // initial script
                 ),
             ],
             vec![0x00], // minimal root script

@@ -176,7 +176,7 @@ pub fn Home() -> Element {
                 div { class: "flex gap-2",
                     input {
                         r#type: "text",
-                        placeholder: "Enter ID or address...",
+                        r#type: "text",
                         class: "flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     }
                     button { class: "px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors",

@@ -347,7 +347,7 @@ pub fn DeployContract() -> Element {
                             value: "{deployer_key.read()}",
                             oninput: move |evt| { deployer_key.set(evt.value()); error.set(None); },
                             class: "{input_mono_class()}",
-                            placeholder: "0x..."
+                            r#type: "text"
                         }
                     })}
                 }
@@ -389,7 +389,7 @@ pub fn DeployContract() -> Element {
 
                             let chain_name_str = chain_name(&selected_chain.read());
                             result.set(Some(format!(
-                                "Contract deployed successfully on {}!\n\nAddress: {}\n\nNote: This is a simulation. Real deployment would:\n1. Upload {} bytes of bytecode\n2. Execute deployment transaction\n3. Wait for confirmation",
+                                "Contract deployed successfully on {}!\n\nAddress: {}\n\nNote: This is a preview. Real deployment would:\n1. Upload {} bytes of bytecode\n2. Execute deployment transaction\n3. Wait for confirmation",
                                 chain_name_str,
                                 addr,
                                 main_contract_file.read().as_ref().map(|f| f.content.len()).unwrap_or(0)

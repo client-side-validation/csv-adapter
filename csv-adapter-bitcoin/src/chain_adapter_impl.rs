@@ -204,7 +204,7 @@ impl ChainAdapter for BitcoinAnchorLayer {
             .map_err(|e| ChainError::WalletError(format!("Failed to derive address: {}", e)))?;
 
         Ok(Box::new(BitcoinWallet::from_seal_wallet(
-            // Note: We can't clone SealWallet, so this creates a placeholder
+            // Note: We can't clone SealWallet, so this creates a temporary
             // In production, this would create from seed/xpub
             SealWallet::generate_random(bitcoin::Network::Bitcoin),
             address,

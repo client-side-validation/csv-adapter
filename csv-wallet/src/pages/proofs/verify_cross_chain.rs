@@ -34,7 +34,7 @@ pub fn VerifyCrossChainProof() -> Element {
                         value: "{proof_input.read()}",
                         oninput: move |evt| { proof_input.set(evt.value()); },
                         class: "{input_class()} h-40 font-mono text-xs",
-                        placeholder: "Paste the cross-chain proof JSON here..."
+                        r#type: "text"
                     }
                 })}
 

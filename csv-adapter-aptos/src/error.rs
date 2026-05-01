@@ -37,7 +37,7 @@ pub enum AptosError {
     CheckpointFailed(String),
 
     /// Transaction submission or execution failed.
-    /// Recovery: Check transaction simulation error, adjust gas parameters.
+    /// Recovery: Check transaction dry-run error, adjust gas parameters.
     #[error("Transaction failed: {0}")]
     TransactionFailed(String),
 
@@ -225,7 +225,7 @@ impl HasErrorSuggestion for AptosError {
             AptosError::TransactionFailed(_) => Some(FixAction::Retry {
                 parameter_changes: std::collections::HashMap::from([
                     ("check_gas".to_string(), "true".to_string()),
-                    ("simulate_first".to_string(), "true".to_string()),
+                    ("dry_run_first".to_string(), "true".to_string()),
                     ("update_sequence".to_string(), "true".to_string()),
                 ]),
             }),

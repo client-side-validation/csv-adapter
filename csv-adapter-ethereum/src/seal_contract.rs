@@ -182,13 +182,13 @@ mod tests {
         let calldata = CsvSealAbi::encode_mark_seal_used([1u8; 32], [2u8; 32]);
         assert_eq!(calldata.len(), 4 + 32 + 32);
         // Selector is first 4 bytes of keccak256("markSealUsed(bytes32,bytes32)")
-        assert_ne!(&calldata[..4], &[0xDE, 0xAD, 0xBE, 0xEF]); // No longer placeholder
+        assert_ne!(&calldata[..4], &[0xDE, 0xAD, 0xBE, 0xEF]); // No longer temporary
     }
 
     #[test]
     fn test_seal_used_signature_is_valid_keccak() {
         let sig = CsvSealAbi::seal_used_event_signature();
-        // Should not be all zeros or the old placeholder
+        // Should not be all zeros or the old temporary value
         assert!(sig.iter().any(|&b| b != 0));
         assert_ne!(sig, [0u8; 32]);
     }

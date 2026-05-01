@@ -603,7 +603,7 @@ pub fn CrossChainTransfer() -> Element {
                         value: "{dest_owner.read()}",
                         oninput: move |evt| { dest_owner.set(evt.value()); },
                         class: "{input_mono_class()}",
-                        placeholder: "0x... (defaults to your address)",
+                        r#type: "text",
                         disabled: *executing.read(),
                     }
                 })}

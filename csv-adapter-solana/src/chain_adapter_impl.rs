@@ -252,7 +252,7 @@ impl ChainAdapter for SolanaAnchorLayer {
         // If RPC is configured, wrap it
         if let Some(rpc) = self.rpc_client.as_ref() {
             // Clone the RPC client reference - we can't easily clone Box<dyn SolanaRpc>
-            // so this is a placeholder
+            // so this is a basic implementation
             let _ = rpc;
         }
 

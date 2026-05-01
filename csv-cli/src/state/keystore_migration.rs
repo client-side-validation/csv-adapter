@@ -1,10 +1,10 @@
-//! Keystore migration module (stub - no migration functionality).
+//! Keystore migration module (basic - no migration functionality).
 
-/// Stub migration manager.
+/// Basic migration manager.
 pub struct KeystoreMigration;
 
 impl KeystoreMigration {
-    /// Create a new stub instance.
+    /// Create a new basic instance.
     pub fn new() -> Self {
         Self
     }

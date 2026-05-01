@@ -40,7 +40,7 @@ pub fn GenerateProof() -> Element {
                         value: "{right_id.read()}",
                         oninput: move |evt| { right_id.set(evt.value()); },
                         class: "{input_mono_class()}",
-                        placeholder: "0x..."
+                        r#type: "text"
                     }
                 })}
 
@@ -60,7 +60,7 @@ pub fn GenerateProof() -> Element {
                             "chain": selected_chain.read().to_string(),
                             "right_id": right_id.read().clone(),
                             "proof_type": proof_type,
-                            "data": "proof_data_placeholder"
+                            "data": "proof_data_value"
                         });
                         let formatted = serde_json::to_string_pretty(&proof_json).unwrap_or_default();
                         result.set(Some(formatted));

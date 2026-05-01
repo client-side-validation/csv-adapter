@@ -66,7 +66,7 @@ impl WalletConnectionContext {
         }
 
         // Real implementation would call eth_requestAccounts via JS interop
-        // For now, simulate success
+        // For now, assume success
         match wallet_connection::connect_metamask().await {
             Ok(wallet) => {
                 let mut state = self.state.write();

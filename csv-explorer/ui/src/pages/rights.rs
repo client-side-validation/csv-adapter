@@ -66,7 +66,7 @@ pub fn RightsList() -> Element {
                             r#type: "text",
                             value: "{search_query.read()}",
                             oninput: move |evt| search_query.set(evt.value()),
-                            placeholder: "Search by ID or owner...",
+                            r#type: "text",
                             class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         }
                     }

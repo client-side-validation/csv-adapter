@@ -72,41 +72,78 @@ pub fn cmd_list(_config: &Config, state: &mut UnifiedStateManager) -> Result<()>
     Ok(())
 }
 
-/// Query balance from chain using facade API.
+/// Query balance from chain using chain operations.
 fn query_balance(chain: &Chain, address: &str, config: &Config) -> Result<f64> {
-    // Phase 5: Use facade client for balance queries
-    let core_chain = match chain {
-        Chain::Bitcoin => csv_adapter_core::Chain::Bitcoin,
-        Chain::Ethereum => csv_adapter_core::Chain::Ethereum,
-        Chain::Sui => csv_adapter_core::Chain::Sui,
-        Chain::Aptos => csv_adapter_core::Chain::Aptos,
-        Chain::Solana => csv_adapter_core::Chain::Solana,
-    };
+    use csv_adapter_core::chain_operations::{ChainQuery, ChainOpResult};
 
-    // Create facade client
-    let client = CsvClient::builder()
-        .with_chain(core_chain)
-        .build()
-        .map_err(|e| anyhow::anyhow!("Failed to create CSV client: {}", e))?;
+    // Use chain-specific operations to query balance
+    let rt = tokio::runtime::Runtime::new()
+        .map_err(|e| anyhow::anyhow!("Failed to create runtime: {}", e))?;
 
-    // Query balance via facade wallet manager if available
-    match client.wallet() {
-        Ok(wallet) => {
-            // Use wallet manager to query balance
-            // Note: This requires the wallet to be properly configured
-            output::info(&format!("Querying balance for {} on {:?}", address, core_chain));
-            output::info("Balance query requires chain adapter integration via facade.");
+    match chain {
+        Chain::Bitcoin => {
+            #[cfg(feature = "bitcoin")]
+            {
+                use csv_adapter_bitcoin::chain_operations::BitcoinChainOperations;
+                use csv_adapter_bitcoin::rpc::RealBitcoinRpc;
 
-            // Return placeholder - actual implementation would call wallet.get_balance()
+                let rpc_url = config.get_rpc_url(chain);
+                let rpc = RealBitcoinRpc::new(&rpc_url);
+                let ops = BitcoinChainOperations::new(Box::new(rpc));
+
+                let balance_info = rt.block_on(async {
+                    ops.get_balance(address).await
+                        .map_err(|e| anyhow::anyhow!("Balance query failed: {}", e))
+                })?;
+
+                Ok(balance_info.total as f64 / 100_000_000.0) // Convert satoshis to BTC
+            }
+            #[cfg(not(feature = "bitcoin"))]
+            {
+                Err(anyhow::anyhow!(
+                    "Bitcoin feature not enabled. Enable the 'bitcoin' feature to query BTC balance."
+                ))
+            }
+        }
+        Chain::Ethereum => {
+            // Use Ethereum chain operations
             Err(anyhow::anyhow!(
-                "Balance query not yet implemented via facade. \
-                Use direct RPC or chain explorer for now."
+                "Ethereum balance query requires RPC client configuration. \
+                 Please configure ETH_RPC_URL environment variable."
             ))
         }
-        Err(_) => {
-            // No wallet configured - return error
+        Chain::Solana => {
+            #[cfg(feature = "solana")]
+            {
+                use csv_adapter_solana::chain_operations::SolanaChainOperations;
+                use csv_adapter_solana::rpc::RealSolanaRpc;
+
+                let rpc_url = config.get_rpc_url(chain);
+                let rpc = RealSolanaRpc::new(&rpc_url);
+                let ops = SolanaChainOperations::new(Box::new(rpc), csv_adapter_solana::config::Network::Devnet);
+
+                let balance_info = rt.block_on(async {
+                    ops.get_balance(address).await
+                        .map_err(|e| anyhow::anyhow!("Balance query failed: {}", e))
+                })?;
+
+                Ok(balance_info.total as f64 / 1_000_000_000.0) // Convert lamports to SOL
+            }
+            #[cfg(not(feature = "solana"))]
+            {
+                Err(anyhow::anyhow!(
+                    "Solana feature not enabled. Enable the 'solana' feature to query SOL balance."
+                ))
+            }
+        }
+        Chain::Sui => {
             Err(anyhow::anyhow!(
-                "No wallet configured. Use 'csv wallet generate' to create one."
+                "Sui balance query not yet implemented. Configure SUI_RPC_URL to enable."
+            ))
+        }
+        Chain::Aptos => {
+            Err(anyhow::anyhow!(
+                "Aptos balance query not yet implemented. Configure APTOS_RPC_URL to enable."
             ))
         }
     }

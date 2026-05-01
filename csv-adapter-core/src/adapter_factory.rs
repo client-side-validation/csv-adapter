@@ -107,10 +107,10 @@ impl AdapterFactory {
         //     if let Some(cfg) = config {
         //         match csv_adapter_ethereum::create_ethereum_adapter(&cfg) {
         //             Ok(adapter) => Box::new(adapter),
-        //             Err(_) => Box::new(EthereumAnchorLayer::with_mock().unwrap()),
+        //             Err(_) => Box::new(EthereumAnchorLayer::with_test().unwrap()),
         //         }
         //     } else {
-        //         Box::new(EthereumAnchorLayer::with_mock().unwrap())
+        //         Box::new(EthereumAnchorLayer::with_test().unwrap())
         //     }
         // }));
 
@@ -137,10 +137,10 @@ impl AdapterFactory {
         //     if let Some(cfg) = config {
         //         match csv_adapter_sui::create_sui_adapter(&cfg) {
         //             Ok(adapter) => Box::new(adapter),
-        //             Err(_) => Box::new(SuiAnchorLayer::with_mock().unwrap()),
+        //             Err(_) => Box::new(SuiAnchorLayer::with_test().unwrap()),
         //         }
         //     } else {
-        //         Box::new(SuiAnchorLayer::with_mock().unwrap())
+        //         Box::new(SuiAnchorLayer::with_test().unwrap())
         //     }
         // }));
 
@@ -150,10 +150,10 @@ impl AdapterFactory {
         //     if let Some(cfg) = config {
         //         match csv_adapter_aptos::create_aptos_adapter(&cfg) {
         //             Ok(adapter) => Box::new(adapter),
-        //             Err(_) => Box::new(AptosAnchorLayer::with_mock().unwrap()),
+        //             Err(_) => Box::new(AptosAnchorLayer::with_test().unwrap()),
         //         }
         //     } else {
-        //         Box::new(AptosAnchorLayer::with_mock().unwrap())
+        //         Box::new(AptosAnchorLayer::with_test().unwrap())
         //     }
         // }));
     }
@@ -389,7 +389,7 @@ mod tests {
 
         // Register a custom chain
         factory.register("custom_chain", || {
-            Box::new(ScalableSolanaAdapter::new()) // Using Solana as placeholder
+            Box::new(ScalableSolanaAdapter::new()) // Using Solana as example
         });
 
         assert!(factory.is_supported("custom_chain"));

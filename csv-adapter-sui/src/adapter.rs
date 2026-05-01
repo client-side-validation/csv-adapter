@@ -246,9 +246,9 @@ impl SuiAnchorLayer {
         })
     }
 
-    /// Create a new adapter with mock RPC for testing (only in test builds).
+    /// Create a new adapter with test RPC for testing (only in test builds).
     #[cfg(test)]
-    pub fn with_mock() -> SuiResult<Self> {
+    pub fn with_test() -> SuiResult<Self> {
         let config = SuiConfig {
             seal_contract: crate::SealContractConfig {
                 package_id: Some(
@@ -554,7 +554,7 @@ impl AnchorLayer for SuiAnchorLayer {
                 .event_builder
                 .build(*commitment.as_bytes(), seal.object_id);
 
-            // Return simulated anchor
+            // Return fallback anchor
             Ok(SuiAnchorRef::new(seal.object_id, [0u8; 32], 0))
         }
     }
@@ -771,7 +771,7 @@ mod tests {
     use super::*;
 
     fn test_adapter() -> SuiAnchorLayer {
-        SuiAnchorLayer::with_mock().unwrap()
+        SuiAnchorLayer::with_test().unwrap()
     }
 
     #[test]

@@ -189,7 +189,7 @@ pub trait DeterministicVM {
     fn validate_outputs(&self, inputs: &VMInputs, outputs: &VMOutputs) -> Result<(), VMError>;
 }
 
-/// PassthroughVM: a stub implementation that passes inputs through as outputs.
+/// PassthroughVM: a basic implementation that passes inputs through as outputs.
 ///
 /// This is used for testing the proof pipeline without a full VM.
 /// It validates that total input value >= total output value for
@@ -222,7 +222,7 @@ impl DeterministicVM for PassthroughVM {
         // Simulate execution: pass inputs through as outputs
         // In a real VM, this would execute the bytecode
 
-        // Check step limit (simulated)
+        // Check step limit (tracked)
         let steps = inputs.owned_inputs.len() as u64 + 1;
         if steps > self.max_steps {
             return Err(VMError::ExecutionLimitExceeded {

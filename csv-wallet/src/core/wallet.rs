@@ -183,9 +183,9 @@ impl ExtendedWallet {
                 addresses.push((Chain::Bitcoin, address));
             }
             Err(e) => {
-                // Fallback to placeholder if derivation fails
-                eprintln!("Warning: Bitcoin address derivation failed: {}", e);
-                addresses.push((Chain::Bitcoin, "tb1p...".to_string()));
+                // Log error but don't add a sample address
+                eprintln!("Error: Bitcoin address derivation failed: {}", e);
+                // Don't add invalid placeholder - let caller handle the missing address
             }
         }
 

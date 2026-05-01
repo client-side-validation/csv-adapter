@@ -44,7 +44,7 @@ impl WalletHook {
     /// In production, this would interface with the CSV wallet SDK.
     pub async fn connect(&mut self) -> Result<(), WalletError> {
         // In production: interface with CSV wallet SDK
-        // For now, simulate a connection
+        // For now, use a test connection
         self.state.is_connected = true;
         self.state.address = Some("bc1qexampleaddress".to_string());
         self.state.rights_count = 0;

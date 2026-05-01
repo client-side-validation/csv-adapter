@@ -343,7 +343,7 @@ mod tests {
     }
 
     #[test]
-    fn test_program_deployment_placeholder() {
+    fn test_program_deployment_basic() {
         // Verify the deployment structure compiles
         let program_id = Pubkey::new_unique();
         let signature = Signature::new_unique();

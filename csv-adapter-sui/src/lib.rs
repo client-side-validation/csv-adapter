@@ -14,8 +14,8 @@
 //! ```no_run
 //! use csv_adapter_sui::{SuiAnchorLayer, SuiConfig, SuiNetwork};
 //!
-//! // Create adapter with mock RPC for testing
-//! let adapter = SuiAnchorLayer::with_mock().unwrap();
+//! // Create adapter with test RPC for testing
+//! let adapter = SuiAnchorLayer::with_test().unwrap();
 //!
 //! // Or with configuration
 //! let config = SuiConfig::new(SuiNetwork::Testnet);
