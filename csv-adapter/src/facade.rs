@@ -44,7 +44,7 @@ use csv_adapter_core::{
     Chain,
     FullChainAdapter, BalanceInfo, TransactionInfo, TransactionStatus,
     DeploymentStatus, RightOperationResult,
-    RightId, Hash
+    RightId, Hash, ProofBundle
 };
 
 use crate::client::ClientRef;
@@ -461,6 +461,41 @@ impl ChainFacade {
     /// Get the list of registered chains.
     pub fn registered_chains(&self) -> Vec<Chain> {
         self.adapters.keys().copied().collect()
+    }
+
+    /// Generate a proof for a right on the specified chain.
+    ///
+    /// This is a placeholder implementation for API compatibility.
+    pub async fn generate_proof(
+        &self,
+        chain: Chain,
+        _right_id: &RightId,
+    ) -> Result<ProofBundle, CsvError> {
+        let _adapter = self.get_adapter(chain)?;
+        // Placeholder: return an empty proof bundle
+        // In production, this would query the chain for inclusion proof
+        Err(CsvError::CapabilityUnavailable {
+            chain,
+            capability: "generate_proof".to_string(),
+        })
+    }
+
+    /// Verify a proof bundle for a cross-chain transfer.
+    ///
+    /// This is a placeholder implementation for API compatibility.
+    pub async fn verify_proof_bundle(
+        &self,
+        chain: Chain,
+        _proof_bundle: &ProofBundle,
+        _right_id: &RightId,
+    ) -> Result<bool, CsvError> {
+        let _adapter = self.get_adapter(chain)?;
+        // Placeholder: return false
+        // In production, this would verify the proof bundle
+        Err(CsvError::CapabilityUnavailable {
+            chain,
+            capability: "verify_proof_bundle".to_string(),
+        })
     }
 }
 

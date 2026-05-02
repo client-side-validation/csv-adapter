@@ -100,15 +100,14 @@ fn query_balance(chain: &Chain, address: &str, config: &Config) -> Result<f64> {
     let rt = tokio::runtime::Runtime::new()
         .map_err(|e| anyhow::anyhow!("Failed to create runtime: {}", e))?;
 
-    let address_bytes = hex::decode(address.strip_prefix("0x").unwrap_or(address))
-        .map_err(|e| anyhow::anyhow!("Invalid address format: {}", e))?;
+    let clean_address = address.strip_prefix("0x").unwrap_or(address);
 
     let balance_info = rt.block_on(async {
-        client.chain_facade().get_balance(core_chain, &address_bytes).await
+        client.chain_facade().get_balance(core_chain, clean_address).await
     });
 
     match balance_info {
-        Ok(balance_info) => Ok(balance_info.confirmed as f64 / 1e8), // Convert from satoshis to BTC for Bitcoin, adjust for other chains as needed
+        Ok(balance_info) => Ok(balance_info.available as f64 / 1e8), // Convert from satoshis to BTC for Bitcoin, adjust for other chains as needed
         Err(e) => {
             // Check if it's a configuration error
             if matches!(e, csv_adapter::CsvError::ChainNotEnabled(_)) {

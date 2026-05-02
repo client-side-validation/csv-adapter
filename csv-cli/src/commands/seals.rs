@@ -19,7 +19,7 @@ pub enum SealAction {
     Create {
         /// Chain name
         #[arg(value_enum)]
-        chain: Chain,
+        chain: ConfigChain,
         /// Value (chain-specific)
         #[arg(short, long)]
         value: Option<u64>,
@@ -28,7 +28,7 @@ pub enum SealAction {
     Consume {
         /// Chain name
         #[arg(value_enum)]
-        chain: Chain,
+        chain: ConfigChain,
         /// Seal reference (chain-specific format)
         seal_ref: String,
     },
@@ -36,7 +36,7 @@ pub enum SealAction {
     Verify {
         /// Chain name
         #[arg(value_enum)]
-        chain: Chain,
+        chain: ConfigChain,
         /// Seal reference
         seal_ref: String,
     },
@@ -44,7 +44,7 @@ pub enum SealAction {
     List {
         /// Filter by chain
         #[arg(short, long, value_enum)]
-        chain: Option<Chain>,
+        chain: Option<ConfigChain>,
     },
 }
 
@@ -64,7 +64,7 @@ fn cmd_create(
 ) -> Result<()> {
     output::header(&format!("Creating Seal on {}", chain));
 
-    let core_chain = to_core_chain(chain);
+    let core_chain = to_core_chain(chain.clone());
 
     // Phase 5: Use facade client to create seal via RightsManager
     let client = CsvClient::builder()
@@ -131,7 +131,7 @@ fn cmd_consume(
         return Err(anyhow::anyhow!("Seal replay detected"));
     }
 
-    let core_chain = to_core_chain(chain);
+    let core_chain = to_core_chain(chain.clone());
 
     // Use facade to consume the seal
     let client = CsvClient::builder()
@@ -179,7 +179,7 @@ fn cmd_verify(
     let seal_bytes = hex::decode(seal_ref.trim_start_matches("0x"))
         .map_err(|e| anyhow::anyhow!("Invalid seal reference: {}", e))?;
 
-    let core_chain = to_core_chain(chain);
+    let core_chain = to_core_chain(chain.clone());
 
     // Use facade to verify seal status
     let client = CsvClient::builder()
@@ -206,13 +206,13 @@ fn cmd_verify(
     match rights.get(&right_id) {
         Ok(Some(right)) => {
             // Right exists in the system
-            let status = if local_consumed || right.consumed { "Consumed" } else { "Unconsumed" };
+            let status = if local_consumed || right.nullifier.is_some() { "Consumed" } else { "Unconsumed" };
             output::kv("Chain", &chain.to_string());
             output::kv_hash("Seal", &seal_bytes);
             output::kv("Status", status);
             output::kv("Right ID", &hex::encode(right.id.as_bytes())[..16]);
 
-            if !local_consumed && !right.consumed {
+            if !local_consumed && right.nullifier.is_none() {
                 output::info("Seal is available for use");
             }
         }

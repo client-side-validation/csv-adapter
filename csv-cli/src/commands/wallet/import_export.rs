@@ -159,8 +159,8 @@ fn import_from_private_key(
     private_key: &str,
     state: &mut UnifiedStateManager,
 ) -> Result<()> {
-    use csv_adapter_keystore::keystore::{create_keystore, KeystoreFile};
-    use csv_adapter_keystore::memory::Passphrase;
+    use csv_adapter_keystore::keystore::{KeystoreFile, KdfType};
+    use csv_adapter_keystore::memory::{Passphrase, SecretKey};
 
     output::info("Importing from private key...");
     output::warning("Private key will be immediately encrypted and stored in keystore");
@@ -182,7 +182,10 @@ fn import_from_private_key(
 
     // Encrypt and store in keystore (production path)
     let passphrase = Passphrase::new(""); // In real usage, prompt for password
-    let keystore = create_keystore(&key_bytes, &passphrase)
+    let key_array: [u8; 32] = key_bytes.try_into()
+        .map_err(|_| anyhow::anyhow!("Invalid key length"))?;
+    let secret_key = SecretKey::new(key_array);
+    let keystore = KeystoreFile::encrypt(&secret_key, &passphrase, KdfType::default())
         .map_err(|e| anyhow::anyhow!("Failed to create keystore: {}", e))?;
 
     // Store keystore path instead of raw key

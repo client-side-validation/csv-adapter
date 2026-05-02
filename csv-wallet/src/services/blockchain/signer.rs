@@ -7,7 +7,11 @@
 
 use crate::services::blockchain::types::{BlockchainError, SignedTransaction, UnsignedTransaction};
 use crate::services::blockchain::wallet::NativeWallet;
-use csv_adapter::prelude::*;
+use csv_adapter::prelude::{
+    CsvClient, Chain as AdapterChain, Commitment, Hash, ProofBundle, Right, RightId,
+    CrossChainError, RightsManager, TransferManager, ProofManager, Wallet,
+};
+use csv_adapter::StoreBackend;
 use csv_adapter_core::Chain;
 use csv_adapter_core::chain_operations::ChainSigner;
 
@@ -57,7 +61,7 @@ impl TransactionSigner {
 
         // Delegate signing to the ChainSigner trait via the facade
         let signature = facade
-            .sign_transaction(chain, &tx_bytes, key_id.as_bytes())
+            .sign_transaction(chain, &tx_bytes, &key_id)
             .await
             .map_err(|e| BlockchainError {
                 message: format!("ChainSigner failed: {}", e),
@@ -89,7 +93,7 @@ impl TransactionSigner {
         let facade = client.chain_facade();
 
         // Use a default key ID for now - should come from keystore
-        let key_id = b"default";
+        let key_id = "default";
 
         facade
             .sign_transaction(Chain::Bitcoin, unsigned_tx, key_id)
@@ -130,7 +134,7 @@ impl TransactionSigner {
             })?;
 
         facade
-            .sign_transaction(Chain::Sui, tx_bytes, key_id.as_bytes())
+            .sign_transaction(Chain::Sui, tx_bytes, &key_id)
             .await
             .map_err(|e| BlockchainError {
                 message: format!("Sui signing failed: {}", e),
@@ -158,7 +162,7 @@ impl TransactionSigner {
             })?;
 
         facade
-            .sign_transaction(Chain::Aptos, tx_bytes, key_id.as_bytes())
+            .sign_transaction(Chain::Aptos, tx_bytes, &key_id)
             .await
             .map_err(|e| BlockchainError {
                 message: format!("Aptos signing failed: {}", e),
@@ -186,7 +190,7 @@ impl TransactionSigner {
             })?;
 
         facade
-            .sign_transaction(Chain::Solana, tx_bytes, key_id.as_bytes())
+            .sign_transaction(Chain::Solana, tx_bytes, &key_id)
             .await
             .map_err(|e| BlockchainError {
                 message: format!("Solana signing failed: {}", e),

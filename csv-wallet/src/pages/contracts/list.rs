@@ -55,7 +55,7 @@ pub fn Contracts() -> Element {
                                     match discover_contracts(account.chain, &account.address, &config.api_url, None).await {
                                         Ok(contracts) => {
                                             for c in contracts {
-                                                let c_addr = c.address.clone();
+                                                let c_addr = c.contract_address.clone();
                                                 // Use a deterministic tx_hash based on address
                                                 let tx_hash = format!("discovered_{}_{}", account.chain, &c_addr[..20.min(c_addr.len())]);
                                                 let contract = DeployedContract {

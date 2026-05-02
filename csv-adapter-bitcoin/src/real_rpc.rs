@@ -21,13 +21,20 @@ pub mod real_rpc {
     pub struct RealBitcoinRpc {
         client: Client,
         network: Network,
+        url: String,
+        auth: Auth,
     }
 
     impl RealBitcoinRpc {
         /// Create a new real RPC client (no auth — for local/public nodes)
         pub fn new(url: &str, network: Network) -> Result<Self, RealRpcError> {
             let client = Client::new(url, Auth::None)?;
-            Ok(Self { client, network })
+            Ok(Self {
+                client,
+                network,
+                url: url.to_string(),
+                auth: Auth::None,
+            })
         }
 
         /// Create with authentication
@@ -37,8 +44,14 @@ pub mod real_rpc {
             pass: &str,
             network: Network,
         ) -> Result<Self, RealRpcError> {
-            let client = Client::new(url, Auth::UserPass(user.into(), pass.into()))?;
-            Ok(Self { client, network })
+            let auth = Auth::UserPass(user.into(), pass.into());
+            let client = Client::new(url, auth.clone())?;
+            Ok(Self {
+                client,
+                network,
+                url: url.to_string(),
+                auth,
+            })
         }
 
         /// Get UTXOs for a specific Bitcoin address
@@ -252,11 +265,11 @@ pub mod real_rpc {
             // For RealBitcoinRpc, the client should be wrapped in Arc or use connection pooling.
             // For now, we create a new client with the same configuration.
             Box::new(RealBitcoinRpc {
-                client: Client::new(
-                    self.client.url().to_string(),
-                    self.client.auth().clone()
-                ).expect("Failed to clone RPC client"),
+                client: Client::new(&self.url, self.auth.clone())
+                    .expect("Failed to clone RPC client"),
                 network: self.network,
+                url: self.url.clone(),
+                auth: self.auth.clone(),
             })
         }
     }

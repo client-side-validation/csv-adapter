@@ -11,7 +11,11 @@
 //! This module is Production Guarantee Plan compliant - all operations
 //! go through the csv-adapter facade rather than duplicate implementations.
 
-use csv_adapter::prelude::*;
+use csv_adapter::prelude::{
+    CsvClient, Chain as AdapterChain, Commitment, Hash, ProofBundle, Right, RightId,
+    CrossChainError, RightsManager, TransferManager, ProofManager, Wallet,
+};
+use csv_adapter::StoreBackend;
 use csv_adapter_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
 use csv_adapter_core::Chain;
 use serde::{Deserialize, Serialize};
@@ -216,13 +220,11 @@ impl ChainApi {
         // Build CSV client with the requested chain enabled
         let client = self.get_or_build_client(chain).await?;
 
-        // Parse address to bytes
-        let address_bytes = self.parse_address_to_bytes(chain, address)?;
-
         // Query balance through the facade (delegates to ChainQuery trait)
+        // Note: get_balance expects the address as a string
         let balance_info = client
             .chain_facade()
-            .get_balance(chain, &address_bytes)
+            .get_balance(chain, address)
             .await
             .map_err(|e| ChainApiError::AdapterError(format!("Facade error: {}", e)))?;
 

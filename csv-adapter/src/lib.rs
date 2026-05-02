@@ -119,6 +119,9 @@ pub use errors::CsvError;
 /// Re-export client
 pub use client::CsvClient;
 
+/// Re-export builder types
+pub use builder::{ClientBuilder, StoreBackend};
+
 /// Re-export facade types
 pub use facade::{ChainFacade, AdapterFacade, AdapterConfig, AdapterBuilder};
 

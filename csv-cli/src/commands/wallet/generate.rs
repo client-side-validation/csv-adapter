@@ -134,7 +134,7 @@ fn generate_wallet_for_chain(
     };
 
     // Convert mnemonic to seed
-    let mnemonic_obj = Mnemonic::from_str(mnemonic)
+    let mnemonic_obj = Mnemonic::from_phrase(mnemonic)
         .map_err(|e| anyhow::anyhow!("Invalid mnemonic: {}", e))?;
     let seed = mnemonic_obj.to_seed(None);
 

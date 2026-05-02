@@ -28,6 +28,7 @@ pub use config::BlockchainConfig;
 pub use estimator::{FeeEstimator, FeePriority};
 #[allow(unused_imports)]
 pub use signer::TransactionSigner;
+pub use types::{ContractDeployment, ContractType};
 #[allow(unused_imports)]
 pub use submitter::TransactionSubmitter;
 pub use types::{BlockchainError};

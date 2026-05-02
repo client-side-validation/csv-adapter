@@ -96,7 +96,7 @@ in-memory = []
 wallet = ["dep:ed25519-dalek", "dep:bip32"]
 
 # Experimental features
-experimental = []
+experimental = ["csv-adapter-core/experimental"]
 
 [dev-dependencies]
 rand = "0.8"

@@ -36,6 +36,29 @@ use crate::tagged_hash::csv_tagged_hash;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RightId(pub Hash);
 
+impl RightId {
+    /// Creates a new RightId from a 32-byte hash.
+    #[inline]
+    pub fn new(bytes: [u8; 32]) -> Self {
+        Self(Hash::new(bytes))
+    }
+
+    /// Creates a new RightId from a byte slice.
+    /// Panics if the slice is not exactly 32 bytes.
+    #[inline]
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let array: [u8; 32] = bytes.try_into()
+            .expect("RightId::from_bytes requires exactly 32 bytes");
+        Self::new(array)
+    }
+
+    /// Returns the underlying hash bytes.
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        self.0.as_bytes()
+    }
+}
+
 /// Proof of ownership for a Right.
 ///
 /// On L1 chains (Bitcoin, Sui): this is the UTXO/Object ownership proof.

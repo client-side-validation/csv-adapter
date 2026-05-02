@@ -6,6 +6,7 @@ use crate::context::{
 };
 use crate::pages::common::*;
 use crate::routes::Route;
+use crate::services::blockchain::types::{ContractDeployment, ContractType};
 use csv_adapter_core::Chain;
 use dioxus::prelude::*;
 use std::rc::Rc;
@@ -270,12 +271,12 @@ pub fn CrossChainTransfer() -> Element {
                     if let Some(contract) = source_contracts.first() {
                         contracts.insert(
                             from,
-                            crate::services::blockchain::ContractDeployment {
+                            ContractDeployment {
                                 chain: from,
                                 contract_address: contract.address.clone(),
                                 tx_hash: contract.tx_hash.clone(),
                                 deployed_at: contract.deployed_at,
-                                contract_type: crate::services::blockchain::ContractType::Lock,
+                                contract_type: ContractType::Lock,
                             },
                         );
                     }
@@ -288,12 +289,12 @@ pub fn CrossChainTransfer() -> Element {
                     if let Some(contract) = target_contracts.get(selected_idx) {
                         contracts.insert(
                             to,
-                            crate::services::blockchain::ContractDeployment {
+                            ContractDeployment {
                                 chain: to,
                                 contract_address: contract.address.clone(),
                                 tx_hash: contract.tx_hash.clone(),
                                 deployed_at: contract.deployed_at,
-                                contract_type: crate::services::blockchain::ContractType::Lock,
+                                contract_type: ContractType::Lock,
                             },
                         );
                     }

@@ -73,7 +73,7 @@ pub fn execute(
 }
 
 /// Convert CLI Chain enum to core Chain enum
-fn to_core_chain(chain: ConfigChain) -> Chain {
+pub fn to_core_chain(chain: ConfigChain) -> Chain {
     match chain {
         ConfigChain::Bitcoin => Chain::Bitcoin,
         ConfigChain::Ethereum => Chain::Ethereum,

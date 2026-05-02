@@ -23,8 +23,8 @@ pub fn cmd_transfer(
     _config: &Config,
     state: &mut UnifiedStateManager,
 ) -> Result<()> {
-    let from_chain = to_core_chain(from);
-    let to_chain = to_core_chain(to);
+    let from_chain = to_core_chain(from.clone());
+    let to_chain = to_core_chain(to.clone());
 
     output::header(&format!("Cross-Chain Transfer: {:?} → {:?}", from_chain, to_chain));
 
@@ -82,18 +82,27 @@ pub fn cmd_transfer(
     output::info("Cross-chain transfer requires chain adapter integration.");
     output::info("Using facade API - implementation pending in chain adapters.");
 
+    // Clone for use in record after get_address call
+    let from_chain_clone = from.clone();
+    let sender = state.get_address(&from).map(|s| s.to_string());
+
     // Record transfer in state
     let transfer_record = TransferRecord {
         id: transfer_id.clone(),
-        source_chain: from,
+        source_chain: from_chain_clone,
         dest_chain: to,
         right_id: right_id_hash.to_string(),
-        sender_address: state.get_address(&from),
+        sender_address: sender,
         destination_address: Some(dest_addr),
-        status: TransferStatus::Pending,
-        created_at: chrono::Utc::now(),
+        source_tx_hash: None,
+        source_fee: None,
+        dest_tx_hash: None,
+        dest_fee: None,
+        destination_contract: None,
+        proof: None,
+        status: TransferStatus::Initiated,
+        created_at: chrono::Utc::now().timestamp() as u64,
         completed_at: None,
-        tx_hash: None,
     };
 
     state.add_transfer(transfer_record);

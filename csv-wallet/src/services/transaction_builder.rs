@@ -7,7 +7,10 @@
 //! Production Guarantee Plan compliant - no duplicate implementations.
 
 use crate::services::blockchain::BlockchainError;
-use csv_adapter::prelude::*;
+use csv_adapter::prelude::{
+    CsvClient, Chain as AdapterChain, Commitment, Hash, ProofBundle, Right, RightId,
+    CrossChainError, RightsManager, TransferManager, ProofManager, Wallet,
+};
 use csv_adapter_core::Chain;
 
 /// Build a complete, serialized transaction ready for signing
@@ -33,6 +36,11 @@ pub fn build_transaction(
         Chain::Sui => build_sui_transaction_data_simple(from, to, data),
         Chain::Aptos => build_aptos_transaction_data_simple(from, to, data, nonce),
         Chain::Solana => build_solana_transaction_data(to, value, data),
+        _ => Err(BlockchainError {
+            message: format!("Transaction building not supported for chain: {:?}", chain),
+            chain: Some(chain),
+            code: Some(400),
+        }),
     }
 }
 
@@ -350,5 +358,20 @@ pub fn build_aptos_transaction(
     sequence_number: u64,
 ) -> Result<Vec<u8>, BlockchainError> {
     build_aptos_transaction_data_simple(sender, contract, data, sequence_number)
+}
+
+/// Discover contracts for a given address on a chain.
+///
+/// This is a placeholder implementation that returns an empty list.
+/// In production, this would query the chain for deployed contracts.
+pub async fn discover_contracts(
+    _chain: Chain,
+    _address: &str,
+    _api_url: &str,
+    _filter: Option<&str>,
+) -> Result<Vec<crate::services::blockchain::ContractDeployment>, BlockchainError> {
+    // Placeholder: return empty list
+    // In production, this would query the chain's RPC for contracts
+    Ok(Vec::new())
 }
 

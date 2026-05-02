@@ -22,6 +22,12 @@ impl NativeWallet {
         self.account.address.clone()
     }
 
+    /// Get the key ID for signing operations.
+    /// Returns the address as the key identifier.
+    pub fn key_id(&self) -> Result<String, BlockchainError> {
+        Ok(self.account.address.clone())
+    }
+
     /// Get the private key from keystore (if available).
     /// Requires the wallet password to decrypt the key.
     pub fn private_key(&self, password: &str) -> Result<String, BlockchainError> {

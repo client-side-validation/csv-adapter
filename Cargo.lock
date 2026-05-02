@@ -3386,6 +3386,8 @@ name = "csv-cli"
 version = "0.4.0"
 dependencies = [
  "anyhow",
+ "blake2",
+ "bs58",
  "chrono",
  "clap",
  "colored",
@@ -3394,15 +3396,22 @@ dependencies = [
  "csv-adapter-keystore",
  "csv-adapter-store",
  "dirs",
+ "ed25519-dalek",
  "env_logger",
  "hex",
  "log",
+ "rand 0.8.6",
+ "reqwest 0.12.28",
+ "secp256k1 0.28.2",
  "serde",
  "serde_json",
+ "sha2",
+ "sha3",
  "tempfile",
  "tokio",
  "toml",
  "tracing",
+ "typenum",
 ]
 
 [[package]]

@@ -257,7 +257,6 @@ fn AddAccountTab() -> Element {
                             oninput: move |evt| { pk_input.set(evt.value()); error.set(None); },
                             class: "w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-gray-100 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none",
                             rows: 3,
-                            r#type: "text"
                         }
                         button {
                             onclick: move |_| {

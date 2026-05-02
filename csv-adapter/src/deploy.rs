@@ -307,7 +307,7 @@ impl DeploymentManager {
     }
 
     /// Deploy CSV seal module on Aptos.
-    #[cfg(feature = "aptos")]
+    #[cfg(feature = "deploy-aptos")]
     pub async fn deploy_csv_seal_module(
         &self,
         config: &csv_adapter_aptos::config::AptosConfig,

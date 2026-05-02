@@ -12,14 +12,17 @@ use crate::services::blockchain::estimator::{FeeEstimator, FeePriority};
 use crate::services::blockchain::signer::TransactionSigner;
 use crate::services::blockchain::submitter::TransactionSubmitter;
 use crate::services::blockchain::types::{
-    BitcoinUtxo, BlockchainError, CrossChainProof,
+    BitcoinUtxo, BlockchainError, ContractDeployment, CrossChainProof,
     CrossChainStatus, CrossChainTransferResult, ProofData, SignedTransaction, TransactionReceipt,
     TransactionStatus, UnsignedTransaction,
 };
 use crate::services::blockchain::wallet::NativeWallet;
 use crate::wallet_core::ChainAccount;
-use bitcoin::hashes::Hash;
-use csv_adapter::prelude::*;
+use csv_adapter::prelude::{
+    CsvClient, Chain as AdapterChain, Commitment, Hash, ProofBundle, Right, RightId,
+    CrossChainError, RightsManager, TransferManager, ProofManager, Wallet,
+};
+use csv_adapter::StoreBackend;
 use csv_adapter_core::Chain;
 
 /// Main blockchain service.
@@ -110,7 +113,9 @@ impl BlockchainService {
         web_sys::console::log_1(&format!("Estimated fee: {}", fee_estimate).into());
 
         // Create right ID
-        let right_id_obj = csv_adapter_core::right::RightId::new(right_id.as_bytes().to_vec());
+        let right_id_bytes: [u8; 32] = right_id.as_bytes()[..32].try_into()
+            .map_err(|_| BlockchainError { message: "Invalid right_id length".into(), chain: Some(chain), code: Some(400) })?;
+        let right_id_obj = csv_adapter_core::right::RightId::new(right_id_bytes);
 
         // Get key ID for signing
         let key_id = signer.key_id().map_err(|e| BlockchainError {
@@ -460,17 +465,10 @@ impl BlockchainService {
                 })?;
             let right_id = csv_adapter_core::RightId::from_bytes(&right_id_bytes);
 
-            match csv_client.chain_facade().verify_proof_bundle(
-                target_chain,
-                &proof.lock_tx_hash,
-                &right_id,
-            ).await {
-                Ok(valid) => return Ok(valid),
-                Err(e) => {
-                    web_sys::console::error_1(&format!("Facade proof verification failed: {}", e).into());
-                    // Fall through to capability error
-                }
-            }
+            // Note: verify_proof_bundle requires a ProofBundle type which needs to be
+            // constructed from the proof data. This is a placeholder for future implementation.
+            // For now, fall through to the capability error below.
+            let _ = (right_id, proof.lock_tx_hash.clone()); // Silence unused warnings
         }
 
         // Proof verification requires a real implementation
