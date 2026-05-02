@@ -1,29 +1,50 @@
-//! Cross-Chain Seal Registry
+//! Cross-Chain Seal Registry - SECURITY CRITICAL
 //!
 //! Tracks consumed seals across all chains to detect double-consumption
 //! attempts, including cross-chain double-spends.
 //!
-//! ## Purpose
+//! ## Security Purpose
 //!
+//! This registry is the **primary defense against double-spending** in the CSV protocol.
 //! When a Right is consumed, the seal that enforced it is recorded here.
-//! This allows the client to detect if the same seal (or equivalent seal
-//! on another chain) has been used more than once.
+//! Any subsequent attempt to consume the same seal will be detected and rejected.
 //!
 //! ## Chain-Specific Seal Types
 //!
-//! | Chain | Seal Type | Identifier |
-//! |-------|-----------|------------|
-//! | Bitcoin | UTXO spend | txid:vout |
-//! | Sui | Object deletion | object_id:version |
-//! | Aptos | Resource destruction | resource_address:account |
-//! | Ethereum | Nullifier registration | nullifier_hash |
+//! | Chain | Seal Type | Identifier | Single-Use Enforcement |
+//! |-------|-----------|------------|------------------------|
+//! | Bitcoin | UTXO spend | txid:vout | Structural (output consumed) |
+//! | Sui | Object deletion | object_id:version | Structural (object deleted) |
+//! | Aptos | Resource destruction | resource_address:account | Type-enforced (Move linearity) |
+//! | Ethereum | Nullifier registration | nullifier_hash | Contract-enforced (registry) |
+//! | Solana | PDA closure | pda_address | Program-enforced (account closed) |
 //!
-//! ## Cross-Chain Detection
+//! ## Cross-Chain Double-Spend Detection
 //!
 //! The registry maps all seal types to a unified `SealIdentity` that can
 //! be compared across chains. This detects:
 //! - Same seal used twice on the same chain
 //! - Equivalent seals used on different chains (cross-chain double-spend)
+//!
+//! ## Security Invariants
+//!
+//! 1. **At-Most-Once Consumption**: Each seal may appear in `consumed_seals`
+//!    at most once with status `Unconsumed`. Subsequent consumption attempts
+//!    result in `DoubleSpent` status.
+//!
+//! 2. **Immutable History**: Once a consumption is recorded, it cannot be
+//!    removed or altered. This provides an audit trail for forensic analysis.
+//!
+//! 3. **Chain-Agnostic Detection**: The registry treats seals from different
+//!    chains with the same identity as conflicts, preventing cross-chain replays.
+//!
+//! ## Audit Checklist
+//!
+//! - [ ] `record_consumption()` correctly detects and records double-spends
+//! - [ ] `check_seal_status()` returns accurate status for all seal types
+//! - [ ] Registry state persists across application restarts
+//! - [ ] No path exists to remove or modify recorded consumptions
+//! - [ ] Cross-chain seal identity collisions are properly handled
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
@@ -81,10 +102,35 @@ pub enum SealStatus {
     DoubleSpent { consumptions: Vec<SealConsumption> },
 }
 
-/// Cross-chain seal registry.
+/// Cross-chain seal registry - **Critical Security Component**.
 ///
 /// Tracks all consumed seals across all chains and provides
-/// double-consumption detection.
+/// double-consumption detection. This is the primary defense against
+/// double-spending in the CSV protocol.
+///
+/// # Security Properties
+///
+/// 1. **Append-Only Log**: Consumption records are never deleted, providing
+///    an immutable audit trail of all seal consumption events.
+///
+/// 2. **Deterministic Lookup**: Seal identity is derived from normalized
+///    bytes, ensuring consistent lookup regardless of chain origin.
+///
+/// 3. **Cross-Chain Correlation**: The `right_consumption_map` enables
+///    tracking all seals consumed by a specific Right across all chains.
+///
+/// # Thread Safety
+///
+/// This struct is NOT thread-safe by default. In multi-threaded contexts,
+/// external synchronization (Mutex/RwLock) is required.
+///
+/// # Audit Note
+///
+/// The `consumed_seals` map is the critical data structure. Its key is
+/// `seal_ref.to_vec()` and its value is a vector of consumption events.
+/// - Empty vector: No consumption recorded
+/// - One entry: Valid single consumption
+/// - Multiple entries: Double-spend detected (preserved for forensics)
 #[derive(Default)]
 pub struct CrossChainSealRegistry {
     /// Map from seal identity to consumption events
@@ -103,10 +149,34 @@ impl CrossChainSealRegistry {
 
     /// Record a seal consumption event.
     ///
+    /// This is the **primary double-spend prevention method**. It atomically:
+    /// 1. Checks if the seal has been consumed before
+    /// 2. If not, records the consumption and returns Ok
+    /// 3. If yes, records the attempted double-spend and returns Err
+    ///
+    /// # Security Requirements (CRITICAL)
+    /// - MUST check existing consumptions before recording
+    /// - MUST record double-spend attempts for forensic analysis
+    /// - MUST update both `consumed_seals` and `right_consumption_map`
+    /// - MUST be atomic (no race conditions between check and record)
+    ///
     /// # Returns
-    /// - `Ok(())` if this is the first consumption of this seal
-    /// - `Err(double_spend)` if the seal was already consumed
-    ///   (but the consumption is still recorded for auditing)
+    /// - `Ok(())` if this is the first valid consumption of this seal
+    /// - `Err(DoubleSpendError)` if the seal was already consumed
+    ///   (the new consumption is still recorded for auditing purposes)
+    ///
+    /// # Audit Note
+    /// The double-spend detection logic must be carefully verified:
+    /// 1. The `is_double_spend` check uses `contains_key()` and checks if
+    ///    the existing entry is non-empty
+    /// 2. Even on double-spend, we record the attempt for forensics
+    /// 3. The error includes details of both the original and new consumption
+    ///
+    /// # Security Impact
+    /// A bug in this method could allow double-spending. Verify:
+    /// - No TOCTOU (time-of-check-time-of-use) race conditions
+    /// - Proper handling of all seal reference types
+    /// - Immutable recording of all consumption events
     pub fn record_consumption(
         &mut self,
         consumption: SealConsumption,
@@ -163,6 +233,25 @@ impl CrossChainSealRegistry {
     }
 
     /// Check the status of a seal.
+    ///
+    /// This method queries the registry to determine if a seal has been
+    /// consumed and on which chain(s).
+    ///
+    /// # Security Requirements
+    /// - MUST accurately report all recorded consumptions
+    /// - MUST distinguish between `Unconsumed`, `ConsumedOnChain`, and `DoubleSpent`
+    /// - MUST handle all seal reference types correctly
+    ///
+    /// # Returns
+    /// - `SealStatus::Unconsumed` - Seal has never been recorded
+    /// - `SealStatus::ConsumedOnChain` - Seal consumed exactly once
+    /// - `SealStatus::DoubleSpent` - Seal consumed multiple times (attack detected)
+    ///
+    /// # Audit Note
+    /// Verify this method correctly handles edge cases:
+    /// - Empty seal references
+    /// - Seals consumed on multiple different chains
+    /// - Seals consumed multiple times on the same chain
     pub fn check_seal_status(&self, seal_ref: &SealRef) -> SealStatus {
         let key = seal_ref.to_vec();
 

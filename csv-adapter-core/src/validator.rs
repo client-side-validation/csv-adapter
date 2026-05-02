@@ -1,4 +1,4 @@
-//! Consignment Validation Pipeline
+//! Consignment Validation Pipeline - SECURITY CRITICAL
 //!
 //! Provides detailed, step-by-step validation of consignments:
 //! 1. Fetch state proof chain
@@ -36,6 +36,39 @@
 //!   - All checks pass → Accept
 //!   - Any check fails → Reject with reason
 //! ```
+//!
+//! # Security Purpose
+//!
+//! This validator is the **gatekeeper for all incoming consignments**. It ensures
+//! that only valid, properly authorized state transitions are accepted into the
+//! local state. A compromised or bypassed validator would allow fraudulent
+//! state transitions.
+//!
+//! # Security Invariants
+//!
+//! 1. **Deterministic Validation**: Same consignment always produces same result
+//! 2. **Complete Verification**: All 5 validation steps must pass
+//! 3. **No Partial Acceptance**: A consignment is either fully accepted or rejected
+//! 4. **Audit Trail**: Rejected consignments include detailed failure reasons
+//! 5. **Seal Uniqueness**: Double-spend attempts are detected via `CrossChainSealRegistry`
+//!
+//! # Critical Validation Steps
+//!
+//! | Step | Purpose | Security Impact |
+//! |------|---------|-----------------|
+//! | 1. Structural | Ensure well-formed data | Prevents malformed input attacks |
+//! | 2. Commitment Chain | Verify chain integrity | Prevents insertion of fake history |
+//! | 3. Seal Consumption | Double-spend detection | Prevents replay attacks |
+//! | 4. State Transition | Valid state evolution | Prevents invalid state changes |
+//! | 5. Acceptance | Final gate | Only valid consignments accepted |
+//!
+//! # Audit Checklist
+//!
+//! - [ ] All 5 validation steps execute for every consignment
+//! - [ ] Seal consumption check uses `CrossChainSealRegistry`
+//! - [ ] No validation step can be bypassed via configuration
+//! - [ ] Failed validations return detailed but safe error messages
+//! - [ ] Validator state doesn't affect validation outcome (deterministic)
 
 use alloc::vec::Vec;
 

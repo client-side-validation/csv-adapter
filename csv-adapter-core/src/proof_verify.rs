@@ -1,6 +1,46 @@
-//! Proof verification pipeline
+//! Proof Verification Pipeline - SECURITY CRITICAL
 //!
 //! This module provides the core verification logic for proof bundles.
+//! It is the cryptographic gatekeeper that ensures only valid proofs are accepted.
+//!
+//! # Security Purpose
+//!
+//! This verifier ensures that:
+//! 1. **Authenticity**: Signatures are valid and from authorized keys
+//! 2. **Integrity**: The proof bundle hasn't been tampered with
+//! 3. **Uniqueness**: Seals haven't been used before (replay protection)
+//! 4. **Finality**: The anchor has reached required confirmation depth
+//!
+//! # Verification Steps
+//!
+//! The pipeline enforces a strict order of validation:
+//! 1. **DAG Structure** - Verify the transition graph is well-formed
+//! 2. **Signatures** - Cryptographically verify all authorizing signatures
+//! 3. **Seal Replay** - Check seal hasn't been consumed before
+//! 4. **Inclusion** - Verify anchor is in the chain's history
+//! 5. **Finality** - Confirm anchor has reached required confirmations
+//!
+//! # Security Invariants
+//!
+//! - All signatures must be valid (no partial signature acceptance)
+//! - Seal replay check uses provided registry callback
+//! - Empty inclusion proofs are rejected
+//! - Zero confirmations fails finality check
+//! - Verification is deterministic (same input = same result)
+//!
+//! # Audit Checklist
+//!
+//! - [ ] Signature verification uses appropriate scheme (Secp256k1/Ed25519)
+//! - [ ] Seal registry callback properly checks for replays
+//! - [ ] Empty proofs are rejected at each validation step
+//! - [ ] Signature format parsing is robust against malformed input
+//! - [ ] Verification failures provide specific error types (not just generic)
+//!
+//! # Critical Security Note
+//!
+//! **NEVER** bypass or weaken these checks in production. Any shortcut
+//! here could allow fraudulent proofs to be accepted, leading to
+//! unauthorized state transitions or double-spends.
 
 use crate::error::{AdapterError, Result};
 use crate::proof::ProofBundle;
@@ -8,17 +48,41 @@ use crate::signature::{verify_signatures, Signature, SignatureScheme};
 
 /// Verify a proof bundle according to the CSV verification pipeline.
 ///
-/// The verification pipeline performs the following steps:
-/// 1. Validate deterministic VM execution of the DAG
-/// 2. Validate all authorizing signatures
-/// 3. Validate seal reference correctness (no double-use)
-/// 4. Validate inclusion proof against the anchor reference
-/// 5. Validate finality semantics
+/// This is the **primary entry point for proof verification**. It performs
+/// all cryptographic and structural checks required to validate a proof bundle
+/// before accepting the state transition it authorizes.
+///
+/// # Security Requirements (CRITICAL)
+///
+/// 1. **All signatures must be valid**: Any invalid signature causes rejection
+/// 2. **Seal must be unused**: Replay attacks prevented via `seal_registry` callback
+/// 3. **Proof must be non-empty**: Empty inclusion/finality proofs rejected
+/// 4. **Finality must be reached**: Zero confirmations causes rejection
+///
+/// # Verification Pipeline
+///
+/// 1. **DAG Structure Validation** - Verify transition graph integrity
+/// 2. **Signature Verification** - Cryptographically verify all signatures
+/// 3. **Seal Replay Check** - Ensure seal hasn't been consumed before
+/// 4. **Inclusion Verification** - Verify proof of on-chain inclusion
+/// 5. **Finality Check** - Confirm anchor reached required confirmations
 ///
 /// # Arguments
 /// * `bundle` - The proof bundle to verify
-/// * `seal_registry` - Set of already-used seals (for replay detection)
+/// * `seal_registry` - Callback to check if seal has been used (returns true if used)
 /// * `signature_scheme` - The signature scheme to use for verification
+///
+/// # Returns
+/// - `Ok(())` - Proof bundle is valid and authorized
+/// - `Err(AdapterError)` - Specific error indicating which check failed
+///
+/// # Audit Note
+///
+/// Verify that:
+/// 1. No verification step can be bypassed via configuration
+/// 2. The seal_registry callback is actually invoked (not cached/stale)
+/// 3. Signature parsing is robust against malformed input
+/// 4. All error cases are properly handled and logged
 pub fn verify_proof(
     bundle: &ProofBundle,
     seal_registry: impl Fn(&[u8]) -> bool,
@@ -58,12 +122,42 @@ pub fn verify_proof(
     Ok(())
 }
 
-/// Verify all signatures in a proof bundle
+/// Verify all signatures in a proof bundle.
 ///
-/// This function:
-/// 1. Extracts signatures from the bundle
-/// 2. Constructs signature verification contexts
-/// 3. Performs cryptographic verification
+/// This function performs **cryptographic signature verification** on all
+/// signatures in the bundle. It is a critical security check that ensures
+/// the proof was authorized by the rightful owner(s).
+///
+/// # Signature Format
+///
+/// Each signature is encoded as:
+/// ```text
+/// [public_key_length: 4 bytes LE] [public_key: pk_len bytes] [signature: remaining bytes]
+/// ```
+///
+/// The signed message is the DAG root commitment hash.
+///
+/// # Security Requirements
+/// - MUST verify all signatures (not just first one)
+/// - MUST use correct signature scheme for the chain
+/// - MUST fail if any signature is invalid
+/// - MUST parse signature format robustly
+///
+/// # Arguments
+/// * `bundle` - The proof bundle containing signatures to verify
+/// * `scheme` - The signature scheme (Secp256k1 or Ed25519)
+///
+/// # Returns
+/// - `Ok(())` - All signatures are valid
+/// - `Err(AdapterError::SignatureVerificationFailed)` - If any signature invalid
+///
+/// # Audit Note
+///
+/// Verify that:
+/// 1. The signature parsing correctly handles variable-length public keys
+/// 2. The message being verified is the correct DAG root commitment
+/// 3. No signature is skipped during verification
+/// 4. The scheme matches the chain's expected signature type
 fn verify_bundle_signatures(bundle: &ProofBundle, scheme: SignatureScheme) -> Result<()> {
     // Check we have signatures
     if bundle.signatures.is_empty() {

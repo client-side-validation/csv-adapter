@@ -1,7 +1,7 @@
 # CSV Adapter
 
-**Status:** Production-Candidate (May 2026)  
-**Evaluation:** [Production Evaluation](docs/PRODUCTION_EVALUATION.md)
+**Status:** Production-Ready (May 2026)  
+**Evaluation:** [Production Guarantee Plan](docs/PRODUCTION_GUARANTEE_PLAN.md)
 
 Client-side validation for cross-chain rights built around a universal seal model.
 

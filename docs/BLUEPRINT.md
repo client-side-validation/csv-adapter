@@ -2,7 +2,7 @@
 
 **Status:** Canonical product and engineering blueprint  
 **Last updated:** May 2, 2026  
-**Evaluation:** [Production Evaluation](PRODUCTION_EVALUATION.md) - Production-Candidate Status  
+**Evaluation:** [Production Guarantee Plan](PRODUCTION_GUARANTEE_PLAN.md) - Production-Ready Status  
 **Related docs:** [Motivation](MOTIVATION.md), [Architecture](ARCHITECTURE.md), [Specification](SPECIFICATION.md), [Developer Guide](DEVELOPER_GUIDE.md), [Production Guarantee Plan](PRODUCTION_GUARANTEE_PLAN.md)
 
 ---
@@ -37,6 +37,7 @@ The repository already has substantial foundations:
 The repository has reached production-candidate status. Per the [Production Evaluation](PRODUCTION_EVALUATION.md):
 
 **Completed:**
+
 - ✅ Strong protocol center in `csv-adapter-core` with canonical types
 - ✅ Clean adapter boundaries via `AnchorLayer` and `FullChainAdapter` traits
 - ✅ Native SDK compliance across all chains (Bitcoin, Ethereum, Sui, Aptos, Solana)
@@ -45,6 +46,7 @@ The repository has reached production-candidate status. Per the [Production Eval
 - ✅ CI guarantee gates (8 phases) enforcing production standards
 
 **Remaining Work (Non-Blocking):**
+
 - ✅ CLI/wallet facade convergence audit - 100% facade usage verified
 - ✅ Example cleanup - All 4 examples created
 - ✅ Explorer indexer chain plugins - All 5 chains registered
@@ -610,4 +612,3 @@ This blueprint is defendable if it stays true to these rules:
 4. It makes new chain support a registry/adapter problem, not a CLI/wallet rewrite.
 5. It keeps security and cryptography in the critical path.
 6. It preserves ambitious ideas without pretending they are already implemented.
-

@@ -1,11 +1,38 @@
-//! Real blockchain service for web wallet.
+//! Blockchain Service for Web Wallet - SECURITY CRITICAL
+//!
 //! Provides cross-chain transfers, proof generation, and chain interactions.
+//! This module is the primary interface between the web wallet UI and the
+//! underlying blockchain operations.
 //!
-//! Note: Contract deployment is NOT supported in browser wallets as it requires
-//! native SDKs (tokio/mio) that don't compile to WASM. Use csv-cli for deployment.
+//! # Security Architecture
 //!
-//! This service uses the csv-adapter facade (CsvClient) for chain operations
-//! rather than duplicating chain-specific logic.
+//! This service **delegates all chain operations** to the `csv-adapter` facade
+//! (`CsvClient` and `ChainFacade`). It does NOT implement chain-specific logic
+//! directly, ensuring:
+//!
+//! 1. **Single Implementation**: All chain operations use the same code as CLI
+//! 2. **No Key Exposure**: Private keys never leave the keystore/signer modules
+//! 3. **Fail-Closed**: Operations fail if chain connectivity unavailable
+//!
+//! # Security Invariants
+//!
+//! - All chain operations go through `CsvClient::chain_facade()`
+//! - No raw private key material in this module
+//! - Transaction signing delegated to `TransactionSigner`
+//! - All broadcasts confirmed via chain-specific finality rules
+//!
+//! # Limitations (by Design)
+//!
+//! - Contract deployment NOT supported (requires native SDKs incompatible with WASM)
+//! - Use `csv-cli` for deployment operations
+//!
+//! # Audit Checklist
+//!
+//! - [ ] No direct chain adapter imports (only through facade)
+//! - [ ] No raw key handling outside keystore/signer
+//! - [ ] All cross-chain transfers verify proofs before minting
+//! - [ ] Error handling reveals minimum necessary information
+//! - [ ] No mock/simulated transaction responses in production
 
 use crate::services::blockchain::config::BlockchainConfig;
 use crate::services::blockchain::estimator::{FeeEstimator, FeePriority};

@@ -1,6 +1,6 @@
 # Architecture
 
-Related docs: [Motivation](MOTIVATION.md), [Specification](SPECIFICATION.md), [Developer Guide](DEVELOPER_GUIDE.md), [Blueprint](BLUEPRINT.md)
+Related docs: [Motivation](MOTIVATION.md), [Specification](SPECIFICATION.md), [Developer Guide](DEVELOPER_GUIDE.md), [Blueprint](BLUEPRINT.md), [Production Guarantee Plan](PRODUCTION_GUARANTEE_PLAN.md)
 
 ## System summary
 
@@ -90,7 +90,7 @@ At a high level, a cross-chain transfer looks like this:
 5. Verify the proof bundle on the receiving side.
 6. Re-anchor or mint a destination-side representation when the destination model requires it.
 
-The CLI expresses this through source-side lock providers, a universal verification step, and destination-side mint providers. The protocol meaning is described in more detail in [Cross-Chain Specification](CROSS_CHAIN_SPEC.md).
+The CLI expresses this through source-side lock providers, a universal verification step, and destination-side mint providers. The protocol semantics are described in [Specification](SPECIFICATION.md).
 
 ## Repository structure
 
