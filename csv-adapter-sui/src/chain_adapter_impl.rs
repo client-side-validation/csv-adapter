@@ -94,6 +94,9 @@ impl RpcClient for SuiRpcClient {
     }
 
     async fn get_balance(&self, address: &str) -> ChainResult<u64> {
+        use serde_json::{json, Value};
+        use reqwest::Client;
+
         // Parse Sui address
         let addr_bytes = hex::decode(address.trim_start_matches("0x"))
             .map_err(|e| ChainError::InvalidInput(format!("Invalid address: {}", e)))?;
@@ -104,42 +107,70 @@ impl RpcClient for SuiRpcClient {
             ));
         }
 
-        let mut addr = [0u8; 32];
-        addr.copy_from_slice(&addr_bytes);
+        let addr_hex = format!("0x{}", hex::encode(&addr_bytes));
 
-        // Get all gas objects owned by address
-        let objects = self
-            .inner
-            .get_gas_objects(addr)
-            .map_err(|e| ChainError::RpcError(format!("{:?}", e)))?;
+        // Query SUI balance via RPC using suix_getBalance endpoint
+        // This RPC endpoint returns the total balance for all SUI coins owned by the address
+        // without requiring individual object queries
+        let rpc_url = "https://fullnode.testnet.sui.io:443";
 
-        // Sum up SUI coins
-        // Note: Proper balance extraction requires parsing the BCS-encoded coin object data
-        // to get the actual balance field. The SuiObject struct needs enhancement to include
-        // parsed object content or a dedicated balance field for coin types.
-        //
-        // For production use, this must be implemented using the Sui SDK's object parsing
-        // capabilities to extract the actual balance from Coin<SUI> objects.
-        let _total_balance = 0u64;
-        for obj in objects {
-            if obj.object_type == "0x2::coin::Coin<0x2::sui::SUI>" {
-                // Placeholder: In real implementation, parse BCS content to get balance
-                // This prevents returning incorrect balance data in production
-                let _ = obj; // Acknowledge we're using the object
-            }
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e| ChainError::RpcError(format!("Failed to create HTTP client: {}", e)))?;
+
+        // suix_getBalance returns total balance for all SUI coins
+        let payload = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "suix_getBalance",
+            "params": [
+                &addr_hex,
+                "0x2::sui::SUI"  // SUI coin type
+            ]
+        });
+
+        let response: Value = client
+            .post(rpc_url)
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| ChainError::RpcError(format!("HTTP request failed: {}", e)))?
+            .json()
+            .await
+            .map_err(|e| ChainError::RpcError(format!("Failed to parse JSON: {}", e)))?;
+
+        // Check for RPC errors
+        if let Some(error) = response.get("error") {
+            return Err(ChainError::RpcError(format!("RPC error: {}", error)));
         }
 
-        // Return capability unavailable error instead of fake balance
-        Err(ChainError::FeatureNotEnabled(
-            "SUI balance extraction requires 'sui-full-balance' feature for BCS parsing".to_string()
-        ))
+        // Extract balance from response
+        // Response format: { "result": { "coinObjectCount": N, "totalBalance": "BALANCE", "lockedBalance": {} } }
+        let result = response
+            .get("result")
+            .ok_or_else(|| ChainError::RpcError("Missing result in response".to_string()))?;
+
+        let total_balance_str = result
+            .get("totalBalance")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| ChainError::RpcError("Missing totalBalance in response".to_string()))?;
+
+        // Parse balance string to u64
+        let total_balance: u64 = total_balance_str
+            .parse()
+            .map_err(|e| ChainError::RpcError(format!("Failed to parse balance: {}", e)))?;
+
+        // Log successful balance query for audit trail
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&format!("Sui balance for {}: {} MIST", addr_hex, total_balance).into());
+
+        #[cfg(not(target_arch = "wasm32"))]
+        log::info!("Sui balance for {}: {} MIST", addr_hex, total_balance);
+
+        Ok(total_balance)
     }
 
-    async fn is_transaction_confirmed(&self, hash: &str) -> ChainResult<bool> {
-        // In Sui, transactions are checkpointed for finality
-        let tx = self.get_transaction(hash).await?;
-        Ok(tx.get("transaction").is_some())
-    }
 
     async fn get_chain_info(&self) -> ChainResult<serde_json::Value> {
         let checkpoint_seq = self
@@ -204,9 +235,37 @@ impl Wallet for SuiWallet {
         }
     }
 
-    fn verify_signature(&self, _data: &[u8], _signature: &[u8]) -> bool {
-        // Would verify Ed25519 signature
-        false
+    fn verify_signature(&self, data: &[u8], signature: &[u8]) -> bool {
+        // Verify Ed25519 signature using the wallet's verifying key
+        // Sui uses Ed25519 for transaction and message signatures
+        
+        // If we have the signing key, derive the verifying key
+        if let Some(signing_key) = &self.signing_key {
+            let verifying_key = signing_key.verifying_key();
+            
+            // Ed25519 signatures are 64 bytes
+            if signature.len() != 64 {
+                return false;
+            }
+            
+            // Convert signature bytes to Signature type
+            let sig_bytes: [u8; 64] = match signature.try_into() {
+                Ok(bytes) => bytes,
+                Err(_) => return false,
+            };
+            
+            let signature = ed25519_dalek::Signature::from_bytes(&sig_bytes);
+            
+            // Verify the signature
+            match verifying_key.verify(data, &signature) {
+                Ok(()) => true,
+                Err(_) => false,
+            }
+        } else {
+            // Without the signing key, we can't verify
+            // In production, you might want to store the verifying_key separately
+            false
+        }
     }
 
     fn generate_address(&self) -> ChainResult<String> {
@@ -308,12 +367,53 @@ impl ChainAdapter for SuiAnchorLayer {
     }
 
     async fn create_wallet(&self, _config: &ChainConfig) -> ChainResult<Box<dyn Wallet>> {
-        // Get sender address from config - use sender_address method or default
-        let address = format!("0x{}", hex::encode([0u8; 32])); // Placeholder
+        // Get address from config or derive from signing key
+        // Priority: 1) config.signer_address, 2) derived from signing_key, 3) error
+        let address = if let Some(configured_address) = &self.config.signer_address {
+            // Use the explicitly configured address
+            configured_address.clone()
+        } else {
+            #[cfg(feature = "rpc")]
+            {
+                // Derive address from signing key if available
+                if let Some(signing_key) = &self.signing_key {
+                    let verifying_key = signing_key.verifying_key();
+                    format!("0x{}", hex::encode(verifying_key.to_bytes()))
+                } else {
+                    return Err(ChainError::InvalidInput(
+                        "No signer_address configured and no signing key available. \
+                         Either set config.signer_address or provide a signing key.".to_string()
+                    ));
+                }
+            }
+            #[cfg(not(feature = "rpc"))]
+            {
+                return Err(ChainError::InvalidInput(
+                    "No signer_address configured. Set config.signer_address to create a read-only wallet.".to_string()
+                ));
+            }
+        };
+
+        // Validate the address format (Sui addresses are 32 bytes / 64 hex chars + 0x prefix)
+        let addr_without_prefix = address.trim_start_matches("0x");
+        if addr_without_prefix.len() != 64 || hex::decode(addr_without_prefix).is_err() {
+            return Err(ChainError::InvalidInput(
+                format!("Invalid Sui address format: {}. Expected 0x + 64 hex characters.", address)
+            ));
+        }
 
         #[cfg(feature = "rpc")]
         {
             if let Some(signing_key) = &self.signing_key {
+                // Verify the configured address matches the signing key
+                let verifying_key = signing_key.verifying_key();
+                let derived_address = format!("0x{}", hex::encode(verifying_key.to_bytes()));
+                if derived_address != address {
+                    return Err(ChainError::InvalidInput(
+                        format!("Address mismatch: configured address {} does not match derived address {} from signing key",
+                            address, derived_address)
+                    ));
+                }
                 return Ok(Box::new(SuiWallet::with_signing_key(
                     address,
                     signing_key.clone(),

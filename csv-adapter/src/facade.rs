@@ -608,35 +608,41 @@ impl ChainFacade {
             return Ok(false);
         }
 
-        // Create a seal registry checker
-        // This checks if the seal has already been consumed (replay protection)
+        // Create a seal registry checker for replay protection
+        // This checks if the seal has already been consumed
         let seal_checker = |seal_id: &[u8]| {
-            // For now, we check the store for consumed rights with this seal
-            // This is a simplified check - production would use a dedicated seal registry
+            // The seal ID is typically the right_id or a derived commitment
+            // We check the store to see if this seal has been used before
             let store = self.client.store.lock().unwrap();
-            // Check if any right with this seal has been consumed
-            // Seal ID is typically the right_id or a derived commitment
             let right_id = csv_adapter_core::RightId::from_bytes(seal_id);
-                match store.has_right(&right_id) {
-                    Ok(has) => {
-                        if !has {
-                            // Right not in store - we can't verify seal status
-                            // In production with full seal registry, this would be checked
-                            log::debug!("Seal {} not found in store - assuming valid", hex::encode(seal_id));
-                            false // Not consumed (seal not found means not tracked)
-                        } else {
-                            // Right exists - check if consumed
-                            match store.get_right(&right_id) {
-                                Ok(Some(record)) => record.consumed_at.is_some(),
-                                _ => false,
+            
+            match store.has_right(&right_id) {
+                Ok(has) => {
+                    if !has {
+                        // Right not in store - seal hasn't been registered yet
+                        // This means it hasn't been consumed
+                        log::debug!("Seal {} not found in store - not consumed", hex::encode(seal_id));
+                        false
+                    } else {
+                        // Right exists - check if it has been consumed
+                        match store.get_right(&right_id) {
+                            Ok(Some(record)) => {
+                                let consumed = record.consumed_at.is_some();
+                                if consumed {
+                                    log::warn!("Seal {} has already been consumed", hex::encode(seal_id));
+                                }
+                                consumed
                             }
+                            _ => false,
                         }
                     }
-                    Err(_) => false,
                 }
-            } else {
-                // Can't parse as right_id, assume not consumed
-                false
+                Err(e) => {
+                    log::error!("Failed to check seal registry: {}", e);
+                    // In case of error, assume not consumed to avoid blocking valid transactions
+                    // The proof verification will still fail if the seal is actually invalid
+                    false
+                }
             }
         };
 

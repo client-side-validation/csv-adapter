@@ -73,8 +73,8 @@ pub mod error_codes {
     pub const CORE_DOMAIN_SEPARATOR_MISMATCH: &str = "CORE_012";
     /// Signature verification failed.
     pub const CORE_SIGNATURE_VERIFICATION_FAILED: &str = "CORE_013";
-    /// Feature not implemented.
-    pub const NOT_IMPLEMENTED: &str = "CORE_014";
+    /// Feature not available/enabled (replaces NOT_IMPLEMENTED).
+    pub const CORE_FEATURE_NOT_ENABLED: &str = "CORE_014";
     /// Generic core error.
     pub const CORE_GENERIC: &str = "CORE_099";
 

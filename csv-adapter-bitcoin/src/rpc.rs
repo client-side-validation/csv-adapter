@@ -9,6 +9,19 @@
 #[cfg(test)]
 use std::collections::HashSet;
 
+/// UTXO information for a specific output
+#[derive(Debug, Clone)]
+pub struct UtxoInfo {
+    /// Transaction ID
+    pub txid: [u8; 32],
+    /// Output index
+    pub vout: u32,
+    /// Amount in satoshis
+    pub amount_sat: u64,
+    /// Confirmations
+    pub confirmations: u64,
+}
+
 /// Trait-based RPC interface for real implementations
 pub trait BitcoinRpc: Send + Sync {
     fn get_block_count(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>>;
@@ -29,6 +42,13 @@ pub trait BitcoinRpc: Send + Sync {
         &self,
         txid: [u8; 32],
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>>;
+
+    /// Get UTXOs for a specific address
+    /// Returns list of (txid, vout, amount_sat, confirmations)
+    fn get_utxos_for_address(
+        &self,
+        address: &str,
+    ) -> Result<Vec<UtxoInfo>, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Clone the RPC client into a new boxed trait object.
     /// Required for the facade pattern to share RPC across operations.
@@ -99,6 +119,28 @@ impl BitcoinRpc for TestBitcoinRpc {
         _txid: [u8; 32],
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
         Ok(0)
+    }
+
+    fn get_utxos_for_address(
+        &self,
+        _address: &str,
+    ) -> Result<Vec<UtxoInfo>, Box<dyn std::error::Error + Send + Sync>> {
+        // For testing, return UTXOs from the stored set
+        let utxos: Vec<UtxoInfo> = self
+            .unspent_utxos
+            .iter()
+            .map(|(txid, vout)| UtxoInfo {
+                txid: {
+                    let mut arr = [0u8; 32];
+                    arr.copy_from_slice(&txid[..32.min(txid.len())]);
+                    arr
+                },
+                vout: *vout,
+                amount_sat: 100000, // Default test amount
+                confirmations: 6,
+            })
+            .collect();
+        Ok(utxos)
     }
 
     fn clone_boxed(&self) -> Box<dyn BitcoinRpc + Send + Sync> {

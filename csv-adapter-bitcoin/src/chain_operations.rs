@@ -758,6 +758,46 @@ impl BitcoinChainRightOps {
     pub fn new(adapter: BitcoinAnchorLayer) -> Self {
         Self { adapter }
     }
+
+    /// Build refund transaction after CSV timeout
+    fn build_refund_transaction(
+        &self,
+        lock_seal: crate::seal::BitcoinSeal,
+        _owner_key: &[u8],
+    ) -> Result<bitcoin::Transaction, String> {
+        let lock_outpoint = bitcoin::OutPoint {
+            txid: bitcoin::Txid::from_slice(&lock_seal.txid)
+                .map_err(|e| format!("Invalid lock txid: {}", e))?,
+            vout: lock_seal.vout,
+        };
+        
+        // Build refund transaction that spends the lock UTXO
+        let tx = bitcoin::Transaction {
+            version: 2,
+            lock_time: bitcoin::absolute::LockTime::from_height(0).unwrap(),
+            input: vec![bitcoin::TxIn {
+                previous_output: lock_outpoint,
+                script_sig: bitcoin::ScriptBuf::new(),
+                sequence: bitcoin::Sequence::from_consensus(0),
+                witness: bitcoin::Witness::new(),
+            }],
+            output: vec![], // Would contain refund output to owner
+        };
+        
+        Ok(tx)
+    }
+
+    /// Sign and broadcast refund transaction
+    async fn sign_and_broadcast_refund(
+        &self,
+        _tx: bitcoin::Transaction,
+        _owner_key: &[u8],
+    ) -> ChainOpResult<String> {
+        // Sign and broadcast via RPC
+        Err(ChainOpError::CapabilityUnavailable(
+            "Refund transaction signing requires wallet integration".to_string()
+        ))
+    }
 }
 
 #[async_trait]
@@ -973,56 +1013,15 @@ impl ChainRightOps for BitcoinChainRightOps {
         
         Ok(RightOperationResult {
             right_id: right_id.clone(),
-            operation: csv_adapter_core::chain_operations::RightOperation::Refund,
-            transaction_hash: signed_tx,
-            block_height: current_height,
-            chain_id: "bitcoin".to_string(),
+            operation: RightOperation::Refund,
+            tx_hash: format!("0x{}", hex::encode(signed_tx.as_bytes())),
+            block_height: self.adapter.get_current_height(),
             metadata: serde_json::json!({
-                "refund_type": "csv_timeout",
-                "lock_height": lock_height,
+                "lock_txid": hex::encode(&lock_seal.txid),
+                "lock_vout": lock_seal.vout,
                 "refund_height": current_height,
             }),
         })
-    }
-    
-    /// Build refund transaction after CSV timeout
-    fn build_refund_transaction(
-        &self,
-        lock_seal: crate::seal::BitcoinSeal,
-        _owner_key: &[u8],
-    ) -> Result<bitcoin::Transaction, String> {
-        let lock_outpoint = bitcoin::OutPoint {
-            txid: bitcoin::Txid::from_slice(&lock_seal.txid)
-                .map_err(|e| format!("Invalid lock txid: {}", e))?,
-            vout: lock_seal.vout,
-        };
-        
-        // Build refund transaction that spends the lock UTXO
-        let tx = bitcoin::Transaction {
-            version: 2,
-            lock_time: bitcoin::absolute::LockTime::from_height(0).unwrap(),
-            input: vec![bitcoin::TxIn {
-                previous_output: lock_outpoint,
-                script_sig: bitcoin::ScriptBuf::new(),
-                sequence: bitcoin::Sequence::from_consensus(0), // No sequence requirement for refund
-                witness: bitcoin::Witness::new(),
-            }],
-            output: vec![], // Would contain refund output to owner
-        };
-        
-        Ok(tx)
-    }
-    
-    /// Sign and broadcast refund transaction
-    async fn sign_and_broadcast_refund(
-        &self,
-        _tx: bitcoin::Transaction,
-        _owner_key: &[u8],
-    ) -> ChainOpResult<String> {
-        // Sign and broadcast via RPC
-        Err(ChainOpError::CapabilityUnavailable(
-            "Refund transaction signing requires wallet integration".to_string()
-        ))
     }
 
     async fn record_right_metadata(

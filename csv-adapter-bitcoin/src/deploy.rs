@@ -88,20 +88,67 @@ impl ContractDeployer {
         let secp = bitcoin::secp256k1::Secp256k1::new();
         let (tweaked_key, _parity) = internal_key.tap_tweak(&secp, Some(script_hash));
 
-        let address =
+        let contract_address =
             bitcoin::Address::p2tr_tweaked(tweaked_key, self.config.network.to_bitcoin_network());
 
-        // Note: The actual transaction building and broadcasting is not yet implemented
-        // as it requires UTXO selection, fee estimation, and proper transaction construction.
-        // For now, we return the deployment configuration that would be used.
+        // Get UTXOs for the deployer address to fund the transaction
+        let deployer_address = format!("{}", internal_key);
+        let utxos = self
+            .rpc
+            .get_utxos_for_address(&deployer_address)
+            .map_err(|e| BitcoinError::RpcError(format!("Failed to get UTXOs: {}", e)))?;
 
-        // Generate a temporary txid (would come from actual broadcast in full impl)
-        let txid = [0u8; 32];
+        if utxos.is_empty() {
+            return Err(BitcoinError::InvalidInput(
+                "No UTXOs available for deployment. Fund the deployer address first.".to_string()
+            ));
+        }
+
+        // Select UTXOs for funding (simple selection: use first sufficient UTXO)
+        let estimated_fee = self.estimate_fee(script.len());
+        let dust_limit = 546u64; // Minimum output value in satoshis
+        let total_needed = estimated_fee + dust_limit;
+
+        let selected_utxo = utxos
+            .into_iter()
+            .find(|u| u.amount_sat >= total_needed)
+            .ok_or_else(|| BitcoinError::InvalidInput(
+                format!("No UTXO with sufficient funds. Need at least {} satoshis", total_needed)
+            ))?;
+
+        // Build the deployment transaction
+        // This creates a Taproot output that locks the contract
+        let tx = self.build_deployment_transaction(
+            &selected_utxo,
+            &contract_address,
+            script,
+            estimated_fee,
+        )?;
+
+        // Sign and broadcast the transaction
+        // Note: In a full implementation, this requires access to the private key
+        // for signing. The current implementation assumes the RPC client handles signing
+        // or the caller provides a signed transaction.
+        let tx_bytes = bitcoin::consensus::encode::serialize(&tx);
+        let txid = self
+            .rpc
+            .send_raw_transaction(tx_bytes)
+            .map_err(|e| BitcoinError::RpcError(format!("Failed to broadcast: {}", e)))?;
+
+        // Find the vout for the contract output
+        let contract_script_pubkey = contract_address.script_pubkey();
+        let vout = tx
+            .output
+            .iter()
+            .position(|output| output.script_pubkey == contract_script_pubkey)
+            .ok_or_else(|| BitcoinError::InvalidInput(
+                "Contract output not found in transaction".to_string()
+            ))? as u32;
 
         Ok(ContractDeployment {
-            address: address.to_string(),
+            address: contract_address.to_string(),
             txid,
-            vout: 0,
+            vout,
             redeem_script: script.to_vec(),
             witness_program: tweaked_key.serialize().to_vec(),
         })
@@ -126,6 +173,76 @@ impl ContractDeployer {
         let fee_rate = 10u64; // sat/vbyte (would come from network)
 
         base_fee * fee_rate
+    }
+
+    /// Build the deployment transaction
+    ///
+    /// Creates a Bitcoin transaction with:
+    /// - Input: The selected UTXO from the deployer
+    /// - Output 1: The Taproot contract output (P2TR)
+    /// - Output 2: Change back to the deployer (if any)
+    fn build_deployment_transaction(
+        &self,
+        utxo: &super::rpc::UtxoInfo,
+        contract_address: &bitcoin::Address,
+        _script: &[u8],
+        fee: u64,
+    ) -> BitcoinResult<bitcoin::Transaction> {
+        use bitcoin::{OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness};
+
+        // Create the input from the UTXO
+        let input = TxIn {
+            previous_output: OutPoint {
+                txid: bitcoin::Txid::from_slice(&utxo.txid)
+                    .map_err(|e| BitcoinError::InvalidInput(format!("Invalid txid: {}", e)))?,
+                vout: utxo.vout,
+            },
+            script_sig: ScriptBuf::new(),
+            sequence: Sequence::ENABLE_RBF_NO_LOCKTIME,
+            witness: Witness::new(),
+        };
+
+        // Create the contract output (P2TR - Taproot)
+        let contract_script_pubkey = contract_address.script_pubkey();
+        let dust_limit = 546u64;
+        let contract_value = dust_limit; // Minimum viable amount for the contract
+
+        // Create the change output if there's leftover after fees
+        let total_input = utxo.amount_sat;
+        let change_value = total_input
+            .saturating_sub(fee)
+            .saturating_sub(contract_value);
+
+        let mut outputs = vec![TxOut {
+            value: bitcoin::Amount::from_sat(contract_value),
+            script_pubkey: contract_script_pubkey,
+        }];
+
+        // Add change output if significant
+        if change_value > dust_limit {
+            // For change, we need the deployer's address - use internal key for now
+            let internal_key = self.wallet.secp_public_key();
+            let change_address = bitcoin::Address::p2wpkh(
+                &internal_key,
+                self.config.network.to_bitcoin_network(),
+            )
+            .map_err(|e| BitcoinError::InvalidInput(format!("Failed to create change address: {}", e)))?;
+
+            outputs.push(TxOut {
+                value: bitcoin::Amount::from_sat(change_value),
+                script_pubkey: change_address.script_pubkey(),
+            });
+        }
+
+        // Build the unsigned transaction
+        let tx = Transaction {
+            version: bitcoin::transaction::Version::TWO,
+            lock_time: bitcoin::locktime::absolute::LockTime::ZERO,
+            input: vec![input],
+            output: outputs,
+        };
+
+        Ok(tx)
     }
 }
 

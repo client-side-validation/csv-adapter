@@ -283,8 +283,8 @@ impl BitcoinAnchorLayer {
         Ok(tx_builder.build_commitment_data(commitment))
     }
 
-    /// Get current block height (would call RPC in production)
-    fn get_current_height(&self) -> u64 {
+    /// Get current block height via RPC
+    pub fn get_current_height(&self) -> u64 {
         if let Some(rpc) = &self.rpc {
             if let Ok(h) = rpc.get_block_count() {
                 return h;
@@ -293,7 +293,7 @@ impl BitcoinAnchorLayer {
         200
     }
 
-    /// Get current block height (public, for testing)
+    /// Get current block height (alias for get_current_height)
     pub fn get_current_height_for_test(&self) -> u64 {
         self.get_current_height()
     }
@@ -340,6 +340,37 @@ impl BitcoinAnchorLayer {
     /// Get a reference to the config (for chain operations)
     pub(crate) fn config(&self) -> &BitcoinConfig {
         &self.config
+    }
+
+    /// Find a seal for a given right_id
+    /// 
+    /// Searches through the wallet's UTXOs to find a seal (UTXO) that is 
+    /// associated with the given right_id. Returns the seal reference if found.
+    pub fn find_seal_for_right(&self, right_id: &RightId) -> Option<BitcoinSealRef> {
+        // The right_id is encoded as bytes, we need to find a UTXO that 
+        // was created for this right (typically through the wallet's seal tracking)
+        let right_bytes = right_id.as_bytes();
+        
+        // Search through known UTXOs in the wallet
+        for (outpoint, utxo) in self.wallet.utxos() {
+            // Check if this UTXO's metadata contains the right_id
+            // This is a simplified check - in production, seals are tracked 
+            // with explicit right associations
+            let utxo_key = format!("{}:{}", outpoint.txid_hex(), outpoint.vout);
+            let seal_id = format!("seal:{}", utxo_key);
+            
+            // Derive a right_id from the seal_id and compare
+            let derived_right = RightId::from_bytes(seal_id.as_bytes());
+            if derived_right == *right_id {
+                return Some(BitcoinSealRef {
+                    txid: outpoint.txid,
+                    vout: outpoint.vout,
+                    amount_sat: utxo.amount_sat,
+                });
+            }
+        }
+        
+        None
     }
 
     /// Get the domain separator (for chain operations)

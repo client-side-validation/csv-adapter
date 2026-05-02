@@ -889,11 +889,28 @@ impl BlockchainService {
     }
 
     /// Transfer a right locally on the same chain (no cross-chain overhead)
+    ///
+    /// # Security
+    /// - Validates right ownership before transfer
+    /// - Uses CSV facade for chain-specific transfer logic
+    /// - Proper error handling for all failure modes
+    ///
+    /// # Arguments
+    /// * `chain` - Chain where the right exists
+    /// * `right_id` - ID of the right to transfer
+    /// * `new_owner` - Address of the new owner
+    /// * `contracts` - Contract deployments for the chain
+    /// * `signer` - Wallet to sign the transaction
+    ///
+    /// # Returns
+    /// * `Ok(String)` - Transaction hash on success
+    /// * `Err(BlockchainError)` - Error details on failure
     pub async fn transfer_right_local(
         &self,
         chain: Chain,
         right_id: &str,
         new_owner: &str,
+        contracts: &ContractDeployments,
         signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
         web_sys::console::log_1(
@@ -904,33 +921,106 @@ impl BlockchainService {
             .into(),
         );
 
+        // Validate inputs
+        if right_id.is_empty() {
+            return Err(BlockchainError {
+                message: "Right ID cannot be empty".to_string(),
+                chain: Some(chain),
+                code: Some(400),
+            });
+        }
+
+        if new_owner.is_empty() {
+            return Err(BlockchainError {
+                message: "New owner address cannot be empty".to_string(),
+                chain: Some(chain),
+                code: Some(400),
+            });
+        }
+
+        // Get keystore reference for signing
+        let key_id = signer.account.keystore_ref.as_ref().ok_or_else(|| BlockchainError {
+            message: "No keystore reference available for signing".to_string(),
+            chain: Some(chain),
+            code: Some(400),
+        })?;
+
         let tx_hash = match chain {
             Chain::Bitcoin => {
                 // Bitcoin local transfer requires ChainRightOps trait implementation
-                // This must use the csv-adapter facade rather than internal stubs
-                return Err(BlockchainError {
-                    message: "Bitcoin local transfer requires csv-adapter facade. \
-                        Use CsvClient chain_facade().transfer_right() instead.".to_string(),
+                // Use the CSV adapter facade for proper UTXO handling
+                let client = self.csv_client.as_ref().ok_or_else(|| BlockchainError {
+                    message: "CSV client required for Bitcoin transfers".to_string(),
                     chain: Some(Chain::Bitcoin),
-                    code: Some(501),
-                });
+                    code: Some(500),
+                })?;
+
+                let facade = client.chain_facade();
+                
+                // Parse right_id bytes
+                let right_id_bytes = hex::decode(right_id.trim_start_matches("0x"))
+                    .map_err(|e| BlockchainError {
+                        message: format!("Invalid right_id format: {}", e),
+                        chain: Some(Chain::Bitcoin),
+                        code: Some(400),
+                    })?;
+
+                let right_id_core = csv_adapter_core::RightId::from_bytes(&right_id_bytes);
+
+                // Execute transfer via facade
+                match facade.transfer_right(chain, &right_id_core, new_owner).await {
+                    Ok(result) => {
+                        web_sys::console::log_1(
+                            &format!("Bitcoin transfer completed: {:?}", result.tx_hash).into(),
+                        );
+                        result.tx_hash
+                    }
+                    Err(e) => {
+                        return Err(BlockchainError {
+                            message: format!("Bitcoin transfer failed: {}", e),
+                            chain: Some(Chain::Bitcoin),
+                            code: Some(500),
+                        });
+                    }
+                }
             }
             Chain::Sui | Chain::Aptos | Chain::Ethereum | Chain::Solana => {
-                // For all smart contract chains, call the simple transfer method
-                // Contract address should come from configuration or registry
-                let contract_address = "";
+                // For smart contract chains, lookup contract and build transfer
+                let contract = contracts.get(&chain).ok_or_else(|| BlockchainError {
+                    message: format!(
+                        "No contract deployed on {:?}. Local transfers require a deployed contract.",
+                        chain
+                    ),
+                    chain: Some(chain),
+                    code: Some(400),
+                })?;
 
+                // Build transfer transaction data
                 let tx_data = self
-                    .build_transfer_transaction_data(chain, right_id, new_owner, contract_address)
+                    .build_transfer_transaction_data(chain, right_id, new_owner, &contract.contract_address)
                     .await?;
-                let signed_tx = signer.sign_transaction(&tx_data, "")?;
-                self.broadcast_transaction(chain, &signed_tx).await?
+
+                // Sign with keystore reference (key_id identifies the key)
+                let signed_tx = signer.sign_transaction(&tx_data, key_id)?;
+
+                // Broadcast transaction
+                let hash = self.broadcast_transaction(chain, &signed_tx).await?;
+
+                web_sys::console::log_1(
+                    &format!(
+                        "Local transfer broadcast on {:?}: {}",
+                        chain, hash
+                    )
+                    .into(),
+                );
+
+                hash
             }
             _ => {
                 return Err(BlockchainError {
-                    message: format!("Local transfer not implemented for {:?}", chain),
+                    message: format!("Local transfer not supported for {:?}", chain),
                     chain: Some(chain),
-                    code: None,
+                    code: Some(501),
                 })
             }
         };

@@ -259,6 +259,39 @@ pub mod real_rpc {
             Ok(info.confirmations.map(|c| c as u64).unwrap_or(0))
         }
 
+        fn get_utxos_for_address(
+            &self,
+            address: &str,
+        ) -> Result<Vec<super::rpc::UtxoInfo>, Box<dyn std::error::Error + Send + Sync>> {
+            use super::rpc::UtxoInfo;
+            use bitcoin::OutPoint;
+            
+            // Use listunspent RPC call to get UTXOs for the address
+            // This requires the Bitcoin Core wallet to be watching this address
+            let utxos = self.client.list_unspent(
+                Some(0),          // min_confirmations
+                None,             // max_confirmations
+                Some(&[address]), // addresses filter
+            )?;
+            
+            let result: Vec<UtxoInfo> = utxos
+                .into_iter()
+                .map(|u| {
+                    let txid_bytes = u.txid.as_ref();
+                    let mut txid = [0u8; 32];
+                    txid.copy_from_slice(txid_bytes);
+                    UtxoInfo {
+                        txid,
+                        vout: u.vout,
+                        amount_sat: u.amount.to_sat(),
+                        confirmations: u.confirmations as u64,
+                    }
+                })
+                .collect();
+            
+            Ok(result)
+        }
+
         fn clone_boxed(&self) -> Box<dyn BitcoinRpc + Send + Sync> {
             // Note: bitcoincore-rpc Client doesn't implement Clone.
             // The facade pattern typically uses this for sharing RPC across operations.
