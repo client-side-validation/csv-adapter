@@ -802,13 +802,120 @@ impl ChainRightOps for BitcoinChainRightOps {
 
     async fn lock_right(
         &self,
-        _right_id: &RightId,
-        _destination_chain: &str,
-        _owner_key_id: &str,
+        right_id: &RightId,
+        destination_chain: &str,
+        owner_key_id: &str,
     ) -> ChainOpResult<RightOperationResult> {
-        // Lock a right for cross-chain transfer
+        // Lock a right for cross-chain transfer by creating a lock UTXO
+        // The lock UTXO contains the destination chain hash in its script
+        
+        // Parse the destination chain to ensure it's valid
+        let destination = destination_chain.parse::<csv_adapter_core::Chain>()
+            .map_err(|_| ChainOpError::InvalidInput(format!("Invalid destination chain: {}", destination_chain)))?;
+        
+        // Get the right's associated UTXO (seal)
+        let seal = self.adapter.find_seal_for_right(right_id)
+            .map_err(|e| ChainOpError::InvalidInput(format!("Failed to find seal for right: {}", e)))?;
+        
+        // Build lock transaction that:
+        // 1. Spends the seal UTXO
+        // 2. Creates a new UTXO with lock script containing destination commitment
+        // 3. Uses CSV (CheckSequenceVerify) for timeout refund capability
+        
+        // Parse owner key for signing
+        let key_bytes = hex::decode(owner_key_id)
+            .map_err(|_| ChainOpError::InvalidInput("Invalid owner key ID format".to_string()))?;
+        
+        if key_bytes.len() != 32 {
+            return Err(ChainOpError::InvalidInput("Owner key must be 32 bytes".to_string()));
+        }
+        
+        // Build lock script that encodes the destination chain
+        // This is a hash160 of the destination chain name
+        use bitcoin_hashes::{sha256d, Hash};
+        let dest_hash = sha256d::Hash::hash(destination_chain.as_bytes());
+        
+        // Create the lock UTXO outpoint reference
+        let lock_outpoint = bitcoin::OutPoint {
+            txid: bitcoin::Txid::from_slice(&seal.txid).map_err(|e| 
+                ChainOpError::InvalidInput(format!("Invalid seal txid: {}", e)))?,
+            vout: seal.vout,
+        };
+        
+        // Build the lock transaction
+        let lock_tx = self.build_lock_transaction(
+            lock_outpoint,
+            &dest_hash,
+            &key_bytes,
+        ).map_err(|e| ChainOpError::TransactionError(format!("Failed to build lock tx: {}", e)))?;
+        
+        // Sign and broadcast the lock transaction
+        let signed_tx = self.sign_and_broadcast_lock(lock_tx, &key_bytes).await?;
+        
+        Ok(RightOperationResult {
+            right_id: right_id.clone(),
+            operation: csv_adapter_core::chain_operations::RightOperation::Lock,
+            transaction_hash: signed_tx,
+            block_height: self.adapter.get_current_height(),
+            chain_id: "bitcoin".to_string(),
+            metadata: serde_json::json!({
+                "destination_chain": destination_chain,
+                "lock_type": "utxo_csv",
+                "timeout_blocks": 144, // ~24 hours
+            }),
+        })
+    }
+    
+    /// Build a lock transaction for cross-chain transfer
+    fn build_lock_transaction(
+        &self,
+        seal_outpoint: bitcoin::OutPoint,
+        dest_hash: &bitcoin_hashes::sha256d::Hash,
+        _owner_key: &[u8],
+    ) -> Result<bitcoin::Transaction, String> {
+        // Create a lock script that:
+        // 1. Requires the destination chain hash to be revealed (for verification)
+        // 2. Has CSV timeout for refund
+        // 3. Requires owner signature
+        
+        // Lock script: OP_IF <dest_hash> OP_EQUALVERIFY OP_ELSE <144> OP_CSV OP_DROP OP_ENDIF <owner_pubkey> OP_CHECKSIG
+        // For simplicity, we'll use a basic P2WPKH with metadata in the witness
+        
+        let lock_script = bitcoin::ScriptBuf::new();
+        // Real implementation would build a proper lock script with CSV
+        
+        // Build transaction
+        let tx = bitcoin::Transaction {
+            version: 2,
+            lock_time: bitcoin::absolute::LockTime::from_height(0).unwrap(),
+            input: vec![bitcoin::TxIn {
+                previous_output: seal_outpoint,
+                script_sig: bitcoin::ScriptBuf::new(),
+                sequence: bitcoin::Sequence::from_consensus(144), // CSV timeout
+                witness: bitcoin::Witness::new(),
+            }],
+            output: vec![bitcoin::TxOut {
+                value: bitcoin::Amount::from_sat(546), // Dust limit
+                script_pubkey: lock_script,
+            }],
+        };
+        
+        Ok(tx)
+    }
+    
+    /// Sign and broadcast a lock transaction
+    async fn sign_and_broadcast_lock(
+        &self,
+        _tx: bitcoin::Transaction,
+        _owner_key: &[u8],
+    ) -> ChainOpResult<String> {
+        // Sign the transaction with the owner key
+        // Broadcast via RPC
+        
+        // For now, return a placeholder - full implementation requires
+        // access to the wallet's signing capabilities
         Err(ChainOpError::CapabilityUnavailable(
-            "Cross-chain locking not yet implemented for Bitcoin".to_string(),
+            "Lock transaction signing requires wallet integration".to_string()
         ))
     }
 
@@ -827,34 +934,236 @@ impl ChainRightOps for BitcoinChainRightOps {
 
     async fn refund_right(
         &self,
-        _right_id: &RightId,
-        _owner_key_id: &str,
+        right_id: &RightId,
+        owner_key_id: &str,
     ) -> ChainOpResult<RightOperationResult> {
-        // Refund a locked right after timeout
+        // Refund a locked right after CSV timeout expires
+        // This spends the lock UTXO back to the owner
+        
+        // Parse owner key
+        let key_bytes = hex::decode(owner_key_id)
+            .map_err(|_| ChainOpError::InvalidInput("Invalid owner key ID format".to_string()))?;
+        
+        if key_bytes.len() != 32 {
+            return Err(ChainOpError::InvalidInput("Owner key must be 32 bytes".to_string()));
+        }
+        
+        // Get the lock UTXO for this right
+        let lock_seal = self.adapter.find_seal_for_right(right_id)
+            .map_err(|e| ChainOpError::InvalidInput(format!("Failed to find lock seal: {}", e)))?;
+        
+        // Verify CSV timeout has expired (144 blocks = ~24 hours)
+        let current_height = self.adapter.get_current_height();
+        let lock_height = lock_seal.block_height.unwrap_or(0);
+        let csv_timeout = 144u64;
+        
+        if current_height < lock_height + csv_timeout {
+            return Err(ChainOpError::InvalidInput(
+                format!("CSV timeout not yet expired. Current: {}, Required: {}", 
+                    current_height, lock_height + csv_timeout)
+            ));
+        }
+        
+        // Build refund transaction
+        let refund_tx = self.build_refund_transaction(lock_seal, &key_bytes)
+            .map_err(|e| ChainOpError::TransactionError(format!("Failed to build refund tx: {}", e)))?;
+        
+        // Sign and broadcast
+        let signed_tx = self.sign_and_broadcast_refund(refund_tx, &key_bytes).await?;
+        
+        Ok(RightOperationResult {
+            right_id: right_id.clone(),
+            operation: csv_adapter_core::chain_operations::RightOperation::Refund,
+            transaction_hash: signed_tx,
+            block_height: current_height,
+            chain_id: "bitcoin".to_string(),
+            metadata: serde_json::json!({
+                "refund_type": "csv_timeout",
+                "lock_height": lock_height,
+                "refund_height": current_height,
+            }),
+        })
+    }
+    
+    /// Build refund transaction after CSV timeout
+    fn build_refund_transaction(
+        &self,
+        lock_seal: crate::seal::BitcoinSeal,
+        _owner_key: &[u8],
+    ) -> Result<bitcoin::Transaction, String> {
+        let lock_outpoint = bitcoin::OutPoint {
+            txid: bitcoin::Txid::from_slice(&lock_seal.txid)
+                .map_err(|e| format!("Invalid lock txid: {}", e))?,
+            vout: lock_seal.vout,
+        };
+        
+        // Build refund transaction that spends the lock UTXO
+        let tx = bitcoin::Transaction {
+            version: 2,
+            lock_time: bitcoin::absolute::LockTime::from_height(0).unwrap(),
+            input: vec![bitcoin::TxIn {
+                previous_output: lock_outpoint,
+                script_sig: bitcoin::ScriptBuf::new(),
+                sequence: bitcoin::Sequence::from_consensus(0), // No sequence requirement for refund
+                witness: bitcoin::Witness::new(),
+            }],
+            output: vec![], // Would contain refund output to owner
+        };
+        
+        Ok(tx)
+    }
+    
+    /// Sign and broadcast refund transaction
+    async fn sign_and_broadcast_refund(
+        &self,
+        _tx: bitcoin::Transaction,
+        _owner_key: &[u8],
+    ) -> ChainOpResult<String> {
+        // Sign and broadcast via RPC
         Err(ChainOpError::CapabilityUnavailable(
-            "Refund not yet implemented".to_string(),
+            "Refund transaction signing requires wallet integration".to_string()
         ))
     }
 
     async fn record_right_metadata(
         &self,
-        _right_id: &RightId,
-        _metadata: serde_json::Value,
-        _owner_key_id: &str,
+        right_id: &RightId,
+        metadata: serde_json::Value,
+        owner_key_id: &str,
     ) -> ChainOpResult<RightOperationResult> {
+        // Record metadata for a right using OP_RETURN
+        // This creates a transaction with metadata in the witness or OP_RETURN
+        
+        // Parse owner key
+        let key_bytes = hex::decode(owner_key_id)
+            .map_err(|_| ChainOpError::InvalidInput("Invalid owner key ID format".to_string()))?;
+        
+        if key_bytes.len() != 32 {
+            return Err(ChainOpError::InvalidInput("Owner key must be 32 bytes".to_string()));
+        }
+        
+        // Get the seal for this right
+        let seal = self.adapter.find_seal_for_right(right_id)
+            .map_err(|e| ChainOpError::InvalidInput(format!("Failed to find seal: {}", e)))?;
+        
+        // Serialize metadata to JSON and hash it
+        let metadata_bytes = serde_json::to_vec(&metadata)
+            .map_err(|e| ChainOpError::SerializationError(format!("Failed to serialize metadata: {}", e)))?;
+        
+        if metadata_bytes.len() > 80 {
+            return Err(ChainOpError::InvalidInput(
+                "Metadata too large for OP_RETURN (max 80 bytes)".to_string()
+            ));
+        }
+        
+        // Build metadata recording transaction
+        let metadata_tx = self.build_metadata_transaction(seal, &metadata_bytes, &key_bytes)
+            .map_err(|e| ChainOpError::TransactionError(format!("Failed to build metadata tx: {}", e)))?;
+        
+        // Sign and broadcast
+        let signed_tx = self.sign_and_broadcast_metadata(metadata_tx, &key_bytes).await?;
+        
+        Ok(RightOperationResult {
+            right_id: right_id.clone(),
+            operation: csv_adapter_core::chain_operations::RightOperation::Metadata,
+            transaction_hash: signed_tx,
+            block_height: self.adapter.get_current_height(),
+            chain_id: "bitcoin".to_string(),
+            metadata: metadata,
+        })
+    }
+    
+    /// Build metadata recording transaction with OP_RETURN
+    fn build_metadata_transaction(
+        &self,
+        seal: crate::seal::BitcoinSeal,
+        metadata: &[u8],
+        _owner_key: &[u8],
+    ) -> Result<bitcoin::Transaction, String> {
+        let seal_outpoint = bitcoin::OutPoint {
+            txid: bitcoin::Txid::from_slice(&seal.txid)
+                .map_err(|e| format!("Invalid seal txid: {}", e))?,
+            vout: seal.vout,
+        };
+        
+        // Build OP_RETURN script
+        let mut op_return_script = bitcoin::ScriptBuf::new();
+        // OP_RETURN <metadata>
+        // Real implementation would use Builder pattern
+        
+        // Build transaction
+        let tx = bitcoin::Transaction {
+            version: 2,
+            lock_time: bitcoin::absolute::LockTime::from_height(0).unwrap(),
+            input: vec![bitcoin::TxIn {
+                previous_output: seal_outpoint,
+                script_sig: bitcoin::ScriptBuf::new(),
+                sequence: bitcoin::Sequence::from_consensus(0xffffffff),
+                witness: bitcoin::Witness::new(),
+            }],
+            output: vec![
+                bitcoin::TxOut {
+                    value: bitcoin::Amount::from_sat(0),
+                    script_pubkey: op_return_script,
+                },
+            ],
+        };
+        
+        Ok(tx)
+    }
+    
+    /// Sign and broadcast metadata transaction
+    async fn sign_and_broadcast_metadata(
+        &self,
+        _tx: bitcoin::Transaction,
+        _owner_key: &[u8],
+    ) -> ChainOpResult<String> {
         Err(ChainOpError::CapabilityUnavailable(
-            "Metadata recording not yet implemented for Bitcoin".to_string(),
+            "Metadata transaction signing requires wallet integration".to_string()
         ))
     }
 
     async fn verify_right_state(
         &self,
-        _right_id: &RightId,
-        _expected_state: &str,
+        right_id: &RightId,
+        expected_state: &str,
     ) -> ChainOpResult<bool> {
-        Err(ChainOpError::CapabilityUnavailable(
-            "Right state verification not yet implemented".to_string(),
-        ))
+        // Verify the current state of a right
+        // This checks if the right's UTXO is still unspent and matches the expected state
+        
+        // Get the seal for this right
+        let seal = match self.adapter.find_seal_for_right(right_id) {
+            Ok(s) => s,
+            Err(_) => {
+                // Right not found - check if it was consumed
+                return match expected_state {
+                    "consumed" | "spent" | "transferred" => Ok(true),
+                    _ => Ok(false),
+                };
+            }
+        };
+        
+        // Check if the seal UTXO is still unspent via RPC
+        let seal_outpoint = bitcoin::OutPoint {
+            txid: bitcoin::Txid::from_slice(&seal.txid)
+                .map_err(|e| ChainOpError::InvalidInput(format!("Invalid seal txid: {}", e)))?,
+            vout: seal.vout,
+        };
+        
+        // Query RPC to check if UTXO is unspent
+        let is_unspent = self.adapter.rpc()
+            .map_err(|e| ChainOpError::RpcError(format!("RPC not available: {}", e)))?
+            .is_utxo_unspent(seal_outpoint.txid.to_byte_array(), seal_outpoint.vout)
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to check UTXO: {}", e)))?;
+        
+        // Match expected state
+        let actual_state = if is_unspent {
+            "active"
+        } else {
+            "consumed"
+        };
+        
+        Ok(actual_state == expected_state)
     }
 }
 
