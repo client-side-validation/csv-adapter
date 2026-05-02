@@ -47,7 +47,68 @@ pub struct BitcoinAnchorLayer {
 }
 
 impl BitcoinAnchorLayer {
-    /// Create with an existing HD wallet.
+    /// Create from configuration and RPC client (standard facade pattern).
+    ///
+    /// # Arguments
+    /// * `config` - Bitcoin adapter configuration (includes network, finality depth, optional xpub)
+    /// * `rpc` - RPC client for Bitcoin node communication
+    ///
+    /// # Security Notes
+    /// - Uses BIP-86 derivation paths for Taproot addresses (m/86'/coin_type'/account'/0/index)
+    /// - Domain separator includes network magic bytes for cross-chain replay protection
+    /// - HD wallet created from xpub if provided, otherwise requires external signing
+    pub fn from_config(
+        config: BitcoinConfig,
+        rpc: Box<dyn BitcoinRpc + Send + Sync>,
+    ) -> BitcoinResult<Self> {
+        // Validate configuration
+        config
+            .validate()
+            .map_err(|e| BitcoinError::RpcError(format!("Invalid configuration: {}", e)))?;
+
+        // Build domain separator: "CSV-BTC-" + network magic bytes (replay protection)
+        let mut domain = [0u8; 32];
+        domain[..8].copy_from_slice(b"CSV-BTC-");
+        let magic = config.network.magic_bytes();
+        domain[8..12].copy_from_slice(&magic);
+
+        // Build protocol ID from network magic
+        let mut protocol_id = [0u8; 32];
+        protocol_id[..4].copy_from_slice(&magic);
+        let tx_builder = CommitmentTxBuilder::new(protocol_id, config.finality_depth as u64);
+
+        // Create wallet from xpub if provided, otherwise generate random for testing
+        let wallet = match &config.xpub {
+            Some(xpub_str) => {
+                SealWallet::from_xpub(xpub_str, config.network.to_bitcoin_network())
+                    .map_err(|e| BitcoinError::RpcError(format!("Wallet creation from xpub failed: {}", e)))?
+            }
+            None => {
+                // Generate random wallet for testing/signet scenarios
+                // Production usage should always provide xpub
+                log::warn!("No xpub provided, generating random wallet (not for production)");
+                SealWallet::generate_random(config.network.to_bitcoin_network())
+            }
+        };
+
+        log::info!(
+            "Initialized Bitcoin adapter for network {:?} (magic={:02x}{:02x}{:02x}{:02x})",
+            config.network,
+            magic[0], magic[1], magic[2], magic[3]
+        );
+
+        Ok(Self {
+            config,
+            wallet,
+            tx_builder,
+            seal_registry: Mutex::new(SealRegistry::new()),
+            domain_separator: domain,
+            rpc: Some(rpc),
+            next_seal_index: Mutex::new(0),
+        })
+    }
+
+    /// Create with an existing HD wallet (for advanced use cases).
     pub fn with_wallet(config: BitcoinConfig, wallet: SealWallet) -> BitcoinResult<Self> {
         let mut domain = [0u8; 32];
         domain[..8].copy_from_slice(b"CSV-BTC-");
@@ -274,6 +335,16 @@ impl BitcoinAnchorLayer {
     pub fn add_utxo(&self, outpoint: bitcoin::OutPoint, amount_sat: u64, account: u32, index: u32) {
         let path = crate::wallet::Bip86Path::external(account, index);
         self.wallet.add_utxo(outpoint, amount_sat, path);
+    }
+
+    /// Get a reference to the config (for chain operations)
+    pub(crate) fn config(&self) -> &BitcoinConfig {
+        &self.config
+    }
+
+    /// Get the domain separator (for chain operations)
+    pub(crate) fn domain(&self) -> [u8; 32] {
+        self.domain_separator
     }
 }
 

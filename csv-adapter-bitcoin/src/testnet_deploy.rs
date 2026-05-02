@@ -48,6 +48,7 @@ impl TestnetDeployConfig {
             finality_depth: self.finality_depth,
             publication_timeout_seconds: self.publication_timeout,
             rpc_url: self.rpc_url.to_string(),
+            xpub: None,
         }
     }
 }

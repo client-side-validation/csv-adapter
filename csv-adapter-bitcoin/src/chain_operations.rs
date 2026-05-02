@@ -727,3 +727,361 @@ impl ChainRightOps for BitcoinChainRightOps {
         ))
     }
 }
+
+/// Unified Bitcoin chain operations implementing FullChainAdapter.
+///
+/// This is the standard facade pattern implementation that combines all chain operation
+/// traits into a single type. Created from BitcoinAnchorLayer via `from_anchor_layer()`.
+///
+/// # Security
+/// - Preserves BIP-86 HD wallet derivation from the anchor layer
+/// - Maintains domain-separated hashing for all proof operations
+/// - Uses RPC client attached to anchor layer for all chain queries
+pub struct BitcoinChainOperations {
+    /// RPC client for chain communication (extracted from anchor layer)
+    rpc: Box<dyn BitcoinRpc + Send + Sync>,
+    /// Network type (preserved from anchor layer config)
+    network: Network,
+    /// Domain separator for proof generation (preserved from anchor layer)
+    domain_separator: [u8; 32],
+    /// Config for right operations
+    config: crate::config::BitcoinConfig,
+    // Note: Right operations require the anchor layer which is created on-demand
+}
+
+impl std::fmt::Debug for BitcoinChainOperations {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BitcoinChainOperations")
+            .field("network", &self.network)
+            .field("domain_separator", &hex::encode(self.domain_separator))
+            .field("config", &self.config)
+            .finish_non_exhaustive()
+    }
+}
+
+impl BitcoinChainOperations {
+    /// Create from BitcoinAnchorLayer (standard facade pattern).
+    ///
+    /// # Arguments
+    /// * `anchor` - The Bitcoin anchor layer with attached RPC and wallet
+    ///
+    /// # Security Notes
+    /// - Preserves all BIP-86 derivation settings from the anchor layer
+    /// - Maintains domain separator for cross-chain replay protection
+    /// - Clones RPC client reference for chain operations
+    pub fn from_anchor_layer(anchor: &BitcoinAnchorLayer) -> ChainOpResult<Self> {
+        // Extract RPC from anchor layer (must be present for real operations)
+        let rpc = anchor
+            .rpc
+            .as_ref()
+            .ok_or_else(|| ChainOpError::FeatureNotEnabled(
+                "RPC client not attached to anchor layer. Use from_config() to attach RPC.".to_string()
+            ))?
+            .clone_boxed();
+
+        // Extract network from anchor layer config (preserves BIP-86 coin type settings)
+        let network = anchor.config().network.to_bitcoin_network();
+
+        // Extract domain separator from anchor layer (preserves cross-chain replay protection)
+        let domain_separator = anchor.domain();
+
+        // Store config for later right operations
+        let config = anchor.config().clone();
+
+        Ok(Self {
+            rpc,
+            network,
+            domain_separator,
+            config,
+        })
+    }
+
+    /// Create from anchor layer components (internal use).
+    ///
+    /// This is the preferred constructor when you have direct access to the components.
+    pub fn new(
+        rpc: Box<dyn BitcoinRpc + Send + Sync>,
+        network: Network,
+        domain_separator: [u8; 32],
+        config: crate::config::BitcoinConfig,
+    ) -> Self {
+        Self {
+            rpc,
+            network,
+            domain_separator,
+            config,
+        }
+    }
+}
+
+#[async_trait]
+impl ChainQuery for BitcoinChainOperations {
+    async fn get_balance(&self, address: &str) -> ChainOpResult<BalanceInfo> {
+        let query = BitcoinChainQuery::new(self.rpc.clone_boxed(), self.network);
+        query.get_balance(address).await
+    }
+
+    async fn get_transaction(&self, tx_hash: &str) -> ChainOpResult<csv_adapter_core::chain_operations::TransactionInfo> {
+        let query = BitcoinChainQuery::new(self.rpc.clone_boxed(), self.network);
+        query.get_transaction(tx_hash).await
+    }
+
+    async fn get_finality(&self, tx_hash: &str) -> ChainOpResult<FinalityStatus> {
+        let query = BitcoinChainQuery::new(self.rpc.clone_boxed(), self.network);
+        query.get_finality(tx_hash).await
+    }
+
+    async fn get_contract_status(&self, contract_address: &str) -> ChainOpResult<ContractStatus> {
+        let query = BitcoinChainQuery::new(self.rpc.clone_boxed(), self.network);
+        query.get_contract_status(contract_address).await
+    }
+
+    async fn get_latest_block_height(&self) -> ChainOpResult<u64> {
+        let query = BitcoinChainQuery::new(self.rpc.clone_boxed(), self.network);
+        query.get_latest_block_height().await
+    }
+
+    async fn get_chain_info(&self) -> ChainOpResult<serde_json::Value> {
+        let query = BitcoinChainQuery::new(self.rpc.clone_boxed(), self.network);
+        query.get_chain_info().await
+    }
+
+    fn validate_address(&self, address: &str) -> bool {
+        let query = BitcoinChainQuery::new(self.rpc.clone_boxed(), self.network);
+        query.validate_address(address)
+    }
+}
+
+#[async_trait]
+impl ChainSigner for BitcoinChainOperations {
+    fn derive_address(&self, public_key: &[u8]) -> ChainOpResult<String> {
+        let signer = BitcoinChainSigner::new(self.network);
+        signer.derive_address(public_key)
+    }
+
+    async fn sign_transaction(&self, tx_data: &[u8], key_id: &str) -> ChainOpResult<Vec<u8>> {
+        let signer = BitcoinChainSigner::new(self.network);
+        signer.sign_transaction(tx_data, key_id).await
+    }
+
+    async fn sign_message(&self, message: &[u8], key_id: &str) -> ChainOpResult<Vec<u8>> {
+        let signer = BitcoinChainSigner::new(self.network);
+        signer.sign_message(message, key_id).await
+    }
+
+    fn verify_signature(
+        &self,
+        message: &[u8],
+        signature: &[u8],
+        public_key: &[u8],
+    ) -> ChainOpResult<bool> {
+        let signer = BitcoinChainSigner::new(self.network);
+        signer.verify_signature(message, signature, public_key)
+    }
+
+    fn signature_scheme(&self) -> SignatureScheme {
+        let signer = BitcoinChainSigner::new(self.network);
+        signer.signature_scheme()
+    }
+}
+
+#[async_trait]
+impl ChainBroadcaster for BitcoinChainOperations {
+    async fn submit_transaction(&self, signed_tx: &[u8]) -> ChainOpResult<String> {
+        let broadcaster = BitcoinChainBroadcaster::new(self.rpc.clone_boxed());
+        broadcaster.submit_transaction(signed_tx).await
+    }
+
+    async fn confirm_transaction(
+        &self,
+        tx_hash: &str,
+        required_confirmations: u64,
+        timeout_secs: u64,
+    ) -> ChainOpResult<TransactionStatus> {
+        let broadcaster = BitcoinChainBroadcaster::new(self.rpc.clone_boxed());
+        broadcaster.confirm_transaction(tx_hash, required_confirmations, timeout_secs).await
+    }
+
+    async fn get_fee_estimate(&self) -> ChainOpResult<u64> {
+        let broadcaster = BitcoinChainBroadcaster::new(self.rpc.clone_boxed());
+        broadcaster.get_fee_estimate().await
+    }
+
+    async fn validate_transaction(&self, tx_data: &[u8]) -> ChainOpResult<()> {
+        let broadcaster = BitcoinChainBroadcaster::new(self.rpc.clone_boxed());
+        broadcaster.validate_transaction(tx_data).await
+    }
+}
+
+#[async_trait]
+impl ChainDeployer for BitcoinChainOperations {
+    async fn deploy_lock_contract(
+        &self,
+        admin_address: &str,
+        config: serde_json::Value,
+    ) -> ChainOpResult<DeploymentStatus> {
+        let deployer = BitcoinChainDeployer;
+        deployer.deploy_lock_contract(admin_address, config).await
+    }
+
+    async fn deploy_mint_contract(
+        &self,
+        admin_address: &str,
+        config: serde_json::Value,
+    ) -> ChainOpResult<DeploymentStatus> {
+        let deployer = BitcoinChainDeployer;
+        deployer.deploy_mint_contract(admin_address, config).await
+    }
+
+    async fn deploy_or_publish_seal_program(
+        &self,
+        program_bytes: &[u8],
+        admin_address: &str,
+    ) -> ChainOpResult<DeploymentStatus> {
+        let deployer = BitcoinChainDeployer;
+        deployer.deploy_or_publish_seal_program(program_bytes, admin_address).await
+    }
+
+    async fn verify_deployment(&self, contract_address: &str) -> ChainOpResult<bool> {
+        let deployer = BitcoinChainDeployer;
+        deployer.verify_deployment(contract_address).await
+    }
+
+    async fn estimate_deployment_cost(&self, program_bytes: &[u8]) -> ChainOpResult<u64> {
+        let deployer = BitcoinChainDeployer;
+        deployer.estimate_deployment_cost(program_bytes).await
+    }
+}
+
+#[async_trait]
+impl ChainProofProvider for BitcoinChainOperations {
+    async fn build_inclusion_proof(
+        &self,
+        commitment: &Hash,
+        block_height: u64,
+    ) -> ChainOpResult<CoreInclusionProof> {
+        let provider = BitcoinChainProofProvider::new(self.rpc.clone_boxed());
+        provider.build_inclusion_proof(commitment, block_height).await
+    }
+
+    fn verify_inclusion_proof(
+        &self,
+        proof: &CoreInclusionProof,
+        commitment: &Hash,
+    ) -> ChainOpResult<bool> {
+        let provider = BitcoinChainProofProvider::new(self.rpc.clone_boxed());
+        provider.verify_inclusion_proof(proof, commitment)
+    }
+
+    async fn build_finality_proof(&self, tx_hash: &str) -> ChainOpResult<FinalityProof> {
+        let provider = BitcoinChainProofProvider::new(self.rpc.clone_boxed());
+        provider.build_finality_proof(tx_hash).await
+    }
+
+    fn verify_finality_proof(
+        &self,
+        proof: &FinalityProof,
+        tx_hash: &str,
+    ) -> ChainOpResult<bool> {
+        let provider = BitcoinChainProofProvider::new(self.rpc.clone_boxed());
+        provider.verify_finality_proof(proof, tx_hash)
+    }
+
+    fn domain_separator(&self) -> [u8; 32] {
+        // Return the domain separator from anchor layer (preserves replay protection)
+        self.domain_separator
+    }
+
+    async fn verify_proof_bundle(
+        &self,
+        inclusion_proof: &CoreInclusionProof,
+        finality_proof: &FinalityProof,
+        commitment: &Hash,
+    ) -> ChainOpResult<bool> {
+        let provider = BitcoinChainProofProvider::new(self.rpc.clone_boxed());
+        provider.verify_proof_bundle(inclusion_proof, finality_proof, commitment).await
+    }
+}
+
+#[async_trait]
+impl ChainRightOps for BitcoinChainOperations {
+    async fn create_right(
+        &self,
+        owner: &str,
+        asset_class: &str,
+        asset_id: &str,
+        metadata: serde_json::Value,
+    ) -> ChainOpResult<RightOperationResult> {
+        // Right creation requires HD wallet with xpub
+        // This would need to be done through the anchor layer directly
+        // For facade operations, we return capability unavailable
+        let _ = (owner, asset_class, asset_id, metadata);
+        Err(ChainOpError::CapabilityUnavailable(
+            "Right creation requires HD wallet. Use BitcoinAnchorLayer directly for seal operations.".to_string()
+        ))
+    }
+
+    async fn consume_right(
+        &self,
+        _right_id: &RightId,
+        _owner_key_id: &str,
+    ) -> ChainOpResult<RightOperationResult> {
+        Err(ChainOpError::CapabilityUnavailable(
+            "Right consumption requires wallet. Use BitcoinAnchorLayer directly for seal operations.".to_string()
+        ))
+    }
+
+    async fn lock_right(
+        &self,
+        _right_id: &RightId,
+        _destination_chain: &str,
+        _owner_key_id: &str,
+    ) -> ChainOpResult<RightOperationResult> {
+        Err(ChainOpError::CapabilityUnavailable(
+            "Right locking requires wallet. Use BitcoinAnchorLayer directly for seal operations.".to_string()
+        ))
+    }
+
+    async fn mint_right(
+        &self,
+        _source_chain: &str,
+        _source_right_id: &RightId,
+        _lock_proof: &CoreInclusionProof,
+        _new_owner: &str,
+    ) -> ChainOpResult<RightOperationResult> {
+        Err(ChainOpError::UnsupportedChain(
+            "Bitcoin cannot mint wrapped rights - it is a source chain".to_string()
+        ))
+    }
+
+    async fn refund_right(
+        &self,
+        _right_id: &RightId,
+        _owner_key_id: &str,
+    ) -> ChainOpResult<RightOperationResult> {
+        Err(ChainOpError::CapabilityUnavailable(
+            "Refund requires wallet. Use BitcoinAnchorLayer directly for seal operations.".to_string()
+        ))
+    }
+
+    async fn record_right_metadata(
+        &self,
+        _right_id: &RightId,
+        _metadata: serde_json::Value,
+        _owner_key_id: &str,
+    ) -> ChainOpResult<RightOperationResult> {
+        Err(ChainOpError::CapabilityUnavailable(
+            "Metadata recording requires wallet. Use BitcoinAnchorLayer directly for seal operations.".to_string()
+        ))
+    }
+
+    async fn verify_right_state(
+        &self,
+        _right_id: &RightId,
+        _expected_state: &str,
+    ) -> ChainOpResult<bool> {
+        Err(ChainOpError::CapabilityUnavailable(
+            "Right state verification requires wallet. Use BitcoinAnchorLayer directly for seal operations.".to_string()
+        ))
+    }
+}

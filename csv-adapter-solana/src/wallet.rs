@@ -98,6 +98,25 @@ impl ProgramWallet {
         let keypair = Keypair::new_from_array(secret_key);
         Ok(Self::from_keypair(keypair))
     }
+
+    /// Create wallet from base58-encoded keypair (standard Solana key format)
+    pub fn from_base58(keypair_str: &str) -> SolanaResult<Self> {
+        // Decode base58 to get the keypair bytes
+        let keypair_bytes = bs58::decode(keypair_str)
+            .into_vec()
+            .map_err(|e| SolanaError::Wallet(format!("Invalid base58 keypair: {}", e)))?;
+
+        // Ensure we have the correct length (64 bytes for full keypair)
+        if keypair_bytes.len() != 64 {
+            return Err(SolanaError::Wallet(format!(
+                "Invalid keypair length: expected 64 bytes, got {}",
+                keypair_bytes.len()
+            )));
+        }
+
+        // Deserialize the keypair
+        Self::deserialize_keypair(&keypair_bytes)
+    }
 }
 
 /// Wallet error type

@@ -489,15 +489,18 @@ impl Default for AdapterConfig {
 ///
 /// # Architecture Compliance
 ///
-/// Each chain has unique constructor requirements:
-/// - **Bitcoin**: Uses HD wallet (`with_wallet`, `from_xpub`, `signet`)
-/// - **Ethereum**: Uses `from_config(config, rpc, csv_seal_address)` 
-/// - **Sui**: Uses `from_config(config, rpc)` with optional signing key
-/// - **Aptos**: Uses `from_config(config, rpc)` with optional signing key
-/// - **Solana**: Uses `new(config)` with builder-style RPC/wallet attachment
+/// All chains now follow the standard facade pattern:
+/// - **Bitcoin**: Uses `from_config(config, rpc)` with optional xpub in config
+/// - **Ethereum**: Uses `from_config(config, rpc, csv_seal_address)`
+/// - **Sui**: Uses `from_config(config, rpc)`
+/// - **Aptos**: Uses `from_config(config, rpc)`
+/// - **Solana**: Uses `from_config(config, rpc)`
 ///
-/// The builder methods handle these differences internally, producing `Arc<dyn FullChainAdapter>`
-/// which are the ChainOperations types implementing the required traits.
+/// Chain operations are created from anchor layers via `from_anchor_layer(&anchor)`,
+/// producing `Arc<dyn FullChainAdapter>` for registration in ChainFacade.
+///
+/// The builder methods handle chain-specific configuration internally while
+/// presenting a unified interface for the facade.
 pub struct AdapterBuilder;
 
 impl AdapterBuilder {
@@ -592,17 +595,48 @@ impl AdapterBuilder {
     pub async fn solana_from_config(
         &self,
         config: csv_adapter_solana::config::SolanaConfig,
+        rpc: Box<dyn csv_adapter_solana::rpc::SolanaRpc>,
     ) -> Result<Arc<dyn FullChainAdapter>, CsvError> {
         use csv_adapter_solana::chain_operations::SolanaChainOperations;
         use csv_adapter_solana::adapter::SolanaAnchorLayer;
 
-        // Solana uses new() which returns Self directly, not Result
-        let anchor_layer = SolanaAnchorLayer::new(config);
+        // Solana now uses from_config() following the standard facade pattern
+        let anchor_layer = SolanaAnchorLayer::from_config(config, rpc)
+            .map_err(|e| CsvError::AdapterError {
+                chain: Chain::Solana,
+                message: format!("Failed to create Solana anchor layer: {}", e),
+            })?;
 
         let operations = SolanaChainOperations::from_anchor_layer(&anchor_layer)
             .map_err(|e| CsvError::AdapterError {
                 chain: Chain::Solana,
                 message: format!("Failed to create Solana chain operations: {}", e),
+            })?;
+
+        Ok(Arc::new(operations))
+    }
+
+    /// Build a Bitcoin adapter from configuration.
+    #[cfg(feature = "bitcoin")]
+    pub async fn bitcoin_from_config(
+        &self,
+        config: csv_adapter_bitcoin::config::BitcoinConfig,
+        rpc: Box<dyn csv_adapter_bitcoin::rpc::BitcoinRpc + Send + Sync>,
+    ) -> Result<Arc<dyn FullChainAdapter>, CsvError> {
+        use csv_adapter_bitcoin::chain_operations::BitcoinChainOperations;
+        use csv_adapter_bitcoin::adapter::BitcoinAnchorLayer;
+
+        // Bitcoin uses from_config() following the standard facade pattern
+        let anchor_layer = BitcoinAnchorLayer::from_config(config, rpc)
+            .map_err(|e| CsvError::AdapterError {
+                chain: Chain::Bitcoin,
+                message: format!("Failed to create Bitcoin anchor layer: {}", e),
+            })?;
+
+        let operations = BitcoinChainOperations::from_anchor_layer(&anchor_layer)
+            .map_err(|e| CsvError::AdapterError {
+                chain: Chain::Bitcoin,
+                message: format!("Failed to create Bitcoin chain operations: {}", e),
             })?;
 
         Ok(Arc::new(operations))

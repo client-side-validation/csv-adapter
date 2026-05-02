@@ -329,6 +329,13 @@ impl BitcoinRpc for MempoolSignetRpc {
             Err(_) => Ok(0),
         }
     }
+
+    fn clone_boxed(&self) -> Box<dyn BitcoinRpc + Send + Sync> {
+        Box::new(MempoolSignetRpc {
+            client: self.client.clone(),
+            base_url: self.base_url.clone(),
+        })
+    }
 }
 
 /// Block info response from mempool.space

@@ -52,7 +52,7 @@ dirs = "5.0"
 rand = "0.8"
 
 # Optional: bring in chain-specific heavy deps when full chain support is needed
-bitcoin = { version = "0.30", features = ["serde", "rand"], optional = true }
+bitcoin = { version = "0.32", features = ["serde", "rand"], optional = true }
 ed25519-dalek = { version = "2.0", features = ["rand_core"], optional = true }
 bip32 = { version = "0.5", features = ["std", "mnemonic"], optional = true }
 solana-sdk = { version = "3.0", optional = true }

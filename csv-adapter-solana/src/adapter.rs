@@ -55,6 +55,48 @@ impl SolanaAnchorLayer {
         }
     }
 
+    /// Create from configuration and RPC client (standard facade pattern).
+    ///
+    /// # Arguments
+    /// * `config` - Solana adapter configuration (includes network, program ID, optional keypair)
+    /// * `rpc_client` - RPC client for Solana node communication
+    ///
+    /// # Security Notes
+    /// - Uses Ed25519 for all signing operations (Solana native)
+    /// - Domain separator includes "SOLanaCSV" prefix for cross-chain replay protection
+    /// - Optional wallet created from config keypair if provided
+    /// - All key material handled through secure ProgramWallet
+    pub fn from_config(
+        config: SolanaConfig,
+        rpc_client: Box<dyn SolanaRpc>,
+    ) -> crate::error::SolanaResult<Self> {
+        // Build wallet from config keypair if provided
+        let wallet = match &config.keypair {
+            Some(keypair_str) => {
+                Some(ProgramWallet::from_base58(keypair_str)
+                    .map_err(|e| crate::error::SolanaError::Wallet(
+                        format!("Failed to create wallet from keypair: {}", e)
+                    ))?)
+            }
+            None => {
+                log::warn!("No keypair provided in config, wallet operations will be unavailable");
+                None
+            }
+        };
+
+        log::info!(
+            "Initialized Solana adapter for network {:?}",
+            config.network
+        );
+
+        Ok(Self {
+            config,
+            rpc_client: Some(rpc_client),
+            wallet,
+            active_seals: std::sync::Mutex::new(Vec::new()),
+        })
+    }
+
     /// Set RPC client
     pub fn with_rpc_client(mut self, rpc_client: Box<dyn SolanaRpc>) -> Self {
         self.rpc_client = Some(rpc_client);

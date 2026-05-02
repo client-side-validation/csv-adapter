@@ -11,6 +11,9 @@ pub struct BitcoinConfig {
     pub publication_timeout_seconds: u64,
     /// RPC endpoint URL
     pub rpc_url: String,
+    /// Optional xpub for HD wallet derivation (BIP-86)
+    /// If None, adapter operates in query-only mode or requires external signing
+    pub xpub: Option<String>,
 }
 
 /// Bitcoin network type
@@ -79,6 +82,7 @@ impl Default for BitcoinConfig {
             finality_depth: 6,
             publication_timeout_seconds: 3600, // 1 hour
             rpc_url: "http://127.0.0.1:8332".to_string(),
+            xpub: None,
         }
     }
 }

@@ -29,6 +29,10 @@ pub trait BitcoinRpc: Send + Sync {
         &self,
         txid: [u8; 32],
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>>;
+
+    /// Clone the RPC client into a new boxed trait object.
+    /// Required for the facade pattern to share RPC across operations.
+    fn clone_boxed(&self) -> Box<dyn BitcoinRpc + Send + Sync>;
 }
 
 /// Test-only RPC client for unit testing
@@ -95,6 +99,13 @@ impl BitcoinRpc for TestBitcoinRpc {
         _txid: [u8; 32],
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
         Ok(0)
+    }
+
+    fn clone_boxed(&self) -> Box<dyn BitcoinRpc + Send + Sync> {
+        Box::new(TestBitcoinRpc {
+            block_count: self.block_count,
+            unspent_utxos: self.unspent_utxos.clone(),
+        })
     }
 }
 
