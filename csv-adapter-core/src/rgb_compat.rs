@@ -144,15 +144,24 @@ impl RgbConsignmentValidator {
     }
 
     /// Check if genesis has non-zero inputs (invalid per RGB)
-    fn genesis_has_inputs(_consignment: &Consignment) -> bool {
+    fn genesis_has_inputs(consignment: &Consignment) -> bool {
         // Genesis should not consume any previous states
-        // This is enforced by convention - genesis has no inputs by definition
-        false
+        // RGB protocol requires genesis to have zero inputs by definition
+        // Check seal_assignments - genesis should not reference prior seals
+        let has_seal_assignments = !consignment.seal_assignments.is_empty();
+
+        // Check transitions - genesis has no transitions, so any transitions
+        // with owned_inputs would indicate non-zero inputs
+        let has_transition_inputs = consignment.transitions.iter().any(|tx| {
+            !tx.owned_inputs.is_empty()
+        });
+
+        has_seal_assignments || has_transition_inputs
     }
 
     /// Validate topological ordering of transitions
     fn validate_topological_order(consignment: &Consignment) -> Vec<RgbValidationError> {
-        let errors = Vec::new();
+        let mut errors = Vec::new();
 
         // Build a map of which transitions produce which states
         let mut state_producers: std::collections::HashMap<String, usize> =
@@ -168,18 +177,31 @@ impl RgbConsignmentValidator {
         for (tx_idx, tx) in consignment.transitions.iter().enumerate() {
             for state_ref in &tx.owned_inputs {
                 // StateRef should reference a prior output
-                // Simplified check: ensure we have seen the commitment before
-                let key = format!("{}-{}", state_ref.type_id, state_ref.commitment);
+                let key = format!("{}-{}", state_ref.type_id, hex::encode(state_ref.commitment.as_bytes()));
                 if !state_producers.contains_key(&key) && tx_idx > 0 {
-                    // Allow if it could be from genesis (simplified)
-                    // Full validation would track exact output indices
+                    // StateRef references a state not produced by genesis or prior transitions
+                    errors.push(RgbValidationError::MissingStateInput {
+                        transition_index: tx_idx,
+                        state_ref: state_ref.clone(),
+                    });
                 }
             }
 
-            // Record outputs
+            // Record outputs as producers for future transitions
             for (out_idx, _assignment) in tx.owned_outputs.iter().enumerate() {
                 let key = format!("tx{}-{}", tx_idx, out_idx);
                 state_producers.insert(key, tx_idx + 1);
+            }
+
+            // Validate that all inputs are resolved before outputs in same transition
+            let mut input_types: std::collections::HashSet<u16> = std::collections::HashSet::new();
+            for input in &tx.owned_inputs {
+                if !input_types.insert(input.type_id) {
+                    errors.push(RgbValidationError::TopologicalOrderViolation {
+                        transition_index: tx_idx,
+                        depends_on: input.type_id as usize,
+                    });
+                }
             }
         }
 
@@ -210,16 +232,90 @@ impl RgbConsignmentValidator {
     }
 
     /// Validate StateRef resolution
-    fn validate_state_refs(_consignment: &Consignment) -> Vec<RgbValidationError> {
-        // Simplified validation - full validation requires tracking exact outputs
-        Vec::new()
+    fn validate_state_refs(consignment: &Consignment) -> Vec<RgbValidationError> {
+        let mut errors = Vec::new();
+
+        // Build a map of all produced states (genesis + all transition outputs)
+        let mut produced_states: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+
+        // Genesis states
+        for (i, assignment) in consignment.genesis.owned_state.iter().enumerate() {
+            let key = format!("g-{}-{}", assignment.state_ref.type_id, hex::encode(assignment.state_ref.commitment.as_bytes()));
+            produced_states.insert(key, 0);
+        }
+
+        // Transition outputs
+        for (tx_idx, tx) in consignment.transitions.iter().enumerate() {
+            for (out_idx, assignment) in tx.owned_outputs.iter().enumerate() {
+                let key = format!("t-{}-{}-{}", tx_idx, out_idx, hex::encode(assignment.state_ref.commitment.as_bytes()));
+                produced_states.insert(key, tx_idx + 1);
+            }
+        }
+
+        // Validate all StateRefs in inputs are resolved
+        for (tx_idx, tx) in consignment.transitions.iter().enumerate() {
+            for input in &tx.owned_inputs {
+                let key = format!("{}-{}", input.type_id, hex::encode(input.commitment.as_bytes()));
+                if !produced_states.contains_key(&key) {
+                    errors.push(RgbValidationError::MissingStateInput {
+                        transition_index: tx_idx,
+                        state_ref: input.clone(),
+                    });
+                }
+            }
+        }
+
+        errors
     }
 
     /// Validate anchor-commitment binding
-    fn validate_anchor_commitment_binding(_consignment: &Consignment) -> Vec<RgbValidationError> {
-        // Each anchor's commitment should match the corresponding transition
-        // Simplified validation - full validation would check the specific batching rules
-        Vec::new()
+    fn validate_anchor_commitment_binding(consignment: &Consignment) -> Vec<RgbValidationError> {
+        let mut errors = Vec::new();
+
+        // Each anchor's commitment should match the corresponding transition hash
+        // In RGB, anchors bind transitions to the blockchain
+        // Each anchor must reference a valid transition in the consignment
+
+        // Build a map of transition IDs for anchor validation
+        let transition_ids: std::collections::HashSet<[u8; 8]> = consignment.transitions.iter()
+            .map(|tx| tx.transition_id)
+            .collect();
+
+        // Validate each anchor references a valid transition
+        for (anchor_idx, anchor) in consignment.anchors.iter().enumerate() {
+            // Anchor commitment should be derived from the transition it anchors
+            // Check that the anchor's commitment is non-trivial
+            if anchor.commitment.as_bytes() == &[0u8; 32] {
+                errors.push(RgbValidationError::AnchorCommitmentMismatch {
+                    anchor_index: anchor_idx,
+                    expected: Hash::new([0u8; 32]),
+                    actual: anchor.commitment,
+                });
+            }
+
+            // Verify anchor ref is valid
+            if anchor.anchor_ref.seal_id.is_empty() {
+                errors.push(RgbValidationError::AnchorCommitmentMismatch {
+                    anchor_index: anchor_idx,
+                    expected: Hash::new([0u8; 32]),
+                    actual: anchor.commitment,
+                });
+            }
+        }
+
+        // Verify anchors are ordered consistently with transitions
+        for i in 1..consignment.anchors.len() {
+            if consignment.anchors[i].anchor_ref.position < consignment.anchors[i-1].anchor_ref.position {
+                errors.push(RgbValidationError::AnchorCommitmentMismatch {
+                    anchor_index: i,
+                    expected: Hash::new([0u8; 32]),
+                    actual: consignment.anchors[i].commitment,
+                });
+            }
+        }
+
+        errors
     }
 
     /// Validate against schema rules

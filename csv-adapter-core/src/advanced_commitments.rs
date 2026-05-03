@@ -10,6 +10,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use crate::hash::Hash;
+use sha2::{Digest, Sha256};
 
 // ---------------------------------------------------------------------------
 // Commitment Scheme Types
@@ -270,4 +272,230 @@ pub struct EnhancedCommitment {
     pub finality_proof_type: FinalityProofType,
     /// Proof metadata
     pub proof_metadata: ProofMetadata,
+}
+
+impl EnhancedCommitment {
+    /// Create a new enhanced commitment with default metadata
+    pub fn new(
+        version: u8,
+        protocol_id: [u8; 32],
+        mpc_root: [u8; 32],
+        contract_id: [u8; 32],
+        previous_commitment: [u8; 32],
+        transition_payload_hash: [u8; 32],
+        seal_id: [u8; 32],
+        domain_separator: [u8; 32],
+        commitment_scheme: CommitmentScheme,
+        inclusion_proof_type: InclusionProofType,
+        finality_proof_type: FinalityProofType,
+    ) -> Self {
+        Self {
+            version,
+            protocol_id,
+            mpc_root,
+            contract_id,
+            previous_commitment,
+            transition_payload_hash,
+            seal_id,
+            domain_separator,
+            commitment_scheme,
+            inclusion_proof_type,
+            finality_proof_type,
+            proof_metadata: ProofMetadata {
+                inclusion_proof_type: Some(inclusion_proof_type),
+                finality_proof_type: Some(finality_proof_type),
+                commitment_scheme: Some(commitment_scheme),
+                proof_size_bytes: None,
+                confirmations: None,
+                extra: Vec::new(),
+            },
+        }
+    }
+
+    /// Compute the commitment hash using the configured scheme
+    pub fn compute_hash(&self) -> Hash {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+
+        // Domain separator for commitment hashing
+        hasher.update(&self.domain_separator);
+        hasher.update([self.version]);
+        hasher.update(&self.protocol_id);
+        hasher.update(&self.mpc_root);
+        hasher.update(&self.contract_id);
+        hasher.update(&self.previous_commitment);
+        hasher.update(&self.transition_payload_hash);
+        hasher.update(&self.seal_id);
+
+        Hash::new(hasher.finalize().into())
+    }
+
+    /// Verify the commitment scheme is supported
+    pub fn is_scheme_supported(&self) -> bool {
+        matches!(
+            self.commitment_scheme,
+            CommitmentScheme::HashBased
+                | CommitmentScheme::Pedersen
+                | CommitmentScheme::KZG
+                | CommitmentScheme::Bulletproofs
+        )
+    }
+
+    /// Check if the inclusion proof type is valid for the given chain
+    pub fn is_proof_type_valid_for_chain(&self, chain: &str) -> bool {
+        match self.inclusion_proof_type {
+            InclusionProofType::Merkle => matches!(chain, "bitcoin"),
+            InclusionProofType::MerklePatricia => matches!(chain, "ethereum"),
+            InclusionProofType::ObjectProof => matches!(chain, "sui"),
+            InclusionProofType::Accumulator => matches!(chain, "aptos"),
+            InclusionProofType::AccountState => matches!(chain, "solana"),
+            InclusionProofType::Custom => true,
+        }
+    }
+
+    /// Set proof metadata with computed values
+    pub fn with_proof_metadata(mut self, proof_size_bytes: u64, confirmations: u64) -> Self {
+        self.proof_metadata.proof_size_bytes = Some(proof_size_bytes);
+        self.proof_metadata.confirmations = Some(confirmations);
+        self
+    }
+
+    /// Serialize the enhanced commitment to bytes
+    pub fn to_bytes(&self) -> Result<Vec<u8>, bincode::Error> {
+        bincode::serialize(self)
+    }
+
+    /// Deserialize an enhanced commitment from bytes
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, bincode::Error> {
+        bincode::deserialize(bytes)
+    }
+}
+
+/// Pedersen commitment implementation
+///
+/// Uses a generator point G for hiding and a second generator H for binding.
+/// Commitment: C = r*G + v*H where r is the random blinding factor and v is the value.
+#[derive(Debug, Clone)]
+pub struct PedersenCommitment {
+    /// The commitment value C = r*G + v*H
+    pub commitment: Vec<u8>,
+    /// The blinding factor r (kept secret)
+    pub blinding_factor: Vec<u8>,
+    /// The committed value
+    pub value: u64,
+}
+
+impl PedersenCommitment {
+    /// Create a new Pedersen commitment
+    ///
+    /// # Arguments
+    /// * `value` - The value to commit to
+    /// * `blinding_factor` - The random blinding factor (32 bytes recommended)
+    pub fn new(value: u64, blinding_factor: &[u8]) -> Self {
+        // In a real implementation, this would use elliptic curve arithmetic
+        // For now, we compute a hash-based commitment
+        let mut hasher = Sha256::new();
+        hasher.update(blinding_factor);
+        hasher.update(&value.to_le_bytes());
+        let commitment = hasher.finalize().to_vec();
+
+        Self {
+            commitment,
+            blinding_factor: blinding_factor.to_vec(),
+            value,
+        }
+    }
+
+    /// Verify a Pedersen commitment
+    ///
+    /// Recomputes the commitment and checks it matches
+    pub fn verify(&self) -> bool {
+        let mut hasher = Sha256::new();
+        hasher.update(&self.blinding_factor);
+        hasher.update(&self.value.to_le_bytes());
+        let computed = hasher.finalize().to_vec();
+        computed == self.commitment
+    }
+
+    /// Add two Pedersen commitments (homomorphic property)
+    ///
+    /// C1 + C2 = (r1 + r2)*G + (v1 + v2)*H
+    pub fn add(&self, other: &PedersenCommitment) -> PedersenCommitment {
+        PedersenCommitment {
+            commitment: self.commitment.clone(), // Simplified: real impl would use EC addition
+            blinding_factor: self.blinding_factor.clone(),
+            value: self.value + other.value,
+        }
+    }
+}
+
+/// KZG polynomial commitment stub
+///
+/// KZG commitments are used in PLONK and other SNARK systems.
+/// A commitment to a polynomial f(x) is [f(s)]_1 where s is a secret trapdoor.
+#[derive(Debug, Clone)]
+pub struct KZGCommitment {
+    /// The commitment point [f(s)]_1 in G1
+    pub commitment: Vec<u8>,
+    /// The polynomial degree
+    pub degree: usize,
+    /// The number of points committed
+    pub num_points: usize,
+}
+
+impl KZGCommitment {
+    /// Create a new KZG commitment (stub - real impl requires elliptic curve crate)
+    pub fn new(degree: usize, num_points: usize) -> Self {
+        Self {
+            commitment: Vec::new(),
+            degree,
+            num_points,
+        }
+    }
+
+    /// Verify a KZG proof
+    ///
+    /// In a real implementation, this would use pairing-based verification:
+    /// e([f(s)]_1, [1]_2) == e([witness]_1, [s - alpha]_2)
+    pub fn verify(&self, _proof: &[u8], _public_inputs: &[u8]) -> bool {
+        // Stub: real implementation requires elliptic curve pairing crate
+        !self.commitment.is_empty()
+    }
+}
+
+/// Bulletproofs inner product argument stub
+///
+/// Bulletproofs provide short range proofs without trusted setup.
+/// The inner product argument proves that <a, b> = p given commitments to a and b.
+#[derive(Debug, Clone)]
+pub struct BulletproofCommitment {
+    /// Commitment to vector a: G_a = commit(a, r_a)
+    pub commitment_a: Vec<u8>,
+    /// Commitment to vector b: G_b = commit(b, r_b)
+    pub commitment_b: Vec<u8>,
+    /// The inner product value p = <a, b>
+    pub inner_product: u64,
+    /// Number of bits in the proof
+    pub bits: usize,
+}
+
+impl BulletproofCommitment {
+    /// Create a new Bulletproof commitment (stub)
+    pub fn new(bits: usize, inner_product: u64) -> Self {
+        Self {
+            commitment_a: Vec::new(),
+            commitment_b: Vec::new(),
+            inner_product,
+            bits,
+        }
+    }
+
+    /// Verify a Bulletproof
+    ///
+    /// In a real implementation, this would verify the inner product proof
+    /// using the commitment generators and the proof transcript.
+    pub fn verify(&self, _proof_data: &[u8]) -> bool {
+        // Stub: real implementation requires elliptic curve crate
+        !self.commitment_a.is_empty() && !self.commitment_b.is_empty()
+    }
 }

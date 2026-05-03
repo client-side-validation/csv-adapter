@@ -128,6 +128,9 @@ pub mod rgb_compat;
 #[cfg(feature = "tapret")]
 pub mod tapret_verify;
 
+// ZK proof infrastructure (Phase 5)
+pub mod zk_proof;
+
 // ===========================================================================
 // Re-exports: Protocol Contract (🔒 STABLE + 🟡 BETA)
 // ===========================================================================

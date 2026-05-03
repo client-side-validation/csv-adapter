@@ -56,6 +56,10 @@ pub enum InclusionProof {
     Sui(SuiCheckpointProof),
     /// Aptos: Ledger info proof
     Aptos(AptosLedgerProof),
+    /// Solana: Slot-based inclusion proof
+    Solana(SolanaSlotProof),
+    /// ZK proof: chain-agnostic zero-knowledge seal proof
+    ZkSeal(ZkSealProof),
 }
 
 /// Bitcoin Merkle proof of transaction inclusion in a block.
@@ -126,6 +130,67 @@ pub struct AptosLedgerProof {
     pub events: Vec<u8>,
     /// Whether the transaction succeeded
     pub success: bool,
+}
+
+/// Solana slot-based proof of transaction inclusion.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(missing_docs)]
+pub struct SolanaSlotProof {
+    /// Slot number where the transaction was included
+    pub slot: u64,
+    /// Transaction signature
+    pub signature: Vec<u8>,
+    /// Block hash of the slot
+    pub block_hash: [u8; 32],
+    /// Number of confirmations
+    pub confirmations: u64,
+    /// Whether the slot is finalized
+    pub finalized: bool,
+    /// Account keys involved in the transaction
+    pub account_keys: Vec<Vec<u8>>,
+    /// Instruction data hash
+    pub instruction_data_hash: [u8; 32],
+}
+
+/// ZK seal proof for chain-agnostic verification.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ZkSealProof {
+    /// The ZK proof bytes
+    pub proof_bytes: Vec<u8>,
+    /// Verifier key for proof verification
+    pub verifier_key: VerifierKey,
+    /// Public inputs from the proof
+    pub public_inputs: ZkPublicInputs,
+}
+
+/// Verifier key for ZK proof verification.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerifierKey {
+    /// Chain this verifier is for
+    pub chain: ChainId,
+    /// Verifier key bytes
+    pub key_bytes: Vec<u8>,
+    /// Proof system type
+    pub proof_system: String,
+    /// Key version
+    pub version: u32,
+}
+
+/// Public inputs from a ZK seal proof.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ZkPublicInputs {
+    /// The seal reference being proven
+    pub seal_ref: SealRef,
+    /// Block hash where the seal was consumed
+    pub block_hash: Hash,
+    /// Commitment hash bound to the proof
+    pub commitment: Hash,
+    /// Source chain identifier
+    pub source_chain: ChainId,
+    /// Block height
+    pub block_height: u64,
+    /// Unix timestamp
+    pub timestamp: u64,
 }
 
 /// Finality proof confirming source transaction is finalized.

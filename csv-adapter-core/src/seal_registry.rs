@@ -66,6 +66,8 @@ pub enum ChainId {
     Aptos,
     /// Ethereum blockchain (Nullifier seals)
     Ethereum,
+    /// Solana blockchain (PDA seals)
+    Solana,
     /// Custom or unknown chain
     Custom(String),
 }

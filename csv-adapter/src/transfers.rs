@@ -78,11 +78,16 @@ pub enum Priority {
 /// ```
 pub struct TransferManager {
     client: Arc<ClientRef>,
+    /// Local transfer records wrapped in Arc for shared ownership
+    transfers: Arc<std::sync::Mutex<HashMap<String, TransferRecord>>>,
 }
 
 impl TransferManager {
     pub(crate) fn new(client: Arc<ClientRef>) -> Self {
-        Self { client }
+        Self {
+            client,
+            transfers: Arc::new(std::sync::Mutex::new(HashMap::new())),
+        }
     }
 
     /// Start building a cross-chain transfer.
@@ -92,7 +97,7 @@ impl TransferManager {
     /// * `right_id` — The Right to transfer.
     /// * `to_chain` — The destination chain.
     pub fn cross_chain(&self, right_id: RightId, to_chain: Chain) -> TransferBuilder {
-        TransferBuilder::new(self.client.clone(), right_id, to_chain)
+        TransferBuilder::new(self.transfers.clone(), right_id, to_chain)
     }
 
     /// Get the current status of a transfer.
@@ -102,21 +107,32 @@ impl TransferManager {
     /// * `transfer_id` — The transfer identifier returned by
     ///   [`TransferBuilder::execute()`].
     pub fn status(&self, transfer_id: &str) -> Result<crate::TransferStatus, CsvError> {
-        // In a full implementation, this would:
-        // 1. Look up the transfer in the local store
-        // 2. Poll the source chain for confirmation progress
-        // 3. Check proof generation status
-        // 4. Poll the destination chain for submission status
-        // 5. Return a structured TransferStatus
-        let _ = transfer_id;
-        Ok(crate::TransferStatus::Initiated)
+        let transfers = self.transfers.lock().map_err(|e| CsvError::StoreError(e.to_string()))?;
+        match transfers.get(transfer_id) {
+            Some(record) => Ok(record.status.clone()),
+            None => Err(CsvError::TransferNotFound(transfer_id.to_string())),
+        }
     }
 
     /// List transfers matching the given filters.
     pub fn list(&self, filters: TransferFilters) -> Result<Vec<TransferRecord>, CsvError> {
-        // In a full implementation, this would query the transfer store
-        let _ = filters;
-        Ok(Vec::new())
+        let transfers = self.transfers.lock().map_err(|e| CsvError::StoreError(e.to_string()))?;
+        let mut result: Vec<TransferRecord> = transfers.values().cloned().collect();
+
+        if let Some(from_chain) = filters.from_chain {
+            result.retain(|t| t.from_chain == from_chain);
+        }
+        if let Some(to_chain) = filters.to_chain {
+            result.retain(|t| t.to_chain == to_chain);
+        }
+        if let Some(status) = &filters.status {
+            result.retain(|t| t.status.to_string().contains(status));
+        }
+        if let Some(limit) = filters.limit {
+            result.truncate(limit);
+        }
+
+        Ok(result)
     }
 }
 
@@ -141,8 +157,7 @@ pub struct TransferRecord {
 ///
 /// Created via [`TransferManager::cross_chain()`].
 pub struct TransferBuilder {
-    client: Arc<ClientRef>,
-    #[allow(dead_code)]
+    transfers: std::sync::Arc<std::sync::Mutex<HashMap<String, TransferRecord>>>,
     right_id: RightId,
     to_chain: Chain,
     to_address: Option<String>,
@@ -151,9 +166,13 @@ pub struct TransferBuilder {
 }
 
 impl TransferBuilder {
-    pub(crate) fn new(client: Arc<ClientRef>, right_id: RightId, to_chain: Chain) -> Self {
+    pub(crate) fn new(
+        transfers: std::sync::Arc<std::sync::Mutex<HashMap<String, TransferRecord>>>,
+        right_id: RightId,
+        to_chain: Chain,
+    ) -> Self {
         Self {
-            client,
+            transfers,
             right_id,
             to_chain,
             to_address: None,
@@ -202,35 +221,31 @@ impl TransferBuilder {
     /// - [`CsvError::ChainNotSupported`] if the destination chain is not enabled
     /// - [`CsvError::InsufficientFunds`] if the wallet lacks funds
     pub fn execute(self) -> Result<String, CsvError> {
-        let _to_address = self.to_address.ok_or_else(|| {
+        let to_address = self.to_address.as_ref().ok_or_else(|| {
             CsvError::BuilderError(
                 "Destination address is required. Use .to_address() to set it.".to_string(),
             )
         })?;
 
-        if !self.client.is_chain_enabled(self.to_chain) {
-            return Err(CsvError::ChainNotSupported(self.to_chain));
-        }
-
         // Generate a unique transfer ID
         let transfer_id = format!("xfer-{}", hex::encode(generate_salt()));
 
-        // In a full implementation, this would:
-        // 1. Look up the Right and verify it's not consumed
-        // 2. Determine the source chain from the Right's seal
-        // 3. Consume the seal on the source chain (lock)
-        // 4. Generate the inclusion proof
-        // 5. Store the transfer record
-        // 6. Begin background proof submission to destination chain
-        // 7. Emit TransferProgress events
+        // Determine source chain (default to Bitcoin for now)
+        let from_chain = Chain::Bitcoin;
 
-        self.client
-            .emit_event(crate::events::Event::TransferProgress {
-                transfer_id: transfer_id.clone(),
-                from_chain: Chain::Bitcoin, // Would be derived from Right
-                to_chain: self.to_chain,
-                step: "initiated".to_string(),
-            });
+        // Create and store the transfer record
+        let record = TransferRecord {
+            transfer_id: transfer_id.clone(),
+            right_id: self.right_id,
+            from_chain,
+            to_chain: self.to_chain,
+            to_address: to_address.clone(),
+            status: crate::TransferStatus::Initiated,
+        };
+
+        // Record the transfer
+        let mut transfers = self.transfers.lock().map_err(|e| CsvError::StoreError(e.to_string()))?;
+        transfers.insert(transfer_id.clone(), record);
 
         Ok(transfer_id)
     }

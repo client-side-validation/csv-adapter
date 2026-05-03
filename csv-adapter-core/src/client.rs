@@ -421,11 +421,32 @@ impl ValidationClient {
                 }
                 // In production: verify HotStuff ledger signatures
             }
+            (CrossChainInclusionProof::Solana(proof), ChainId::Solana) => {
+                if !proof.finalized {
+                    return Err(ValidationError::InclusionProofFailed(
+                        "Slot not finalized".to_string(),
+                    ));
+                }
+                if proof.confirmations < 32 {
+                    return Err(ValidationError::InclusionProofFailed(
+                        "Insufficient confirmations for Solana finality".to_string(),
+                    ));
+                }
+            }
+            (CrossChainInclusionProof::ZkSeal(proof), _) => {
+                if proof.proof_bytes.is_empty() {
+                    return Err(ValidationError::InclusionProofFailed(
+                        "Empty ZK proof bytes".to_string(),
+                    ));
+                }
+                // ZK proof verification is delegated to the ZkVerifier trait
+            }
             // Mismatched proof type and chain — reject
             (CrossChainInclusionProof::Bitcoin(_), _)
             | (CrossChainInclusionProof::Ethereum(_), _)
             | (CrossChainInclusionProof::Sui(_), _)
-            | (CrossChainInclusionProof::Aptos(_), _) => {
+            | (CrossChainInclusionProof::Aptos(_), _)
+            | (CrossChainInclusionProof::Solana(_), _) => {
                 return Err(ValidationError::InclusionProofFailed(format!(
                     "Proof type does not match expected chain: {:?}",
                     chain
