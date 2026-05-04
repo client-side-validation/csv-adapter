@@ -14,6 +14,7 @@ pub mod chain_operations;
 pub mod config;
 pub mod deploy;
 pub mod error;
+pub mod mpc_batch;
 pub mod proofs;
 pub mod rpc;
 pub mod seal;
@@ -44,6 +45,11 @@ pub use tapret::{
 pub use tx_builder::{CommitmentData, CommitmentTxBuilder, TxBuilderError};
 pub use types::{BitcoinAnchorRef, BitcoinFinalityProof, BitcoinInclusionProof, BitcoinSealRef};
 pub use wallet::{Bip86Path, DerivedTaprootKey, SealWallet, WalletError, WalletUtxo};
+
+// MPC batching for cost optimization
+pub use mpc_batch::{
+    MpcBatcher, MpcTreeExt, BatchedPublication, PendingCommitment, CSV_BTC_PROTOCOL_ID,
+};
 
 // Chain operations exports
 pub use chain_operations::{

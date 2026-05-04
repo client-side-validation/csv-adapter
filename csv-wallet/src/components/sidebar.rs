@@ -216,6 +216,7 @@ fn developer_mode_nav(mode: WalletMode) -> Element {
 
         {sidebar_section("Advanced", rsx! {
             {sidebar_link(Route::Seals {}, "\u{1F512}", "Seals")}
+            {sidebar_link(Route::SealRegistry {}, "\u{1F4D7}", "Seal Registry")}
             {sidebar_link(Route::Proofs {}, "\u{1F4C4}", "Proofs")}
             {sidebar_link(Route::Contracts {}, "\u{1F4DC}", "Contracts")}
         })}

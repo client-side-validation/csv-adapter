@@ -68,6 +68,8 @@ pub enum Route {
     CreateSeal {},
     #[route("/seals/consume")]
     ConsumeSeal { seal_ref: Option<String> },
+    #[route("/seals/registry")]
+    SealRegistry {},
     #[route("/seals/verify")]
     VerifySeal {},
 

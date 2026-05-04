@@ -38,6 +38,10 @@ pub enum BitcoinError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
+    /// MPC tree/building error
+    #[error("MPC error: {0}")]
+    MpcError(String),
+
     /// Wrapper for core adapter errors
     #[error(transparent)]
     CoreError(#[from] csv_adapter_core::AdapterError),
@@ -67,6 +71,7 @@ impl From<BitcoinError> for csv_adapter_core::AdapterError {
                 ))
             }
             BitcoinError::InvalidInput(msg) => csv_adapter_core::AdapterError::InvalidInput(msg),
+            BitcoinError::MpcError(msg) => csv_adapter_core::AdapterError::Generic(format!("MPC: {}", msg)),
         }
     }
 }
@@ -78,6 +83,7 @@ impl BitcoinError {
             BitcoinError::RpcError(_) => true,
             BitcoinError::TransactionNotFound(_) => true,
             BitcoinError::InsufficientConfirmations { .. } => true,
+            BitcoinError::MpcError(_) => true,
             BitcoinError::ReorgDetected { .. } => true,
             BitcoinError::InvalidInput(_) => false,
             BitcoinError::UTXOSpent(_) => false,
@@ -101,6 +107,7 @@ impl HasErrorSuggestion for BitcoinError {
                 error_codes::BTC_INSUFFICIENT_CONFIRMATIONS
             }
             BitcoinError::InvalidInput(_) => error_codes::BTC_RPC_ERROR,
+            BitcoinError::MpcError(_) => "BTC_MPC_ERROR",
             BitcoinError::CoreError(e) => e.error_code(),
         }
     }
@@ -164,6 +171,7 @@ impl HasErrorSuggestion for BitcoinError {
                 )
             }
             BitcoinError::InvalidInput(msg) => format!("Check the input parameters: {}", msg),
+            BitcoinError::MpcError(msg) => format!("MPC tree operation failed: {}. Check commitment data and retry.", msg),
             BitcoinError::CoreError(e) => e.suggested_fix(),
         }
     }
@@ -171,6 +179,7 @@ impl HasErrorSuggestion for BitcoinError {
     fn docs_url(&self) -> String {
         match self {
             BitcoinError::CoreError(e) => e.docs_url(),
+            BitcoinError::MpcError(_) => "https://docs.csv.network/errors/mpc".to_string(),
             _ => error_codes::docs_url(self.error_code()),
         }
     }

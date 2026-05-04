@@ -55,7 +55,7 @@ pub use cross_chain::{CrossChain, CrossChainRetry, CrossChainStatus, CrossChainT
 pub use contracts::{AddContract, ContractStatus, Contracts, DeployContract};
 
 // Re-exports from seals module
-pub use seals::{ConsumeSeal, CreateSeal, Seals, VerifySeal};
+pub use seals::{ConsumeSeal, CreateSeal, SealRegistry, Seals, VerifySeal};
 
 // Re-exports from tests module
 pub use tests::{RunScenario, RunTests, Test};
