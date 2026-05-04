@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSV Wallet Custom Styles */
+
+/* ===== Design Tokens ===== */
+:root {
+    /* Single-Use Seal States - core UI vocabulary */
+    --seal-unconsumed: #22c55e;
+    --seal-consumed: #6b7280;
+    --seal-double-spent: #ef4444;
+    --seal-pending: #f59e0b;
+
+    /* Proof verification states */
+    --proof-valid: #22c55e;
+    --proof-invalid: #ef4444;
+    --proof-pending: #f59e0b;
+    --proof-unverified: #6b7280;
+
+    /* Commitment chain visualization */
+    --chain-genesis: #8b5cf6;
+    --chain-node: #3b82f6;
+    --chain-latest: #22c55e;
+    --chain-link: #374151;
+}
+
+/* ===== Seal Status Styles ===== */
+.seal-unconsumed {
+    color: var(--seal-unconsumed);
+}
+
+.seal-consumed {
+    color: var(--seal-consumed);
+}
+
+.seal-double-spent {
+    color: var(--seal-double-spent);
+}
+
+.seal-pending {
+    color: var(--seal-pending);
+}
+
+/* ===== Proof Status Styles ===== */
+.proof-valid {
+    color: var(--proof-valid);
+}
+
+.proof-invalid {
+    color: var(--proof-invalid);
+}
+
+.proof-pending {
+    color: var(--proof-pending);
+}
+
+.proof-unverified {
+    color: var(--proof-unverified);
+}
+
+/* ===== Chain Visualization ===== */
+.chain-genesis {
+    color: var(--chain-genesis);
+}
+
+.chain-node {
+    color: var(--chain-node);
+}
+
+.chain-latest {
+    color: var(--chain-latest);
+}
+
+.chain-link {
+    color: var(--chain-link);
+}

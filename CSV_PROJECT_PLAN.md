@@ -25,6 +25,7 @@
 ## 1. Honest Assessment
 
 ### What works well
+
 - `csv-adapter-core` protocol center is architecturally sound
 - `AnchorLayer` → `FullChainAdapter` trait hierarchy is clean
 - Chain-graded trust model (UTXO vs Object vs Nullifier) is a genuine insight
@@ -73,6 +74,7 @@ let seal_id = format!("seal_{}_{}", chain, chrono::Utc::now().timestamp_millis()
 ```
 
 A single-use seal MUST be a chain-native reference:
+
 - **Bitcoin**: `OutPoint { txid, vout }` — a specific UTXO
 - **Ethereum**: `(contract_address, storage_slot)` or nullifier hash
 - **Sui**: `ObjectId` — a real Sui object
@@ -292,6 +294,7 @@ User: "Create a seal on Sui"
 ```
 
 **Files to change:**
+
 - `csv-wallet/src/seals/manager.rs` — add `adapter` parameter to `create_seal`
 - `csv-wallet/src/seals/store.rs` — add `seal_ref` field to storage schema
 - `csv-wallet/src/services/seal_service.rs` — wire adapter resolution
@@ -304,11 +307,13 @@ User: "Create a seal on Sui"
 `csv-adapter-core/src/validator.rs` contains a correct 5-step validation pipeline. It is never called from the wallet. When a user receives a proof bundle or a consignment, the validator must run before the right is accepted into state.
 
 **Current flow (broken):**
+
 ```
 User receives transfer → UI updates state optimistically → no validation
 ```
 
 **Correct flow:**
+
 ```
 User receives consignment
   → csv-wallet/src/pages/validate/consignment.rs (already exists!)
@@ -318,6 +323,7 @@ User receives consignment
 ```
 
 **Files to change:**
+
 - `csv-wallet/src/pages/validate/consignment.rs` — connect to `ConsignmentValidator`
 - `csv-wallet/src/pages/validate/proof.rs` — connect to `ProofVerifier`
 - `csv-wallet/src/pages/validate/seal.rs` — connect to `SealRegistry::check_consumed`
@@ -328,6 +334,7 @@ User receives consignment
 `csv-adapter-core/src/commitment_chain.rs` correctly walks the hash chain. Surface this.
 
 **Add to `csv-wallet/src/pages/rights/journey.rs`** (already exists):
+
 - Show each commitment in the chain as a timeline node
 - Show the genesis commitment separately highlighted
 - Show `previous_commitment` hash linking to prior node
@@ -350,6 +357,7 @@ testnet-integration:
 ```
 
 Create `csv-adapter-bitcoin/tests/integration_bitcoin.rs` with:
+
 - Create seal on signet
 - Publish commitment
 - Verify inclusion
@@ -371,6 +379,7 @@ These tests already have groundwork in `csv-adapter-bitcoin/examples/signet_real
 Current state: each crate defines its own error types with no consistent mapping.
 
 **Problem files:**
+
 - `csv-adapter-core/src/error.rs` — `AdapterError`
 - `csv-adapter-bitcoin/src/error.rs` — `BitcoinError`
 - `csv-adapter-ethereum/src/error.rs` — `EthereumError`
@@ -383,6 +392,7 @@ Current state: each crate defines its own error types with no consistent mapping
 **Fix:** All chain errors must implement `Into<AdapterError>`. Add `From<BitcoinError> for AdapterError`, etc. The wallet uses only `CsvError` which wraps `AdapterError`. No `String` errors in service calls.
 
 In `csv-adapter-core/src/error.rs`, add:
+
 ```rust
 #[derive(Debug, thiserror::Error)]
 pub enum AdapterError {
@@ -410,6 +420,7 @@ csv-explorer         → may depend on csv-adapter + csv-adapter-store
 ```
 
 **Violations to fix:**
+
 - `csv-wallet` must NOT directly import `csv-adapter-bitcoin`, `csv-adapter-ethereum`, etc. — all chain operations go through `csv-adapter::ChainFacade`
 - Check current `csv-wallet/Cargo.toml` for direct chain adapter deps
 
@@ -532,6 +543,7 @@ tailwind_output = "assets/tailwind.css"
 Run `npx tailwindcss -i public/tailwind.css -o assets/tailwind.css --watch` in dev. CI generates the CSS before build. The 300ms hack in `main.rs` is deleted entirely.
 
 Remove from `main.rs`:
+
 ```rust
 // DELETE THIS:
 use_effect(move || {
@@ -600,6 +612,7 @@ Sidebar:
 ```
 
 This requires changes to:
+
 - `csv-wallet/src/layout.rs` — mode switcher
 - `csv-wallet/src/components/sidebar.rs` — conditional navigation
 - `csv-wallet/src/routes.rs` — no structural change needed
@@ -634,6 +647,7 @@ Currently the `ProofBundle` is created and stored but never shown to users as a 
 **Add:** `csv-wallet/src/pages/proofs/bundle.rs` (new page)
 
 A proof bundle page that shows:
+
 - Source chain anchor (tx hash, block height, finality status)
 - Inclusion proof (Merkle branch, root)
 - Finality proof (confirmations, checkpoint, etc.)
@@ -766,6 +780,7 @@ Do NOT start Phase 5 while seals are still fake timestamp strings.
 Target: A `ZkSealProof` that proves a Bitcoin UTXO was spent in block X without requiring the verifier to query any Bitcoin RPC.
 
 **Implementation path:**
+
 1. Choose SP1 (easier developer experience) over Risc0 for initial implementation
 2. Write guest program: `csv-adapter-bitcoin/src/sp1_guest/spv.rs`
    - Input: raw Bitcoin transaction + Merkle branch + block header
@@ -789,6 +804,7 @@ SP1 proofs are large (~1MB). For Ethereum, use Groth16 which produces 256-byte p
 AluVM provides deterministic execution for contract validation scripts. This enables schema-enforced state transition rules that run client-side, verified by any counterparty.
 
 Wire `AluVmAdapter::execute` to the validator pipeline:
+
 - Schema validation step in `validator.rs` currently does structural checks only
 - With AluVM: schema can contain bytecode that enforces custom invariants
 - Example: "This right can only be transferred to addresses starting with specific prefix"
@@ -826,6 +842,7 @@ typescript-sdk/
 ```
 
 **Key:** The TypeScript client should be able to verify a `ProofBundle` received from a Rust peer. This requires either:
+
 - WASM compilation of `csv-adapter-core::proof_verify` — best approach
 - Pure TypeScript re-implementation of the verification — fallback
 
@@ -834,6 +851,7 @@ typescript-sdk/
 `csv-mcp-server` enables AI agents (Claude, GPT, etc.) to operate CSV rights workflows.
 
 **High-value actions for MCP:**
+
 - `create_seal(chain, value)` — agent creates a seal
 - `transfer_right(right_id, destination)` — agent transfers a right
 - `verify_proof(bundle_json)` — agent verifies a proof bundle
@@ -944,12 +962,14 @@ Week 17+:   Phase 6 (TypeScript SDK, MCP server)
 ## The Competitive Advantage Summary
 
 Traditional bridges and NFT solutions:
+
 - Hold funds in custodial contracts
 - Require trusting bridge operators
 - Cannot prove history without RPC
 - Double-spends require chain reorganization to detect
 
 Your system with CSV + Single-Use Seals:
+
 - **No custody** — rights are off-chain state, seals are chain-enforced one-shot locks
 - **No trusted bridge** — proof bundles are self-verifying
 - **Offline verification** — anyone with the bundle can verify without any server

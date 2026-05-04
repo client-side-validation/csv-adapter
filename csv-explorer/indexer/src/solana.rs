@@ -419,10 +419,26 @@ impl SolanaIndexer {
     ) -> Option<RightRecord> {
         let sig = Self::tx_signature(txn_info);
         let slot = txn_info.slot.unwrap_or(0);
+
+        // Extract account keys from transaction message for real seal reference
+        // Solana transaction structure: transaction.message.accountKeys
+        let first_account = txn_info
+            .transaction
+            .as_ref()
+            .and_then(|t| t.get("message"))
+            .and_then(|m| m.get("accountKeys"))
+            .and_then(|keys| keys.as_array())
+            .and_then(|arr| arr.first())
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        // Use first account as potential seal reference, or "unknown" if unavailable
+        let seal_ref = first_account.unwrap_or_else(|| "unknown".to_string());
+
         Some(RightRecord {
             id: format!("sol-right-{}", sig),
             chain: "solana".to_string(),
-            seal_ref: format!("sol-pda-{}", sig),
+            seal_ref,
             commitment: format!("sol-commitment-{}", sig),
             owner: "unknown".to_string(),
             created_at: chrono::Utc::now(),
@@ -441,11 +457,27 @@ impl SolanaIndexer {
 
     fn parse_seal_from_log(&self, txn_info: &TransactionInfo, block: u64) -> Option<SealRecord> {
         let sig = Self::tx_signature(txn_info);
+
+        // Extract account keys from transaction message for real seal reference
+        // Solana transaction structure: transaction.message.accountKeys
+        let first_account = txn_info
+            .transaction
+            .as_ref()
+            .and_then(|t| t.get("message"))
+            .and_then(|m| m.get("accountKeys"))
+            .and_then(|keys| keys.as_array())
+            .and_then(|arr| arr.first())
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        // Use first account as potential seal reference, or "unknown" if unavailable
+        let seal_ref = first_account.unwrap_or_else(|| "unknown".to_string());
+
         Some(SealRecord {
             id: format!("sol-seal-{}", sig),
             chain: "solana".to_string(),
             seal_type: SealType::Account,
-            seal_ref: format!("sol-pda-{}", sig),
+            seal_ref,
             right_id: None,
             status: SealStatus::Consumed,
             consumed_at: Some(chrono::Utc::now()),

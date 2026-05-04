@@ -418,10 +418,18 @@ impl AptosIndexer {
         let owner = event.data.get("owner")?.as_str()?.to_string();
         let commitment = event.data.get("commitment")?.as_str()?.to_string();
 
+        // Use actual seal_id from event data if available, otherwise "unknown"
+        let seal_ref = event
+            .data
+            .get("seal_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+
         Some(RightRecord {
             id: right_id,
             chain: "aptos".to_string(),
-            seal_ref: format!("aptos-event-{}", event.sequence_number),
+            seal_ref,
             commitment,
             owner,
             created_at: chrono::Utc::now(),
@@ -443,11 +451,14 @@ impl AptosIndexer {
 
         let is_consumed = event.type_.contains("Consumed") || event.type_.contains("spent");
 
+        // seal_ref should be the actual seal_id from on-chain event data, not a constructed string
+        let seal_ref = seal_id.clone();
+
         Some(SealRecord {
             id: seal_id,
             chain: "aptos".to_string(),
             seal_type: SealType::Resource,
-            seal_ref: format!("aptos-event-{}", event.sequence_number),
+            seal_ref,
             right_id: None,
             status: if is_consumed {
                 SealStatus::Consumed

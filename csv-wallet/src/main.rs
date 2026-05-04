@@ -28,12 +28,7 @@ fn main() {
 #[component]
 fn App() -> Element {
     rsx! {
-        // Tailwind CSS CDN (play CDN auto-scans classes)
-        document::Script {
-            src: "https://cdn.tailwindcss.com",
-        }
-
-        // Critical reset
+        // Critical reset (required for base styling)
         document::Style {
             r#type: "text/css",
             "{CRITICAL_CSS}"

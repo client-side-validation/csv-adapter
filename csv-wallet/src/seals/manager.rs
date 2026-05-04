@@ -64,27 +64,31 @@ impl SealManager {
     ///
     /// # IMPORTANT: Protocol Correctness
     /// The `seal_ref` MUST be a real chain-native seal identifier obtained from
-    /// a chain adapter's `create_seal()` method. Never pass a fake/timestamp-based ID.
+    /// a chain adapter's `create_seal()` method. This function will fail if no
+    /// real seal reference is provided.
     ///
     /// # Arguments
     /// * `chain` - The blockchain where the seal is created
     /// * `value` - Optional value/funding for the seal (chain-specific units)
-    /// * `seal_ref` - The real chain-native seal reference from the chain adapter
+    /// * `seal_ref` - The real chain-native seal reference from the chain adapter (REQUIRED)
     ///
     /// # Returns
     /// A `SealRecord` with the real on-chain seal reference stored
+    ///
+    /// # Errors
+    /// Returns an error if `seal_ref` is None (fake seals not allowed)
     pub fn create_seal(
         &self,
         chain: Chain,
         value: Option<u64>,
         seal_ref: Option<SealRef>,
     ) -> Result<SealRecord, String> {
-        // Use the real seal_id from chain-native reference, or generate a placeholder
-        // (placeholder is only for display until real seal is created on-chain)
-        let seal_id = seal_ref
-            .as_ref()
-            .map(|sr| hex::encode(&sr.seal_id))
-            .unwrap_or_else(|| format!("seal_{}_{}", chain, chrono::Utc::now().timestamp_millis()));
+        let seal_ref = seal_ref.ok_or_else(|| {
+            "Protocol violation: Cannot create seal without a real chain-native SealRef. \
+             Use the chain adapter's create_seal() method to obtain a real seal reference.".to_string()
+        })?;
+
+        let seal_id = hex::encode(&seal_ref.seal_id);
 
         let record = SealRecord {
             id: seal_id.clone(),
@@ -94,7 +98,7 @@ impl SealManager {
             updated_at: chrono::Utc::now(),
             right_id: None,
             value,
-            seal_ref,
+            seal_ref: Some(seal_ref),
         };
 
         self.store.save_seal(&record).map_err(|e| format!("{}", e))?;
