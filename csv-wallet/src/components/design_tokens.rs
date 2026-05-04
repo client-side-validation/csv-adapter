@@ -216,6 +216,7 @@ pub fn seal_state_class(state: SealState) -> String {
         SealState::Consumed => "seal-consumed".to_string(),
         SealState::Locked => "seal-locked".to_string(),
         SealState::Error => "seal-error".to_string(),
+        SealState::DoubleSpent => "seal-double-spent".to_string(),
     }
 }
 
@@ -232,6 +233,8 @@ pub enum SealState {
     Locked,
     /// Seal operation failed.
     Error,
+    /// Seal was double-spent (protocol violation detected).
+    DoubleSpent,
 }
 
 impl SealState {
@@ -243,6 +246,7 @@ impl SealState {
             SealState::Consumed => "Consumed",
             SealState::Locked => "Locked",
             SealState::Error => "Error",
+            SealState::DoubleSpent => "Double-Spent",
         }
     }
 
@@ -254,11 +258,17 @@ impl SealState {
             SealState::Consumed => "var(--seal-consumed-dot)".to_string(),
             SealState::Locked => "var(--seal-locked-dot)".to_string(),
             SealState::Error => "var(--seal-error-dot)".to_string(),
+            SealState::DoubleSpent => "var(--seal-double-spent)".to_string(),
         }
     }
 
     /// Check if state is actionable.
     pub fn is_actionable(&self) -> bool {
         matches!(self, SealState::Active | SealState::Pending)
+    }
+
+    /// Check if state represents a protocol violation.
+    pub fn is_violation(&self) -> bool {
+        matches!(self, SealState::DoubleSpent | SealState::Error)
     }
 }

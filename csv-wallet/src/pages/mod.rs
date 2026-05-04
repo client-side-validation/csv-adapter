@@ -46,7 +46,7 @@ pub use accounts::{AccountTransactions, Dashboard};
 pub use rights::{ConsumeRight, CreateRight, RightJourney, Rights, ShowRight, TransferRight};
 
 // Re-exports from proofs module
-pub use proofs::{GenerateProof, Proofs, VerifyCrossChainProof, VerifyProof};
+pub use proofs::{GenerateProof, ProofBundlePage, Proofs, VerifyCrossChainProof, VerifyProof};
 
 // Re-exports from cross_chain module
 pub use cross_chain::{CrossChain, CrossChainRetry, CrossChainStatus, CrossChainTransfer};
@@ -62,7 +62,7 @@ pub use tests::{RunScenario, RunTests, Test};
 
 // Re-exports from validate module
 pub use validate::{
-    Validate, ValidateCommitmentChain, ValidateConsignment, ValidateProof, ValidateSeal,
+    OfflineVerify, Validate, ValidateCommitmentChain, ValidateConsignment, ValidateProof, ValidateSeal,
 };
 
 // Re-exports from transactions module

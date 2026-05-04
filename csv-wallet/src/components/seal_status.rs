@@ -70,6 +70,7 @@ pub fn SealStatusBadge(props: SealStatusBadgeProps) -> Element {
         SealState::Consumed => "seal-consumed",
         SealState::Locked => "seal-locked",
         SealState::Error => "seal-error",
+        SealState::DoubleSpent => "seal-double-spent",
     };
 
     let should_pulse = props.pulse.unwrap_or(props.state == SealState::Pending);
@@ -223,6 +224,7 @@ fn seal_state_class(state: SealState) -> &'static str {
         SealState::Consumed => "seal-consumed",
         SealState::Locked => "seal-locked",
         SealState::Error => "seal-error",
+        SealState::DoubleSpent => "seal-double-spent",
     }
 }
 

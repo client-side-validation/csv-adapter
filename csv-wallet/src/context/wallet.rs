@@ -758,6 +758,11 @@ impl WalletContext {
             .cloned()
     }
 
+    /// Get proof by seal_ref (alias for proof_for_seal)
+    pub fn get_proof(&self, seal_ref: &str) -> Option<ProofRecord> {
+        self.proof_for_seal(seal_ref)
+    }
+
     /// Get all proofs for a right
     pub fn proofs_for_right(&self, right_id: &str) -> Vec<ProofRecord> {
         self.state

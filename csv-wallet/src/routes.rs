@@ -30,6 +30,8 @@ pub enum Route {
     // Proofs
     #[route("/proofs")]
     Proofs {},
+    #[route("/proofs/:id/bundle")]
+    ProofBundlePage { id: String },
     #[route("/proofs/generate")]
     GenerateProof {},
     #[route("/proofs/verify")]
@@ -82,6 +84,8 @@ pub enum Route {
     Validate {},
     #[route("/validate/consignment")]
     ValidateConsignment {},
+    #[route("/validate/offline")]
+    OfflineVerify {},
     #[route("/validate/proof")]
     ValidateProof {},
     #[route("/validate/seal")]
