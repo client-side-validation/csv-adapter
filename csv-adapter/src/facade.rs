@@ -300,6 +300,40 @@ impl ChainFacade {
             })
     }
 
+    /// Create a new seal on the specified chain.
+    ///
+    /// This is the primary facade function for seal creation. It delegates to the
+    /// chain adapter's AnchorLayer::create_seal method to create a real chain-native seal.
+    ///
+    /// # Arguments
+    /// * `chain` - The blockchain where the seal will be created
+    /// * `value` - Optional value/funding for the seal (chain-specific units like satoshis, wei, etc.)
+    ///
+    /// # Returns
+    /// * `Ok(SealRef)` - The real chain-native seal reference
+    /// * `Err` - If seal creation fails
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let seal_ref = facade.create_seal(Chain::Bitcoin, Some(100_000)).await?;
+    /// // seal_ref.seal_id contains the actual on-chain identifier (e.g., UTXO txid)
+    /// ```
+    pub async fn create_seal(
+        &self,
+        chain: Chain,
+        value: Option<u64>,
+    ) -> Result<csv_adapter_core::SealRef, CsvError> {
+        let adapter = self.get_adapter(chain)?;
+        
+        // Delegate to the adapter's create_seal method
+        adapter
+            .create_seal(value)
+            .map_err(|e| CsvError::AdapterError {
+                chain,
+                message: format!("Seal creation failed: {}", e),
+            })
+    }
+
     /// Mint a right on the destination chain.
     ///
     /// Delegates to ChainRightOps::mint_right.

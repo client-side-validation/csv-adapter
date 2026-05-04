@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 use crate::hash::Hash;
 use crate::proof::{FinalityProof, InclusionProof};
 use crate::right::RightId;
+use crate::seal::SealRef;
+use crate::traits::AnchorLayer;
 
 /// Result type for chain operations
 pub type ChainOpResult<T> = Result<T, ChainOpError>;
@@ -505,6 +507,20 @@ pub trait FullChainAdapter:
 
     /// Check if a specific capability is available
     fn is_capability_available(&self, capability: ChainCapability) -> bool;
+
+    /// Create a new seal on the chain.
+    ///
+    /// This method creates a real chain-native seal that can be used for
+    /// anchoring commitments. The seal is created via the chain adapter's
+    /// AnchorLayer implementation.
+    ///
+    /// # Arguments
+    /// * `value` - Optional value/funding for the seal (chain-specific units)
+    ///
+    /// # Returns
+    /// * `Ok(SealRef)` - The created seal reference
+    /// * `Err` - If seal creation fails or is not supported
+    fn create_seal(&self, value: Option<u64>) -> ChainOpResult<SealRef>;
 }
 
 /// Chain capabilities that may not be available on all chains
@@ -560,6 +576,13 @@ impl<T: ChainQuery + ChainSigner + ChainBroadcaster + ChainDeployer + ChainProof
         // By default, assume all capabilities are available
         // Individual adapters should override this
         true
+    }
+
+    fn create_seal(&self, _value: Option<u64>) -> ChainOpResult<SealRef> {
+        // Default implementation returns error - adapters must override
+        Err(ChainOpError::CapabilityUnavailable(
+            "Seal creation not implemented for this chain".into(),
+        ))
     }
 }
 
