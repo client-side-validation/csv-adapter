@@ -255,9 +255,25 @@ impl KeyManager {
     pub fn format_address(&self, chain: Chain) -> Result<String, KeyError> {
         match chain {
             Chain::Bitcoin => {
-                let (_, pubkey) = self.derive_bitcoin_keys()?;
-                // Simplified - in production convert to bech32m
-                Ok(format!("bc1q{}", hex::encode(&pubkey.serialize()[0..20])))
+                let (_, xonly_pubkey) = self.derive_bitcoin_keys()?;
+                // Build proper Taproot (P2TR) address using bech32m encoding
+                // Taproot address: bc1p<xonly_pubkey>
+                use bitcoin::secp256k1::PublicKey as BitcoinPubkey;
+                use bitcoin::key::XOnlyPublicKey as BitcoinXOnlyPubkey;
+
+                // Convert secp256k1 XOnlyPublicKey to bitcoin crate format
+                let xonly_bytes = xonly_pubkey.serialize();
+                let bitcoin_xonly = BitcoinXOnlyPubkey::from_slice(&xonly_bytes)
+                    .map_err(|e| KeyError::InvalidKeyFormat(format!("Invalid XOnly public key: {}", e)))?;
+
+                // Build Taproot address (witness v1)
+                let address = bitcoin::Address::from_witness_program(
+                    bitcoin::WitnessProgram::new_v1(bitcoin_xonly)
+                        .map_err(|e| KeyError::InvalidKeyFormat(format!("Invalid witness program: {}", e)))?,
+                    bitcoin::Network::Bitcoin,
+                );
+
+                Ok(address.to_string())
             }
             Chain::Ethereum => {
                 let (_, address) = self.derive_ethereum_keys()?;

@@ -54,92 +54,66 @@ pub fn NftPage() -> Element {
     }
 }
 
+/// NFT Gallery component - displays user's NFT collection
+///
+/// **NOTE**: Currently displays empty state. To wire this to real data:
+/// 1. Add NFT fetching service to context
+/// 2. Connect to NFT APIs (Alchemy, Moralis, etc.) or chain adapters
+/// 3. Store NFT data in wallet state
 #[component]
 pub fn NftGallery() -> Element {
-    // Sample NFT data for demonstration
-    let sample_nfts = [
-        NftRecord {
-            id: "nft-1".to_string(),
-            chain: csv_adapter_core::Chain::Ethereum,
-            collection_id: Some("collection-1".to_string()),
-            name: "Cosmic Ape #1234".to_string(),
-            symbol: Some("APE".to_string()),
-            description: Some("A rare cosmic ape exploring the metaverse".to_string()),
-            owner: "0x1234...5678".to_string(),
-            token_id: Some("1234".to_string()),
-            metadata: None,
-            image_url: Some("https://example.com/ape1.jpg".to_string()),
-            external_url: Some("https://opensea.io/assets/ethereum/0x.../1234".to_string()),
-            created_at: 1640995200,
-            status: NftStatus::Owned,
-        },
-        NftRecord {
-            id: "nft-2".to_string(),
-            chain: csv_adapter_core::Chain::Solana,
-            collection_id: Some("collection-2".to_string()),
-            name: "Solana Monkey #567".to_string(),
-            symbol: Some("SOLMONK".to_string()),
-            description: Some("A cool monkey from the Solana ecosystem".to_string()),
-            owner: "9WzDXwBbmkg8ZXtBjTfZFpK9S".to_string(),
-            token_id: Some("567".to_string()),
-            metadata: None,
-            image_url: Some("https://example.com/monkey1.jpg".to_string()),
-            external_url: Some("https://magiceden.io/items/567".to_string()),
-            created_at: 1640995200,
-            status: NftStatus::Owned,
-        },
-    ];
+    // TODO: Wire to real NFT data source via context
+    // For now, show empty state with instructions
+    let has_nfts = false;
 
     rsx! {
-        div { class: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
-            {sample_nfts.iter().map(|nft| {
-                rsx! {
-                    NftCard { nft: nft.clone() }
+        if has_nfts {
+            div { class: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
+                // NFT cards will render here when data is available
+                "NFT collection will appear here once connected to an NFT data source."
+            }
+        } else {
+            div { class: "flex flex-col items-center justify-center py-16 text-center",
+                div { class: "text-6xl mb-4", "\u{1F3A8}" }
+                h3 { class: "text-xl font-semibold text-gray-900 dark:text-white mb-2",
+                    "No NFTs Found"
                 }
-            })}
+                p { class: "text-gray-600 dark:text-gray-400 max-w-md mb-6",
+                    "This feature requires connection to an NFT data source (e.g., Alchemy, Moralis, or direct chain queries)."
+                }
+                div { class: "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-lg",
+                    p { class: "text-sm text-blue-800 dark:text-blue-200",
+                        "To implement: Add NFT service to AppContext that fetches from blockchain RPC or NFT APIs."
+                    }
+                }
+            }
         }
     }
 }
 
+/// NFT Collections component - displays NFT collections
+///
+/// **NOTE**: Currently displays empty state. Requires NFT service implementation.
 #[component]
 pub fn NftCollections() -> Element {
-    // Mock collection data
-    let sample_collections = [
-        NftCollection {
-            id: "collection-1".to_string(),
-            chain: csv_adapter_core::Chain::Ethereum,
-            name: "Bored Ape Yacht Club".to_string(),
-            symbol: "BAYC".to_string(),
-            description: Some("A collection of unique apes".to_string()),
-            image_url: Some("https://example.com/bayc.jpg".to_string()),
-            external_url: Some("https://boredapeyachtclub.com".to_string()),
-            total_supply: 10000,
-            owner_count: 6500,
-            floor_price: Some(15.5),
-            created_at: 1640995200,
-        },
-        NftCollection {
-            id: "collection-2".to_string(),
-            chain: csv_adapter_core::Chain::Solana,
-            name: "Solana Monkey Business".to_string(),
-            symbol: "SMB".to_string(),
-            description: Some("Monkeys building on Solana".to_string()),
-            image_url: Some("https://example.com/smb.jpg".to_string()),
-            external_url: Some("https://smb.genesisdao.com".to_string()),
-            total_supply: 5000,
-            owner_count: 1200,
-            floor_price: Some(2.8),
-            created_at: 1640995200,
-        },
-    ];
+    // TODO: Wire to real NFT collection data
+    let has_collections = false;
 
     rsx! {
-        div { class: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
-            {sample_collections.iter().map(|collection| {
-                rsx! {
-                    CollectionCard { collection: collection.clone() }
+        if has_collections {
+            div { class: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
+                "Collections will appear here once connected to an NFT data source."
+            }
+        } else {
+            div { class: "flex flex-col items-center justify-center py-16 text-center",
+                div { class: "text-6xl mb-4", "\u{1F5BC}" }
+                h3 { class: "text-xl font-semibold text-gray-900 dark:text-white mb-2",
+                    "No Collections Found"
                 }
-            })}
+                p { class: "text-gray-600 dark:text-gray-400 max-w-md",
+                    "NFT collections will appear here once you connect to an NFT data source."
+                }
+            }
         }
     }
 }

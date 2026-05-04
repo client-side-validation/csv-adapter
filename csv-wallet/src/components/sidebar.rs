@@ -1,7 +1,39 @@
-//! Sidebar navigation component.
+//! Sidebar navigation component with Mode Switcher.
+//!
+//! Three distinct user personas: User Mode, Developer Mode, Validator Mode
 
 use crate::routes::Route;
 use dioxus::prelude::*;
+
+/// Wallet user modes - defines the navigation structure
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum WalletMode {
+    /// End users holding tokenized rights. Simple navigation.
+    #[default]
+    User,
+    /// Developers building on CSV protocol. Advanced tools exposed.
+    Developer,
+    /// Counterparties verifying proof bundles. Validation tools.
+    Validator,
+}
+
+impl WalletMode {
+    pub fn label(&self) -> &'static str {
+        match self {
+            WalletMode::User => "User",
+            WalletMode::Developer => "Developer",
+            WalletMode::Validator => "Validator",
+        }
+    }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            WalletMode::User => "\u{1F465}",      // 👤
+            WalletMode::Developer => "\u{1F4BB}", // 💻
+            WalletMode::Validator => "\u{1F50D}", // 🔍
+        }
+    }
+}
 
 /// Sidebar section helper.
 fn sidebar_section(title: &str, children: Element) -> Element {
@@ -24,10 +56,57 @@ fn sidebar_link(to: Route, icon: &str, label: &str) -> Element {
     }
 }
 
-/// Sidebar navigation component.
+/// Mode switcher component - allows switching between User/Developer/Validator modes
+#[component]
+fn ModeSwitcher(mode: Signal<WalletMode>) -> Element {
+    let current = mode();
+
+    rsx! {
+        div { class: "px-3 py-2",
+            div { class: "flex bg-gray-800 rounded-lg p-1",
+                // User Mode
+                button {
+                    class: if current == WalletMode::User {
+                        "flex-1 px-2 py-1 text-xs font-medium bg-blue-600 text-white rounded transition-colors"
+                    } else {
+                        "flex-1 px-2 py-1 text-xs font-medium text-gray-400 hover:text-white transition-colors"
+                    },
+                    onclick: move |_| mode.set(WalletMode::User),
+                    span { "{WalletMode::User.icon()}" }
+                    span { " User" }
+                }
+                // Developer Mode
+                button {
+                    class: if current == WalletMode::Developer {
+                        "flex-1 px-2 py-1 text-xs font-medium bg-purple-600 text-white rounded transition-colors"
+                    } else {
+                        "flex-1 px-2 py-1 text-xs font-medium text-gray-400 hover:text-white transition-colors"
+                    },
+                    onclick: move |_| mode.set(WalletMode::Developer),
+                    span { "{WalletMode::Developer.icon()}" }
+                    span { " Dev" }
+                }
+                // Validator Mode
+                button {
+                    class: if current == WalletMode::Validator {
+                        "flex-1 px-2 py-1 text-xs font-medium bg-green-600 text-white rounded transition-colors"
+                    } else {
+                        "flex-1 px-2 py-1 text-xs font-medium text-gray-400 hover:text-white transition-colors"
+                    },
+                    onclick: move |_| mode.set(WalletMode::Validator),
+                    span { "{WalletMode::Validator.icon()}" }
+                    span { " Valid" }
+                }
+            }
+        }
+    }
+}
+
+/// Sidebar navigation component with mode-based sections.
 #[component]
 pub fn Sidebar(sidebar_open: bool) -> Element {
     let open = sidebar_open;
+    let mut mode = use_signal(WalletMode::default);
 
     rsx! {
         aside {
@@ -47,43 +126,20 @@ pub fn Sidebar(sidebar_open: bool) -> Element {
                 }
             }
 
-            // Nav sections
+            // Mode Switcher (only when expanded)
+            if open {
+                ModeSwitcher { mode }
+            }
+
+            // Nav sections - conditionally rendered based on mode
             if open {
                 nav { class: "flex-1 py-3 px-2 overflow-y-auto",
-                    {sidebar_section("Overview", rsx! {
-                        {sidebar_link(Route::Dashboard {}, "\u{1F4CA}", "Dashboard")}
-                        {sidebar_link(Route::Transactions {}, "\u{1F4B8}", "Transactions")}
-                    })}
+                    // Mode-specific navigation sections
+                    {user_mode_nav(mode())}
+                    {developer_mode_nav(mode())}
+                    {validator_mode_nav(mode())}
 
-                    {sidebar_section("Rights & Assets", rsx! {
-                        {sidebar_link(Route::Rights {}, "\u{1F48E}", "All Rights")}
-                        {sidebar_link(Route::CreateRight {}, "\u{2795}", "Create Right")}
-                        {sidebar_link(Route::TransferRight {}, "\u{27A1}", "Transfer Right")}
-                        {sidebar_link(Route::ConsumeRight {}, "\u{1F525}", "Consume Right")}
-                    })}
-
-                    {sidebar_section("Cross-Chain Transfer", rsx! {
-                        {sidebar_link(Route::CrossChain {}, "\u{21C4}", "All Transfers")}
-                        {sidebar_link(Route::CrossChainTransfer {}, "\u{2795}", "New Transfer")}
-                        {sidebar_link(Route::CrossChainStatus {}, "\u{1F50D}", "Status")}
-                    })}
-
-                    {sidebar_section("Seals & Proofs", rsx! {
-                        {sidebar_link(Route::Seals {}, "\u{1F512}", "Seals (Locked Rights)")}
-                        {sidebar_link(Route::Proofs {}, "\u{1F4C4}", "Proofs (Validation)")}
-                    })}
-
-                    {sidebar_section("Contracts", rsx! {
-                        {sidebar_link(Route::Contracts {}, "\u{1F4DC}", "All Contracts")}
-                        // Note: Contract deployment requires native SDKs (tokio/mio)
-                        // which don't compile to WASM. Use csv-cli for deployment.
-                    })}
-
-                    {sidebar_section("Test & Validate", rsx! {
-                        {sidebar_link(Route::Test {}, "\u{1F9EA}", "Tests")}
-                        {sidebar_link(Route::Validate {}, "\u{2705}", "Validate")}
-                    })}
-
+                    // Common sections for all modes
                     div { class: "border-t border-gray-800 my-3" }
 
                     {sidebar_section("Wallet & Settings", rsx! {
@@ -92,17 +148,109 @@ pub fn Sidebar(sidebar_open: bool) -> Element {
                     })}
                 }
             } else {
-                // Collapsed sidebar - icons only
+                // Collapsed sidebar - icons only (common links)
                 nav { class: "flex-1 py-3 px-2 flex flex-col items-center gap-1",
                     Link { to: Route::Dashboard {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Dashboard", "\u{1F4CA}" }
-                    Link { to: Route::Transactions {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Transactions", "\u{1F4B8}" }
                     Link { to: Route::Rights {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Rights", "\u{1F48E}" }
-                    Link { to: Route::Seals {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Seals", "\u{1F512}" }
-                    Link { to: Route::Proofs {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Proofs", "\u{1F4C4}" }
-                    Link { to: Route::CrossChain {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Cross-Chain", "\u{21C4}" }
+                    Link { to: Route::WalletPage {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Wallet", "\u{1F4B3}" }
                     Link { to: Route::Settings {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Settings", "\u{2699}\u{FE0F}" }
                 }
             }
         }
+    }
+}
+
+/// User Mode navigation - simple, focused on assets and transfers
+fn user_mode_nav(mode: WalletMode) -> Element {
+    if mode != WalletMode::User {
+        return rsx! {};
+    }
+
+    rsx! {
+        {sidebar_section("Portfolio", rsx! {
+            {sidebar_link(Route::WalletPage {}, "\u{1F4B0}", "My Assets")}
+            {sidebar_link(Route::Dashboard {}, "\u{1F4CA}", "Overview")}
+        })}
+
+        {sidebar_section("My Rights", rsx! {
+            {sidebar_link(Route::Rights {}, "\u{1F48E}", "All Rights")}
+            {sidebar_link(Route::CreateRight {}, "\u{2795}", "Create Right")}
+        })}
+
+        {sidebar_section("Send / Receive", rsx! {
+            {sidebar_link(Route::TransferRight {}, "\u{1F4E4}", "Send Right")}
+            {sidebar_link(Route::CrossChainTransfer {}, "\u{1F504}", "Cross-Chain")}
+        })}
+
+        {sidebar_section("History", rsx! {
+            {sidebar_link(Route::Transactions {}, "\u{1F4B8}", "Transactions")}
+            {sidebar_link(Route::CrossChain {}, "\u{21C4}", "Cross-Chain Transfers")}
+        })}
+    }
+}
+
+/// Developer Mode navigation - advanced tools and raw data
+fn developer_mode_nav(mode: WalletMode) -> Element {
+    if mode != WalletMode::Developer {
+        return rsx! {};
+    }
+
+    rsx! {
+        {sidebar_section("Overview", rsx! {
+            {sidebar_link(Route::Dashboard {}, "\u{1F4CA}", "Dashboard")}
+            {sidebar_link(Route::Transactions {}, "\u{1F4B8}", "Transactions")}
+        })}
+
+        {sidebar_section("Rights & Assets", rsx! {
+            {sidebar_link(Route::Rights {}, "\u{1F48E}", "All Rights")}
+            {sidebar_link(Route::CreateRight {}, "\u{2795}", "Create Right")}
+            {sidebar_link(Route::TransferRight {}, "\u{27A1}", "Transfer Right")}
+            {sidebar_link(Route::ConsumeRight {}, "\u{1F525}", "Consume Right")}
+        })}
+
+        {sidebar_section("Cross-Chain Transfer", rsx! {
+            {sidebar_link(Route::CrossChain {}, "\u{21C4}", "All Transfers")}
+            {sidebar_link(Route::CrossChainTransfer {}, "\u{2795}", "New Transfer")}
+            {sidebar_link(Route::CrossChainStatus {}, "\u{1F50D}", "Status")}
+        })}
+
+        {sidebar_section("Advanced", rsx! {
+            {sidebar_link(Route::Seals {}, "\u{1F512}", "Seals")}
+            {sidebar_link(Route::Proofs {}, "\u{1F4C4}", "Proofs")}
+            {sidebar_link(Route::Contracts {}, "\u{1F4DC}", "Contracts")}
+        })}
+
+        {sidebar_section("Tools", rsx! {
+            {sidebar_link(Route::Test {}, "\u{1F9EA}", "Tests")}
+            {sidebar_link(Route::Validate {}, "\u{2705}", "Validate")}
+        })}
+    }
+}
+
+/// Validator Mode navigation - verification and proof checking
+fn validator_mode_nav(mode: WalletMode) -> Element {
+    if mode != WalletMode::Validator {
+        return rsx! {};
+    }
+
+    rsx! {
+        {sidebar_section("Overview", rsx! {
+            {sidebar_link(Route::Dashboard {}, "\u{1F4CA}", "Dashboard")}
+        })}
+
+        {sidebar_section("Verification", rsx! {
+            {sidebar_link(Route::Proofs {}, "\u{1F4C4}", "Verify Proof")}
+            {sidebar_link(Route::CrossChainStatus {}, "\u{1F50D}", "Verify Transfer")}
+            {sidebar_link(Route::Seals {}, "\u{1F512}", "Check Seal")}
+        })}
+
+        {sidebar_section("Validation", rsx! {
+            {sidebar_link(Route::Validate {}, "\u{2705}", "Validate Consignment")}
+            {sidebar_link(Route::Proofs {}, "\u{1F4CB}", "Proof Inspector")}
+        })}
+
+        {sidebar_section("Cross-Chain", rsx! {
+            {sidebar_link(Route::CrossChain {}, "\u{21C4}", "All Transfers")}
+        })}
     }
 }

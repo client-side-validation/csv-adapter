@@ -1,4 +1,5 @@
 # The Complete Renaming Plan
+
 ## CSV Adapter Project — Every Name, Every Level
 
 ---
@@ -8,25 +9,27 @@
 The project has three distinct naming problems that feed each other:
 
 **Problem 1 — "Adapter" means nothing.**  
-An adapter is a small connector between two incompatible interfaces. This codebase 
-is a full protocol SDK with a wallet, explorer, cross-chain proof system, and contract 
-schema library. "Adapter" describes none of that. It also appears at three different 
-levels with three different meanings: `ChainAdapter` (plugin), `AnchorLayer` (protocol 
-trait), `FullChainAdapter` (combined operations). The word does different things each 
+An adapter is a small connector between two incompatible interfaces. This codebase
+is a full protocol SDK with a wallet, explorer, cross-chain proof system, and contract
+schema library. "Adapter" describes none of that. It also appears at three different
+levels with three different meanings: `ChainAdapter` (plugin), `AnchorLayer` (protocol
+trait), `FullChainAdapter` (combined operations). The word does different things each
 time it appears.
 
 **Problem 2 — The three-layer trait hierarchy has no clear names.**  
+
 ```
 ChainAdapter       ← "basic plugin descriptor" (chain_id, capabilities, create_client)
 AnchorLayer        ← "the actual seal protocol" (create_seal, publish, verify_inclusion, enforce_seal)
 FullChainAdapter   ← "combined: Query + Signer + Broadcaster + Deployer + ProofProvider + RightOps"
 ```
-These three are architecturally correct and distinct. They just share a word ("adapter" 
+
+These three are architecturally correct and distinct. They just share a word ("adapter"
 or "layer") that reveals nothing about what each one does.
 
 **Problem 3 — "Right" and "SealRef" are ambiguous in their own contexts.**  
-`SealRef` clashes with Rust's `&SealRef` reference syntax every time it appears in 
-function signatures. `Right` collides with the English word "correct" and the 
+`SealRef` clashes with Rust's `&SealRef` reference syntax every time it appears in
+function signatures. `Right` collides with the English word "correct" and the
 directional word, causing readers to re-parse every sentence.
 
 ---
@@ -34,10 +37,11 @@ directional word, causing readers to re-parse every sentence.
 ## Part 1 — Project and Repository Name
 
 ### Current: `csv-adapter`
+
 ### Verdict: Wrong on both words
 
-"CSV" to any outsider means comma-separated values. The `client-side-validation` 
-GitHub org rescues it — but the repo name cannot assume the org is always visible. 
+"CSV" to any outsider means comma-separated values. The `client-side-validation`
+GitHub org rescues it — but the repo name cannot assume the org is always visible.
 "Adapter" is documented above.
 
 ### Recommendation: Rename repo to `csv-protocol`
@@ -50,18 +54,18 @@ github.com/client-side-validation/csv-ts         ← TypeScript SDK
 github.com/client-side-validation/csv-mcp        ← MCP server
 ```
 
-`csv-protocol` reads as "the Rust implementation of the CSV protocol" — accurate, 
-clear, searchable. The org name `client-side-validation` provides the expansion for 
+`csv-protocol` reads as "the Rust implementation of the CSV protocol" — accurate,
+clear, searchable. The org name `client-side-validation` provides the expansion for
 anyone who needs it.
 
-Keep the GitHub org name exactly as is. `client-side-validation` is precise, unique, 
+Keep the GitHub org name exactly as is. `client-side-validation` is precise, unique,
 and googleable. Do not shorten it.
 
 ---
 
 ## Part 2 — Crate Names
 
-The `csv-adapter-*` naming layers the word "adapter" into every import path. 
+The `csv-adapter-*` naming layers the word "adapter" into every import path.
 Drop it entirely.
 
 | Current crate name | New crate name | Rationale |
@@ -81,13 +85,14 @@ Drop it entirely.
 | *(future)* | `csv-schemas` | Contract schema library. |
 
 **`Cargo.toml` workspace package name:**
+
 ```toml
 [workspace.package]
 # was: name not set explicitly, version = "0.4.0"
 # all crates get their own name field with the new names above
 ```
 
-**Crate rename note:** `cargo` crate names use hyphens, Rust import paths use underscores. 
+**Crate rename note:** `cargo` crate names use hyphens, Rust import paths use underscores.
 `csv-core` → `use csv_core::...`. This is already the pattern in your codebase.
 
 ---
@@ -99,13 +104,13 @@ This is the architectural heart. Three traits, three precise new names.
 ### Layer 1: `ChainAdapter` → `ChainDriver`
 
 **Location:** `csv-adapter-core/src/chain_adapter.rs`  
-**What it does:** Plugin descriptor for a chain. Provides `chain_id()`, 
-`chain_name()`, `capabilities()`, `create_client()`, `create_wallet()`. 
+**What it does:** Plugin descriptor for a chain. Provides `chain_id()`,
+`chain_name()`, `capabilities()`, `create_client()`, `create_wallet()`.
 This is how a chain registers itself into the system.
 
-**Why "Driver"?** A device driver is the minimal interface that allows an OS to use 
-a piece of hardware. `ChainDriver` is exactly that — the minimal interface that allows 
-the protocol to use a blockchain. It does not do protocol operations; it describes the 
+**Why "Driver"?** A device driver is the minimal interface that allows an OS to use
+a piece of hardware. `ChainDriver` is exactly that — the minimal interface that allows
+the protocol to use a blockchain. It does not do protocol operations; it describes the
 chain and creates the tools to interact with it.
 
 ```rust
@@ -126,18 +131,20 @@ pub trait ChainDriverExt: ChainDriver { ... }
 
 **Location:** `csv-adapter-core/src/traits.rs`  
 **What it does:** THE core protocol trait. Defines:
+
 - `create_seal()` — open a new single-use seal on-chain
 - `publish()` — anchor a commitment to a seal
 - `verify_inclusion()` — prove commitment is in a block
 - `verify_finality()` — prove block is final
 - `enforce_seal()` — consume/close the seal
 
-**Why "SealProtocol"?** This trait IS the single-use seal protocol. Every method 
-is a step in the seal lifecycle. "Anchor" in the current name focuses on where 
-commitments land; "SealProtocol" names what the trait is responsible for managing: 
+**Why "SealProtocol"?** This trait IS the single-use seal protocol. Every method
+is a step in the seal lifecycle. "Anchor" in the current name focuses on where
+commitments land; "SealProtocol" names what the trait is responsible for managing:
 the full lifecycle of a seal.
 
 The implementations become:
+
 ```rust
 // Before
 struct EthereumAnchorLayer
@@ -153,6 +160,7 @@ struct SuiSealProtocol
 **File rename:** `traits.rs` → `seal_protocol.rs`
 
 The associated types get clearer names too:
+
 ```rust
 pub trait SealProtocol {
     type SealPoint: Debug + Clone + Eq;       // was: SealRef
@@ -168,6 +176,7 @@ pub trait SealProtocol {
 
 **Location:** `csv-adapter-core/src/chain_adapter.rs` (currently shares file with Layer 1)  
 **What it does:** The complete chain implementation combining:
+
 - `ChainQuery` — read chain state
 - `ChainSigner` — sign transactions
 - `ChainBroadcaster` — submit transactions
@@ -175,8 +184,8 @@ pub trait SealProtocol {
 - `ChainProofProvider` — build proof bundles
 - `ChainRightOps` — operate on Rights
 
-**Why "Backend"?** A backend is a full, complete implementation. "Full" in 
-`FullChainAdapter` already signals completeness; "Backend" names what it is: 
+**Why "Backend"?** A backend is a full, complete implementation. "Full" in
+`FullChainAdapter` already signals completeness; "Backend" names what it is:
 the complete chain-side implementation that the protocol runtime talks to.
 
 ```rust
@@ -186,11 +195,12 @@ pub trait FullChainAdapter: ChainQuery + ChainSigner + ChainBroadcaster +
 
 // After
 pub trait ChainBackend: ChainQuery + ChainSigner + ChainBroadcaster +
-    ChainDeployer + ChainProofProvider + ChainTitleOps { ... }
-// (ChainRightOps → ChainTitleOps because Right → Title, see Part 4)
+    ChainDeployer + ChainProofProvider + ChainSanadOps { ... }
+// (ChainRightOps → ChainSanadOps because Right → Sanad, see Part 4)
 ```
 
 **Separate files:** Split `chain_adapter.rs` into:
+
 - `driver.rs` — `ChainDriver` (Layer 1)
 - `backend.rs` — `ChainBackend` + all sub-traits (Layer 3)
 
@@ -231,14 +241,14 @@ SolanaChainOperations           SolanaBackend
 
 ### `SealRef` → `SealPoint`
 
-**Problem:** `SealRef` clashes with Rust reference syntax. `&SealRef` in a 
-function signature is genuinely ambiguous for a millisecond — "is this a 
-reference to something, or the SealRef type?" Also, it's not "a reference to 
+**Problem:** `SealRef` clashes with Rust reference syntax. `&SealRef` in a
+function signature is genuinely ambiguous for a millisecond — "is this a
+reference to something, or the SealRef type?" Also, it's not "a reference to
 a seal" — it IS the seal identifier itself.
 
-**Why "SealPoint"?** Bitcoin uses `OutPoint` (txid + vout) to identify a specific 
-output. A Bitcoin seal IS an OutPoint. `SealPoint` generalizes this: a specific 
-point on any chain that acts as a seal. It's precise, has blockchain precedent, 
+**Why "SealPoint"?** Bitcoin uses `OutPoint` (txid + vout) to identify a specific
+output. A Bitcoin seal IS an OutPoint. `SealPoint` generalizes this: a specific
+point on any chain that acts as a seal. It's precise, has blockchain precedent,
 and does not clash with Rust syntax.
 
 ```rust
@@ -256,6 +266,7 @@ pub struct SealPoint {
 ```
 
 Chain-specific variants:
+
 ```rust
 // Before                        // After
 BitcoinSealRef                   BitcoinSealPoint
@@ -269,10 +280,10 @@ The fuzz target `fuzz_seal_ref_from_bytes.rs` → `fuzz_seal_point_from_bytes.rs
 
 ### `AnchorRef` → `CommitAnchor`
 
-**Problem:** `AnchorRef` suffers the same ref-confusion as `SealRef`. Also 
+**Problem:** `AnchorRef` suffers the same ref-confusion as `SealRef`. Also
 ambiguous with the proposed rename of `AnchorLayer`.
 
-**Why "CommitAnchor"?** It's where a commitment was anchored on-chain. 
+**Why "CommitAnchor"?** It's where a commitment was anchored on-chain.
 "CommitAnchor" reads as a noun: "the anchor for a commitment."
 
 ```rust
@@ -289,20 +300,21 @@ pub struct AptosCommitAnchor { ... }
 
 ---
 
-### `Right` → `Title`
+### `Right` → `Sanad`
 
 **The question:** Is "Right" a good name?
 
-It is legally accurate (a "right" in property law is exclusive and transferable), 
+It is legally accurate (a "right" in property law is exclusive and transferable),
 short, and maps to the concept. But it has two practical problems:
 
-1. Collides with English: "turn right", "that's right", "right-click" — every 
+1. Collides with English: "turn right", "that's right", "right-click" — every
    developer mentally re-parses "right" the first time they encounter it in code.
-2. In your own codebase, `OwnedState` already exists in `state.rs` and represents 
-   raw owned state. The relationship between `Right` and `OwnedState` is unclear 
+2. In your own codebase, `OwnedState` already exists in `state.rs` and represents
+   raw owned state. The relationship between `Right` and `OwnedState` is unclear
    when names look unrelated.
 
-**Why "Title"?** A property title is:
+**Why "Sanad"?** A property title is:
+
 - A legal document proving ownership ✓
 - Exclusive — one title per property ✓  
 - Transferable — deeds change hands ✓
@@ -316,16 +328,17 @@ pub struct Right { ... }
 pub type RightId = Hash;
 
 // After
-pub struct Title { ... }
-pub type TitleId = Hash;
+pub struct Sanad { ... }
+pub type SanadId = Hash;
 ```
 
 Supporting type renames:
+
 ```rust
 // Before                       After
-RightOperationResult            TitleOperationResult
-ChainRightOps                   ChainTitleOps
-RightId                         TitleId
+RightOperationResult            SanadOperationResult
+ChainRightOps                   ChainSanadOps
+RightId                         SanadId
 fuzz_right_from_canonical_bytes fuzz_title_from_canonical_bytes
 basic_right.rs (example)        basic_title.rs
 ```
@@ -336,13 +349,13 @@ basic_right.rs (example)        basic_title.rs
 
 ### `MpcTree` → `CommitMux`
 
-**Problem:** "MPC" stands for Multi-Protocol Commitment (the doc comment says so). 
-But every developer will read "MPC" as Multi-Party Computation — a completely 
-different cryptographic concept. The confusion is not hypothetical; it will mislead 
+**Problem:** "MPC" stands for Multi-Protocol Commitment (the doc comment says so).
+But every developer will read "MPC" as Multi-Party Computation — a completely
+different cryptographic concept. The confusion is not hypothetical; it will mislead
 every new contributor.
 
-**Why "CommitMux"?** A multiplexer (mux) combines multiple signals into one output. 
-`CommitMux` combines multiple protocol commitments into one on-chain output. 
+**Why "CommitMux"?** A multiplexer (mux) combines multiple signals into one output.
+`CommitMux` combines multiple protocol commitments into one on-chain output.
 "Mux" has technical precision without collision with MPC terminology.
 
 ```rust
@@ -359,9 +372,9 @@ MerkleBranchNode             MuxBranchNode  (or keep MerkleBranchNode — it's c
 
 ### `CrossChainSealRegistry` → `SealNullifier`
 
-The name "registry" suggests a lookup table. What this actually does is enforce 
-that a seal cannot be consumed twice. That's a nullifier — the ZK term for "a 
-value that, once revealed, can never be used again." Using the standard term 
+The name "registry" suggests a lookup table. What this actually does is enforce
+that a seal cannot be consumed twice. That's a nullifier — the ZK term for "a
+value that, once revealed, can never be used again." Using the standard term
 aligns with Phase 5 ZK work where actual ZK nullifiers will be used.
 
 ```rust
@@ -379,12 +392,12 @@ pub struct SealNullifier { ... }
 ### `ChainFacade` → `CsvRuntime`
 
 **Location:** `csv-adapter/src/facade.rs`  
-This is the top-level orchestrator: routes all protocol operations to the correct 
-chain backend, manages registered backends, provides the unified API that CLI, 
+This is the top-level orchestrator: routes all protocol operations to the correct
+chain backend, manages registered backends, provides the unified API that CLI,
 wallet, and explorer use.
 
-"Facade" is a GoF design pattern name — not a domain concept. "Runtime" is precise: 
-it is the runtime environment that manages chain connections and executes protocol 
+"Facade" is a GoF design pattern name — not a domain concept. "Runtime" is precise:
+it is the runtime environment that manages chain connections and executes protocol
 operations.
 
 ```rust
@@ -403,10 +416,11 @@ pub struct CsvRuntime { ... }
 ### `RealRpc` → `ChainNode`
 
 In each chain adapter there are two files:
+
 - `rpc.rs` — the trait defining what RPC calls are available
 - `real_rpc.rs` — the actual HTTP/WS client implementation
 
-"Real" implies there is also a "fake" (there is: the mock in `adapters/test.rs`). 
+"Real" implies there is also a "fake" (there is: the mock in `adapters/test.rs`).
 But naming the production struct "Real" is odd in production code.
 
 **Better:** The struct connecting to an actual chain node IS a node connection.
@@ -420,6 +434,7 @@ node.rs      →  contains: BitcoinNode
 ```
 
 Same pattern for all five chains:
+
 ```
 csv-bitcoin/src/real_rpc.rs    → csv-bitcoin/src/node.rs     (BitcoinNode)
 csv-ethereum/src/real_rpc.rs   → csv-ethereum/src/node.rs    (EthereumNode)
@@ -435,8 +450,9 @@ csv-solana/src/real_rpc.rs     → csv-solana/src/node.rs      (SolanaNode)
 **Location:** `csv-adapter-core/src/adapter_factory.rs`  
 **What it does:** Registers and instantiates chain drivers by chain ID.
 
-Since `ChainAdapter` → `ChainDriver`, the factory that creates them is a registry 
+Since `ChainAdapter` → `ChainDriver`, the factory that creates them is a registry
 of drivers. Three files in core currently overlap in responsibility:
+
 - `adapter_factory.rs` — creates drivers
 - `chain_plugin.rs` — plugin registry
 - `chain_discovery.rs` — discovers available chains
@@ -463,7 +479,7 @@ driver_registry.rs     → DriverRegistry (merged), DriverMetadata (was ChainPlu
 |---|---|---|
 | `src/traits.rs` | `src/seal_protocol.rs` | Contains SealProtocol trait |
 | `src/chain_adapter.rs` | `src/driver.rs` | ChainDriver (Layer 1 only) |
-| `src/right.rs` | `src/title.rs` | Right → Title |
+| `src/right.rs` | `src/title.rs` | Right → Sanad |
 | `src/seal_registry.rs` | `src/nullifier.rs` | SealNullifier |
 | `src/mpc.rs` | `src/commit_mux.rs` | CommitMux |
 | `src/adapter_factory.rs` | `src/driver_registry.rs` | Merged with chain_plugin + chain_discovery |
@@ -475,11 +491,12 @@ driver_registry.rs     → DriverRegistry (merged), DriverMetadata (was ChainPlu
 | `src/adapters/test.rs` | `src/drivers/mock.rs` | "mock" is the standard term for test doubles |
 | `src/proof_verify.rs` | `src/verifier.rs` | The module is the verifier, not the action |
 | `src/agent_types.rs` | `src/mcp.rs` | AI agent types belong to MCP context |
-| `examples/basic_right.rs` | `examples/basic_title.rs` | Follows Title rename |
+| `examples/basic_right.rs` | `examples/basic_title.rs` | Follows Sanad rename |
 | `fuzz/fuzz_targets/fuzz_right_from_canonical_bytes.rs` | `fuzz/fuzz_targets/fuzz_title.rs` | Shorter |
 | `fuzz/fuzz_targets/fuzz_seal_ref_from_bytes.rs` | `fuzz/fuzz_targets/fuzz_seal_point.rs` | Follows SealPoint rename |
 
 Files to keep exactly as-is (names are correct):
+
 ```
 src/commitment.rs
 src/commitment_chain.rs
@@ -530,17 +547,20 @@ Each `csv-adapter-{chain}/src/` gets:
 | `deploy.rs` | `deploy.rs` | Keep |
 
 Bitcoin-specific files (keep all, names are good):
+
 ```
 bip341.rs, spv.rs, tapret.rs, tx_builder.rs, 
 mempool_rpc.rs, wallet.rs, testnet_deploy.rs
 ```
 
 Ethereum-specific (keep):
+
 ```
 seal_contract.rs, finality.rs, mpt.rs
 ```
 
 Aptos-specific (keep):
+
 ```
 checkpoint.rs, merkle.rs
 ```
@@ -569,7 +589,7 @@ checkpoint.rs, merkle.rs
 |---|---|---|
 | `wallet_core.rs` | *(deleted — merged into wallet/ module)* | Phase 0.3 consolidation |
 | `seals/manager.rs` | `seals/registry.rs` | It's the local seal registry |
-| `pages/rights/` | `pages/titles/` | Follows Title rename |
+| `pages/rights/` | `pages/titles/` | Follows Sanad rename |
 | `pages/rights/journey.rs` | `pages/titles/provenance.rs` | Better: shows provenance |
 | `pages/rights/consume.rs` | `pages/titles/consume.rs` | Keep verb |
 | `pages/rights/transfer.rs` | `pages/titles/transfer.rs` | Keep verb |
@@ -578,8 +598,8 @@ checkpoint.rs, merkle.rs
 | `components/seal_status.rs` | `components/seal_status.rs` | Keep |
 | `components/seal_visualizer.rs` | `components/seal_view.rs` | Shorter |
 | `components/proof_inspector.rs` | `components/proof_view.rs` | Consistent `-view` suffix |
-| `hooks/use_assets.rs` | `hooks/use_titles.rs` | Follows Title rename |
-| `assets/` (whole folder) | `titles/` | Follows Title rename |
+| `hooks/use_assets.rs` | `hooks/use_titles.rs` | Follows Sanad rename |
+| `assets/` (whole folder) | `titles/` | Follows Sanad rename |
 
 ---
 
@@ -593,8 +613,8 @@ These do not require file renames but require find-replace across the codebase:
 |---|---|---|
 | `SealRef` | `SealPoint` | seal.rs, all consumers |
 | `AnchorRef` | `CommitAnchor` | commitment.rs, all consumers |
-| `Right` | `Title` | title.rs (renamed from right.rs) |
-| `RightId` | `TitleId` | title.rs |
+| `Right` | `Sanad` | title.rs (renamed from right.rs) |
+| `RightId` | `SanadId` | title.rs |
 | `AnchorLayer` | `SealProtocol` | seal_protocol.rs |
 | `FullChainAdapter` | `ChainBackend` | backend.rs |
 | `ChainAdapter` | `ChainDriver` | driver.rs |
@@ -604,8 +624,8 @@ These do not require file renames but require find-replace across the codebase:
 | `MpcProof` | `MuxProof` | commit_mux.rs |
 | `CrossChainSealRegistry` | `SealNullifier` | nullifier.rs |
 | `AdapterError` | `ProtocolError` | error.rs — "Adapter" gone from error names too |
-| `ChainRightOps` | `ChainTitleOps` | backend.rs |
-| `RightOperationResult` | `TitleOperationResult` | backend.rs |
+| `ChainRightOps` | `ChainSanadOps` | backend.rs |
+| `RightOperationResult` | `SanadOperationResult` | backend.rs |
 | `ChainPluginMetadata` | `DriverMetadata` | driver_registry.rs |
 | `ChainPluginRegistry` | `DriverRegistry` | driver_registry.rs |
 | `ChainVerificationResult` | `VerificationResult` | (drop "Chain" prefix — context is clear) |
@@ -641,7 +661,7 @@ These do not require file renames but require find-replace across the codebase:
 | Before | After |
 |---|---|
 | `use_assets` hook | `use_titles` |
-| `AssetService` | `TitleService` |
+| `AssetService` | `SanadService` |
 | All `right` references in AppState | `title` |
 
 ---
@@ -650,10 +670,11 @@ These do not require file renames but require find-replace across the codebase:
 
 ### `Seal` — Keep exactly as-is
 
-"Seal" is used by RGB. It is the correct term from the single-use seal literature 
+"Seal" is used by RGB. It is the correct term from the single-use seal literature
 (Peter Todd's original construction). Any deviation from this term:
+
 1. Breaks alignment with the RGB ecosystem you want interoperability with
-2. Loses the theoretical precision — a "seal" in this context has a specific 
+2. Loses the theoretical precision — a "seal" in this context has a specific
    mathematical meaning that differentiates it from a "lock" or "commitment"
 
 The word "seal" is fine. `seal.rs`, `SealStatus`, `SealRecord` — all keep "Seal".  
@@ -661,8 +682,9 @@ Only `SealRef` changes (to `SealPoint`) because "Ref" is the broken part, not "S
 
 ### `Consignment` — Keep exactly as-is
 
-RGB uses "consignment" for the package of data shipped from sender to receiver 
+RGB uses "consignment" for the package of data shipped from sender to receiver
 containing the proof history. The term is:
+
 - Standard in the CSV/RGB literature
 - Precise: a consignment contains goods (proof data) for delivery
 - Self-describing: you consign the proof to the receiver for independent verification
@@ -671,7 +693,7 @@ containing the proof history. The term is:
 
 ### `ProofBundle` — Keep
 
-"ProofBundle" is specific, accurate, and not confusing. The bundle of proofs. 
+"ProofBundle" is specific, accurate, and not confusing. The bundle of proofs.
 Alternative `Certificate` would lose the word "proof" which matters.
 
 ### `CommitmentChain` — Keep
@@ -680,7 +702,7 @@ Technically precise. A chain (hash-linked list) of commitments. Keep.
 
 ### `TapretCommitment`, `OpretCommitment` — Keep
 
-These are Bitcoin-specific terms (Tapret = taproot-embedded, Opret = OP_RETURN-embedded). 
+These are Bitcoin-specific terms (Tapret = taproot-embedded, Opret = OP_RETURN-embedded).
 They are standard in the RGB/CSV Bitcoin literature.
 
 ---
@@ -695,15 +717,15 @@ Establish these rules in `CONTRIBUTING.md` to prevent drift:
 `RealRpc` → `ChainNode` (name the thing, not that it's "real")
 
 **Rule 2: No "Ref" suffix on non-reference types**  
-Rust uses `Ref` for borrowed smart pointers. Domain types that happen to 
+Rust uses `Ref` for borrowed smart pointers. Domain types that happen to
 identify something use `Point`, `Id`, `Anchor`, `Locator`.
 
 **Rule 3: Error types use `Error` suffix, not `Errors`**  
 `errors.rs` → `error.rs`. `CsvErrors` → `SdkError`. Singular.
 
 **Rule 4: File name = primary type name**  
-`seal_protocol.rs` contains `SealProtocol`. `title.rs` contains `Title`.  
-If a file contains multiple types with no primary, it becomes `mod.rs` or a 
+`seal_protocol.rs` contains `SealProtocol`. `title.rs` contains `Sanad`.  
+If a file contains multiple types with no primary, it becomes `mod.rs` or a
 descriptive noun: `types.rs`, `ops.rs`.
 
 **Rule 5: "Backend" for full implementations, "Driver" for descriptors**  
@@ -743,9 +765,9 @@ Step 4 — Trait renames (most impactful architecturally)
   File renames: traits.rs → seal_protocol.rs, chain_adapter.rs → driver.rs + backend.rs
   CI must pass.
 
-Step 5 — Right → Title
+Step 5 — Right → Sanad
   right.rs → title.rs
-  Global find-replace: Right → Title, RightId → TitleId
+  Global find-replace: Right → Sanad, RightId → SanadId
   Wallet pages/rights/ → pages/titles/
   Wallet hooks/use_assets → use_titles
   CI must pass.
@@ -809,8 +831,8 @@ THREE TRAIT LAYERS
 TYPES
   SealRef             → SealPoint           (not a Rust reference)
   AnchorRef           → CommitAnchor        (where a commitment is anchored)
-  Right               → Title               (a property title, chain of title)
-  RightId             → TitleId
+  Right               → Sanad               (a property title, chain of title)
+  RightId             → SanadId
   MpcTree             → CommitMux           (not multi-party computation)
   MpcLeaf             → MuxLeaf
   MpcProof            → MuxProof

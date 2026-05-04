@@ -632,13 +632,15 @@ pub fn build_solana_transaction_with_blockhash(
         }).collect(),
     };
 
-    // Serialize transaction
+    // Serialize unsigned transaction
+    // Note: Signatures are added by the signer after this transaction is built.
+    // This is standard Solana transaction flow: build message → sign → attach signatures.
     let mut tx_data = Vec::new();
 
-    // Signatures placeholder (will be filled during signing)
+    // Compact array of signatures (empty for now - will be filled by signer)
     tx_data.push(signers.len() as u8);
     for _ in 0..signers.len() {
-        tx_data.extend_from_slice(&[0u8; 64]); // Placeholder signature
+        tx_data.extend_from_slice(&[0u8; 64]); // Reserved space for Ed25519 signatures
     }
 
     // Message
