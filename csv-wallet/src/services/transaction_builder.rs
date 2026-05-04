@@ -12,6 +12,7 @@ use csv_adapter::prelude::{
     CrossChainError, RightsManager, TransferManager, ProofManager, Wallet,
 };
 use csv_adapter_core::Chain;
+use std::str::FromStr;
 
 /// Build a complete, serialized transaction ready for signing
 ///
@@ -332,33 +333,34 @@ fn estimate_tx_size(num_inputs: usize, num_outputs: usize, op_return_size: usize
 }
 
 /// Parse Bitcoin address and return script pubkey
+///
+/// Uses the bitcoin crate for proper address parsing supporting both
+/// bech32 (SegWit) and legacy base58 addresses.
 fn parse_bitcoin_address(address: &str) -> Result<(Vec<u8>, bool), BlockchainError> {
-    // Try bech32 (SegWit)
-    if address.starts_with("bc1") || address.starts_with("tb1") {
-        // Bech32 decoding would go here - for now assume P2WPKH
-        // P2WPKH script: 0x00 0x14 <20 byte hash160>
-        // This is a simplified version - real implementation needs full bech32 decoding
-        let witness_program = vec![0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-        Ok((witness_program, true))
-    } else {
-        // Legacy base58 address - would need full decoding
-        Err(BlockchainError {
-            message: "Legacy addresses not supported in this simplified implementation. Use bech32 (bc1...) addresses.".to_string(),
+    use bitcoin::address::Address;
+    use bitcoin::address::NetworkUnchecked;
+
+    // Parse the address using bitcoin crate
+    let addr: Address<NetworkUnchecked> = Address::from_str(address)
+        .map_err(|e| BlockchainError {
+            message: format!("Invalid Bitcoin address: {}", e),
             chain: Some(Chain::Bitcoin),
             code: Some(400),
-        })
-    }
+        })?;
+
+    // Get the script pubkey
+    let checked_addr = addr.assume_checked();
+    let script_pubkey = checked_addr.script_pubkey();
+    let is_segwit = script_pubkey.is_witness_program();
+
+    Ok((script_pubkey.to_bytes(), is_segwit))
 }
 
 /// Parse legacy Bitcoin address
+///
+/// Delegates to parse_bitcoin_address which now supports both bech32 and base58.
 fn parse_legacy_address(address: &str) -> Result<Vec<u8>, BlockchainError> {
-    // Legacy P2PKH/P2SH decoding would go here
-    Err(BlockchainError {
-        message: "Legacy address support requires additional implementation".to_string(),
-        chain: Some(Chain::Bitcoin),
-        code: Some(400),
-    })
+    parse_bitcoin_address(address).map(|(script, _)| script)
 }
 
 /// Bitcoin transaction structure for serialization
@@ -447,24 +449,21 @@ impl BitcoinTransaction {
 
 /// Build basic Bitcoin transaction data (legacy function)
 ///
-/// For production use, use `build_btc_transaction_with_utxos` which provides
-/// proper UTXO selection and fee calculation.
+/// **DEPRECATED**: This function requires UTXOs to build valid Bitcoin transactions.
+/// Use `build_btc_transaction_with_utxos` which provides proper UTXO selection
+/// and fee calculation via the ChainFacade.
 fn build_btc_transaction_data(
-    to: &str,
-    value: u64,
-    data: Vec<u8>,
+    _to: &str,
+    _value: u64,
+    _data: Vec<u8>,
 ) -> Result<Vec<u8>, BlockchainError> {
-    // Delegate to the proper implementation with empty UTXO list
-    // This is a simplified fallback - real usage should provide UTXOs
-    build_btc_transaction_with_utxos(
-        &[],  // No UTXOs available - will error if called
-        to,
-        value,
-        10,   // 10 sat/vbyte default fee rate
-        to,   // Use recipient as change address (not ideal)
-        if data.is_empty() { None } else { Some(&data) },
-        UtxoSelectionStrategy::LargestFirst,
-    )
+    Err(BlockchainError {
+        message: "build_btc_transaction_data is deprecated. Use build_btc_transaction_with_utxos \
+                 which requires UTXO inputs. Fetch UTXOs via the chain adapter's \
+                 get_utxos_for_address method before building transactions.".to_string(),
+        chain: Some(Chain::Bitcoin),
+        code: Some(400),
+    })
 }
 
 /// Build Sui transaction data for basic contract calls
@@ -794,52 +793,27 @@ fn build_account_keys(fee_payer: &[u8], _instructions: &[SolanaInstruction]) -> 
     keys
 }
 
-/// Build Solana transaction data for basic contract calls
+/// Build Solana transaction data for transfers (DEPRECATED)
 ///
-/// NOTE: For production use with proper instruction encoding,
-/// use ChainFacade::build_contract_call which delegates to the Solana adapter.
+/// **DEPRECATED**: This function required a placeholder blockhash which produces
+/// invalid transactions. Use `build_solana_transaction_with_blockhash` with a
+/// real blockhash obtained from Solana RPC `getRecentBlockhash`.
+#[deprecated(
+    since = "0.4.0",
+    note = "Use build_solana_transaction_with_blockhash with a real blockhash from Solana RPC"
+)]
 fn build_solana_transaction_data(
-    to: &str,
-    value: u64,
-    data: Vec<u8>,
+    _to: &str,
+    _value: u64,
+    _data: Vec<u8>,
 ) -> Result<Vec<u8>, BlockchainError> {
-    // This is a simplified implementation that uses placeholder blockhash
-    // For production, use build_solana_transaction_with_blockhash with a real blockhash
-
-    let mut tx_data = Vec::new();
-
-    // Recent blockhash (32 bytes) - placeholder (zeros indicate this needs a real blockhash)
-    tx_data.extend_from_slice(&[0u8; 32]);
-
-    // Number of signatures (1 byte)
-    tx_data.push(0x01);
-
-    // Instructions count (1 byte)
-    tx_data.push(0x01);
-
-    // Program ID (32 bytes) - decode base58
-    let program_bytes = bs58::decode(to).into_vec()
-        .map_err(|e| BlockchainError {
-            message: format!("Invalid program ID: {}", e),
-            chain: Some(Chain::Solana),
-            code: Some(400),
-        })?;
-    if program_bytes.len() != 32 {
-        return Err(BlockchainError {
-            message: "Solana program ID must be 32 bytes".to_string(),
-            chain: Some(Chain::Solana),
-            code: Some(400),
-        });
-    }
-    tx_data.extend_from_slice(&program_bytes);
-
-    // Instruction data
-    tx_data.extend_from_slice(&data);
-
-    // Value (8 bytes) - for transfers
-    tx_data.extend_from_slice(&value.to_le_bytes());
-
-    Ok(tx_data)
+    Err(BlockchainError {
+        message: "build_solana_transaction_data is deprecated. Use build_solana_transaction_with_blockhash \
+                 with a real blockhash obtained from Solana RPC getRecentBlockhash. \
+                 Transactions with placeholder blockhashes are invalid and will be rejected.".to_string(),
+        chain: Some(Chain::Solana),
+        code: Some(400),
+    })
 }
 
 /// Build Sui transaction data for contract calls
@@ -958,18 +932,19 @@ pub async fn discover_contracts(
 }
 
 /// Discover Ethereum contracts deployed by an address
+///
+/// Scans recent blocks (last 100) for deployment transactions from the given address.
+/// Uses eth_getTransactionCount and eth_getBlockByNumber RPC calls.
 async fn discover_ethereum_contracts(
     address: &str,
     api_url: &str,
     filter: Option<&str>,
 ) -> Result<Vec<crate::services::blockchain::ContractDeployment>, BlockchainError> {
     use crate::services::blockchain::{ContractDeployment, ContractType};
-    
-    // Use eth_getTransactionCount and eth_getBlockByNumber to find deployment transactions
-    // This is a simplified implementation - full version would scan all blocks
-    
+
     let client = reqwest::Client::new();
-    
+    let scan_blocks = 100u64; // Scan last 100 blocks
+
     // Get current block number
     let block_number_payload = serde_json::json!({
         "jsonrpc": "2.0",
@@ -977,7 +952,7 @@ async fn discover_ethereum_contracts(
         "params": [],
         "id": 1
     });
-    
+
     let response = client
         .post(api_url)
         .json(&block_number_payload)
@@ -988,84 +963,163 @@ async fn discover_ethereum_contracts(
             chain: Some(Chain::Ethereum),
             code: Some(500),
         })?;
-    
+
     let result: serde_json::Value = response.json().await.map_err(|e| BlockchainError {
         message: format!("Failed to parse response: {}", e),
         chain: Some(Chain::Ethereum),
         code: Some(500),
     })?;
-    
-    let _current_block = u64::from_str_radix(
+
+    let current_block = u64::from_str_radix(
         result["result"].as_str().unwrap_or("0x0").trim_start_matches("0x"),
         16
     ).unwrap_or(0);
-    
-    // For now, return empty list - full implementation would:
-    // 1. Scan recent blocks for deployment transactions from this address
-    // 2. Parse transaction receipts for contract addresses
-    // 3. Filter by contract type if requested
-    
-    let _filter_type = filter.map(|f| match f.to_lowercase().as_str() {
+
+    let default_filter_type = filter.map(|f| match f.to_lowercase().as_str() {
         "registry" => ContractType::Registry,
         "bridge" => ContractType::Bridge,
         "lock" => ContractType::Lock,
         _ => ContractType::Registry,
     });
-    
-    Ok(Vec::new())
+
+    let mut deployments = Vec::new();
+    let start_block = current_block.saturating_sub(scan_blocks);
+
+    // Scan recent blocks for deployment transactions
+    for block_num in start_block..=current_block {
+        let block_hex = format!("0x{:x}", block_num);
+        let block_payload = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "eth_getBlockByNumber",
+            "params": [block_hex, true],
+            "id": 1
+        });
+
+        if let Ok(response) = client.post(api_url).json(&block_payload).send().await {
+            if let Ok(result) = response.json::<serde_json::Value>().await {
+                if let Some(txs) = result["result"]["transactions"].as_array() {
+                    for tx in txs {
+                        // Check if this is a deployment (contract creation has no to address)
+                        if tx["from"].as_str() == Some(address) && tx["to"].is_null() {
+                            if let Some(tx_hash) = tx["hash"].as_str() {
+                                if let Some(contract_addr) = tx["contractAddress"].as_str() {
+                                    // Use filter type or default to Registry
+                                    let contract_type = default_filter_type.unwrap_or(ContractType::Registry);
+
+                                    deployments.push(ContractDeployment {
+                                        chain: Chain::Ethereum,
+                                        contract_address: contract_addr.to_string(),
+                                        contract_type,
+                                        deployed_at: block_num,
+                                        tx_hash: tx_hash.to_string(),
+                                    });
+
+                                    // Limit results
+                                    if deployments.len() >= 10 {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Early exit if we have enough results
+        if deployments.len() >= 10 {
+            break;
+        }
+    }
+
+    Ok(deployments)
 }
 
 /// Discover Solana programs owned by an address
+///
+/// Uses getProgramAccounts with BPF filter to find executable programs
+/// deployed by or owned by the given address.
 async fn discover_solana_programs(
     address: &str,
     api_url: &str,
     filter: Option<&str>,
 ) -> Result<Vec<crate::services::blockchain::ContractDeployment>, BlockchainError> {
     use crate::services::blockchain::{ContractDeployment, ContractType};
-    
-    // Solana uses Program Derived Addresses (PDAs) for programs
-    // Query the account to see if it owns any program data accounts
-    
+
     let client = reqwest::Client::new();
-    
+
+    let default_contract_type = filter.map(|f| match f.to_lowercase().as_str() {
+        "registry" => ContractType::Registry,
+        "bridge" => ContractType::Bridge,
+        "lock" => ContractType::Lock,
+        _ => ContractType::Registry,
+    }).unwrap_or(ContractType::Registry);
+
+    // Use getProgramAccounts to find BPF Loader accounts (programs)
     let payload = serde_json::json!({
         "jsonrpc": "2.0",
-        "method": "getAccountInfo",
-        "params": [address, {"encoding": "base64"}],
+        "method": "getProgramAccounts",
+        "params": [
+            "BPFLoaderUpgradeab1e11111111111111111111111", // BPF Upgradeable Loader
+            {
+                "filters": [
+                    {
+                        "memcmp": {
+                            "offset": 4, // After discriminator
+                            "bytes": address
+                        }
+                    }
+                ],
+                "encoding": "base64"
+            }
+        ],
         "id": 1
     });
-    
+
     let response = client
         .post(api_url)
         .json(&payload)
         .send()
         .await
         .map_err(|e| BlockchainError {
-            message: format!("Failed to query account: {}", e),
+            message: format!("Failed to query programs: {}", e),
             chain: Some(Chain::Solana),
             code: Some(500),
         })?;
-    
-    let _result: serde_json::Value = response.json().await.map_err(|e| BlockchainError {
+
+    let result: serde_json::Value = response.json().await.map_err(|e| BlockchainError {
         message: format!("Failed to parse response: {}", e),
         chain: Some(Chain::Solana),
         code: Some(500),
     })?;
-    
-    // Check if account is a program
-    let _filter_type = filter.map(|f| match f.to_lowercase().as_str() {
-        "registry" => ContractType::Registry,
-        "bridge" => ContractType::Bridge,
-        "lock" => ContractType::Lock,
-        _ => ContractType::Registry,
-    });
-    
-    // Full implementation would:
-    // 1. Check if account is executable (is a program)
-    // 2. Find all program data accounts owned by this address
-    // 3. Parse program metadata
-    
-    Ok(Vec::new())
+
+    let mut deployments = Vec::new();
+
+    if let Some(accounts) = result["result"].as_array() {
+        for account in accounts.iter().take(10) {
+            if let Some(pubkey) = account["pubkey"].as_str() {
+                // Check if account data indicates it's executable
+                let account_data = account["account"]["data"].as_array()
+                    .and_then(|arr| arr.first())
+                    .and_then(|v| v.as_str());
+
+                let is_executable = account["account"]["executable"].as_bool()
+                    .unwrap_or(false);
+
+                if is_executable || account_data.is_some() {
+                    deployments.push(ContractDeployment {
+                        chain: Chain::Solana,
+                        contract_address: pubkey.to_string(),
+                        contract_type: default_contract_type,
+                        deployed_at: 0, // Solana doesn't have block numbers in the same way
+                        tx_hash: "unknown".to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(deployments)
 }
 
 /// Discover Sui packages owned by an address

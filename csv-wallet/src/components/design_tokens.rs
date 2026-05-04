@@ -103,7 +103,43 @@ const CSS_TOKENS: &str = r#"
     --seal-error-border: var(--color-error-500);
     --seal-error-text: var(--color-error-700);
     --seal-error-dot: #ef4444;
-    
+
+    /* ========================================
+       SINGLE-USE SEAL SEMANTIC TOKENS
+       Core UI vocabulary for seal states
+       ======================================== */
+
+    /* Seal is valid and unspent */
+    --seal-unconsumed: #22c55e;
+    /* Seal is spent, right transferred */
+    --seal-consumed: #6b7280;
+    /* Protocol violation detected */
+    --seal-double-spent: #ef4444;
+    /* Awaiting chain finality */
+    --seal-pending: #f59e0b;
+
+    /* ========================================
+       PROOF VERIFICATION STATES
+       ======================================== */
+
+    --proof-valid: #22c55e;
+    --proof-invalid: #ef4444;
+    --proof-pending: #f59e0b;
+    --proof-unverified: #6b7280;
+
+    /* ========================================
+       COMMITMENT CHAIN VISUALIZATION
+       ======================================== */
+
+    /* Genesis commitment */
+    --chain-genesis: #8b5cf6;
+    /* Intermediate commitment */
+    --chain-node: #3b82f6;
+    /* Latest valid commitment */
+    --chain-latest: #22c55e;
+    /* Hash chain link lines */
+    --chain-link: #374151;
+
     /* ========================================
        SPACING SCALE
        ======================================== */

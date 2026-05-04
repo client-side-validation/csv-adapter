@@ -92,7 +92,7 @@ pub struct ContractDeployment {
     pub contract_type: ContractType,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
 pub enum ContractType {
     Registry,
     Bridge,
