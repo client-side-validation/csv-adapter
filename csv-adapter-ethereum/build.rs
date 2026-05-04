@@ -41,7 +41,7 @@ fn has_forge() -> bool {
 
 fn compile_with_forge(contracts_dir: &Path) {
     let output = Command::new("forge")
-        .args(&["build", "--sizes"])
+        .args(["build", "--sizes"])
         .current_dir(contracts_dir)
         .output()
         .expect("Failed to execute forge build");
@@ -70,17 +70,13 @@ fn generate_bytecode_constants(bytecode_out: &Path, contracts_dir: &Path) {
         "CSVMINT_BYTECODE",
     );
 
-    code.push_str(&format!(
-        "/// CSVLock contract bytecode (pre-compiled at build time)\n"
-    ));
+    code.push_str("/// CSVLock contract bytecode (pre-compiled at build time)\n");
     code.push_str(&format!(
         "pub const CSVLOCK_BYTECODE: &[u8] = &[{}];\n\n",
         csv_lock_bytecode
     ));
 
-    code.push_str(&format!(
-        "/// CSVMint contract bytecode (pre-compiled at build time)\n"
-    ));
+    code.push_str("/// CSVMint contract bytecode (pre-compiled at build time)\n");
     code.push_str(&format!(
         "pub const CSVMINT_BYTECODE: &[u8] = &[{}];\n\n",
         csv_mint_bytecode

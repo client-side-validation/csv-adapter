@@ -1,4 +1,5 @@
 # Evaluation: 5 Advanced Feature Ideas
+
 ## CSV Adapter — Precise Assessment Against Current Codebase
 
 ---
@@ -30,8 +31,8 @@ Ethereum EIP-1559 dynamic fees (base fee + priority fee) are not modeled at all.
 In order of impact:
 
 **Impact 1 — MPC Tree (Already Designed, Not Wired)**  
-`csv-adapter-core/src/mpc.rs` is the single biggest gas lever. Multiple commitments 
-share one Bitcoin transaction output via the MPC Merkle root. 10 rights, 1 tx fee split 
+`csv-adapter-core/src/mpc.rs` is the single biggest gas lever. Multiple commitments
+share one Bitcoin transaction output via the MPC Merkle root. 10 rights, 1 tx fee split
 10 ways. This is a ~10x cost reduction for active users. Phase 4.5 in the main plan.
 
 **Impact 2 — Real Fee Estimation**  
@@ -46,7 +47,7 @@ Replace `estimator.rs` hardcoded values with live API calls:
 | Aptos | RPC `estimate_gas_price` | `gas_estimate` |
 
 **Impact 3 — Commitment Batching (Future)**  
-Queue commitments client-side, batch publish when fee is low. Requires a scheduling 
+Queue commitments client-side, batch publish when fee is low. Requires a scheduling
 component and user-configured fee ceiling. Phase 5+ work.
 
 ### Verdict
@@ -83,16 +84,16 @@ The `SealRef` serialization format is forward-compatible. The signature trait is
 
 This is actually more important for your architecture than for typical blockchains.  
 
-Traditional chain assets (Bitcoin UTXOs, ERC-20 balances) become vulnerable to quantum 
+Traditional chain assets (Bitcoin UTXOs, ERC-20 balances) become vulnerable to quantum
 attacks simultaneously with the chain's own cryptography. Everyone upgrades together.
 
-In CSV, a `ProofBundle` is a long-lived off-chain artifact. A proof bundle generated 
-today could be presented for verification in 2035 when quantum computers are practical. 
-If the signature scheme is broken, the proof becomes forgeable — even if Bitcoin itself 
+In CSV, a `ProofBundle` is a long-lived off-chain artifact. A proof bundle generated
+today could be presented for verification in 2035 when quantum computers are practical.
+If the signature scheme is broken, the proof becomes forgeable — even if Bitcoin itself
 has upgraded.
 
-The commitment chain is your audit trail. If even one link in the chain used a broken 
-signature scheme, the entire provenance becomes unverifiable. This is the unique 
+The commitment chain is your audit trail. If even one link in the chain used a broken
+signature scheme, the entire provenance becomes unverifiable. This is the unique
 PQ risk for CSV that doesn't exist for on-chain-only systems.
 
 ### NIST PQ Standards (Finalized 2024)
@@ -116,8 +117,8 @@ pub enum SignatureScheme {
 }
 ```
 
-**Hybrid mode (recommended for transition):** Sign with both Ed25519 and ML-DSA. 
-Verifiers accept either. When quantum threat materializes, drop Ed25519. Proof bundles 
+**Hybrid mode (recommended for transition):** Sign with both Ed25519 and ML-DSA.
+Verifiers accept either. When quantum threat materializes, drop Ed25519. Proof bundles
 carry both signatures during transition. This is how IETF recommends migrating.
 
 ### Verdict
@@ -129,8 +130,8 @@ carry both signatures during transition. This is how IETF recommends migrating.
 | Seal creation with PQ keys | Phase 5 | Large (chain-specific key format) |
 | Migrate existing commitment chains | Never — old signatures stay, new ones upgrade | — |
 
-**Verdict: NOT premature.** The risk is real and unique to your architecture. But implement 
-after Phase 1 (real seals) and Phase 5 (ZK proofs) — in that order. The ZK work will 
+**Verdict: NOT premature.** The risk is real and unique to your architecture. But implement
+after Phase 1 (real seals) and Phase 5 (ZK proofs) — in that order. The ZK work will
 clarify which proof components need PQ hardening.
 
 ---
@@ -142,6 +143,7 @@ clarify which proof components need PQ hardening.
 **What exists:**
 
 `csv-explorer/api/src/websocket.rs` — Full WebSocket server with subscription manager:
+
 ```rust
 pub struct SubscriptionManager {
     subscriptions: Arc<RwLock<HashMap<String, Vec<mpsc::UnboundedSender<SubscriptionEvent>>>>>,
@@ -151,7 +153,7 @@ pub struct SubscriptionManager {
 
 `csv-adapter/src/events.rs` — `EventStream` type with `broadcast::Receiver<Event>`
 
-`csv-adapter-core/src/events.rs` — Standardized `CsvEvent` types: RightCreated, 
+`csv-adapter-core/src/events.rs` — Standardized `CsvEvent` types: RightCreated,
 RightConsumed, CrossChainLock, CrossChainMint, NullifierRegistered
 
 **What's missing:**
@@ -161,7 +163,7 @@ RightConsumed, CrossChainLock, CrossChainMint, NullifierRegistered
 `csv-wallet/src/hooks/use_wallet.rs` — no event listener  
 `csv-wallet/src/hooks/use_network.rs` — no chain state monitoring  
 
-The wallet and the explorer are architecturally disconnected. The explorer streams events 
+The wallet and the explorer are architecturally disconnected. The explorer streams events
 that the wallet never receives.
 
 ### What "Real-Time Pipeline" Should Actually Mean Here
@@ -182,6 +184,7 @@ User opens wallet
 ```
 
 Files to change:
+
 - `csv-wallet/src/hooks/use_wallet_connection.rs` (exists) — add WebSocket connect
 - `csv-wallet/src/hooks/use_seals.rs` — subscribe to seal events
 - `csv-wallet/src/hooks/use_assets.rs` — subscribe to right events
@@ -197,13 +200,13 @@ The `TransferState` machine from Phase 2.4 maps directly to WebSocket events.
 Wire `csv-wallet/src/pages/cross_chain/status.rs` to live events.
 
 **Stream 3 — Proof Streaming for Large Bundles (FUTURE)**  
-When proof bundles are large (SPV proofs with many Merkle branches, ZK proofs at ~1MB), 
-streaming the proof to a counterparty chunk-by-chunk using a content-addressed protocol 
+When proof bundles are large (SPV proofs with many Merkle branches, ZK proofs at ~1MB),
+streaming the proof to a counterparty chunk-by-chunk using a content-addressed protocol
 is more reliable than a single HTTP transfer. This is Phase 5+ (needs ZK first).
 
 ### Bigger Opportunity: Consignment P2P Transport
 
-The deepest real-time need is peer-to-peer consignment exchange. Currently there is no 
+The deepest real-time need is peer-to-peer consignment exchange. Currently there is no
 transport for consignment delivery between counterparties. Options in order of complexity:
 
 | Transport | Complexity | Description |
@@ -213,9 +216,9 @@ transport for consignment delivery between counterparties. Options in order of c
 | WebRTC data channel | Medium | Browser P2P, no server needed |
 | libp2p | High | Full P2P network, gossip, DHT |
 
-**Recommended:** Nostr first. A Nostr relay is a simple pub/sub server. CSV events map 
-naturally to Nostr events (kind 30078 for application data). Counterparties subscribe 
-to each other's public keys. No custom server infrastructure. Existing Nostr relays can 
+**Recommended:** Nostr first. A Nostr relay is a simple pub/sub server. CSV events map
+naturally to Nostr events (kind 30078 for application data). Counterparties subscribe
+to each other's public keys. No custom server infrastructure. Existing Nostr relays can
 be used. This is the fastest path to real P2P consignment delivery.
 
 Implementation: `csv-adapter/src/transport/nostr.rs` (new) wrapping a Nostr client.
@@ -244,7 +247,7 @@ It removes all polling, makes the UI reactive, and requires zero new infrastruct
 "Distributed optimization" means different things at different layers:
 
 **Layer A — RPC Redundancy (Should be done now)**  
-Single RPC providers are a reliability and censorship risk. Each chain adapter currently 
+Single RPC providers are a reliability and censorship risk. Each chain adapter currently
 uses one configured RPC. Add multi-provider fallback:
 
 ```rust
@@ -273,32 +276,33 @@ This is Phase 2 work. Not advanced — it's production hardening.
 `csv-adapter-core/src/performance.rs` has `ProofCache` and mentions parallel verification.  
 `examples/parallel_verification.rs` demonstrates the pattern.  
 
-The `validator.rs` 5-step pipeline is sequential. Steps 1-2 (structural + commitment chain) 
-can run concurrently with step 5 setup. Steps 3-4 (seal consumption + state transitions) 
+The `validator.rs` 5-step pipeline is sequential. Steps 1-2 (structural + commitment chain)
+can run concurrently with step 5 setup. Steps 3-4 (seal consumption + state transitions)
 must be sequential due to dependencies.
 
 This is a 1.5-2x speedup, not a 10x. Worth doing but not urgent.
 
 **Layer C — State Synchronization (Medium Term)**  
-When a user has the wallet on multiple devices, or multiple parties are validating the 
+When a user has the wallet on multiple devices, or multiple parties are validating the
 same contract, state needs to sync. Currently there is no sync protocol.
 
-The correct model for CSV: the commitment chain IS the sync protocol. Any party with 
-the latest consignment has the full authoritative state. "Sync" means "share the latest 
+The correct model for CSV: the commitment chain IS the sync protocol. Any party with
+the latest consignment has the full authoritative state. "Sync" means "share the latest
 consignment." The Nostr transport (from Item 3) solves this automatically.
 
 **Layer D — Distributed Seal Registry (Long Term)**  
-`csv-adapter-core/src/seal_registry.rs` is currently a local in-memory + stored registry. 
-For multi-party contracts where multiple parties need to know about seal consumption, 
+`csv-adapter-core/src/seal_registry.rs` is currently a local in-memory + stored registry.
+For multi-party contracts where multiple parties need to know about seal consumption,
 the registry needs to be distributed.
 
 Options:
-- **Bloom filter gossip** — each party maintains a bloom filter of consumed seals, 
-  gossips it to peers. False positives (flagging unconsumed seals as consumed) are 
+
+- **Bloom filter gossip** — each party maintains a bloom filter of consumed seals,
+  gossips it to peers. False positives (flagging unconsumed seals as consumed) are
   acceptable; false negatives (missing a consumed seal) are not. One-way ratchet.
-- **Accumulator-based registry** — cryptographic accumulator lets parties verify 
+- **Accumulator-based registry** — cryptographic accumulator lets parties verify
   non-membership of a seal without revealing the full set. More complex but private.
-- **On-chain nullifier set** — what Ethereum adapter already does with `CSVLock.sol`. 
+- **On-chain nullifier set** — what Ethereum adapter already does with `CSVLock.sol`.
   Scale to other chains as needed.
 
 ### Verdict
@@ -311,7 +315,7 @@ Options:
 | Bloom filter seal registry gossip | Phase 5 | Large |
 | Distributed cryptographic accumulator | Phase 6+ | Very Large |
 
-**The RPC redundancy is not optional for production.** Everything else is appropriately 
+**The RPC redundancy is not optional for production.** Everything else is appropriately
 ordered by when you'll have real traffic to optimize.
 
 ---
@@ -322,28 +326,28 @@ ordered by when you'll have real traffic to optimize.
 
 This is not an optimization. This is product strategy. It defines why your system exists.
 
-The `schema.rs` + `genesis.rs` + `state.rs` + `transition.rs` system is designed 
-exactly for this. It has no deployed real-world contract templates yet. The examples 
+The `schema.rs` + `genesis.rs` + `state.rs` + `transition.rs` system is designed
+exactly for this. It has no deployed real-world contract templates yet. The examples
 (`gaming.rs`, `subscriptions.rs`) are demos with fake seals and no real schemas.
 
 ### What Single-Use Seals Enable That Nothing Else Does
 
-Traditional smart contracts enforce rules at execution time, on one chain, with trusted 
-chain state. Seals enforce rules at consumption time, across chains, with client-verified 
+Traditional smart contracts enforce rules at execution time, on one chain, with trusted
+chain state. Seals enforce rules at consumption time, across chains, with client-verified
 state. These are categorically different capabilities:
 
 ---
 
 **Contract Type 1 — Single-Use Event Tickets**
 
-Why impossible without seals: A traditional NFT ticket can be screenshotted and shown 
-twice. The blockchain has no mechanism to enforce "shown exactly once at gate" — the 
+Why impossible without seals: A traditional NFT ticket can be screenshotted and shown
+twice. The blockchain has no mechanism to enforce "shown exactly once at gate" — the
 NFT is still owned even after "showing" it. An oracle is needed. Trusted.
 
-With seals: The ticket IS the seal. Consumption of the seal at the gate IS the ticket 
-validation. The gate operator creates a challenge, the ticket holder signs it with the 
-seal key, the seal is consumed on-chain atomically with validation. No oracle. No trusted 
-gate operator database. The blockchain's single-use guarantee IS the anti-duplicate 
+With seals: The ticket IS the seal. Consumption of the seal at the gate IS the ticket
+validation. The gate operator creates a challenge, the ticket holder signs it with the
+seal key, the seal is consumed on-chain atomically with validation. No oracle. No trusted
+gate operator database. The blockchain's single-use guarantee IS the anti-duplicate
 mechanism.
 
 ```
@@ -363,6 +367,7 @@ Schema: EventTicket
 ```
 
 New files:
+
 - `csv-adapter-core/schemas/event_ticket.rs`
 - `csv-adapter-ethereum/contracts/src/EventTicket.sol` (issues tickets as seals)
 
@@ -370,14 +375,14 @@ New files:
 
 **Contract Type 2 — Non-Forgeable Credentials**
 
-Why impossible without seals: On-chain credentials can be revoked, but revocation 
-requires trusting the issuer's revocation list. Offline credentials (JWTs, VCs) can 
+Why impossible without seals: On-chain credentials can be revoked, but revocation
+requires trusting the issuer's revocation list. Offline credentials (JWTs, VCs) can
 be copied. Neither gives you "exactly one valid copy that cannot be duplicated."
 
-With seals: A credential is bound to a seal. The seal is the credential. Only one 
-entity can prove possession (by signing with the seal key). Transfer means consuming 
-the seal and opening a new one — visible on-chain. Revocation means the issuer 
-pre-commits a "poison seal" — if the credential is revoked, the poison seal is consumed, 
+With seals: A credential is bound to a seal. The seal is the credential. Only one
+entity can prove possession (by signing with the seal key). Transfer means consuming
+the seal and opening a new one — visible on-chain. Revocation means the issuer
+pre-commits a "poison seal" — if the credential is revoked, the poison seal is consumed,
 invalidating any subsequent use.
 
 ```
@@ -399,11 +404,12 @@ Schema: Credential
 
 **Contract Type 3 — Atomic Cross-Chain Swap Without Escrow**
 
-Why impossible without seals: Hash Time Lock Contracts (HTLCs) require both parties to 
-lock funds in escrow contracts that can be timed out. Capital is locked. Trust in 
+Why impossible without seals: Hash Time Lock Contracts (HTLCs) require both parties to
+lock funds in escrow contracts that can be timed out. Capital is locked. Trust in
 contract code required. If one party abandons, funds are locked for the timeout period.
 
 With seals (Diffie-Hellman-style atomic swap):
+
 1. Alice has Right A on Bitcoin. Bob has Right B on Ethereum.
 2. Alice creates seal S_A on Bitcoin committing to `hash(secret)`.
 3. Bob sees S_A, creates seal S_B on Ethereum committing to `hash(secret)`.
@@ -411,7 +417,7 @@ With seals (Diffie-Hellman-style atomic swap):
 5. Bob sees `secret` on Ethereum, uses it to consume S_A on Bitcoin → gets Right A.
 6. Both seals consumed atomically with respect to each other. No escrow. No timeout.
 
-The commitment chain proves the full swap history. Neither party can claim only half 
+The commitment chain proves the full swap history. Neither party can claim only half
 happened — the seal consumption is the atomic event.
 
 ```
@@ -429,14 +435,14 @@ Schema: AtomicSwap
 
 **Contract Type 4 — Provenance Certificate (Supply Chain)**
 
-Why impossible without seals: Supply chain provenance today requires trusting a database 
-(GS1, IBM Food Trust, etc.). The database operator can edit history. Blockchain supply 
-chain projects use NFT-style tokens but the token can be transferred independently of 
+Why impossible without seals: Supply chain provenance today requires trusting a database
+(GS1, IBM Food Trust, etc.). The database operator can edit history. Blockchain supply
+chain projects use NFT-style tokens but the token can be transferred independently of
 the physical item — nothing binds them.
 
-With seals: Each physical custody transfer IS a seal consumption + new seal opening. 
-The commitment chain IS the audit trail. The chain cannot be edited because each 
-commitment links to the prior commitment's hash. The "token" (right) moves with the 
+With seals: Each physical custody transfer IS a seal consumption + new seal opening.
+The commitment chain IS the audit trail. The chain cannot be edited because each
+commitment links to the prior commitment's hash. The "token" (right) moves with the
 physical item — custody = key possession = ability to consume the seal.
 
 ```
@@ -454,13 +460,13 @@ Schema: Provenance
 
 **Contract Type 5 — Time-Bounded License**
 
-Why impossible without seals: On-chain licenses renew automatically (subscription billing) 
-or expire based on block time — both require trusting the chain's clock and the contract's 
+Why impossible without seals: On-chain licenses renew automatically (subscription billing)
+or expire based on block time — both require trusting the chain's clock and the contract's
 state. Off-chain licenses (SaaS) require trusting the vendor's server.
 
-With seals: A license is a seal + expiry commitment. Using the software = presenting 
-a proof of unconsumed seal. The seal expiry is in the commitment — client-verified. 
-Renewal = issuer opens a new seal, sends new right via consignment. No on-chain 
+With seals: A license is a seal + expiry commitment. Using the software = presenting
+a proof of unconsumed seal. The seal expiry is in the commitment — client-verified.
+Renewal = issuer opens a new seal, sends new right via consignment. No on-chain
 transaction for verification (offline works). On-chain only for issuance and renewal.
 
 ```
@@ -502,6 +508,7 @@ csv-schemas/
 ```
 
 Each schema module contains:
+
 1. `const SCHEMA_ID: Hash` — deterministic schema fingerprint
 2. `struct [Name]Genesis` — genesis parameters
 3. `enum [Name]State` — valid state variants
@@ -510,6 +517,7 @@ Each schema module contains:
 6. Integration with `csv-adapter-core::schema::Schema` for AluVM validation
 
 **Matching on-chain contracts:**
+
 - `csv-adapter-ethereum/contracts/src/EventTicket.sol` — Solidity for ticket issuance
 - `csv-adapter-sui/contracts/sources/credential.move` — Move for credentials
 - `csv-adapter-bitcoin/` — Tapret commitment for provenance (no contract needed)
@@ -541,6 +549,6 @@ Atomic swap after Phase 5 ZK proofs stabilize.
 | Real-world contracts | Highest strategic value — defines why your system exists | Phase 4 | Event ticket + provenance: demonstrable, unique, deployable |
 
 **Nothing on this list is premature if ordered correctly.**  
-The mistakes would be: implementing PQ before ZK, implementing P2P gossip before Nostr, 
-implementing atomic swaps before real seals work, building a contract library before 
+The mistakes would be: implementing PQ before ZK, implementing P2P gossip before Nostr,
+implementing atomic swaps before real seals work, building a contract library before
 the schema system is wired to AluVM.

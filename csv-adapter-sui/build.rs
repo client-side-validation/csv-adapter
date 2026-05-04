@@ -38,7 +38,7 @@ fn has_sui_cli() -> bool {
 
 fn compile_with_sui(contracts_dir: &Path) {
     let output = Command::new("sui")
-        .args(&["move", "build"])
+        .args(["move", "build"])
         .current_dir(contracts_dir)
         .output()
         .expect("Failed to execute sui move build");
@@ -98,7 +98,7 @@ fn find_first_file_with_extension(dir: &Path, extension: &str) -> Option<PathBuf
             if let Some(found) = find_first_file_with_extension(&path, extension) {
                 return Some(found);
             }
-        } else if path.extension().map_or(false, |e| e == extension) {
+        } else if path.extension().is_some_and(|e| e == extension) {
             return Some(path);
         }
     }

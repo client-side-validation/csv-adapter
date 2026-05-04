@@ -38,7 +38,7 @@ fn has_aptos_cli() -> bool {
 
 fn compile_with_aptos(contracts_dir: &Path) {
     let output = Command::new("aptos")
-        .args(&["move", "compile"])
+        .args(["move", "compile"])
         .current_dir(contracts_dir)
         .output()
         .expect("Failed to execute aptos move compile");
@@ -98,7 +98,7 @@ fn find_first_file_with_extension(dir: &Path, extension: &str) -> Option<PathBuf
             if let Some(found) = find_first_file_with_extension(&path, extension) {
                 return Some(found);
             }
-        } else if path.extension().map_or(false, |e| e == extension) {
+        } else if path.extension().is_some_and(|e| e == extension) {
             return Some(path);
         }
     }

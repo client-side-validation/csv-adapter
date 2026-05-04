@@ -25,6 +25,7 @@ pub mod testnet_deploy;
 pub mod tx_builder;
 pub mod types;
 pub mod wallet;
+pub mod zk_prover;
 
 #[cfg(feature = "rpc")]
 pub mod real_rpc;
@@ -45,6 +46,7 @@ pub use tapret::{
 pub use tx_builder::{CommitmentData, CommitmentTxBuilder, TxBuilderError};
 pub use types::{BitcoinAnchorRef, BitcoinFinalityProof, BitcoinInclusionProof, BitcoinSealRef};
 pub use wallet::{Bip86Path, DerivedTaprootKey, SealWallet, WalletError, WalletUtxo};
+pub use zk_prover::{BitcoinSpvProver, Sp1BtcSpvInput};
 
 // MPC batching for cost optimization
 pub use mpc_batch::{

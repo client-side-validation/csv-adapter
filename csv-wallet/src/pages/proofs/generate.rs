@@ -56,9 +56,25 @@ pub fn GenerateProof() -> Element {
 
                 button {
                     onclick: move |_| {
+                        // Get the real seal_ref from the wallet context for this right
+                        let right_id_str = right_id.read().clone();
+                        let seal_ref = wallet_ctx.seal_for_right(&right_id_str)
+                            .map(|s| s.seal_ref.clone())
+                            .unwrap_or_else(|| {
+                                // If no seal found, cannot generate proof - this is a protocol requirement
+                                web_sys::console::error_1(&"No seal found for right - cannot generate proof without real chain-native seal".into());
+                                String::new()
+                            });
+
+                        if seal_ref.is_empty() {
+                            result.set(Some("Error: No seal found for this right. Create a seal first.".to_string()));
+                            return;
+                        }
+
                         let proof_json = serde_json::json!({
                             "chain": selected_chain.read().to_string(),
-                            "right_id": right_id.read().clone(),
+                            "right_id": right_id_str.clone(),
+                            "seal_ref": seal_ref.clone(),
                             "proof_type": proof_type,
                             "data": "proof_data_value"
                         });
@@ -66,8 +82,8 @@ pub fn GenerateProof() -> Element {
                         result.set(Some(formatted));
                         wallet_ctx.add_proof(ProofRecord {
                             chain: *selected_chain.read(),
-                            right_id: right_id.read().clone(),
-                            seal_ref: format!("seal_{}", &right_id.read()[..16.min(right_id.read().len())]),
+                            right_id: right_id_str,
+                            seal_ref,
                             proof_type: proof_type.to_string(),
                             status: ProofStatus::Generated,
                             generated_at: js_sys::Date::now() as u64 / 1000,

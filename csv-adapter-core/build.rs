@@ -29,7 +29,7 @@ fn main() {
     // Parse version components
     let parts: Vec<&str> = version.split('.').collect();
     let major = parts
-        .get(0)
+        .first()
         .and_then(|s| s.parse::<u32>().ok())
         .unwrap_or(0);
     let minor = parts

@@ -34,6 +34,7 @@ pub mod settings;
 pub mod tests;
 pub mod transactions;
 pub mod validate;
+pub mod zk_proofs;
 
 // Re-exports from nft_page and wallet_page (standalone files)
 pub use nft_page::{NftCollections, NftDetail, NftGallery};
@@ -64,6 +65,9 @@ pub use tests::{RunScenario, RunTests, Test};
 pub use validate::{
     OfflineVerify, Validate, ValidateCommitmentChain, ValidateConsignment, ValidateProof, ValidateSeal,
 };
+
+// Re-exports from zk_proofs module (Phase 5)
+pub use zk_proofs::{ZkGenerateProof, ZkVerifyProof};
 
 // Re-exports from transactions module
 pub use transactions::{TransactionDetail, Transactions};

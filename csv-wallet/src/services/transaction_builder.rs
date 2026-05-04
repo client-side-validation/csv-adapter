@@ -32,7 +32,13 @@ pub fn build_transaction(
         Chain::Bitcoin => build_btc_transaction_data(to, value, data),
         Chain::Sui => build_sui_transaction_data_simple(from, to, data),
         Chain::Aptos => build_aptos_transaction_data_simple(from, to, data, nonce),
-        Chain::Solana => build_solana_transaction_data(to, value, data),
+        Chain::Solana => {
+            return Err(BlockchainError {
+                message: "Solana transactions require a recent blockhash. Use build_solana_transaction_with_blockhash() with a blockhash from Solana RPC.".to_string(),
+                chain: Some(Chain::Solana),
+                code: Some(400),
+            })
+        }
         _ => Err(BlockchainError {
             message: format!("Transaction building not supported for chain: {:?}", chain),
             chain: Some(chain),

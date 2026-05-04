@@ -31,9 +31,9 @@ pub struct CsvWalletAccount {
     pub keystore_ref: Option<String>,
     /// Derived address for display
     pub address: String,
-    /// Balance in native token
+    /// Balance in native token (raw u64 units - satoshis, wei, lamports, etc.)
     #[serde(default, skip_serializing)]
-    pub balance: f64,
+    pub balance_raw: u64,
     /// BIP-44 derivation path (if HD wallet)
     pub derivation_path: Option<String>,
 }
@@ -424,7 +424,7 @@ pub fn cmd_export_csv_wallet(
                 name,
                 keystore_ref: None,
                 address: address.to_string(),
-                balance: 0.0,
+                balance_raw: 0,
                 derivation_path,
             });
         }

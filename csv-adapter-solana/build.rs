@@ -38,7 +38,7 @@ fn has_anchor_cli() -> bool {
 
 fn compile_with_anchor(contracts_dir: &Path) {
     let output = Command::new("anchor")
-        .args(&["build"])
+        .args(["build"])
         .current_dir(contracts_dir)
         .output()
         .expect("Failed to execute anchor build");
@@ -83,7 +83,7 @@ fn read_program_bytecode(contracts_dir: &Path) -> String {
         if let Ok(entries) = fs::read_dir(&deploy_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().map_or(false, |e| e == "so") {
+                if path.extension().is_some_and(|e| e == "so") {
                     if let Ok(bytes) = fs::read(&path) {
                         return bytes_to_array_literal(&bytes);
                     }

@@ -95,6 +95,12 @@ pub enum Route {
     #[route("/validate/commitment-chain")]
     ValidateCommitmentChain {},
 
+    // ZK Proofs (Phase 5)
+    #[route("/zk/generate")]
+    ZkGenerateProof {},
+    #[route("/zk/verify")]
+    ZkVerifyProof {},
+
     // NFT Gallery
     #[route("/nfts")]
     NftGallery {},

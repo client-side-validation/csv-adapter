@@ -24,6 +24,7 @@ pub mod seal;
 pub mod seal_contract;
 pub mod signatures;
 pub mod types;
+pub mod zk_verifier;
 
 #[cfg(feature = "rpc")]
 pub mod real_rpc;
@@ -51,6 +52,7 @@ pub use seal_contract::CsvSealAbi;
 pub use types::{
     EthereumAnchorRef, EthereumFinalityProof, EthereumInclusionProof, EthereumSealRef,
 };
+pub use zk_verifier::{EthereumGroth16Verifier, SolidityGroth16Proof, generate_verifier_contract_bytecode};
 
 // Chain operations exports
 pub use chain_operations::EthereumChainOperations;
