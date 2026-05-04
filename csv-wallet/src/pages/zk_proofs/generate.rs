@@ -7,10 +7,12 @@
 use crate::context::{use_wallet_context, ProofRecord, ProofStatus};
 use crate::pages::common::*;
 use crate::routes::Route;
-use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
-use csv_adapter_core::zk_proof::{ChainWitness, ZkProver, ZkSealProof};
-use csv_adapter_core::{Chain, signature::SignatureScheme};
+use csv_adapter_core::zk_proof::{ChainWitness, ZkSealProof};
+use csv_adapter_core::Chain;
 use dioxus::prelude::*;
+
+#[cfg(feature = "csv-adapter-bitcoin")]
+use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
 
 /// Generate ZK proof page
 #[component]
@@ -158,24 +160,23 @@ pub fn ZkGenerateProof() -> Element {
                         }
 
                         if res.success {
-                            if let Some(proof) = &res.proof {
+                            if let Some(proof) = res.proof.clone() {
                                 div { class: "mt-4 space-y-2",
                                     p { class: "text-sm text-gray-400", "Proof Details:" }
                                     div { class: "p-3 bg-gray-800 rounded-lg font-mono text-xs",
                                         p { "Chain: {proof.public_inputs.source_chain.to_string()}" }
                                         p { "Block Height: {proof.public_inputs.block_height}" }
                                         p { "Proof System: {proof.verifier_key.proof_system.to_string()}" }
-                                        p { "Verifier Key Hash: {}", hex::encode(&proof.verifier_key.hash().as_bytes()[..8]) }
                                     }
 
                                     button {
                                         class: "{btn_secondary_class()} w-full mt-2",
                                         onclick: move |_| {
                                             // Copy proof to clipboard
-                                            let proof_json = serde_json::to_string_pretty(proof).unwrap_or_default();
-                                            web_sys::clipboard::Clipboard::new()
-                                                .unwrap()
-                                                .write_text(&proof_json);
+                                            let proof_json = serde_json::to_string_pretty(&proof).unwrap_or_default();
+                                            let window = web_sys::window().unwrap();
+                                            let clipboard = window.navigator().clipboard();
+                                            let _ = clipboard.write_text(&proof_json);
                                         },
                                         "📋 Copy Proof to Clipboard"
                                     }
@@ -246,6 +247,7 @@ struct ZkResult {
 }
 
 /// Generate a Bitcoin SPV ZK proof using SP1
+#[cfg(feature = "csv-adapter-bitcoin")]
 fn generate_bitcoin_zk_proof(seal_ref: &str, right_id: &str) -> Result<ZkSealProof, String> {
     use csv_adapter_core::hash::Hash;
     use csv_adapter_core::seal::SealRef;
@@ -273,6 +275,12 @@ fn generate_bitcoin_zk_proof(seal_ref: &str, right_id: &str) -> Result<ZkSealPro
 
     prover.prove_seal_consumption(&seal, &witness)
         .map_err(|e| format!("Proof generation failed: {}", e))
+}
+
+/// Generate a Bitcoin SPV ZK proof using SP1 (stub for non-bitcoin builds)
+#[cfg(not(feature = "csv-adapter-bitcoin"))]
+fn generate_bitcoin_zk_proof(_seal_ref: &str, _right_id: &str) -> Result<ZkSealProof, String> {
+    Err("Bitcoin ZK proof generation not available in this build".to_string())
 }
 
 /// Generate an Ethereum Groth16 ZK proof

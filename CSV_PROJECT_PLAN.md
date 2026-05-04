@@ -758,23 +758,23 @@ This is not premature optimization. It's infrastructure. The MPC tree directly r
   To complete the MPC integration with `BitcoinAnchorLayer::publish()`, the following steps are required:
 
   1. **Batcher Instance in BitcoinAnchorLayer**
-    - Add `mpc_batcher: MpcBatcher` field to `BitcoinAnchorLayer`
-    - Initialize with configurable batch thresholds
+  - Add `mpc_batcher: MpcBatcher` field to `BitcoinAnchorLayer`
+  - Initialize with configurable batch thresholds
 
-  2. **Configuration for Batch Thresholds**
-    - `batch_size` - Maximum commitments per batch (default: 10)
-    - `min_batch_size` - Minimum before auto-batch (default: 2)
-    - `max_wait_seconds` - Timeout for forcing batch (default: 300)
+  1. **Configuration for Batch Thresholds**
+  - `batch_size` - Maximum commitments per batch (default: 10)
+  - `min_batch_size` - Minimum before auto-batch (default: 2)
+  - `max_wait_seconds` - Timeout for forcing batch (default: 300)
 
-  3. **Timer/Scheduler for Batch Publication**
-    - Periodic check for batch readiness
-    - Timeout-based forced publication
-    - Background task integration
+  1. **Timer/Scheduler for Batch Publication**
+  - Periodic check for batch readiness
+  - Timeout-based forced publication
+  - Background task integration
 
-  4. **Integration with Commitment Flow**
-    - Modify `publish()` to queue commitments when batching enabled
-    - Batch publication path: build MPC tree → publish root → distribute proofs
-    - Single-commitment fallback when batching disabled
+  1. **Integration with Commitment Flow**
+  - Modify `publish()` to queue commitments when batching enabled
+  - Batch publication path: build MPC tree → publish root → distribute proofs
+  - Single-commitment fallback when batching disabled
 
   **Important:** This is a runtime configuration choice, not a missing feature. Single-commitment publishing works correctly today. Batching is a cost optimization that can be enabled when operational requirements warrant it.
 
@@ -848,6 +848,57 @@ Wire `AluVmAdapter::execute` to the validator pipeline:
 - Example: "This right can only be transferred to addresses starting with specific prefix"
 
 Start with `PassthroughVM` for all existing rights (backward compatible), migrate to `AluVmAdapter` for new rights with bytecode schemas.
+
+### 5.5 Where the ZK-proofs lives
+
+What goes on Bitcoin (32 bytes):
+The tapret/opret output embeds one 32-byte commitment hash. That is all Bitcoin ever sees. The seal consumption is just a UTXO being spent — a normal Bitcoin transaction.
+What the SP1 proof actually proves:
+"This Bitcoin transaction (with this commitment) was included in block X, and that block has Y confirmations." The proof replaces the need for the verifier to call a Bitcoin RPC node to verify this themselves.
+
+Where the SP1 proof lives:
+Inside the ProofBundle, which travels peer-to-peer as part of the Consignment. The flow:
+
+Sender                              Receiver
+  │                                    │
+  ├─ spends UTXO on Bitcoin            │
+  ├─ generates SP1 proof (~1-4MB)      │
+  ├─ bundles into ProofBundle          │
+  ├─ sends Consignment (off-chain) ───►│
+  │   contains: ProofBundle            │
+  │             CommitmentChain        │
+  │             Title state            │
+  │                                    ├─ runs sp1_verifier::verify()
+  │                                    ├─ no RPC call needed
+  │                                    └─ accepts or rejects locally
+
+The SP1 proof is a one-time artifact — generated once by the sender, verified once by the receiver, then the receiver only needs to store the fact that verification passed and keep the CommitAnchor (32-byte block reference). They do not need to retain the full proof after verification unless they intend to re-prove to a third party.
+
+The size problem is real, and here are the three standard solutions:
+
+Option 1 — Groth16 wrapping (best for most cases)
+SP1 can wrap its STARK proof in a Groth16 proof. Output is ~256 bytes. Verification takes ~2ms. The receiver gets a tiny proof instead of 1-4MB. The tradeoff is a trusted setup ceremony for the Groth16 parameters — SP1's ceremony is public. This is what your zk_proof.rs should use as default.
+
+Option 2 — Store proof on IPFS/Arweave, pass hash in Consignment
+If the proof must be retained for future re-presentation (e.g. supply chain provenance where auditors may arrive later), store the SP1 proof content-addressed on IPFS. The CommitAnchor in the Consignment carries the IPFS CID. Anyone who needs to re-verify fetches it by CID. The Consignment stays small.
+
+Option 3 — Don't use SP1 for Bitcoin SPV at all — use existing SPV
+Your csv-bitcoin/src/spv.rs already builds a Merkle inclusion proof (a few hundred bytes). This is not a ZK proof — the verifier must trust that the block headers are honest. But if the receiver runs a light Bitcoin node (or uses a header chain they already trust), the SPV proof is sufficient and costs nothing to generate. SP1 is only needed when the receiver cannot or will not trust any Bitcoin RPC.
+
+What to actually build:
+ProofBundle {
+    // Always present — tiny, no trust needed for chain-native inclusion
+    spv_proof: BitcoinSpvProof,          // Merkle branch, ~500 bytes
+
+    // Optional — eliminates RPC trust entirely  
+    zk_proof: Option<Groth16Proof>,      // 256 bytes (wrapped SP1)
+    
+    // For future third-party auditors
+    proof_archive_cid: Option<String>,   // IPFS CID of the full STARK
+}
+
+The receiver chooses their trust model: verify with SPV (trust a header source), verify with Groth16 (trust nothing, just math), or fetch and verify the full STARK from IPFS (maximum verifiability).
+The large raw SP1 STARK proof stays off every chain, off the consignment, and lives on IPFS only if the use case requires long-term re-provability.
 
 ---
 

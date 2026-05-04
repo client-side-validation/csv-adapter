@@ -479,6 +479,25 @@ fn proof_data_display(data: &crate::context::ProofData) -> Element {
                 }
             }
         }
+        crate::context::ProofData::Zk {
+            proof_system,
+            proof_bytes,
+            seal_id,
+            block_hash,
+            block_height,
+            verifier_key_hash,
+        } => {
+            rsx! {
+                div { class: "space-y-1 text-xs",
+                    p { span { class: "text-gray-500", "Proof System: " }, "{proof_system}" }
+                    p { span { class: "text-gray-500", "Proof Size: " }, "{proof_bytes.len()} bytes" }
+                    p { span { class: "text-gray-500", "Seal ID: " }, span { class: "font-mono", "{truncate_address(seal_id, 16)}" } }
+                    p { span { class: "text-gray-500", "Block: " }, "{block_height}" }
+                    p { span { class: "text-gray-500", "Block Hash: " }, span { class: "font-mono", "{truncate_address(block_hash, 16)}" } }
+                    p { span { class: "text-gray-500", "Verifier: " }, span { class: "font-mono", "{truncate_address(verifier_key_hash, 16)}" } }
+                }
+            }
+        }
     }
 }
 

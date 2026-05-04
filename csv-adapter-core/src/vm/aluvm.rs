@@ -540,7 +540,7 @@ mod tests {
         let vm = AluVmAdapter::default_();
         let inputs = make_inputs();
         let bytecode = vec![0x00];
-        let outputs = vm.execute(&bytecode, inputs, &[]).unwrap();
+        let outputs = vm.execute(&bytecode, inputs.clone(), &[]).unwrap();
         assert!(vm.validate_outputs(&inputs, &outputs).is_ok());
     }
 

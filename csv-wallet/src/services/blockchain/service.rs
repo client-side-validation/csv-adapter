@@ -605,6 +605,18 @@ impl BlockchainService {
                         code: Some(500),
                     })?
             }
+            ProofData::Zk { proof_bytes, seal_id, .. } => {
+                // For ZK proofs, use the proof_bytes directly and seal_id as the leaf
+                let mut proof_data = vec![];
+                proof_data.extend_from_slice(proof_bytes.as_bytes());
+                proof_data.extend_from_slice(seal_id.as_bytes());
+                InclusionProof::new(proof_data, Hash::new(right_id_bytes.try_into().unwrap_or([0u8; 32])), 0)
+                    .map_err(|e| BlockchainError {
+                        message: format!("Failed to create inclusion proof from ZK data: {}", e),
+                        chain: Some(proof.source_chain),
+                        code: Some(500),
+                    })?
+            }
         };
 
         // Create finality proof (minimal implementation)

@@ -236,6 +236,35 @@ pub enum ProofData {
         /// Merkle proof
         merkle_proof: Vec<String>,
     },
+    /// Zero-Knowledge proof (Phase 5)
+    /// Stores a ZkSealProof for trustless verification without RPC
+    Zk {
+        /// Proof system used (SP1, Groth16, PlonK, etc.)
+        proof_system: String,
+        /// Serialized proof bytes (base64 encoded)
+        proof_bytes: String,
+        /// Public inputs from the proof
+        seal_id: String,
+        block_hash: String,
+        block_height: u64,
+        /// Verifier key hash (for identifying the circuit)
+        verifier_key_hash: String,
+    },
+}
+
+impl ProofData {
+    /// Check if this is a ZK proof
+    pub fn is_zk(&self) -> bool {
+        matches!(self, ProofData::Zk { .. })
+    }
+
+    /// Get the proof system if this is a ZK proof
+    pub fn zk_proof_system(&self) -> Option<&str> {
+        match self {
+            ProofData::Zk { proof_system, .. } => Some(proof_system),
+            _ => None,
+        }
+    }
 }
 
 /// A proof record - cryptographic proof that validates a Seal.
@@ -263,6 +292,53 @@ pub struct ProofRecord {
     pub target_chain: Option<Chain>,
     /// Verification transaction hash on target chain
     pub verification_tx_hash: Option<String>,
+}
+
+impl ProofRecord {
+    /// Create a new ZK proof record from a ZkSealProof (Phase 5).
+    pub fn from_zk_proof(
+        right_id: String,
+        seal_ref: String,
+        zk_proof: &csv_adapter_core::zk_proof::ZkSealProof,
+    ) -> Self {
+        use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+        let proof_system = zk_proof.verifier_key.proof_system.to_string();
+        let proof_bytes = STANDARD.encode(&zk_proof.proof_bytes);
+        let seal_id = hex::encode(&zk_proof.public_inputs.seal_ref.seal_id);
+        let block_hash = hex::encode(zk_proof.public_inputs.block_hash.as_bytes());
+        let verifier_key_hash = hex::encode(&zk_proof.verifier_key.hash().as_bytes()[..16]);
+
+        Self {
+            chain: zk_proof.public_inputs.source_chain,
+            right_id,
+            seal_ref,
+            proof_type: "zk_seal".to_string(),
+            status: ProofStatus::Generated,
+            generated_at: zk_proof.public_inputs.timestamp,
+            verified_at: None,
+            data: Some(ProofData::Zk {
+                proof_system,
+                proof_bytes,
+                seal_id,
+                block_hash,
+                block_height: zk_proof.public_inputs.block_height,
+                verifier_key_hash,
+            }),
+            target_chain: None,
+            verification_tx_hash: None,
+        }
+    }
+
+    /// Check if this proof record is a ZK proof.
+    pub fn is_zk_proof(&self) -> bool {
+        self.data.as_ref().map_or(false, |d| d.is_zk())
+    }
+
+    /// Get the ZK proof data if this is a ZK proof.
+    pub fn zk_data(&self) -> Option<&ProofData> {
+        self.data.as_ref().filter(|d| d.is_zk())
+    }
 }
 
 /// An NFT (Non-Fungible Token) record.

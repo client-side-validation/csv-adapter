@@ -175,15 +175,26 @@ impl WalletContext {
                     } else {
                         ProofStatus::Generated
                     };
+                    // Build ProofData from store record if it's a ZK proof
+                    let data = p.proof_system.as_ref().map(|system| {
+                        crate::context::ProofData::Zk {
+                            proof_system: system.clone(),
+                            proof_bytes: p.proof_data.clone().unwrap_or_default(),
+                            seal_id: p.right_id.clone(),
+                            block_hash: String::new(),
+                            block_height: p.block_height.unwrap_or(0),
+                            verifier_key_hash: String::new(),
+                        }
+                    });
                     Some(ProofRecord {
                         chain: convert_chain_from_store(p.chain),
                         right_id: p.right_id,
                         seal_ref: String::new(), // Old format doesn't have this
                         proof_type: p.proof_type,
                         status,
-                        generated_at: 0,
-                        verified_at: if p.verified { Some(0) } else { None },
-                        data: None,
+                        generated_at: p.created_at,
+                        verified_at: p.verified_at,
+                        data,
                         target_chain: None,
                         verification_tx_hash: None,
                     })
@@ -315,8 +326,12 @@ impl WalletContext {
                     chain: convert_chain_to_store(p.chain.clone()),
                     right_id: p.right_id.clone(),
                     proof_type: p.proof_type.clone(),
+                    proof_system: p.data.as_ref().and_then(|d| d.zk_proof_system().map(|s| s.to_string())),
                     verified: p.status == ProofStatus::Verified,
                     proof_data: None,
+                    block_height: None,
+                    created_at: p.generated_at,
+                    verified_at: p.verified_at,
                 })
                 .collect(),
             contracts: s

@@ -276,5 +276,17 @@ fn proof_data_summary(data: &crate::context::ProofData) -> Element {
                 }
             }
         }
+        crate::context::ProofData::Zk {
+            proof_system,
+            proof_bytes,
+            ..
+        } => {
+            rsx! {
+                div { class: "space-y-1 text-xs",
+                    p { span { class: "text-gray-500", "ZK Proof: " }, "{proof_system}" }
+                    p { span { class: "text-gray-500", "Size: " }, "{proof_bytes.len()} bytes" }
+                }
+            }
+        }
     }
 }

@@ -237,6 +237,16 @@ fn inclusion_proof_section(proof: &ProofRecord) -> Element {
                                 p { class: "font-medium", "{slot}" }
                             }
                         },
+                        crate::context::ProofData::Zk { proof_system, block_height, .. } => rsx! {
+                            div { class: "p-3 bg-gray-800/50 rounded-lg",
+                                p { class: "text-xs text-gray-500 mb-1", "ZK Proof System" }
+                                p { class: "font-medium", "{proof_system}" }
+                            }
+                            div { class: "p-3 bg-gray-800/50 rounded-lg",
+                                p { class: "text-xs text-gray-500 mb-1", "Block Height" }
+                                p { class: "font-medium", "{block_height}" }
+                            }
+                        },
                     }}
 
                     // Inclusion proof explanation

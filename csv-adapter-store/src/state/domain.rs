@@ -155,19 +155,79 @@ pub struct SealRecord {
 }
 
 /// Proof record (cryptographic proofs for CSV).
+///
+/// Stores both traditional inclusion proofs and ZK proofs (Phase 5).
+/// For ZK proofs, the proof_data contains the serialized ZkSealProof.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProofRecord {
     /// Chain where proof is valid.
     pub chain: Chain,
     /// Right ID this proof is for.
     pub right_id: String,
-    /// Proof type (e.g., "inclusion", "exclusion", "transition").
+    /// Proof type (e.g., "inclusion", "exclusion", "transition", "zk_seal").
     pub proof_type: String,
+    /// Proof system used (e.g., "sp1", "groth16", "plonk" for ZK proofs).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_system: Option<String>,
     /// Whether proof has been verified.
     pub verified: bool,
     /// Proof data (base64 encoded).
+    /// For ZK proofs, this is the serialized ZkSealProof bytes.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof_data: Option<String>,
+    /// Block height where the proof was generated/verified.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub block_height: Option<u64>,
+    /// Timestamp when proof was created.
+    pub created_at: u64,
+    /// Timestamp when proof was verified (if applicable).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verified_at: Option<u64>,
+}
+
+impl ProofRecord {
+    /// Create a new ZK proof record.
+    pub fn new_zk_proof(
+        chain: Chain,
+        right_id: String,
+        proof_system: &str,
+        proof_data: Vec<u8>,
+        block_height: u64,
+    ) -> Self {
+        use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+        Self {
+            chain,
+            right_id,
+            proof_type: "zk_seal".to_string(),
+            proof_system: Some(proof_system.to_string()),
+            verified: false,
+            proof_data: Some(STANDARD.encode(proof_data)),
+            block_height: Some(block_height),
+            created_at: 0, // Should be set by caller
+            verified_at: None,
+        }
+    }
+
+    /// Get the decoded proof data as bytes.
+    pub fn decoded_proof_data(&self) -> Option<Vec<u8>> {
+        use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+        self.proof_data
+            .as_ref()
+            .and_then(|data| STANDARD.decode(data).ok())
+    }
+
+    /// Mark the proof as verified.
+    pub fn mark_verified(&mut self, timestamp: u64) {
+        self.verified = true;
+        self.verified_at = Some(timestamp);
+    }
+
+    /// Check if this is a ZK proof.
+    pub fn is_zk_proof(&self) -> bool {
+        self.proof_type == "zk_seal" || self.proof_system.is_some()
+    }
 }
 
 /// Transaction type.

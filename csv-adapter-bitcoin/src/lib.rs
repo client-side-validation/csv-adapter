@@ -26,6 +26,7 @@ pub mod tx_builder;
 pub mod types;
 pub mod wallet;
 pub mod zk_prover;
+pub mod sp1_guest;
 
 #[cfg(feature = "rpc")]
 pub mod real_rpc;
@@ -47,6 +48,7 @@ pub use tx_builder::{CommitmentData, CommitmentTxBuilder, TxBuilderError};
 pub use types::{BitcoinAnchorRef, BitcoinFinalityProof, BitcoinInclusionProof, BitcoinSealRef};
 pub use wallet::{Bip86Path, DerivedTaprootKey, SealWallet, WalletError, WalletUtxo};
 pub use zk_prover::{BitcoinSpvProver, Sp1BtcSpvInput};
+pub use sp1_guest::{Sp1BtcSpvInput as Sp1GuestInput, Sp1BtcSpvOutput as Sp1GuestOutput, verify_bitcoin_spv};
 
 // MPC batching for cost optimization
 pub use mpc_batch::{

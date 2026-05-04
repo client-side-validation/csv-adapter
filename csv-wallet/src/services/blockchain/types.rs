@@ -80,6 +80,21 @@ pub enum ProofData {
         proof: Vec<u8>,
         root_hash: String,
     },
+    /// Zero-Knowledge proof (Phase 5)
+    Zk {
+        /// Proof system used (SP1, Groth16, etc.)
+        proof_system: String,
+        /// Base64-encoded proof bytes
+        proof_bytes: String,
+        /// Seal ID this proof is for
+        seal_id: String,
+        /// Block hash where proof was generated
+        block_hash: String,
+        /// Block height
+        block_height: u64,
+        /// Verifier key hash
+        verifier_key_hash: String,
+    },
 }
 
 /// Contract deployment info.
