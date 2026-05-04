@@ -8,7 +8,7 @@ mod use_wallet_connection;
 // Re-export from use_balance - REAL IMPLEMENTATION
 #[allow(unused_imports)]
 pub use use_balance::{
-    chain_symbol, format_balance, use_balance, AccountBalance, BalanceContext, BalanceProvider,
+    chain_symbol, format_balance, format_balance_display, use_balance, AccountBalance, BalanceContext, BalanceProvider,
 };
 
 // Re-export from use_network

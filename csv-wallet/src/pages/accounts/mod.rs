@@ -2,7 +2,7 @@
 
 use crate::context::types::{RightStatus, TransferStatus};
 use crate::context::use_wallet_context;
-use crate::hooks::{format_balance, AccountBalance};
+use crate::hooks::{format_balance_display, AccountBalance};
 use crate::pages::common::*;
 use crate::routes::Route;
 pub use csv_adapter_core::Chain;
@@ -44,9 +44,9 @@ pub fn Dashboard() -> Element {
                 for account in accounts_to_fetch {
                     let balance_result = api.get_balance(account.chain, &account.address).await;
 
-                    let balance = match balance_result {
+                    let balance_raw = match balance_result {
                         Ok(b) => b,
-                        Err(_) => 0.0,
+                        Err(_) => 0u64,
                     };
                     let error = balance_result.err().map(|e| e.to_string());
 
@@ -54,7 +54,7 @@ pub fn Dashboard() -> Element {
                         account_id: account.id.clone(),
                         chain: account.chain,
                         address: account.address.clone(),
-                        balance,
+                        balance_raw,
                         loading: false,
                         error,
                     };
@@ -134,13 +134,13 @@ pub fn Dashboard() -> Element {
                                                 if account.chain == Chain::Bitcoin {
                                                     p { class: "text-[10px] text-gray-500 max-w-[200px] truncate", "{error}" }
                                                 }
-                                            } else if balance_data.balance > 0.0 {
+                                            } else if balance_data.balance_raw > 0 {
                                                 p { class: "text-xs text-green-400 font-medium",
-                                                    "{format_balance(balance_data.balance, account.chain)}"
+                                                    "{format_balance_display(balance_data.balance_raw, account.chain)}"
                                                 }
                                             } else {
                                                 p { class: "text-xs text-yellow-400 font-medium",
-                                                    "{format_balance(balance_data.balance, account.chain)} (No funds)"
+                                                    "{format_balance_display(balance_data.balance_raw, account.chain)} (No funds)"
                                                 }
                                             }
                                         } else {

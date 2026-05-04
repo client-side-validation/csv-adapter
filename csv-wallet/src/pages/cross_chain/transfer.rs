@@ -61,8 +61,8 @@ pub fn CrossChainTransfer() -> Element {
     let dest_accounts = wallet_ctx.accounts_for_chain(*to_chain.read());
     let has_dest_account = !dest_accounts.is_empty();
 
-    // Track fetched destination balance
-    let mut dest_balance = use_signal(|| 0.0);
+    // Track fetched destination balance (in raw chain units: satoshis, lamports, MIST, octas, wei)
+    let mut dest_balance_raw = use_signal(|| 0u64);
     let mut dest_balance_loading = use_signal(|| false);
 
     // Fetch destination balance when chain or account changes
@@ -77,7 +77,7 @@ pub fn CrossChainTransfer() -> Element {
                     use crate::services::chain_api::ChainApi;
                     let api = ChainApi::default();
                     if let Ok(balance) = api.get_balance(to_chain_val, &addr).await {
-                        dest_balance.set(balance);
+                        dest_balance_raw.set(balance);
                     }
                     dest_balance_loading.set(false);
                 });
@@ -85,16 +85,16 @@ pub fn CrossChainTransfer() -> Element {
         }
     });
 
-    // Check if destination account has minimum balance for gas
-    // Sui: ~0.01 SUI, Aptos: ~0.01 APT, Ethereum: variable
-    let min_dest_balance = match *to_chain.read() {
-        Chain::Sui => 0.01,
-        Chain::Aptos => 0.01,
-        Chain::Ethereum => 0.001, // ~$2-3 for simple transfer
-        Chain::Solana => 0.001,   // ~0.001 SOL
-        _ => 0.0,                 // Bitcoin doesn't need pre-funded destination for minting
+    // Check if destination account has minimum balance for gas (in raw chain units)
+    // Sui: ~0.01 SUI = 10_000_000 MIST, Aptos: ~0.01 APT = 1_000_000 octas
+    let min_dest_balance_raw = match *to_chain.read() {
+        Chain::Sui => 10_000_000u64,     // 0.01 SUI in MIST
+        Chain::Aptos => 1_000_000u64,  // 0.01 APT in octas
+        Chain::Ethereum => 1_000_000_000_000_000u64, // ~0.001 ETH in wei
+        Chain::Solana => 1_000_000u64, // ~0.001 SOL in lamports
+        _ => 0u64,                      // Bitcoin doesn't need pre-funded destination for minting
     };
-    let dest_has_enough_balance = *dest_balance.read() >= min_dest_balance;
+    let dest_has_enough_balance = *dest_balance_raw.read() >= min_dest_balance_raw;
 
     // Get contracts for source and target chains
     let source_contracts = wallet_ctx.contracts_for_chain(*from_chain.read());

@@ -3,6 +3,7 @@
 //! Handles submitting signed transactions to different chains.
 
 use crate::services::blockchain::types::{BlockchainError, SignedTransaction, TransactionReceipt, TransactionStatus};
+use base64::Engine;
 use csv_adapter_core::Chain;
 
 /// Transaction submitter for broadcasting to chains.
@@ -233,8 +234,8 @@ impl TransactionSubmitter {
             "id": 1,
             "method": "sui_executeTransactionBlock",
             "params": [
-                base64::encode(tx_bytes),
-                [base64::encode([signature, public_key].concat())],
+                base64::engine::general_purpose::STANDARD.encode(tx_bytes),
+                [base64::engine::general_purpose::STANDARD.encode([signature, public_key].concat())],
                 {"showEffects": true, "showEvents": true},
                 "WaitForLocalExecution",
             ],
@@ -310,7 +311,7 @@ impl TransactionSubmitter {
 
         // Aptos expects the signed transaction as BCS-encoded bytes
         // The signed_tx.raw_bytes should be the BCS-encoded SignedTransaction
-        let tx_data = base64::encode(&signed_tx.raw_bytes);
+        let tx_data = base64::engine::general_purpose::STANDARD.encode(&signed_tx.raw_bytes);
 
         // Build the request for Aptos transactions endpoint
         let aptos_request = serde_json::json!({
@@ -390,12 +391,10 @@ impl TransactionSubmitter {
         signed_tx: &SignedTransaction,
         rpc_url: &str,
     ) -> Result<TransactionReceipt, BlockchainError> {
-        use base64::encode;
-
         web_sys::console::log_1(&"Submitting to Solana network...".into());
 
         // Solana transactions are base64-encoded when sent via RPC
-        let encoded_tx = encode(&signed_tx.raw_bytes);
+        let encoded_tx = base64::engine::general_purpose::STANDARD.encode(&signed_tx.raw_bytes);
 
         // Build the RPC request for sendTransaction
         let rpc_request = serde_json::json!({

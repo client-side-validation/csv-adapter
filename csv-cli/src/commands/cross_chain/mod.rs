@@ -6,12 +6,10 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use csv_adapter::CsvClient;
 use csv_adapter_core::Chain;
 
 use crate::config::{Chain as ConfigChain, Config};
-use crate::output;
-use crate::state::{TransferStatus, UnifiedStateManager};
+use crate::state::UnifiedStateManager;
 
 pub mod status;
 pub mod transfer;

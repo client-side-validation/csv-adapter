@@ -2,7 +2,6 @@
 //!
 //! Provides deployment using CSV adapter deploy modules via RPC.
 
-use crate::commands::contracts::types::DiscoveredContract;
 use crate::config::{Chain, Config};
 use crate::output;
 use crate::state::{ContractRecord, UnifiedStateManager};
@@ -159,7 +158,7 @@ fn deploy_sui_csv_client(
 
     output::progress(2, 3, "Building CSV client with Sui chain...");
 
-    let client = CsvClient::builder()
+    let _client = CsvClient::builder()
         .with_chain(to_core_chain(Chain::Sui))
         .build()
         .map_err(|e| anyhow::anyhow!("Failed to build CSV client: {}", e))?;
@@ -197,7 +196,7 @@ fn deploy_aptos_csv_client(
 
     output::progress(2, 3, "Building CSV client with Aptos chain...");
 
-    let client = CsvClient::builder()
+    let _client = CsvClient::builder()
         .with_chain(to_core_chain(Chain::Aptos))
         .build()
         .map_err(|e| anyhow::anyhow!("Failed to build CSV client: {}", e))?;
@@ -227,7 +226,7 @@ fn deploy_solana_csv_client(_config: &Config, state: &mut UnifiedStateManager) -
 
     output::progress(2, 3, "Building CSV client with Solana chain...");
 
-    let client = CsvClient::builder()
+    let _client = CsvClient::builder()
         .with_chain(to_core_chain(Chain::Solana))
         .build()
         .map_err(|e| anyhow::anyhow!("Failed to build CSV client: {}", e))?;

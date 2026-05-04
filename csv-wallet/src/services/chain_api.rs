@@ -11,10 +11,7 @@
 //! This module is Production Guarantee Plan compliant - all operations
 //! go through the csv-adapter facade rather than duplicate implementations.
 
-use csv_adapter::prelude::{
-    CsvClient, Chain as AdapterChain, Commitment, Hash, ProofBundle, Right, RightId,
-    CrossChainError, RightsManager, TransferManager, ProofManager, Wallet,
-};
+use csv_adapter::prelude::CsvClient;
 use csv_adapter::StoreBackend;
 use csv_adapter_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
 use csv_adapter_core::Chain;
@@ -216,7 +213,10 @@ impl ChainApi {
     ///
     /// This delegates to ChainQuery::get_balance via the facade instead of
     /// making direct HTTP calls, ensuring production guarantee compliance.
-    pub async fn get_balance(&self, chain: Chain, address: &str) -> Result<f64, ChainApiError> {
+    ///
+    /// Returns raw chain units (satoshis, lamports, MIST, octas, wei).
+    /// Use `format_balance_display()` from hooks::use_balance for human-readable formatting.
+    pub async fn get_balance(&self, chain: Chain, address: &str) -> Result<u64, ChainApiError> {
         // Build CSV client with the requested chain enabled
         let client = self.get_or_build_client(chain).await?;
 
@@ -228,8 +228,8 @@ impl ChainApi {
             .await
             .map_err(|e| ChainApiError::AdapterError(format!("Facade error: {}", e)))?;
 
-        // Convert from chain-specific units to display units
-        Ok(self.convert_to_display_units(chain, balance_info.total))
+        // Return raw chain units - display conversion happens at UI layer
+        Ok(balance_info.total)
     }
 
     /// Update the configuration for a chain.
@@ -245,7 +245,7 @@ impl ChainApi {
     /// Get or build a CsvClient for the specified chain.
     async fn get_or_build_client(&self, chain: Chain) -> Result<CsvClient, ChainApiError> {
         // Build a new client with the requested chain enabled
-        let config = self
+        let _config = self
             .configs
             .get(&chain)
             .cloned()
@@ -290,17 +290,6 @@ impl ChainApi {
         }
     }
 
-    /// Convert from chain's smallest unit to display unit.
-    fn convert_to_display_units(&self, chain: Chain, amount: u64) -> f64 {
-        match chain {
-            Chain::Bitcoin => amount as f64 / 100_000_000.0, // satoshis to BTC
-            Chain::Ethereum => amount as f64 / 1e18,         // wei to ETH
-            Chain::Sui => amount as f64 / 1e9,               // MIST to SUI
-            Chain::Aptos => amount as f64 / 1e8,             // octas to APT
-            Chain::Solana => amount as f64 / 1e9,            // lamports to SOL
-            _ => amount as f64,
-        }
-    }
 }
 
 impl Default for ChainApi {

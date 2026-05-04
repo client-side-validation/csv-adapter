@@ -75,7 +75,7 @@ pub fn cmd_transfer(
         .map_err(|e| anyhow::anyhow!("Failed to create CSV client: {}", e))?;
 
     // Use facade transfer manager
-    let transfers = client.transfers();
+    let _transfers = client.transfers();
 
     // In a full implementation, this would execute the cross-chain transfer
     // using the facade's cross_chain method. For now, we record the intent.

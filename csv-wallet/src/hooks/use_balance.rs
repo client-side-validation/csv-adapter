@@ -10,7 +10,9 @@ pub struct AccountBalance {
     pub account_id: String,
     pub chain: Chain,
     pub address: String,
-    pub balance: f64,
+    /// Balance in raw chain units (satoshis, lamports, MIST, octas, wei).
+    /// Use `format_balance_display()` for human-readable display.
+    pub balance_raw: u64,
     pub loading: bool,
     pub error: Option<String>,
 }
@@ -32,13 +34,13 @@ impl BalanceContext {
         self.balances.read().values().cloned().collect()
     }
 
-    /// Get total balance for a chain.
-    pub fn chain_total(&self, chain: Chain) -> f64 {
+    /// Get total raw balance for a chain (in chain-native units).
+    pub fn chain_total_raw(&self, chain: Chain) -> u64 {
         self.balances
             .read()
             .values()
             .filter(|b| b.chain == chain)
-            .map(|b| b.balance)
+            .map(|b| b.balance_raw)
             .sum()
     }
 
@@ -68,16 +70,38 @@ pub fn use_balance() -> BalanceContext {
     use_context::<BalanceContext>()
 }
 
-/// Format balance for display with appropriate precision.
-pub fn format_balance(balance: f64, chain: Chain) -> String {
+/// Format raw balance for display with appropriate precision.
+/// Takes raw chain units (satoshis, lamports, etc.) and returns human-readable string.
+pub fn format_balance_display(balance_raw: u64, chain: Chain) -> String {
     match chain {
-        Chain::Bitcoin => format!("{:.8} BTC", balance),
-        Chain::Ethereum => format!("{:.6} ETH", balance),
-        Chain::Sui => format!("{:.4} SUI", balance),
-        Chain::Aptos => format!("{:.4} APT", balance),
-        Chain::Solana => format!("{:.4} SOL", balance),
-        _ => format!("{:.4}", balance),
+        Chain::Bitcoin => {
+            let btc = balance_raw as f64 / 100_000_000.0;
+            format!("{:.8} BTC", btc)
+        }
+        Chain::Ethereum => {
+            let eth = balance_raw as f64 / 1e18;
+            format!("{:.6} ETH", eth)
+        }
+        Chain::Sui => {
+            let sui = balance_raw as f64 / 1e9;
+            format!("{:.4} SUI", sui)
+        }
+        Chain::Aptos => {
+            let apt = balance_raw as f64 / 1e8;
+            format!("{:.4} APT", apt)
+        }
+        Chain::Solana => {
+            let sol = balance_raw as f64 / 1e9;
+            format!("{:.4} SOL", sol)
+        }
+        _ => format!("{} units", balance_raw),
     }
+}
+
+/// Legacy alias for backward compatibility - prefer format_balance_display.
+#[deprecated(since = "0.4.0", note = "Use format_balance_display with raw u64 instead")]
+pub fn format_balance(balance: f64, chain: Chain) -> String {
+    format_balance_display(balance as u64, chain)
 }
 
 /// Get chain symbol.

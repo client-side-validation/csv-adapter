@@ -404,7 +404,7 @@ impl Config {
 }
 
 /// Get cached wallet config from csv-wallet data (internal helper, legacy format)
-fn get_cached_wallet_config(chain: &Chain, account: &CsvAccount) -> Option<LegacyWalletConfig> {
+fn get_cached_wallet_config(chain: &Chain, _account: &CsvAccount) -> Option<LegacyWalletConfig> {
     let cache = get_csv_wallet_cache();
     let mut cache = cache.lock().ok()?;
 

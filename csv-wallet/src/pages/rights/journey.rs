@@ -525,7 +525,7 @@ fn destination_section(right: &TrackedRight) -> Element {
 /// This section visualizes the cryptographic commitment chain that proves
 /// the provenance of the Right. This is the primary UI proof that CSV works
 /// differently from bridges - the user can SEE their entire provenance chain.
-fn commitment_chain_section(right: &TrackedRight, proofs: &[ProofRecord]) -> Element {
+fn commitment_chain_section(_right: &TrackedRight, proofs: &[ProofRecord]) -> Element {
     // Build commitment chain from available data
     // In a full implementation, this would come from the consignment
     let chain = build_commitment_chain_from_proofs(proofs);

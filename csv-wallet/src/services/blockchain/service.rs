@@ -35,20 +35,14 @@
 //! - [ ] No mock/simulated transaction responses in production
 
 use crate::services::blockchain::config::BlockchainConfig;
-use crate::services::blockchain::estimator::{FeeEstimator, FeePriority};
-use crate::services::blockchain::signer::TransactionSigner;
-use crate::services::blockchain::submitter::TransactionSubmitter;
 use crate::services::blockchain::types::{
-    BitcoinUtxo, BlockchainError, ContractDeployment, CrossChainProof,
+    BlockchainError, ContractDeployment, CrossChainProof,
     CrossChainStatus, CrossChainTransferResult, ProofData, SignedTransaction, TransactionReceipt,
     TransactionStatus, UnsignedTransaction,
 };
 use crate::services::blockchain::wallet::NativeWallet;
 use crate::wallet_core::ChainAccount;
-use csv_adapter::prelude::{
-    CsvClient, Chain as AdapterChain, Commitment, Hash, ProofBundle, Right, RightId,
-    CrossChainError, RightsManager, TransferManager, ProofManager, Wallet,
-};
+use csv_adapter::prelude::CsvClient;
 use csv_adapter::StoreBackend;
 use csv_adapter_core::Chain;
 
@@ -111,7 +105,7 @@ impl BlockchainService {
         &self,
         chain: Chain,
         right_id: &str,
-        owner: &str,
+        _owner: &str,
         _contract_address: &str,
         signer: &NativeWallet,
     ) -> Result<TransactionReceipt, BlockchainError> {

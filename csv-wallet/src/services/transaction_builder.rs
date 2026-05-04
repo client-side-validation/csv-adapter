@@ -7,10 +7,6 @@
 //! Production Guarantee Plan compliant - no duplicate implementations.
 
 use crate::services::blockchain::BlockchainError;
-use csv_adapter::prelude::{
-    CsvClient, Chain as AdapterChain, Commitment, Hash, ProofBundle, Right, RightId,
-    CrossChainError, RightsManager, TransferManager, ProofManager, Wallet,
-};
 use csv_adapter_core::Chain;
 use std::str::FromStr;
 
@@ -785,7 +781,7 @@ impl SolanaMessage {
 
 fn build_account_keys(fee_payer: &[u8], _instructions: &[SolanaInstruction]) -> Vec<[u8; 32]> {
     // Start with fee payer
-    let mut keys = vec![
+    let keys = vec![
         fee_payer.try_into().expect("Fee payer is 32 bytes"),
     ];
 
@@ -921,7 +917,7 @@ pub async fn discover_contracts(
     api_url: &str,
     filter: Option<&str>,
 ) -> Result<Vec<crate::services::blockchain::ContractDeployment>, BlockchainError> {
-    use crate::services::blockchain::{ContractDeployment, ContractType};
+    
     
     match chain {
         Chain::Ethereum => discover_ethereum_contracts(address, api_url, filter).await,
@@ -1130,7 +1126,7 @@ async fn discover_sui_packages(
     api_url: &str,
     filter: Option<&str>,
 ) -> Result<Vec<crate::services::blockchain::ContractDeployment>, BlockchainError> {
-    use crate::services::blockchain::{ContractDeployment, ContractType};
+    use crate::services::blockchain::ContractType;
     
     // Query Sui RPC for objects owned by this address
     let client = reqwest::Client::new();
@@ -1180,7 +1176,7 @@ async fn discover_aptos_modules(
     api_url: &str,
     filter: Option<&str>,
 ) -> Result<Vec<crate::services::blockchain::ContractDeployment>, BlockchainError> {
-    use crate::services::blockchain::{ContractDeployment, ContractType};
+    use crate::services::blockchain::ContractType;
     
     // Query Aptos REST API for account modules
     let client = reqwest::Client::new();

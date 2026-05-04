@@ -3,7 +3,6 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use csv_adapter_core::hash::Hash;
 
 use crate::config::{Chain, Config};
 use crate::output;
@@ -65,11 +64,11 @@ fn cmd_generate(
     right_id: String,
     output: Option<String>,
     config: &Config,
-    state: &UnifiedStateManager,
+    _state: &UnifiedStateManager,
 ) -> Result<()> {
     use csv_adapter::prelude::CsvClient;
     use csv_adapter_core::Chain as AdapterChain;
-    use csv_adapter::prelude::ProofManager;
+    
     use csv_adapter_core::right::RightId;
 
     output::header(&format!("Generating Proof on {}", chain));
@@ -87,7 +86,7 @@ fn cmd_generate(
     output::kv_hash("Right ID", &hash_bytes);
 
     // Get chain configuration
-    let chain_config = config.chain(&chain)?;
+    let _chain_config = config.chain(&chain)?;
 
     // Build CSV client with the chain enabled
     let adapter_chain = match chain {

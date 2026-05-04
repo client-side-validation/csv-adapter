@@ -63,7 +63,7 @@ pub fn execute(
 fn cmd_create(
     chain: Chain,
     value: Option<u64>,
-    config: &Config,
+    _config: &Config,
     state: &mut UnifiedStateManager,
 ) -> Result<()> {
     output::header(&format!("Creating Right on {}", chain));

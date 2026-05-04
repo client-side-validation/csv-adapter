@@ -106,7 +106,7 @@ fn ModeSwitcher(mode: Signal<WalletMode>) -> Element {
 #[component]
 pub fn Sidebar(sidebar_open: bool) -> Element {
     let open = sidebar_open;
-    let mut mode = use_signal(WalletMode::default);
+    let mode = use_signal(WalletMode::default);
 
     rsx! {
         aside {

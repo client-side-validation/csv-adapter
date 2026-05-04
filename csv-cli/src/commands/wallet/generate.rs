@@ -13,9 +13,7 @@ use std::collections::HashMap;
 use csv_adapter_keystore::{
     Mnemonic, MnemonicType,
     bip44::{derive_all_chain_keys, derive_address_from_key},
-    memory::Seed,
 };
-use std::str::FromStr;
 
 /// Initialize wallet with one-command setup.
 pub fn cmd_init(

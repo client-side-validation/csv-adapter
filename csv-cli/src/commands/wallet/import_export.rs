@@ -7,9 +7,7 @@ use crate::output;
 use crate::state::UnifiedStateManager;
 use anyhow::Result;
 use csv_adapter_core::Chain as CoreChain;
-use csv_adapter_core::hash::Hash;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Wallet data format compatible with csv-wallet.
 #[derive(Serialize, Deserialize, Clone)]
@@ -217,7 +215,7 @@ fn import_from_private_key(
     let key_array: [u8; 32] = key_bytes.try_into()
         .map_err(|_| anyhow::anyhow!("Invalid key length"))?;
     let secret_key = SecretKey::new(key_array);
-    let keystore = KeystoreFile::encrypt(&secret_key, &passphrase, KdfType::default())
+    let _keystore = KeystoreFile::encrypt(&secret_key, &passphrase, KdfType::default())
         .map_err(|e| anyhow::anyhow!("Failed to create keystore: {}", e))?;
 
     // Store keystore path instead of raw key
@@ -457,7 +455,7 @@ pub fn cmd_export_csv_wallet(
 pub fn cmd_sync_csv_wallet(
     path: Option<String>,
     _config: &Config,
-    state: &mut UnifiedStateManager,
+    _state: &mut UnifiedStateManager,
 ) -> Result<()> {
     let path = path.unwrap_or_else(|| {
         dirs::home_dir()
