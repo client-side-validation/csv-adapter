@@ -469,10 +469,10 @@ pub fn CrossChainTransfer() -> Element {
                             },
                             for (idx, account) in accounts.iter().enumerate() {
                                 option { key: "account-{idx}", value: idx.to_string(), selected: idx == *selected_account_index.read(),
-                                    {format!("{} - {} (Balance: {:.4}){}",
+                                    {format!("{} - {} (Balance: {:.8}){}",
                                         account.name,
                                         &account.address[..8.min(account.address.len())],
-                                        account.balance,
+                                        account.balance_raw as f64 / 1e8, // Convert satoshis to BTC for display
                                         if account.is_watch_only() { " [WATCH-ONLY]" } else { "" }
                                     )}
                                 }

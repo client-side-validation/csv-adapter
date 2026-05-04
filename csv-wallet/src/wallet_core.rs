@@ -29,9 +29,10 @@ pub struct ChainAccount {
     /// Derived address for display
     pub address: String,
     /// Balance in native token (BTC, ETH, SUI, APT, etc.)
+    /// Stored as raw chain-native units (satoshis, wei, lamports, MIST, octas)
     /// Not serialized - fetched dynamically from blockchain
     #[serde(default, skip_serializing)]
-    pub balance: f64,
+    pub balance_raw: u64,
     /// BIP-44 derivation path (if HD wallet)
     pub derivation_path: Option<String>,
 }
@@ -45,7 +46,7 @@ impl ChainAccount {
             name: name.to_string(),
             keystore_ref: None,
             address: address.to_string(),
-            balance: 0.0,
+            balance_raw: 0,
             derivation_path: None,
         }
     }
@@ -69,7 +70,7 @@ impl ChainAccount {
             name: name.to_string(),
             keystore_ref: Some(keystore_ref.to_string()),
             address: address.to_string(),
-            balance: 0.0,
+            balance_raw: 0,
             derivation_path: derivation_path.map(|s| s.to_string()),
         }
     }

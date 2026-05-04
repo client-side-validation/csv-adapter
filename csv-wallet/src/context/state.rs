@@ -47,7 +47,14 @@ impl PartialEq for AppState {
         self.selected_chain == other.selected_chain
             && self.selected_network == other.selected_network
             && self.wallet.total_accounts() == other.wallet.total_accounts()
+            && self.rights.len() == other.rights.len()
+            && self.seals.len() == other.seals.len()
+            && self.proofs.len() == other.proofs.len()
+            && self.transfers.len() == other.transfers.len()
+            && self.contracts.len() == other.contracts.len()
+            && self.transactions.len() == other.transactions.len()
             && self.nfts.len() == other.nfts.len()
             && self.nft_collections.len() == other.nft_collections.len()
+            && self.notification.is_some() == other.notification.is_some()
     }
 }

@@ -238,7 +238,10 @@ let store = SealStore::new();
 let manager = SealManager::new(store);
 
 // Create a seal on Bitcoin testnet
-let seal = manager.create_seal(Chain::Bitcoin, Some(100_000))?;
+// NOTE: For protocol correctness, you should obtain the seal_ref from
+// a chain adapter's create_seal() method to get a real chain-native seal.
+// This example shows the API with a placeholder seal_ref (None).
+let seal = manager.create_seal(Chain::Bitcoin, Some(100_000), None)?;
 
 // Check seal status
 let is_consumed = manager.is_seal_consumed(&seal.id)?;

@@ -27,19 +27,6 @@ fn main() {
 
 #[component]
 fn App() -> Element {
-    let mut ready = use_signal(|| false);
-
-    use_effect(move || {
-        use gloo_timers::future::sleep;
-        use std::time::Duration;
-
-        wasm_bindgen_futures::spawn_local(async move {
-            // Wait for Tailwind Play CDN to scan and apply classes
-            sleep(Duration::from_millis(300)).await;
-            ready.set(true);
-        });
-    });
-
     rsx! {
         // Tailwind CSS CDN (play CDN auto-scans classes)
         document::Script {
@@ -58,26 +45,15 @@ fn App() -> Element {
             "{GLOBAL_CSS}"
         }
 
-        if *ready.read() {
-            // Main app with all required providers
-            WalletProvider {
-                hooks::WalletProvider {
-                    hooks::NetworkProvider {
-                        hooks::BalanceProvider {
-                            hooks::WalletConnectionProvider {
-                                Router::<Route> {}
-                            }
+        // Main app with all required providers
+        WalletProvider {
+            hooks::WalletProvider {
+                hooks::NetworkProvider {
+                    hooks::BalanceProvider {
+                        hooks::WalletConnectionProvider {
+                            Router::<Route> {}
                         }
                     }
-                }
-            }
-        } else {
-            // Loading screen (inline styles, no Tailwind needed)
-            div {
-                style: "min-height:100vh;display:flex;align-items:center;justify-content:center;background:#030712;color:#f3f4f6;",
-                div { style: "text-align:center;",
-                    div { style: "font-size:48px;margin-bottom:16px;", "\u{1F510}" }
-                    p { style: "color:#9ca3af;font-size:14px;", "Loading CSS Wallet\u{2026}" }
                 }
             }
         }

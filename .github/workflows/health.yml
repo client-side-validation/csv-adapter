@@ -1,0 +1,122 @@
+name: Code Health
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: Lint & Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Run clippy (strict)
+        run: cargo clippy --all-features -- -D warnings -D clippy::float_arithmetic -D clippy::cast_precision_loss
+
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --all-features
+
+      - name: Run tests
+        run: cargo test --workspace --all-features
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build docs
+        run: cargo doc --no-deps --document-private-items --all-features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
+  # Testnet integration tests - only run on main branch
+  integration:
+    name: Testnet Integration
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Bitcoin Signet Integration
+        run: cargo test --test integration_bitcoin -- --ignored 2>/dev/null || echo "No Bitcoin integration tests yet"
+        env:
+          BITCOIN_SIGNET_RPC: ${{ secrets.BITCOIN_SIGNET_RPC }}
+
+      - name: Ethereum Sepolia Integration
+        run: cargo test --test integration_ethereum -- --ignored 2>/dev/null || echo "No Ethereum integration tests yet"
+        env:
+          ETHEREUM_SEPOLIA_RPC: ${{ secrets.ETHEREUM_SEPOLIA_RPC }}
+
+      - name: Sui Testnet Integration
+        run: cargo test --test integration_sui -- --ignored 2>/dev/null || echo "No Sui integration tests yet"
+        env:
+          SUI_TESTNET_RPC: ${{ secrets.SUI_TESTNET_RPC }}

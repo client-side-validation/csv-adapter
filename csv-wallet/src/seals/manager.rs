@@ -2,7 +2,7 @@
 //!
 //! Core seal management operations.
 
-use csv_adapter_core::{Chain, RightId};
+use csv_adapter_core::{Chain, RightId, SealRef};
 use serde::{Serialize, Deserialize};
 
 /// Seal status.
@@ -29,7 +29,7 @@ pub enum SealStatus {
 /// Seal record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SealRecord {
-    /// Seal ID
+    /// Seal ID (human-readable format)
     pub id: String,
     /// Chain
     pub chain: Chain,
@@ -43,6 +43,9 @@ pub struct SealRecord {
     pub right_id: Option<RightId>,
     /// Value (if applicable)
     pub value: Option<u64>,
+    /// Real chain-native seal reference (from chain adapter)
+    /// This is the actual on-chain seal identifier, NOT a timestamp-based fake ID
+    pub seal_ref: Option<SealRef>,
 }
 
 /// Seal manager for creating and managing seals.
@@ -58,9 +61,31 @@ impl SealManager {
     }
 
     /// Create a new seal on a specific chain.
-    pub fn create_seal(&self, chain: Chain, value: Option<u64>) -> Result<SealRecord, String> {
-        let seal_id = format!("seal_{}_{}", chain, chrono::Utc::now().timestamp_millis());
-        
+    ///
+    /// # IMPORTANT: Protocol Correctness
+    /// The `seal_ref` MUST be a real chain-native seal identifier obtained from
+    /// a chain adapter's `create_seal()` method. Never pass a fake/timestamp-based ID.
+    ///
+    /// # Arguments
+    /// * `chain` - The blockchain where the seal is created
+    /// * `value` - Optional value/funding for the seal (chain-specific units)
+    /// * `seal_ref` - The real chain-native seal reference from the chain adapter
+    ///
+    /// # Returns
+    /// A `SealRecord` with the real on-chain seal reference stored
+    pub fn create_seal(
+        &self,
+        chain: Chain,
+        value: Option<u64>,
+        seal_ref: Option<SealRef>,
+    ) -> Result<SealRecord, String> {
+        // Use the real seal_id from chain-native reference, or generate a placeholder
+        // (placeholder is only for display until real seal is created on-chain)
+        let seal_id = seal_ref
+            .as_ref()
+            .map(|sr| hex::encode(&sr.seal_id))
+            .unwrap_or_else(|| format!("seal_{}_{}", chain, chrono::Utc::now().timestamp_millis()));
+
         let record = SealRecord {
             id: seal_id.clone(),
             chain,
@@ -69,10 +94,11 @@ impl SealManager {
             updated_at: chrono::Utc::now(),
             right_id: None,
             value,
+            seal_ref,
         };
 
         self.store.save_seal(&record).map_err(|e| format!("{}", e))?;
-        
+
         Ok(record)
     }
 
