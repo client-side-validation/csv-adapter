@@ -17,6 +17,10 @@ pub enum AdapterError {
     #[error("Invalid seal: {0}")]
     InvalidSeal(String),
 
+    /// Seal was never created on-chain (caught fake seal IDs)
+    #[error("Seal {0} has no on-chain anchor — was it created via a real chain adapter?")]
+    SealNotAnchored(String),
+
     /// Commitment hash mismatch
     #[error("Commitment hash mismatch: expected {expected}, got {actual}")]
     CommitmentMismatch {
@@ -91,6 +95,11 @@ impl AdapterError {
         matches!(self, AdapterError::SealReplay(_))
     }
 
+    /// Check if this error indicates a seal without on-chain anchor
+    pub fn is_seal_not_anchored(&self) -> bool {
+        matches!(self, AdapterError::SealNotAnchored(_))
+    }
+
     /// Check if this error is a signature verification failure
     pub fn is_signature_error(&self) -> bool {
         matches!(self, AdapterError::SignatureVerificationFailed(_))
@@ -113,6 +122,7 @@ impl HasErrorSuggestion for AdapterError {
         match self {
             AdapterError::SealReplay(_) => error_codes::CORE_SEAL_REPLAY,
             AdapterError::InvalidSeal(_) => error_codes::CORE_INVALID_SEAL,
+            AdapterError::SealNotAnchored(_) => error_codes::CORE_SEAL_NOT_ANCHORED,
             AdapterError::CommitmentMismatch { .. } => error_codes::CORE_COMMITMENT_MISMATCH,
             AdapterError::InclusionProofFailed(_) => error_codes::CORE_INCLUSION_PROOF_FAILED,
             AdapterError::FinalityNotReached(_) => error_codes::CORE_FINALITY_NOT_REACHED,
@@ -142,6 +152,15 @@ impl HasErrorSuggestion for AdapterError {
             AdapterError::InvalidSeal(_) => {
                 "The seal format is invalid. Verify the seal is properly constructed \
                  and matches the expected format for this chain.".to_string()
+            }
+            AdapterError::SealNotAnchored(seal_id) => {
+                format!(
+                    "Seal {} was never created on-chain via a real chain adapter. \
+                     This typically means a fake/timestamp-based seal ID was used. \
+                     Create the seal using the chain adapter's create_seal() method \
+                     to get a real chain-native seal reference.",
+                    seal_id
+                )
             }
             AdapterError::CommitmentMismatch { expected, actual } => {
                 format!(

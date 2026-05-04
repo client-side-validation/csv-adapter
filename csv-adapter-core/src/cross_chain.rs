@@ -45,6 +45,58 @@ pub struct CrossChainLockEvent {
     pub timestamp: u64,
 }
 
+/// Transfer state machine for cross-chain transfers.
+///
+/// Cross-chain transfers have implicit state (Lock → WaitFinality → ProveInclusion →
+/// MintDestination) but this is not modeled as an explicit state machine.
+/// Junior devs are adding code that skips steps. This state machine makes
+/// the flow explicit and prevents skipping steps.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum TransferState {
+    /// Seal locked on source chain, tx submitted
+    Locked {
+        /// Source transaction hash
+        source_tx: String,
+        /// Lock block height
+        lock_height: u64,
+    },
+    /// Waiting for finality on source chain
+    AwaitingFinality {
+        /// Confirmations needed
+        confirmations_needed: u32,
+        /// Confirmations have
+        confirmations_have: u32,
+    },
+    /// Finality reached, building proof bundle
+    BuildingProof,
+    /// Proof bundle ready, transmitting to destination
+    ProofReady {
+        /// The proof bundle
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bundle: Option<crate::proof::ProofBundle>,
+    },
+    /// Minting on destination chain
+    Minting {
+        /// Destination transaction hash (if known)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        dest_tx: Option<String>,
+    },
+    /// Transfer complete
+    Complete {
+        /// Destination transaction hash
+        dest_tx: String,
+        /// Destination seal reference
+        dest_seal: SealRef,
+    },
+    /// Transfer failed, reason recorded
+    Failed {
+        /// Failure reason
+        reason: String,
+        /// Whether the failure is recoverable
+        recoverable: bool,
+    },
+}
+
 /// Inclusion proof — chain-specific format.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InclusionProof {

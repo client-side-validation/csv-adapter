@@ -75,6 +75,8 @@ pub mod error_codes {
     pub const CORE_SIGNATURE_VERIFICATION_FAILED: &str = "CORE_013";
     /// Feature not available/enabled (replaces NOT_IMPLEMENTED).
     pub const CORE_FEATURE_NOT_ENABLED: &str = "CORE_014";
+    /// Seal has no on-chain anchor (fake seal detected).
+    pub const CORE_SEAL_NOT_ANCHORED: &str = "CORE_015";
     /// Generic core error.
     pub const CORE_GENERIC: &str = "CORE_099";
 
