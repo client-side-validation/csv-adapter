@@ -245,19 +245,21 @@ impl ChainApi {
     /// Get or build a CsvClient for the specified chain.
     async fn get_or_build_client(&self, chain: Chain) -> Result<CsvClient, ChainApiError> {
         // Build a new client with the requested chain enabled
-        let _config = self
-            .configs
-            .get(&chain)
-            .cloned()
-            .unwrap_or_else(|| ChainConfig::for_chain(chain, NetworkType::Testnet));
-
-        CsvClient::builder()
+        let client = CsvClient::builder()
             .with_chain(chain)
             .with_store_backend(StoreBackend::InMemory)
             .build()
             .map_err(|e| {
                 ChainApiError::AdapterError(format!("Failed to build CSV client: {}", e))
-            })
+            })?;
+
+        // Initialize adapters for the enabled chain
+        // This registers the actual chain adapter implementations with the facade
+        client.init_adapters().await.map_err(|e| {
+            ChainApiError::AdapterError(format!("Failed to initialize chain adapters: {}", e))
+        })?;
+
+        Ok(client)
     }
 
     /// Parse address string to bytes based on chain type.

@@ -13,6 +13,11 @@ port = 8181
 watch_path = ["src", "public"]
 
 [web.resource]
+
+[web.resource.dev]
+style = ["assets/tailwind.css"]
+
+[web.resource.build]
 style = ["assets/tailwind.css"]
 
 [wasm]

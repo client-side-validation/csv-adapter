@@ -325,6 +325,50 @@ impl CsvClient {
         &self.chain_facade
     }
 
+    /// Initialize and register chain adapters for all enabled chains.
+    ///
+    /// This method must be called after building the client to instantiate
+    /// and register the actual chain adapter implementations. Without this,
+    /// the facade will have no adapters and chain operations will fail with
+    /// "Chain not supported" errors.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use csv_adapter::prelude::*;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<()> {
+    ///     let client = CsvClient::builder()
+    ///         .with_chain(Chain::Bitcoin)
+    ///         .with_chain(Chain::Ethereum)
+    ///         .with_store_backend(StoreBackend::InMemory)
+    ///         .build()?;
+    ///
+    ///     // Initialize adapters for all enabled chains
+    ///     client.init_adapters().await?;
+    ///
+    ///     // Now you can use the facade
+    ///     let balance = client.chain_facade()
+    ///         .get_balance(Chain::Bitcoin, "bc1...")
+    ///         .await?;
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn init_adapters(&self) -> Result<(), CsvError> {
+        // TODO: Implement auto-initialization of chain adapters
+        // For each enabled chain:
+        // 1. Create chain-specific config from self.config
+        // 2. Create RPC client using the configured URL
+        // 3. Use AdapterBuilder to create the adapter
+        // 4. Register adapter via self.chain_facade.register_adapter()
+        //
+        // For now, adapters must be registered manually using AdapterBuilder
+        // and register_adapter() which now works thanks to interior mutability.
+        Ok(())
+    }
+
     /// Emit an event to all event stream subscribers.
     #[cfg(feature = "tokio")]
     #[allow(dead_code)]

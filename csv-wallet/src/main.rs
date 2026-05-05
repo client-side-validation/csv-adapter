@@ -20,6 +20,8 @@ mod wallet_core;
 use context::WalletProvider;
 use routes::Route;
 
+const TAILWIND_CSS: &str = include_str!("../assets/tailwind.css");
+
 fn main() {
     console_error_panic_hook::set_once();
     dioxus::launch(App);
@@ -28,6 +30,12 @@ fn main() {
 #[component]
 fn App() -> Element {
     rsx! {
+        // Tailwind CSS stylesheet (embedded)
+        document::Style {
+            r#type: "text/css",
+            "{TAILWIND_CSS}"
+        }
+
         // Critical reset (required for base styling)
         document::Style {
             r#type: "text/css",
@@ -56,8 +64,8 @@ fn App() -> Element {
 }
 
 const CRITICAL_CSS: &str = "
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { min-height: 100vh; background: #030712; color: #f3f4f6; font-family: system-ui, -apple-system, sans-serif; }
+*, *::before, *::after { box-sizing: border-box; }
+body { min-height: 100vh; margin: 0; padding: 0; background: #030712; color: #f3f4f6; font-family: system-ui, -apple-system, sans-serif; }
 #main { display: block; }
 ";
 

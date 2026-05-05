@@ -39,7 +39,7 @@ hex = "0.4.3"
 bs58 = "0.5"
 rand = "0.8"
 bip32 = { version = "0.5", features = ["std", "mnemonic"] }
-bitcoin = { version = "0.32", features = ["std", "rand-std"] }
+bitcoin = { version = "0.32", default-features = false, features = ["serde", "rand-std", "std"] }
 
 # Encryption
 aes-gcm = "0.10"
@@ -78,7 +78,7 @@ base64 = "0.21"
 wasm-bindgen-test = "0.3"
 
 [features]
-default = []
+default = ["csv-adapter-bitcoin"]
 solana = ["dep:csv-adapter-solana"]
 csv-adapter-bitcoin = ["dep:csv-adapter-bitcoin", "csv-adapter/bitcoin"]
 csv-adapter-ethereum = ["dep:csv-adapter-ethereum", "csv-adapter/ethereum"]

@@ -27,7 +27,7 @@
 //! - Chain-specific implementations are properly abstracted
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 // Imports for contract call encoding
 #[allow(unused_imports)]
@@ -66,14 +66,27 @@ use crate::errors::CsvError;
 #[derive(Clone)]
 pub struct ChainFacade {
     client: Arc<ClientRef>,
-    adapters: HashMap<Chain, Arc<dyn FullChainAdapter>>,
+    adapters: Arc<Mutex<HashMap<Chain, Arc<dyn FullChainAdapter>>>>,
 }
 
 impl ChainFacade {
     pub(crate) fn new(client: Arc<ClientRef>) -> Self {
         Self {
             client,
-            adapters: HashMap::new(),
+            adapters: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Create a new ChainFacade with pre-built adapters.
+    ///
+    /// This is used by the builder to auto-register adapters when chains are enabled.
+    pub(crate) fn with_adapters(
+        client: Arc<ClientRef>,
+        adapters: HashMap<Chain, Arc<dyn FullChainAdapter>>,
+    ) -> Self {
+        Self {
+            client,
+            adapters: Arc::new(Mutex::new(adapters)),
         }
     }
 
@@ -87,14 +100,16 @@ impl ChainFacade {
     /// use csv_adapter::facade::{ChainFacade, AdapterBuilder, AdapterConfig};
     /// use csv_adapter_core::Chain;
     ///
-    /// let mut facade = ChainFacade::new(/* client ref */);
+    /// let facade = ChainFacade::new(/* client ref */);
     /// let adapter = AdapterBuilder::new()
     ///     .ethereum_from_config(config, rpc, csv_seal_address)
+    ///     .await
     ///     .build();
     /// facade.register_adapter(Chain::Ethereum, adapter);
     /// ```
-    pub fn register_adapter(&mut self, chain: Chain, adapter: Arc<dyn FullChainAdapter>) {
-        self.adapters.insert(chain, adapter);
+    pub fn register_adapter(&self, chain: Chain, adapter: Arc<dyn FullChainAdapter>) {
+        let mut adapters = self.adapters.lock().unwrap();
+        adapters.insert(chain, adapter);
     }
 
     /// Query the balance for an address on the specified chain.
@@ -481,7 +496,8 @@ impl ChainFacade {
 
     /// Get the adapter for the specified chain.
     fn get_adapter(&self, chain: Chain) -> Result<Arc<dyn FullChainAdapter>, CsvError> {
-        self.adapters
+        let adapters = self.adapters.lock().unwrap();
+        adapters
             .get(&chain)
             .cloned()
             .ok_or(CsvError::ChainNotSupported(chain))
@@ -489,12 +505,14 @@ impl ChainFacade {
 
     /// Check if an adapter is registered for the given chain.
     pub fn has_adapter(&self, chain: Chain) -> bool {
-        self.adapters.contains_key(&chain)
+        let adapters = self.adapters.lock().unwrap();
+        adapters.contains_key(&chain)
     }
 
     /// Get the list of registered chains.
     pub fn registered_chains(&self) -> Vec<Chain> {
-        self.adapters.keys().copied().collect()
+        let adapters = self.adapters.lock().unwrap();
+        adapters.keys().copied().collect()
     }
 
     /// Generate a proof for a right on the specified chain.
@@ -1054,7 +1072,7 @@ mod tests {
     fn test_chain_facade_creation() {
         let client_ref = Arc::new(ClientRef::new());
         let facade = ChainFacade::new(client_ref);
-        assert!(facade.adapters.is_empty());
+        assert!(facade.adapters.lock().unwrap().is_empty());
     }
 
     #[test]
