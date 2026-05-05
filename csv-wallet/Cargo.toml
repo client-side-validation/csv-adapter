@@ -21,6 +21,8 @@ csv-adapter-core = { path = "../csv-adapter-core" }
 csv-adapter-store = { path = "../csv-adapter-store", default-features = false, features = ["browser-storage"] }
 csv-adapter-keystore = { path = "../csv-adapter-keystore", features = ["wasm"] }
 csv-adapter-solana = { path = "../csv-adapter-solana", optional = true }
+csv-adapter-bitcoin = { path = "../csv-adapter-bitcoin", optional = true }
+csv-adapter-ethereum = { path = "../csv-adapter-ethereum", optional = true }
 
 # Dioxus 0.7
 dioxus = { version = "0.7", features = ["web", "router"] }
@@ -78,3 +80,5 @@ wasm-bindgen-test = "0.3"
 [features]
 default = []
 solana = ["dep:csv-adapter-solana"]
+csv-adapter-bitcoin = ["dep:csv-adapter-bitcoin", "csv-adapter/bitcoin"]
+csv-adapter-ethereum = ["dep:csv-adapter-ethereum", "csv-adapter/ethereum"]

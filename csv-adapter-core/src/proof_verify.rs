@@ -84,6 +84,7 @@ use crate::signature::{verify_signatures, Signature, SignatureScheme};
 /// 3. Signature parsing is robust against malformed input
 /// 4. All error cases are properly handled and logged
 /// Maximum age of a proof bundle in seconds (24 hours)
+#[allow(dead_code)]
 const MAX_PROOF_AGE_SECONDS: u64 = 86400;
 
 /// Maximum proof bundle size in bytes (1MB)

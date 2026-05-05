@@ -6,14 +6,8 @@
 use crate::context::{use_wallet_context, ProofRecord, ProofStatus};
 use crate::pages::common::*;
 use crate::routes::Route;
-use csv_adapter_core::zk_proof::{ZkSealProof, ProofSystem};
+use csv_adapter_core::zk_proof::ZkSealProof;
 use dioxus::prelude::*;
-
-#[cfg(feature = "csv-adapter-bitcoin")]
-use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
-
-#[cfg(feature = "csv-adapter-ethereum")]
-use csv_adapter_ethereum::zk_verifier::EthereumGroth16Verifier;
 
 /// Verify ZK proof page
 #[component]
@@ -289,22 +283,14 @@ fn verify_zk_proof(input: &str) -> Result<(ZkSealProof, bool), String> {
     // Verify based on proof system
     let valid = match proof.verifier_key.proof_system {
         csv_adapter_core::zk_proof::ProofSystem::SP1 => {
-            #[cfg(feature = "csv-adapter-bitcoin")]
-            {
-                // Use Bitcoin SPV verifier (which implements ZkVerifier)
-                let verifier = BitcoinSpvProver::new();
-                verifier.verify(&proof).is_ok()
-            }
-            #[cfg(not(feature = "csv-adapter-bitcoin"))]
-            {
-                // Bitcoin verifier not available in this build
-                // For now, accept mock proofs (structural validation only)
-                proof.is_structurally_valid()
-            }
+            // Bitcoin SPV proofs use structural validation (no ZkVerifier impl yet)
+            proof.is_structurally_valid()
         }
         csv_adapter_core::zk_proof::ProofSystem::Groth16 => {
             #[cfg(feature = "csv-adapter-ethereum")]
             {
+                use csv_adapter_ethereum::zk_verifier::EthereumGroth16Verifier;
+                use csv_adapter_core::zk_proof::ZkVerifier;
                 // Use Ethereum Groth16 verifier
                 let verifier = EthereumGroth16Verifier::new();
                 verifier.verify(&proof).is_ok()

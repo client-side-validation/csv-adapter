@@ -19,7 +19,6 @@ use crate::hash::Hash;
 use crate::proof::{FinalityProof, InclusionProof};
 use crate::right::RightId;
 use crate::seal::SealRef;
-use crate::traits::AnchorLayer;
 
 /// Result type for chain operations
 pub type ChainOpResult<T> = Result<T, ChainOpError>;

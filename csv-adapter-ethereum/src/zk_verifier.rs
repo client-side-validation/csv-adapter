@@ -20,7 +20,7 @@
 //! For this reason, Groth16 is preferred for Ethereum verification.
 
 use csv_adapter_core::protocol_version::Chain;
-use csv_adapter_core::zk_proof::{ProofSystem, VerifierKey, ZkError, ZkPublicInputs, ZkSealProof, ZkVerifier};
+use csv_adapter_core::zk_proof::{ProofSystem, ZkError, ZkPublicInputs, ZkSealProof, ZkVerifier};
 use sha2::{Digest, Sha256};
 
 /// Groth16 ZK Verifier for Ethereum

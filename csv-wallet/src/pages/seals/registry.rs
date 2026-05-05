@@ -22,7 +22,6 @@
 //! | Ethereum | Nullifier registration | Contract-enforced |
 //! | Solana | PDA closure | Program-enforced |
 
-use crate::components::design_tokens::SealState;
 use crate::context::{use_wallet_context, SealRecord, SealStatus};
 use crate::pages::common::*;
 use crate::routes::Route;

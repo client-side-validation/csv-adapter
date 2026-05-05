@@ -10,7 +10,6 @@ use crate::services::blockchain::wallet::NativeWallet;
 use csv_adapter::prelude::CsvClient;
 use csv_adapter::StoreBackend;
 use csv_adapter_core::Chain;
-use csv_adapter_core::chain_operations::ChainSigner;
 
 /// Transaction signer for different chains.
 ///

@@ -185,7 +185,7 @@ impl AptosAnchorLayer {
         use aptos_sdk::transaction::EntryFunction;
         use aptos_sdk::transaction::payload::TransactionPayload;
         use aptos_sdk::transaction::types::RawTransaction;
-        use aptos_sdk::types::{AccountAddress, ChainId, MoveModuleId, TypeTag};
+        use aptos_sdk::types::{AccountAddress, ChainId, MoveModuleId};
 
         // Parse module address
         let module_addr = AccountAddress::from_hex(module_address)

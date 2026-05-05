@@ -77,6 +77,7 @@ pub enum Priority {
 /// # }
 /// ```
 pub struct TransferManager {
+    #[allow(dead_code)]
     client: Arc<ClientRef>,
     /// Local transfer records wrapped in Arc for shared ownership
     transfers: Arc<std::sync::Mutex<HashMap<String, TransferRecord>>>,

@@ -153,7 +153,7 @@ impl Sp1BtcSpvOutput {
 /// 3. The block header hash matches the claimed block hash
 pub fn verify_bitcoin_spv(input: &Sp1BtcSpvInput) -> bool {
     // Step 1: Compute txid from transaction data
-    let txid = input.compute_txid();
+    let _txid = input.compute_txid();
     
     // Step 2: Verify the Merkle branch
     let computed_merkle_root = input.compute_merkle_root();

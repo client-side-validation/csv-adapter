@@ -157,7 +157,7 @@ impl AluVmAdapter {
         let mut outputs = Vec::new();
         let mut metadata_updates = Vec::new();
         let mut next_seal: Option<SealRef> = None;
-        let mut status = ExecStatus::Ok;
+        let mut _status = ExecStatus::Ok;
 
         // Build a lookup map for owned states by their seal hash
         let mut state_map: BTreeMap<[u8; 16], Vec<u8>> = BTreeMap::new();
@@ -190,7 +190,7 @@ impl AluVmAdapter {
 
             match opcode {
                 Opcode::Stop => {
-                    status = ExecStatus::Ok;
+                    _status = ExecStatus::Ok;
                     break;
                 }
                 Opcode::PushN => {
@@ -292,7 +292,7 @@ impl AluVmAdapter {
                     outputs.push(data);
                 }
                 Opcode::Revert => {
-                    status = ExecStatus::Revert;
+                    _status = ExecStatus::Revert;
                     break;
                 }
                 Opcode::Jump => {
@@ -302,7 +302,6 @@ impl AluVmAdapter {
                         ));
                     }
                     let offset = u16::from_be_bytes([bytecode[pc], bytecode[pc + 1]]) as usize;
-                    pc += 2;
                     if offset >= bytecode.len() {
                         return Err(VMError::InvalidBytecode(format!(
                             "JUMP target {offset} out of bounds"
@@ -352,7 +351,7 @@ impl AluVmAdapter {
                             next_seal = parse_seal_from_data(&data);
                         }
                     }
-                    status = ExecStatus::Return;
+                   _status = ExecStatus::Return;
                     break;
                 }
                 Opcode::Invalid(op) => {

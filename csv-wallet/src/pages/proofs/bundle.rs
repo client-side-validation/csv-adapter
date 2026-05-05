@@ -25,7 +25,7 @@ pub fn ProofBundlePage(id: String) -> Element {
     // Find proof by seal_ref (which is used as the proof ID)
     let proof = wallet_ctx.proof_for_seal(&id);
     let mut show_export_modal = use_signal(|| false);
-    let mut export_format = use_signal(|| ExportFormat::Json);
+    let export_format = use_signal(|| ExportFormat::Json);
 
     rsx! {
         div { class: "max-w-4xl mx-auto space-y-6",

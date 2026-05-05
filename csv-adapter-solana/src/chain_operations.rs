@@ -9,7 +9,6 @@
 //! - ChainRightOps: Right management via program accounts
 
 use async_trait::async_trait;
-use futures_util::TryFutureExt;
 use csv_adapter_core::chain_operations::{
     BalanceInfo, ChainBroadcaster, ChainDeployer, ChainOpError, ChainOpResult, ChainProofProvider,
     ChainQuery, ChainRightOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus,

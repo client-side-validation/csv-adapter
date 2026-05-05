@@ -186,6 +186,26 @@ impl SealsRepository {
 
         rows.iter().map(row_to_seal).collect()
     }
+
+    /// Get a seal by its chain-native identifier (e.g., Bitcoin txid:vout, Sui ObjectId).
+    ///
+    /// This enables cross-chain seal lookup — given a seal reference from any chain,
+    /// you can find the corresponding seal record in the explorer.
+    pub async fn get_by_chain_native_id(&self, chain_native_id: &str) -> Result<Option<SealRecord>> {
+        let row = sqlx::query(
+            "SELECT id, chain, seal_type, seal_ref, right_id, status, \
+             consumed_at, consumed_tx, block_height \
+             FROM seals WHERE seal_ref = ?",
+        )
+        .bind(chain_native_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match row {
+            Some(row) => Ok(Some(row_to_seal(&row)?)),
+            None => Ok(None),
+        }
+    }
 }
 
 fn row_to_seal(row: &SqliteRow) -> Result<SealRecord> {

@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use csv_adapter_core::chain_operations::{
     BalanceInfo, ChainBroadcaster, ChainDeployer, ChainOpError, ChainOpResult, ChainProofProvider,
     ChainQuery, ChainRightOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus,
-    RightOperation, RightOperationResult, TransactionInfo,
+    RightOperationResult, TransactionInfo,
     TransactionStatus,
 };
 use csv_adapter_core::hash::Hash;
@@ -23,9 +23,8 @@ use sha3::{Digest, Sha3_256};
 
 use crate::adapter::AptosAnchorLayer;
 use crate::config::AptosNetwork;
-use crate::error::AptosError;
 use crate::proofs::CommitmentEventBuilder;
-use crate::rpc::{AptosLedgerInfo, AptosResource, AptosRpc, AptosTransaction};
+use crate::rpc::{AptosRpc, AptosTransaction};
 
 /// Aptos chain operations implementation
 pub struct AptosChainOperations {
@@ -138,7 +137,7 @@ impl ChainQuery for AptosChainOperations {
 
         // Look for CoinStore resource
         let mut total_balance = 0u64;
-        let mut token_balances = Vec::new();
+        let token_balances = Vec::new();
 
         // Get the CoinStore resource directly for accurate balance
         let coin_resource = self.rpc().get_resource(

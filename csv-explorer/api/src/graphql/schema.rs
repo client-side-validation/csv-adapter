@@ -250,6 +250,26 @@ impl Query {
         })
     }
 
+    /// Get a seal by its chain-native identifier (e.g., Bitcoin txid:vout, Sui ObjectId, Ethereum storage slot).
+    ///
+    /// This enables cross-chain seal lookup — given a seal reference from any chain,
+    /// you can find the corresponding seal record in the explorer.
+    async fn seal_by_chain_native_id(
+        &self,
+        ctx: &Context<'_>,
+        chain_native_id: String,
+    ) -> Result<Option<Seal>> {
+        let gql_ctx = ctx
+            .data::<GraphqlContext>()
+            .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
+        let repo = SealsRepository::new(gql_ctx.pool.clone());
+        let record = repo
+            .get_by_chain_native_id(&chain_native_id)
+            .await
+            .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
+        Ok(record.map(Seal::from))
+    }
+
     /// Get a single contract by ID.
     async fn contract(&self, ctx: &Context<'_>, id: String) -> Result<Option<CsvContractGql>> {
         let gql_ctx = ctx

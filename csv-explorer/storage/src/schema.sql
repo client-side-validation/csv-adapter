@@ -79,5 +79,7 @@ CREATE INDEX IF NOT EXISTS idx_transfers_status ON transfers(status);
 CREATE INDEX IF NOT EXISTS idx_seals_chain ON seals(chain);
 CREATE INDEX IF NOT EXISTS idx_seals_status ON seals(status);
 CREATE INDEX IF NOT EXISTS idx_seals_right_id ON seals(right_id);
+CREATE INDEX IF NOT EXISTS idx_seals_seal_ref ON seals(seal_ref);
+CREATE INDEX IF NOT EXISTS idx_rights_seal_ref ON rights(seal_ref);
 CREATE INDEX IF NOT EXISTS idx_contracts_chain ON contracts(chain);
 CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status);

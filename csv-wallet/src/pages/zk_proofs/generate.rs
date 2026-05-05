@@ -7,12 +7,9 @@
 use crate::context::{use_wallet_context, ProofRecord, ProofStatus};
 use crate::pages::common::*;
 use crate::routes::Route;
-use csv_adapter_core::zk_proof::{ChainWitness, ZkSealProof};
+use csv_adapter_core::zk_proof::ZkSealProof;
 use csv_adapter_core::Chain;
 use dioxus::prelude::*;
-
-#[cfg(feature = "csv-adapter-bitcoin")]
-use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
 
 /// Generate ZK proof page
 #[component]
@@ -249,8 +246,10 @@ struct ZkResult {
 /// Generate a Bitcoin SPV ZK proof using SP1
 #[cfg(feature = "csv-adapter-bitcoin")]
 fn generate_bitcoin_zk_proof(seal_ref: &str, right_id: &str) -> Result<ZkSealProof, String> {
+    use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
     use csv_adapter_core::hash::Hash;
     use csv_adapter_core::seal::SealRef;
+    use csv_adapter_core::zk_proof::{ChainWitness, ZkProver};
 
     let prover = BitcoinSpvProver::new();
 
