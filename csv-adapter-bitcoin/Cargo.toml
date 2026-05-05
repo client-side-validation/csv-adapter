@@ -20,7 +20,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 csv-adapter-core = { version = "0.4.0", path = "../csv-adapter-core" }
-csv-adapter-store = { version = "0.4.0", path = "../csv-adapter-store", optional = true }
+csv-adapter-store = { version = "0.4.0", path = "../csv-adapter-store", optional = true, default-features = false }
 async-trait.workspace = true
 bitcoin = { version = "0.32", default-features = false, features = ["serde", "rand-std", "std"] }
 bitcoin_hashes = "0.14"
@@ -40,8 +40,8 @@ reqwest = { version = "0.12", features = ["json", "blocking"], optional = true }
 
 [features]
 default = []
-rpc = ["bitcoincore-rpc", "csv-adapter-store"]
-signet-rest = ["reqwest", "csv-adapter-store"]
+rpc = ["bitcoincore-rpc", "dep:csv-adapter-store", "csv-adapter-store?/sqlite"]
+signet-rest = ["reqwest", "dep:csv-adapter-store", "csv-adapter-store?/browser-storage"]
 production = ["rpc"]
 
 [dev-dependencies]

@@ -147,7 +147,8 @@ use commands::tests::TestAction;
 use commands::validate::ValidateAction;
 use commands::wallet::WalletAction;
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     // Initialize logging
@@ -162,7 +163,7 @@ fn main() -> anyhow::Result<()> {
     // Dispatch commands
     let result = match cli.command {
         Commands::Chain { action } => chain::execute(action, &config),
-        Commands::Wallet { action } => wallet::execute(action, &config, &mut state),
+        Commands::Wallet { action } => wallet::execute(action, &config, &mut state).await,
         Commands::Right { action } => rights::execute(action, &config, &mut state),
         Commands::Proof { action } => proofs::execute(action, &config, &state),
         Commands::CrossChain { action } => cross_chain::execute(action, &config, &mut state),

@@ -63,11 +63,11 @@ default = ["std", "tokio"]
 std = ["csv-adapter-core/std"]
 
 # Chain features
-bitcoin = ["dep:csv-adapter-bitcoin", "dep:bitcoin", "dep:bip32"]
-ethereum = ["dep:csv-adapter-ethereum"]
-sui = ["dep:csv-adapter-sui"]
-aptos = ["dep:csv-adapter-aptos"]
-solana = ["dep:csv-adapter-solana"]
+bitcoin = ["dep:csv-adapter-bitcoin", "dep:bitcoin", "dep:bip32", "csv-adapter-bitcoin/signet-rest"]
+ethereum = ["dep:csv-adapter-ethereum", "csv-adapter-ethereum/rpc"]
+sui = ["dep:csv-adapter-sui", "csv-adapter-sui/rpc"]
+aptos = ["dep:csv-adapter-aptos", "csv-adapter-aptos/rpc"]
+solana = ["dep:csv-adapter-solana", "csv-adapter-solana/rpc"]
 all-chains = ["bitcoin", "ethereum", "sui", "aptos", "solana"]
 
 # RPC features for chain queries
@@ -75,6 +75,7 @@ rpc = [
     "bitcoin",
     "ethereum",
     "csv-adapter-bitcoin/rpc",
+    "csv-adapter-bitcoin/signet-rest",
     "csv-adapter-ethereum/rpc",
 ]
 

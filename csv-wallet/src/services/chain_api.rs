@@ -11,13 +11,11 @@
 //! This module is Production Guarantee Plan compliant - all operations
 //! go through the csv-adapter facade rather than duplicate implementations.
 
-use csv_adapter::prelude::CsvClient;
+use csv_adapter::prelude::{CsvClient, NetworkType};
 use csv_adapter::StoreBackend;
 use csv_adapter_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
 use csv_adapter_core::Chain;
 use serde::{Deserialize, Serialize};
-
-use crate::services::network::NetworkType;
 
 /// Configuration for a chain API endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -198,15 +196,33 @@ pub struct ChainApi {
     csv_client: Option<CsvClient>,
     /// Chain configurations.
     configs: std::collections::HashMap<Chain, ChainConfig>,
+    /// Current network type (mainnet/testnet).
+    network: NetworkType,
 }
 
 impl ChainApi {
-    /// Create a new ChainApi with default configurations.
+    /// Create a new ChainApi with default configurations on testnet.
     pub fn new() -> Result<Self, ChainApiError> {
+        Self::with_network(NetworkType::Testnet)
+    }
+
+    /// Create a new ChainApi with specified network.
+    pub fn with_network(network: NetworkType) -> Result<Self, ChainApiError> {
         Ok(Self {
             csv_client: None,
             configs: default_configs(),
+            network,
         })
+    }
+
+    /// Set the network type.
+    pub fn set_network(&mut self, network: NetworkType) {
+        self.network = network;
+    }
+
+    /// Get the current network type.
+    pub fn network(&self) -> NetworkType {
+        self.network
     }
 
     /// Get balance for an address on a specific chain using the csv-adapter facade.
@@ -253,9 +269,9 @@ impl ChainApi {
                 ChainApiError::AdapterError(format!("Failed to build CSV client: {}", e))
             })?;
 
-        // Initialize adapters for the enabled chain
+        // Initialize adapters for the enabled chain with the correct network
         // This registers the actual chain adapter implementations with the facade
-        client.init_adapters().await.map_err(|e| {
+        client.init_adapters(self.network).await.map_err(|e| {
             ChainApiError::AdapterError(format!("Failed to initialize chain adapters: {}", e))
         })?;
 
@@ -299,6 +315,7 @@ impl Default for ChainApi {
         Self {
             csv_client: None,
             configs: default_configs(),
+            network: NetworkType::Testnet,
         }
     }
 }

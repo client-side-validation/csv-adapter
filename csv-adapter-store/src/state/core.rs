@@ -18,6 +18,13 @@ pub enum Network {
     Main,
 }
 
+impl Network {
+    /// Check if this is a testnet or devnet (non-production).
+    pub fn is_testnet(&self) -> bool {
+        matches!(self, Self::Test | Self::Dev)
+    }
+}
+
 impl std::fmt::Display for Network {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

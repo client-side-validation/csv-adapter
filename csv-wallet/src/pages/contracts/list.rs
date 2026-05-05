@@ -40,7 +40,7 @@ pub fn Contracts() -> Element {
                             let mut wallet_ctx_clone = wallet_ctx_for_discovery.clone();
                             wasm_bindgen_futures::spawn_local(async move {
                                 use crate::services::chain_api::ChainConfig;
-                                use crate::services::network::NetworkType;
+                                use csv_adapter::prelude::NetworkType;
                                 use crate::services::transaction_builder::discover_contracts;
 
                                 let mut total_found = 0;

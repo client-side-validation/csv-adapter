@@ -155,6 +155,22 @@ impl StoreHandle {
     }
 }
 
+/// Network type for adapter initialization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NetworkType {
+    /// Mainnet (production network)
+    Mainnet,
+    /// Testnet (testing network)
+    Testnet,
+}
+
+impl NetworkType {
+    /// Check if this is a testnet.
+    pub fn is_testnet(&self) -> bool {
+        matches!(self, Self::Testnet)
+    }
+}
+
 /// The unified CSV client.
 ///
 /// This is the main entry point for all CSV operations. Construct it
@@ -332,6 +348,10 @@ impl CsvClient {
     /// the facade will have no adapters and chain operations will fail with
     /// "Chain not supported" errors.
     ///
+    /// # Arguments
+    ///
+    /// * `network` - Network type (Mainnet or Testnet) to configure RPC endpoints
+    ///
     /// # Example
     ///
     /// ```no_run
@@ -345,8 +365,8 @@ impl CsvClient {
     ///         .with_store_backend(StoreBackend::InMemory)
     ///         .build()?;
     ///
-    ///     // Initialize adapters for all enabled chains
-    ///     client.init_adapters().await?;
+    ///     // Initialize adapters for all enabled chains on testnet
+    ///     client.init_adapters(NetworkType::Testnet).await?;
     ///
     ///     // Now you can use the facade
     ///     let balance = client.chain_facade()
@@ -356,17 +376,187 @@ impl CsvClient {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn init_adapters(&self) -> Result<(), CsvError> {
-        // TODO: Implement auto-initialization of chain adapters
-        // For each enabled chain:
-        // 1. Create chain-specific config from self.config
-        // 2. Create RPC client using the configured URL
-        // 3. Use AdapterBuilder to create the adapter
-        // 4. Register adapter via self.chain_facade.register_adapter()
-        //
-        // For now, adapters must be registered manually using AdapterBuilder
-        // and register_adapter() which now works thanks to interior mutability.
+    pub async fn init_adapters(&self, network: NetworkType) -> Result<(), CsvError> {
+        for chain in &self.enabled_chains {
+            let adapter_result = Self::build_adapter_for_chain(*chain, &self.config, network).await;
+
+            match adapter_result {
+                Ok(Some(adapter)) => {
+                    self.chain_facade.register_adapter(*chain, adapter);
+                    log::info!("Initialized adapter for chain: {:?} on {:?}", chain, network);
+                }
+                Ok(None) => {
+                    log::debug!("Skipping adapter initialization for unsupported chain: {:?}", chain);
+                }
+                Err(e) => {
+                    log::warn!("Failed to initialize adapter for chain {:?}: {}", chain, e);
+                    // Continue with other chains even if one fails
+                }
+            }
+        }
+
         Ok(())
+    }
+
+    /// Build an adapter for a specific chain.
+    async fn build_adapter_for_chain(
+        chain: Chain,
+        _config: &crate::config::Config,
+        network: NetworkType,
+    ) -> Result<Option<std::sync::Arc<dyn csv_adapter_core::FullChainAdapter>>, CsvError> {
+        let _builder = crate::facade::AdapterBuilder::new();
+        let is_testnet = matches!(network, NetworkType::Testnet);
+
+        match chain {
+            #[cfg(feature = "bitcoin")]
+            Chain::Bitcoin => {
+                log::warn!("Building Bitcoin adapter for {:?} network", network);
+                let rpc_url = _config
+                    .chains
+                    .get("bitcoin")
+                    .map(|c| c.rpc.url.clone())
+                    .filter(|url| !url.is_empty())
+                    .unwrap_or_else(|| {
+                        if is_testnet {
+                            "https://mempool.space/signet/api".to_string()
+                        } else {
+                            "https://mempool.space/api".to_string()
+                        }
+                    });
+                let btc_network = if is_testnet {
+                    csv_adapter_bitcoin::Network::Signet
+                } else {
+                    csv_adapter_bitcoin::Network::Mainnet
+                };
+                log::warn!("Building Bitcoin adapter with RPC URL: {}", rpc_url);
+                let btc_config = csv_adapter_bitcoin::config::BitcoinConfig {
+                    network: btc_network,
+                    finality_depth: 6,
+                    publication_timeout_seconds: 3600,
+                    rpc_url: rpc_url.clone(),
+                    xpub: None,
+                };
+                // Create RPC client - this uses reqwest::blocking which needs its own runtime
+                // We must create it outside any async context to avoid runtime conflicts
+                let rpc = std::thread::spawn(move || {
+                    Box::new(csv_adapter_bitcoin::mempool_rpc::MempoolSignetRpc::with_url(rpc_url)) as Box<dyn csv_adapter_bitcoin::rpc::BitcoinRpc + Send + Sync>
+                }).join()
+                .map_err(|e| CsvError::AdapterError { chain, message: format!("Thread panic: {:?}", e) })?;
+                _builder.bitcoin_from_config(btc_config, rpc).await.map(Some)
+            }
+            #[cfg(feature = "ethereum")]
+            Chain::Ethereum => {
+                let rpc_url = _config
+                    .chains
+                    .get("ethereum")
+                    .map(|c| c.rpc.url.clone())
+                    .filter(|url| !url.is_empty())
+                    .unwrap_or_else(|| {
+                        if is_testnet {
+                            "https://ethereum-sepolia-rpc.publicnode.com".to_string()
+                        } else {
+                            "https://ethereum-rpc.publicnode.com".to_string()
+                        }
+                    });
+                let eth_network = if is_testnet {
+                    csv_adapter_ethereum::config::Network::Sepolia
+                } else {
+                    csv_adapter_ethereum::config::Network::Mainnet
+                };
+                let eth_config = csv_adapter_ethereum::config::EthereumConfig {
+                    network: eth_network,
+                    finality_depth: if is_testnet { 15 } else { 12 },
+                    use_checkpoint_finality: !is_testnet,
+                    rpc_url: rpc_url.clone(),
+                };
+                let csv_seal_address = [0u8; 20]; // Default, should be configured
+                let rpc = Box::new(csv_adapter_ethereum::real_rpc::RealEthereumRpc::new(&rpc_url, csv_seal_address)
+                    .map_err(|e| CsvError::AdapterError { chain: Chain::Ethereum, message: e.to_string() })?);
+                _builder.ethereum_from_config(eth_config, rpc, csv_seal_address).await.map(Some)
+            }
+            #[cfg(feature = "sui")]
+            Chain::Sui => {
+                let rpc_url = _config
+                    .chains
+                    .get("sui")
+                    .map(|c| c.rpc.url.clone())
+                    .filter(|url| !url.is_empty())
+                    .unwrap_or_else(|| {
+                        if is_testnet {
+                            "https://fullnode.testnet.sui.io:443".to_string()
+                        } else {
+                            "https://fullnode.mainnet.sui.io:443".to_string()
+                        }
+                    });
+                let sui_network = if is_testnet {
+                    csv_adapter_sui::config::SuiNetwork::Testnet
+                } else {
+                    csv_adapter_sui::config::SuiNetwork::Mainnet
+                };
+                let mut sui_config = csv_adapter_sui::config::SuiConfig::new(sui_network);
+                sui_config.rpc_url = rpc_url.clone();
+                // Seal contract package ID is required but not available - using placeholder
+                sui_config.seal_contract.package_id = Some("0x0000000000000000000000000000000000000000000000000000000000000000".to_string());
+                let rpc = Box::new(csv_adapter_sui::real_rpc::SuiRpcClient::new(&rpc_url));
+                _builder.sui_from_config(sui_config, rpc).await.map(Some)
+            }
+            #[cfg(feature = "aptos")]
+            Chain::Aptos => {
+                let rpc_url = _config
+                    .chains
+                    .get("aptos")
+                    .map(|c| c.rpc.url.clone())
+                    .filter(|url| !url.is_empty())
+                    .unwrap_or_else(|| {
+                        if is_testnet {
+                            "https://fullnode.testnet.aptoslabs.com/v1".to_string()
+                        } else {
+                            "https://fullnode.mainnet.aptoslabs.com/v1".to_string()
+                        }
+                    });
+                let mut aptos_config = csv_adapter_aptos::config::AptosConfig::default();
+                aptos_config.network = if is_testnet {
+                    csv_adapter_aptos::config::AptosNetwork::Testnet
+                } else {
+                    csv_adapter_aptos::config::AptosNetwork::Mainnet
+                };
+                aptos_config.rpc_url = rpc_url.clone();
+                let rpc = Box::new(csv_adapter_aptos::real_rpc::AptosRpcClient::new(&rpc_url));
+                _builder.aptos_from_config(aptos_config, rpc).await.map(Some)
+            }
+            #[cfg(feature = "solana")]
+            Chain::Solana => {
+                let rpc_url = _config
+                    .chains
+                    .get("solana")
+                    .map(|c| c.rpc.url.clone())
+                    .filter(|url| !url.is_empty())
+                    .unwrap_or_else(|| {
+                        if is_testnet {
+                            "https://api.devnet.solana.com".to_string()
+                        } else {
+                            "https://api.mainnet-beta.solana.com".to_string()
+                        }
+                    });
+                let sol_network = if is_testnet {
+                    csv_adapter_solana::config::Network::Devnet
+                } else {
+                    csv_adapter_solana::config::Network::Mainnet
+                };
+                let sol_config = csv_adapter_solana::config::SolanaConfig {
+                    network: sol_network,
+                    rpc_url: rpc_url.clone(),
+                    csv_program_id: "CsvProgram11111111111111111111111111111111111".to_string(),
+                    keypair: None,
+                    commitment: Some("confirmed".to_string()),
+                    max_retries: 3,
+                    timeout_seconds: 30,
+                };
+                let rpc = Box::new(csv_adapter_solana::rpc::RealSolanaRpc::new(&rpc_url));
+                _builder.solana_from_config(sol_config, rpc).await.map(Some)
+            }
+            _ => Ok(None), // Skip unsupported chains
+        }
     }
 
     /// Emit an event to all event stream subscribers.

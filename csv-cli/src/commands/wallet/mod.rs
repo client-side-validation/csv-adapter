@@ -32,7 +32,7 @@ use crate::state::UnifiedStateManager;
 use anyhow::Result;
 
 /// Execute wallet command.
-pub fn execute(
+pub async fn execute(
     action: WalletAction,
     config: &Config,
     state: &mut UnifiedStateManager,
@@ -48,7 +48,7 @@ pub fn execute(
             generate::cmd_generate(chain, network, config, state)
         }
         WalletAction::Balance { chain, address } => {
-            balance::cmd_balance(chain, address, config, state)
+            balance::cmd_balance(chain, address, config, state).await
         }
         WalletAction::Fund { chain, address } => fund::cmd_fund(chain, address, config, state),
         WalletAction::Export { chain, format } => {
