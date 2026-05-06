@@ -31,8 +31,8 @@ ed25519-dalek = { version = "2.0", features = ["rand_core"] }
 serde_bytes = "0.11"
 
 # Real RPC dependencies (optional, enabled with --features rpc)
-reqwest = { version = "0.12", features = ["json", "blocking"], optional = true }
-tokio = { version = "1", features = ["rt", "time"], optional = true }
+reqwest = { version = "0.12", features = ["json"], optional = true }
+tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
 base64 = { version = "0.22", optional = true }
 
 # Sui Rust SDK crates for contract deployment (sui-rust-sdk from crates.io)
@@ -48,11 +48,11 @@ rand = "0.8"
 [features]
 default = []
 # Enables real RPC client (real JSON-RPC calls over HTTP)
-rpc = ["reqwest", "tokio", "base64"]
+rpc = ["reqwest", "base64"]
 # Sui SDK deployment feature - uses sui-rust-sdk crates from crates.io
-sui-sdk-deploy = ["sui-rpc", "sui-sdk-types", "sui-transaction-builder", "sui-crypto", "bcs", "tokio"]
+sui-sdk-deploy = ["sui-rpc", "sui-sdk-types", "sui-transaction-builder", "sui-crypto", "bcs"]
 
 [dev-dependencies]
 rand = "0.8"
 tempfile = "3"
-reqwest = { version = "0.12", features = ["json", "blocking"] }
+reqwest = { version = "0.12", features = ["json"] }

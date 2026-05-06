@@ -5,42 +5,45 @@ use std::collections::HashMap;
 #[cfg(test)]
 use std::sync::Mutex;
 
+use async_trait::async_trait;
+
 /// Trait for Sui RPC operations
+#[async_trait]
 pub trait SuiRpc: Send + Sync + 'static {
     /// Get object by ID
-    fn get_object(
+    async fn get_object(
         &self,
         object_id: [u8; 32],
     ) -> Result<Option<SuiObject>, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get transaction block by digest
-    fn get_transaction_block(
+    async fn get_transaction_block(
         &self,
         digest: [u8; 32],
     ) -> Result<Option<SuiTransactionBlock>, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get transaction events by digest
-    fn get_transaction_events(
+    async fn get_transaction_events(
         &self,
         digest: [u8; 32],
     ) -> Result<Vec<SuiEvent>, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get checkpoint by sequence number
-    fn get_checkpoint(
+    async fn get_checkpoint(
         &self,
         sequence_number: u64,
     ) -> Result<Option<SuiCheckpoint>, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get latest checkpoint sequence number
-    fn get_latest_checkpoint_sequence_number(
+    async fn get_latest_checkpoint_sequence_number(
         &self,
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get the sender's address
-    fn sender_address(&self) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>>;
+    async fn sender_address(&self) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get gas objects owned by the sender
-    fn get_gas_objects(
+    async fn get_gas_objects(
         &self,
         owner: [u8; 32],
     ) -> Result<Vec<SuiObject>, Box<dyn std::error::Error + Send + Sync>>;
@@ -51,7 +54,7 @@ pub trait SuiRpc: Send + Sync + 'static {
     /// * `tx_bytes` - BCS-serialized TransactionData
     /// * `signature` - Ed25519 signature (64 bytes)
     /// * `public_key` - Signer's public key (32 bytes)
-    fn execute_signed_transaction(
+    async fn execute_signed_transaction(
         &self,
         tx_bytes: Vec<u8>,
         signature: Vec<u8>,
@@ -59,14 +62,14 @@ pub trait SuiRpc: Send + Sync + 'static {
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>>;
 
     /// Wait for transaction confirmation
-    fn wait_for_transaction(
+    async fn wait_for_transaction(
         &self,
         digest: [u8; 32],
         timeout_ms: u64,
     ) -> Result<Option<SuiTransactionBlock>, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get ledger info
-    fn get_ledger_info(&self) -> Result<SuiLedgerInfo, Box<dyn std::error::Error + Send + Sync>>;
+    async fn get_ledger_info(&self) -> Result<SuiLedgerInfo, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Clone the RPC client for creating new boxed instances
     fn clone_boxed(&self) -> Box<dyn SuiRpc>;
@@ -255,29 +258,30 @@ impl MockSuiRpc {
 }
 
 #[cfg(test)]
+#[async_trait]
 impl SuiRpc for MockSuiRpc {
-    fn get_object(
+    async fn get_object(
         &self,
         object_id: [u8; 32],
     ) -> Result<Option<SuiObject>, Box<dyn std::error::Error + Send + Sync>> {
         Ok(self.objects.lock().unwrap().get(&object_id).cloned())
     }
 
-    fn get_transaction_block(
+    async fn get_transaction_block(
         &self,
         digest: [u8; 32],
     ) -> Result<Option<SuiTransactionBlock>, Box<dyn std::error::Error + Send + Sync>> {
         Ok(self.transactions.lock().unwrap().get(&digest).cloned())
     }
 
-    fn get_transaction_events(
+    async fn get_transaction_events(
         &self,
         _digest: [u8; 32],
     ) -> Result<Vec<SuiEvent>, Box<dyn std::error::Error + Send + Sync>> {
         Ok(Vec::new())
     }
 
-    fn get_checkpoint(
+    async fn get_checkpoint(
         &self,
         sequence_number: u64,
     ) -> Result<Option<SuiCheckpoint>, Box<dyn std::error::Error + Send + Sync>> {
@@ -289,17 +293,17 @@ impl SuiRpc for MockSuiRpc {
             .cloned())
     }
 
-    fn get_latest_checkpoint_sequence_number(
+    async fn get_latest_checkpoint_sequence_number(
         &self,
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
         Ok(self.latest_checkpoint)
     }
 
-    fn sender_address(&self) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
+    async fn sender_address(&self) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
         Ok(self.test_address)
     }
 
-    fn get_gas_objects(
+    async fn get_gas_objects(
         &self,
         _owner: [u8; 32],
     ) -> Result<Vec<SuiObject>, Box<dyn std::error::Error + Send + Sync>> {
@@ -314,7 +318,7 @@ impl SuiRpc for MockSuiRpc {
         }])
     }
 
-    fn execute_signed_transaction(
+    async fn execute_signed_transaction(
         &self,
         _tx_bytes: Vec<u8>,
         _signature: Vec<u8>,
@@ -330,7 +334,7 @@ impl SuiRpc for MockSuiRpc {
         Ok(digest)
     }
 
-    fn wait_for_transaction(
+    async fn wait_for_transaction(
         &self,
         _digest: [u8; 32],
         _timeout_ms: u64,
@@ -338,7 +342,7 @@ impl SuiRpc for MockSuiRpc {
         Ok(None)
     }
 
-    fn get_ledger_info(&self) -> Result<SuiLedgerInfo, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_ledger_info(&self) -> Result<SuiLedgerInfo, Box<dyn std::error::Error + Send + Sync>> {
         Ok(SuiLedgerInfo {
             latest_version: self.latest_checkpoint,
             latest_epoch: 1,
@@ -365,8 +369,8 @@ impl SuiRpc for MockSuiRpc {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_object() {
+    #[tokio::test]
+    async fn test_object() {
         let rpc = MockSuiRpc::new(1000);
         let obj = SuiObject {
             object_id: [1u8; 32],
@@ -378,12 +382,12 @@ mod tests {
         };
         rpc.add_object(obj.clone());
 
-        let fetched = rpc.get_object([1u8; 32]).unwrap();
+        let fetched = rpc.get_object([1u8; 32]).await.unwrap();
         assert_eq!(fetched.unwrap().version, 1);
     }
 
-    #[test]
-    fn test_checkpoint() {
+    #[tokio::test]
+    async fn test_checkpoint() {
         let rpc = MockSuiRpc::new(1000);
         let cp = SuiCheckpoint {
             sequence_number: 500,
@@ -394,7 +398,7 @@ mod tests {
         };
         rpc.add_checkpoint(cp.clone());
 
-        let fetched = rpc.get_checkpoint(500).unwrap();
+        let fetched = rpc.get_checkpoint(500).await.unwrap();
         assert!(fetched.unwrap().certified);
     }
 }

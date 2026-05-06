@@ -7,6 +7,30 @@ use crate::config::SuiConfig;
 use crate::error::{SuiError, SuiResult};
 use crate::rpc::SuiRpc;
 
+/// Block on an async future in a sync context.
+fn block_on_async<F: std::future::Future<Output = R> + Send + 'static, R: Send + 'static>(
+    future: F,
+) -> Result<R, SuiError> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| SuiError::RpcError(format!("Failed to create runtime: {}", e)))?;
+    Ok(rt.block_on(future))
+}
+
+/// Block on an async future that returns Result<T, E> in a sync context.
+fn block_on_async_result<F, T, E>(future: F) -> Result<T, SuiError>
+where
+    F: std::future::Future<Output = Result<T, E>> + Send + 'static,
+    E: std::fmt::Display + Send + 'static,
+{
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| SuiError::RpcError(format!("Failed to create runtime: {}", e)))?;
+    rt.block_on(future).map_err(|e| SuiError::RpcError(e.to_string()))
+}
+
 #[cfg(feature = "sui-sdk-deploy")]
 use std::str::FromStr;
 #[cfg(feature = "sui-sdk-deploy")]
@@ -194,17 +218,23 @@ impl PackageDeployer {
         ))
     }
 
-    /// Verify a package is deployed
+   /// Verify a package is deployed
     pub fn verify_package(&self, package_id: [u8; 32]) -> SuiResult<bool> {
         // Check if the object exists and is a package
-        match self.rpc.get_object(package_id) {
-            Ok(Some(obj)) => {
-                // Check if it's a package object
-                Ok(obj.object_type.contains("package"))
-            }
-            Ok(None) => Ok(false),
-            Err(_) => Ok(false),
-        }
+        let rpc = self.rpc.clone_boxed();
+        let result = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            rt.block_on(rpc.get_object(package_id))
+        }).join();
+        let obj = match result {
+            Ok(v) => v.map_err(|e| SuiError::RpcError(e.to_string()))?,
+            Err(e) => return Err(SuiError::RpcError(format!("Blocking task failed: {:?}", e))),
+        };
+        obj.map(|obj| obj.object_type.contains("package"))
+            .ok_or_else(|| SuiError::RpcError("Package not found".to_string()))
     }
 
     /// Estimate deployment cost

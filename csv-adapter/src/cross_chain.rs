@@ -62,7 +62,7 @@ impl From<CrossChainError> for CsvError {
 /// - The chain is not supported
 /// - The RPC call fails
 /// - The transaction cannot be built or submitted
-pub fn mint_right_on_chain(
+pub async fn mint_right_on_chain(
     chain: Chain,
     rpc_url: &str,
     contract: &str,
@@ -86,6 +86,7 @@ pub fn mint_right_on_chain(
                 source_chain,
                 source_seal_ref,
             )
+            .await
             .map_err(|e| CrossChainError::AdapterError(format!("{:?}", e)))
         }
         

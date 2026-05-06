@@ -198,7 +198,28 @@ impl StateProofVerifier {
         resource_type: &str,
         rpc: &dyn AptosRpc,
     ) -> AptosResult<bool> {
-        match rpc.get_resource(address, resource_type, None) {
+        let resource = {
+            let rpc = rpc.clone_boxed();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| AptosError::CheckpointFailed(format!("Failed to build runtime: {}", e)))?;
+            rt.block_on(async { rpc.get_resource(address, resource_type, None).await })
+        }
+        .map_err(|e| AptosError::StateProofFailed(format!("Failed to fetch resource: {}", e)))?;
+        match resource {
+            Some(_) => Ok(true),
+            None => Ok(false),
+        }
+    }
+
+    /// Async version of verify_resource_exists for use in async contexts.
+    pub async fn verify_resource_exists_async(
+        address: [u8; 32],
+        resource_type: &str,
+        rpc: &dyn AptosRpc,
+    ) -> AptosResult<bool> {
+        match rpc.get_resource(address, resource_type, None).await {
             Ok(Some(_)) => Ok(true),
             Ok(None) => Ok(false),
             Err(e) => Err(AptosError::StateProofFailed(format!(
@@ -216,14 +237,19 @@ impl StateProofVerifier {
         resource_type: &str,
         rpc: &dyn AptosRpc,
     ) -> AptosResult<bool> {
+        let resource = {
+            let rpc = rpc.clone_boxed();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| AptosError::CheckpointFailed(format!("Failed to build runtime: {}", e)))?;
+            rt.block_on(async { rpc.get_resource(address, resource_type, None).await })
+        }
+        .map_err(|e| AptosError::StateProofFailed(format!("Failed to verify resource consumption: {}", e)))?;
         // Resource is consumed when it no longer exists
-        match rpc.get_resource(address, resource_type, None) {
-            Ok(Some(_)) => Ok(false), // Still exists, not consumed
-            Ok(None) => Ok(true),     // Doesn't exist, was consumed
-            Err(e) => Err(AptosError::StateProofFailed(format!(
-                "Failed to verify resource consumption: {}",
-                e
-            ))),
+        match resource {
+            Some(_) => Ok(false), // Still exists, not consumed
+            None => Ok(true),     // Doesn't exist, was consumed
         }
     }
 }
@@ -272,7 +298,39 @@ impl EventProofVerifier {
         expected_data: &[u8],
         rpc: &dyn AptosRpc,
     ) -> AptosResult<bool> {
-        let tx = rpc.get_transaction_by_version(tx_version)?;
+        let tx = {
+            let rpc = rpc.clone_boxed();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| AptosError::CheckpointFailed(format!("Failed to build runtime: {}", e)))?;
+            rt.block_on(async { rpc.get_transaction_by_version(tx_version).await })
+        }
+        .map_err(|e| AptosError::EventProofFailed(format!("Failed to get transaction: {}", e)))?;
+        match tx {
+            Some(tx) => {
+                if !tx.success {
+                    return Ok(false);
+                }
+
+                // Search for event with matching data
+                let found = tx.events.iter().any(|e| e.data == expected_data);
+                Ok(found)
+            }
+            None => Err(AptosError::EventProofFailed(format!(
+                "Transaction at version {} not found",
+                tx_version
+            ))),
+        }
+    }
+
+    /// Async version of verify_event_in_tx for use in sync contexts.
+    pub async fn verify_event_in_tx_async(
+        tx_version: u64,
+        expected_data: &[u8],
+        rpc: &dyn AptosRpc,
+    ) -> AptosResult<bool> {
+        let tx = rpc.get_transaction_by_version(tx_version).await?;
         match tx {
             Some(tx) => {
                 if !tx.success {

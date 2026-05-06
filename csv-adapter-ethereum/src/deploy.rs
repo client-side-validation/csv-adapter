@@ -60,7 +60,7 @@ impl ContractDeployer {
     /// This synchronous method provides deployment configuration and validation.
     /// For actual deployment with transaction broadcasting, use `deploy_csv_lock()`
     /// which uses Alloy for async RPC-based deployment with proper signing.
-    pub fn deploy_contract(
+    pub async fn deploy_contract(
         &self,
         bytecode: &[u8],
         from_address: [u8; 20],
@@ -72,6 +72,7 @@ impl ContractDeployer {
         let nonce = self
             .rpc
             .get_transaction_count(from_address)
+            .await
             .map_err(|e| EthereumError::RpcError(format!("Failed to get nonce: {:?}", e)))?;
 
         // Calculate the contract address that would be created
@@ -93,7 +94,7 @@ impl ContractDeployer {
     }
 
     /// Deploy contract with constructor arguments
-    pub fn deploy_contract_with_args(
+    pub async fn deploy_contract_with_args(
         &self,
         bytecode: &[u8],
         constructor_abi: &[u8],
@@ -107,13 +108,13 @@ impl ContractDeployer {
         let mut full_bytecode = bytecode.to_vec();
         full_bytecode.extend_from_slice(&encoded_args);
 
-        self.deploy_contract(&full_bytecode, from_address)
+        self.deploy_contract(&full_bytecode, from_address).await
     }
 
     /// Verify a contract is deployed
-    pub fn verify_contract(&self, address: [u8; 20]) -> EthereumResult<bool> {
+    pub async fn verify_contract(&self, address: [u8; 20]) -> EthereumResult<bool> {
         // Check if there's code at the address
-        match self.rpc.get_code(address) {
+        match self.rpc.get_code(address).await {
             Ok(code) => Ok(!code.is_empty()),
             Err(_) => Ok(false),
         }
@@ -132,9 +133,10 @@ impl ContractDeployer {
     }
 
     /// Get contract code
-    pub fn get_contract_code(&self, address: [u8; 20]) -> EthereumResult<Vec<u8>> {
+    pub async fn get_contract_code(&self, address: [u8; 20]) -> EthereumResult<Vec<u8>> {
         self.rpc
             .get_code(address)
+            .await
             .map_err(|e| EthereumError::RpcError(format!("Failed to get code: {:?}", e)))
     }
 

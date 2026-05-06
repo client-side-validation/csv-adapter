@@ -3,8 +3,9 @@
 //! Implements the SuiRpc trait using Sui's official JSON-RPC API.
 //! Only compiled when the `rpc` feature is enabled.
 
+use async_trait::async_trait;
 use base64::Engine;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
 
@@ -32,7 +33,7 @@ impl SuiRpcClient {
     }
 
     /// Call a Sui JSON-RPC method
-    fn rpc_call(
+    async fn rpc_call(
         &self,
         method: &str,
         params: Value,
@@ -48,8 +49,10 @@ impl SuiRpcClient {
             .client
             .post(&self.rpc_url)
             .json(&payload)
-            .send()?
-            .json()?;
+            .send()
+            .await?
+            .json()
+            .await?;
 
         if let Some(error) = response.get("error") {
             return Err(format!("RPC error: {}", error).into());
@@ -79,8 +82,9 @@ impl SuiRpcClient {
     }
 }
 
+#[async_trait]
 impl SuiRpc for SuiRpcClient {
-    fn get_object(
+    async fn get_object(
         &self,
         object_id: [u8; 32],
     ) -> Result<Option<SuiObject>, Box<dyn std::error::Error + Send + Sync>> {
@@ -91,7 +95,7 @@ impl SuiRpc for SuiRpcClient {
                 id_hex,
                 { "showContent": true, "showBcs": true, "showOwner": true }
             ]),
-        )?;
+        ).await?;
 
         if result.get("data").is_none() || result["data"].is_null() {
             return Ok(None);
@@ -111,7 +115,7 @@ impl SuiRpc for SuiRpcClient {
         }))
     }
 
-    fn get_transaction_block(
+    async fn get_transaction_block(
         &self,
         digest: [u8; 32],
     ) -> Result<Option<SuiTransactionBlock>, Box<dyn std::error::Error + Send + Sync>> {
@@ -122,7 +126,7 @@ impl SuiRpc for SuiRpcClient {
                 digest_hex,
                 { "showInput": true, "showEffects": true, "showEvents": true }
             ]),
-        )?;
+        ).await?;
 
         if result.is_null() {
             return Ok(None);
@@ -172,11 +176,11 @@ impl SuiRpc for SuiRpcClient {
         }))
     }
 
-    fn get_transaction_events(
+    async fn get_transaction_events(
         &self,
         digest: [u8; 32],
     ) -> Result<Vec<SuiEvent>, Box<dyn std::error::Error + Send + Sync>> {
-        let tx_block = self.get_transaction_block(digest)?;
+        let tx_block = self.get_transaction_block(digest).await?;
         if let Some(_block) = tx_block {
             // Events are embedded in the transaction block response
             // In real implementation, parse from sui_getTransactionBlock events array
@@ -186,7 +190,7 @@ impl SuiRpc for SuiRpcClient {
         }
     }
 
-    fn get_checkpoint(
+    async fn get_checkpoint(
         &self,
         sequence_number: u64,
     ) -> Result<Option<SuiCheckpoint>, Box<dyn std::error::Error + Send + Sync>> {
@@ -196,7 +200,7 @@ impl SuiRpc for SuiRpcClient {
                 sequence_number.to_string(),
                 { "showBcs": true, "showTransactions": false }
             ]),
-        )?;
+        ).await?;
 
         if result.is_null() {
             return Ok(None);
@@ -216,14 +220,14 @@ impl SuiRpc for SuiRpcClient {
         }))
     }
 
-    fn get_latest_checkpoint_sequence_number(
+    async fn get_latest_checkpoint_sequence_number(
         &self,
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-        let result = self.rpc_call("sui_getLatestCheckpointSequenceNumber", json!([]))?;
+        let result = self.rpc_call("sui_getLatestCheckpointSequenceNumber", json!([])).await?;
         Ok(result.as_str().unwrap_or("0").parse()?)
     }
 
-    fn sender_address(&self) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
+    async fn sender_address(&self) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
         // This method requires a configured signer with a known address
         // The SuiRpcClient does not store signing keys - they must be provided externally
         Err("CapabilityUnavailable: sender_address requires a configured signer. \
@@ -231,7 +235,7 @@ impl SuiRpc for SuiRpcClient {
              configure a signer address explicitly.".into())
     }
 
-    fn get_gas_objects(
+    async fn get_gas_objects(
         &self,
         owner: [u8; 32],
     ) -> Result<Vec<SuiObject>, Box<dyn std::error::Error + Send + Sync>> {
@@ -243,7 +247,7 @@ impl SuiRpc for SuiRpcClient {
                 null, // cursor
                 null  // limit
             ]),
-        )?;
+        ).await?;
 
         if let Some(data) = result.get("data") {
             if let Some(coins) = data.as_array() {
@@ -270,7 +274,7 @@ impl SuiRpc for SuiRpcClient {
         Ok(Vec::new())
     }
 
-    fn execute_signed_transaction(
+    async fn execute_signed_transaction(
         &self,
         tx_bytes: Vec<u8>,
         signature: Vec<u8>,
@@ -294,7 +298,7 @@ impl SuiRpc for SuiRpcClient {
                     "showEvents": true
                 }
             ]),
-        )?;
+        ).await?;
 
         // Parse the response to get the transaction digest
         if let Some(digest) = result.get("digest").and_then(|d| d.as_str()) {
@@ -304,7 +308,7 @@ impl SuiRpc for SuiRpcClient {
         }
     }
 
-    fn wait_for_transaction(
+    async fn wait_for_transaction(
         &self,
         digest: [u8; 32],
         timeout_ms: u64,
@@ -317,19 +321,19 @@ impl SuiRpc for SuiRpcClient {
                 return Err("Timeout waiting for transaction confirmation".into());
             }
 
-            if let Some(block) = self.get_transaction_block(digest)? {
+            if let Some(block) = self.get_transaction_block(digest).await? {
                 if matches!(block.effects.status, SuiExecutionStatus::Success) {
                     return Ok(Some(block));
                 }
             }
 
-            std::thread::sleep(poll_interval);
+            tokio::time::sleep(poll_interval).await;
         }
     }
 
-    fn get_ledger_info(&self) -> Result<SuiLedgerInfo, Box<dyn std::error::Error + Send + Sync>> {
-        let latest_checkpoint = self.get_latest_checkpoint_sequence_number()?;
-        let checkpoint = self.get_checkpoint(latest_checkpoint)?;
+    async fn get_ledger_info(&self) -> Result<SuiLedgerInfo, Box<dyn std::error::Error + Send + Sync>> {
+        let latest_checkpoint = self.get_latest_checkpoint_sequence_number().await?;
+        let checkpoint = self.get_checkpoint(latest_checkpoint).await?;
 
         Ok(SuiLedgerInfo {
             latest_version: checkpoint

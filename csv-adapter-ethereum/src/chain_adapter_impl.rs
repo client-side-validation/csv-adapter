@@ -33,6 +33,7 @@ impl RpcClient for EthereumRpcClient {
         let tx_hash = self
             .inner
             .send_raw_transaction(tx.to_vec())
+            .await
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))?;
 
         Ok(format!("0x{}", hex::encode(tx_hash)))
@@ -56,6 +57,7 @@ impl RpcClient for EthereumRpcClient {
         let receipt = self
             .inner
             .get_transaction_receipt(tx_hash)
+            .await
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))?
             .ok_or_else(|| ChainError::RpcError("Transaction receipt not found".to_string()))?;
 
@@ -70,6 +72,7 @@ impl RpcClient for EthereumRpcClient {
     async fn get_latest_block(&self) -> ChainResult<u64> {
         self.inner
             .block_number()
+            .await
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))
     }
 
@@ -91,6 +94,7 @@ impl RpcClient for EthereumRpcClient {
         let balance = self
             .inner
             .get_balance(addr)
+            .await
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))?;
 
         // Convert U256 to u64 (will truncate large balances)
@@ -293,6 +297,7 @@ impl ChainAdapter for EthereumAnchorLayer {
             use crate::chain_adapter_impl::EthereumRpcClient;
             let csv_seal_address = self.csv_seal_address;
             let rpc = RealEthereumRpc::new(rpc_url, csv_seal_address)
+                .await
                 .map_err(|e| ChainError::RpcError(format!("Failed to create RPC client: {}", e)))?;
             Ok(Box::new(EthereumRpcClient::new(Box::new(rpc))))
         }
@@ -327,7 +332,7 @@ impl ChainAdapter for EthereumAnchorLayer {
 }
 
 /// Create a new Ethereum adapter from chain configuration
-pub fn create_ethereum_adapter(config: &ChainConfig) -> ChainResult<EthereumAnchorLayer> {
+pub async fn create_ethereum_adapter(config: &ChainConfig) -> ChainResult<EthereumAnchorLayer> {
     // Parse network from config (use default_network field)
     let network = match config.default_network.as_str() {
         "mainnet" => Network::Mainnet,
@@ -362,6 +367,7 @@ pub fn create_ethereum_adapter(config: &ChainConfig) -> ChainResult<EthereumAnch
         let csv_seal_address = [0u8; 20]; // Could be configured
         let rpc: Box<dyn EthereumRpc> = Box::new(
             RealEthereumRpc::new(rpc_url, csv_seal_address)
+                .await
                 .map_err(|e| ChainError::RpcError(format!("{:?}", e)))?
         );
         EthereumAnchorLayer::from_config(eth_config, rpc, csv_seal_address)

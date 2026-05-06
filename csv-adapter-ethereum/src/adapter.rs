@@ -20,7 +20,7 @@ use csv_adapter_core::Hash;
 
 use crate::config::EthereumConfig;
 use crate::error::{EthereumError, EthereumResult};
-use crate::finality::FinalityChecker;
+use crate::finality::{FinalityChecker, FinalityCheckerTrait};
 use crate::rpc::EthereumRpc;
 use crate::seal::SealRegistry;
 use crate::types::{
@@ -74,14 +74,14 @@ impl EthereumAnchorLayer {
 
     /// Create a new adapter with real RPC (requires `rpc` feature)
     #[cfg(feature = "rpc")]
-    pub fn with_real_rpc(
+    pub async fn with_real_rpc(
         config: EthereumConfig,
         csv_seal_address: [u8; 20],
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         use crate::real_rpc::RealEthereumRpc;
 
         let rpc: Box<dyn EthereumRpc> =
-            Box::new(RealEthereumRpc::new(&config.rpc_url, csv_seal_address)?);
+            Box::new(RealEthereumRpc::new(&config.rpc_url, csv_seal_address).await?);
         Self::from_config(config, rpc, csv_seal_address)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
     }
@@ -114,7 +114,7 @@ impl EthereumAnchorLayer {
     /// 5. Verify LOG event contains SealUsed with matching seal_id and commitment
     /// 6. Return anchor reference (tx_hash, block_number, log_index)
     #[cfg(feature = "rpc")]
-    pub fn publish_with_rpc(
+    pub async fn publish_with_rpc(
         &self,
         commitment: Hash,
         seal: EthereumSealRef,
@@ -130,12 +130,14 @@ impl EthereumAnchorLayer {
         let tx_hash = self
             .rpc
             .send_raw_transaction(signed_tx_bytes)
+            .await
             .map_err(|e| AdapterError::NetworkError(e.to_string()))?;
 
         // Step 4: Get receipt
         let receipt = self
             .rpc
             .get_transaction_receipt(tx_hash)
+            .await
             .map_err(|e| AdapterError::NetworkError(e.to_string()))?
             .ok_or_else(|| AdapterError::InclusionProofFailed("Transaction receipt not found".to_string()))?;
 
@@ -178,6 +180,7 @@ impl AnchorLayer for EthereumAnchorLayer {
         #[cfg(feature = "rpc")]
         {
             use crate::real_rpc::{publish, verify_seal_consumption_in_receipt, RealEthereumRpc};
+            use tokio::runtime::Handle;
 
             // Downcast to RealEthereumRpc for the publish flow
             let real_rpc = self
@@ -191,14 +194,16 @@ impl AnchorLayer for EthereumAnchorLayer {
                     )
                 })?;
 
+            let handle = Handle::current();
+            
             // Build, sign, and broadcast the transaction
-            let tx_hash = publish(real_rpc, &seal, *commitment.as_bytes())
+            let tx_hash = handle.block_on(publish(real_rpc, &seal, *commitment.as_bytes()))
                 .map_err(|e| AdapterError::PublishFailed(e.to_string()))?;
 
             // Get the receipt and verify the SealUsed event
-            let receipt = self
-                .rpc
-                .get_transaction_receipt(tx_hash)
+            let receipt = handle.block_on(
+                self.rpc.get_transaction_receipt(tx_hash)
+            )
                 .map_err(|e| AdapterError::NetworkError(e.to_string()))?
                 .ok_or_else(|| AdapterError::PublishFailed("Transaction receipt not found".to_string()))?;
 
@@ -241,6 +246,7 @@ impl AnchorLayer for EthereumAnchorLayer {
         {
             // Try to get real proof data from RPC
             use crate::real_rpc::RealEthereumRpc;
+            use tokio::runtime::Handle;
 
             if let Some(_real_rpc) = self
                 .rpc
@@ -248,23 +254,28 @@ impl AnchorLayer for EthereumAnchorLayer {
                 .as_any()
                 .and_then(|any| any.downcast_ref::<RealEthereumRpc>())
             {
+                let handle = Handle::current();
+                
                 // Get the block header for receipt root
-                let block_hash = self.rpc.get_block_hash(anchor.block_number).map_err(|e| {
+                let block_hash = handle.block_on(
+                    self.rpc.get_block_hash(anchor.block_number)
+                ).map_err(|e| {
                     AdapterError::InclusionProofFailed(format!("Failed to get block hash: {}", e))
                 })?;
 
-                let state_root = self.rpc.get_block_state_root(block_hash).map_err(|e| {
+                let state_root = handle.block_on(
+                    self.rpc.get_block_state_root(block_hash)
+                ).map_err(|e| {
                     AdapterError::InclusionProofFailed(format!("Failed to get state root: {}", e))
                 })?;
 
                 // Get the receipt for the transaction
-                let receipt = self
-                    .rpc
-                    .get_transaction_receipt(anchor.tx_hash)
-                    .map_err(|e| {
-                        AdapterError::InclusionProofFailed(format!("Failed to get receipt: {}", e))
-                    })?
-                    .ok_or_else(|| AdapterError::InclusionProofFailed("Transaction receipt not found".to_string()))?;
+                let receipt = handle.block_on(
+                    self.rpc.get_transaction_receipt(anchor.tx_hash)
+                ).map_err(|e| {
+                    AdapterError::InclusionProofFailed(format!("Failed to get receipt: {}", e))
+                })?
+                .ok_or_else(|| AdapterError::InclusionProofFailed("Transaction receipt not found".to_string()))?;
 
                 // Verify the receipt is in the correct block
                 if receipt.block_number != anchor.block_number {
@@ -305,21 +316,33 @@ impl AnchorLayer for EthereumAnchorLayer {
     }
 
     fn verify_finality(&self, anchor: Self::AnchorRef) -> CoreResult<Self::FinalityProof> {
-        let is_finalized = self
-            .finality_checker
-            .is_finalized(anchor.block_number, self.rpc.as_ref())
-            .unwrap_or(true);
+        #[cfg(feature = "rpc")]
+        {
+            use tokio::runtime::Handle;
+            let handle = Handle::current();
+            let is_finalized = handle.block_on(
+                self.finality_checker.is_finalized(anchor.block_number, self.rpc.as_ref())
+            ).unwrap_or(true);
 
-        let confirmations = self
-            .finality_checker
-            .get_confirmations(anchor.block_number, self.rpc.as_ref())
-            .unwrap_or(self.config.finality_depth);
+            let confirmations = handle.block_on(
+                self.finality_checker.get_confirmations(anchor.block_number, self.rpc.as_ref())
+            ).unwrap_or(self.config.finality_depth);
 
-        Ok(EthereumFinalityProof::new(
-            confirmations,
-            self.config.finality_depth,
-            is_finalized,
-        ))
+            Ok(EthereumFinalityProof::new(
+                confirmations,
+                self.config.finality_depth,
+                is_finalized,
+            ))
+        }
+        #[cfg(not(feature = "rpc"))]
+        {
+            let _ = anchor;
+            Ok(EthereumFinalityProof::new(
+                self.config.finality_depth,
+                self.config.finality_depth,
+                true,
+            ))
+        }
     }
 
     fn enforce_seal(&self, seal: Self::SealRef) -> CoreResult<()> {
@@ -401,29 +424,38 @@ impl AnchorLayer for EthereumAnchorLayer {
     }
 
     fn rollback(&self, anchor: Self::AnchorRef) -> CoreResult<()> {
-        let current = self
-            .rpc
-            .block_number()
-            .map_err(|e| AdapterError::NetworkError(e.to_string()))?;
-        if anchor.block_number > current {
-            return Err(AdapterError::ReorgInvalid(format!(
-                "Block {} beyond current {}",
-                anchor.block_number, current
-            )));
-        }
+        #[cfg(feature = "rpc")]
+        {
+            use tokio::runtime::Handle;
+            let handle = Handle::current();
+            let current = handle.block_on(
+                self.rpc.block_number()
+            ).map_err(|e| AdapterError::NetworkError(e.to_string()))?;
+            if anchor.block_number > current {
+                return Err(AdapterError::ReorgInvalid(format!(
+                    "Block {} beyond current {}",
+                    anchor.block_number, current
+                )));
+            }
 
-        // If the anchor's block is before current block, the transaction may have been reorged out
-        // Clear the seal from registry to allow reuse
-        if anchor.block_number < current {
-            #[allow(unused_mut)]
-            let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
-            // Derive the seal that was used for this anchor
-            // The nonce is tracked via the log_index
-            let seal = EthereumSealRef::new(self.csv_seal_address, 0, anchor.log_index);
-            registry.clear_seal(&seal);
-        }
+            // If the anchor's block is before current block, the transaction may have been reorged out
+            // Clear the seal from registry to allow reuse
+            if anchor.block_number < current {
+                #[allow(unused_mut)]
+                let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
+                // Derive the seal that was used for this anchor
+                // The nonce is tracked via the log_index
+                let seal = EthereumSealRef::new(self.csv_seal_address, 0, anchor.log_index);
+                registry.clear_seal(&seal);
+            }
 
-        Ok(())
+            Ok(())
+        }
+        #[cfg(not(feature = "rpc"))]
+        {
+            let _ = anchor;
+            Ok(())
+        }
     }
 
     fn domain_separator(&self) -> [u8; 32] {

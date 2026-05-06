@@ -3,6 +3,7 @@
 //! This module provides proof verification for Sui's object model,
 //! including object existence proofs, transaction proofs, and event verification.
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{SuiError, SuiResult};
@@ -99,49 +100,59 @@ impl EventProof {
     }
 }
 
+/// Trait for state proof verification operations
+#[async_trait]
+pub trait StateProofVerifierTrait: Send + Sync {
+    /// Verify that an object exists on-chain.
+    async fn verify_object_exists(
+        object_id: [u8; 32],
+        rpc: &dyn SuiRpc,
+    ) -> SuiResult<Option<SuiObject>>;
+
+    /// Verify that an object has been consumed (deleted).
+    async fn verify_object_consumed(object_id: [u8; 32], rpc: &dyn SuiRpc) -> SuiResult<bool>;
+
+    /// Verify that a transaction consumed a specific object.
+    async fn verify_object_consumed_in_tx(
+        tx_digest: [u8; 32],
+        object_id: [u8; 32],
+        rpc: &dyn SuiRpc,
+    ) -> SuiResult<bool>;
+}
+
 /// Verifier for state proofs (object existence/ownership).
 pub struct StateProofVerifier;
 
-impl StateProofVerifier {
+#[async_trait]
+impl StateProofVerifierTrait for StateProofVerifier {
     /// Verify that an object exists on-chain.
-    ///
-    /// # Arguments
-    /// * `object_id` - The object ID to check
-    /// * `rpc` - RPC client for fetching object data
-    pub fn verify_object_exists(
+    async fn verify_object_exists(
         object_id: [u8; 32],
         rpc: &dyn SuiRpc,
     ) -> SuiResult<Option<SuiObject>> {
         let obj = rpc
             .get_object(object_id)
+            .await
             .map_err(|e| SuiError::StateProofFailed(format!("Failed to fetch object: {}", e)))?;
         Ok(obj)
     }
 
     /// Verify that an object has been consumed (deleted).
-    ///
-    /// # Arguments
-    /// * `object_id` - The object ID to check
-    /// * `rpc` - RPC client for fetching object data
-    pub fn verify_object_consumed(object_id: [u8; 32], rpc: &dyn SuiRpc) -> SuiResult<bool> {
+    async fn verify_object_consumed(object_id: [u8; 32], rpc: &dyn SuiRpc) -> SuiResult<bool> {
         let obj = rpc
             .get_object(object_id)
+            .await
             .map_err(|e| SuiError::StateProofFailed(format!("Failed to fetch object: {}", e)))?;
         Ok(obj.is_none())
     }
 
     /// Verify that a transaction consumed a specific object.
-    ///
-    /// # Arguments
-    /// * `tx_digest` - The transaction digest
-    /// * `object_id` - The object ID that should have been consumed
-    /// * `rpc` - RPC client for fetching transaction data
-    pub fn verify_object_consumed_in_tx(
+    async fn verify_object_consumed_in_tx(
         tx_digest: [u8; 32],
         object_id: [u8; 32],
         rpc: &dyn SuiRpc,
     ) -> SuiResult<bool> {
-        let tx = rpc.get_transaction_block(tx_digest).map_err(|e| {
+        let tx = rpc.get_transaction_block(tx_digest).await.map_err(|e| {
             SuiError::StateProofFailed(format!("Failed to fetch transaction: {}", e))
         })?;
 
@@ -162,28 +173,29 @@ impl StateProofVerifier {
     }
 }
 
+/// Trait for event proof verification operations
+#[async_trait]
+pub trait EventProofVerifierTrait: Send + Sync {
+    /// Verify that an event was emitted in a transaction.
+    async fn verify_event_in_tx(
+        tx_digest: [u8; 32],
+        expected_event_data: &[u8],
+        rpc: &dyn SuiRpc,
+    ) -> SuiResult<bool>;
+}
+
 /// Verifier for event proofs.
 pub struct EventProofVerifier;
 
-impl EventProofVerifier {
+#[async_trait]
+impl EventProofVerifierTrait for EventProofVerifier {
     /// Verify that an event was emitted in a transaction.
-    ///
-    /// This verifies the event by:
-    /// 1. Fetching the transaction to confirm it succeeded
-    /// 2. Fetching the events for the transaction
-    /// 3. Computing hash of expected event data
-    /// 4. Comparing against emitted event data hashes
-    ///
-    /// # Arguments
-    /// * `tx_digest` - The transaction digest
-    /// * `expected_event_data` - The expected event data bytes
-    /// * `rpc` - RPC client for fetching transaction data
-    pub fn verify_event_in_tx(
+    async fn verify_event_in_tx(
         tx_digest: [u8; 32],
         expected_event_data: &[u8],
         rpc: &dyn SuiRpc,
     ) -> SuiResult<bool> {
-        let tx = rpc.get_transaction_block(tx_digest).map_err(|e| {
+        let tx = rpc.get_transaction_block(tx_digest).await.map_err(|e| {
             SuiError::EventProofFailed(format!("Failed to fetch transaction: {}", e))
         })?;
 
@@ -195,7 +207,7 @@ impl EventProofVerifier {
                 }
 
                 // Fetch events for this transaction
-                let events = rpc.get_transaction_events(tx_digest).map_err(|e| {
+                let events = rpc.get_transaction_events(tx_digest).await.map_err(|e| {
                     SuiError::EventProofFailed(format!("Failed to fetch events: {}", e))
                 })?;
 
@@ -293,8 +305,8 @@ mod tests {
         SuiTransactionEffects,
     };
 
-    #[test]
-    fn test_verify_object_exists() {
+    #[tokio::test]
+    async fn test_verify_object_exists() {
         let rpc = MockSuiRpc::new(1000);
         rpc.add_object(SuiObject {
             object_id: [1u8; 32],
@@ -302,24 +314,26 @@ mod tests {
             owner: vec![2, 3],
             object_type: "CSV::Seal".to_string(),
             has_public_transfer: false,
+            bcs_data: None,
         });
 
-        let result = StateProofVerifier::verify_object_exists([1u8; 32], &rpc).unwrap();
+        let result = StateProofVerifier::verify_object_exists([1u8; 32], &rpc).await.unwrap();
         assert!(result.is_some());
         assert!(StateProofVerifier::verify_object_exists([99u8; 32], &rpc)
+            .await
             .unwrap()
             .is_none());
     }
 
-    #[test]
-    fn test_verify_object_consumed() {
+    #[tokio::test]
+    async fn test_verify_object_consumed() {
         let rpc = MockSuiRpc::new(1000);
         // Object not in test data means it's "consumed"
-        assert!(StateProofVerifier::verify_object_consumed([99u8; 32], &rpc).unwrap());
+        assert!(StateProofVerifier::verify_object_consumed([99u8; 32], &rpc).await.unwrap());
     }
 
-    #[test]
-    fn test_verify_object_consumed_in_tx() {
+    #[tokio::test]
+    async fn test_verify_object_consumed_in_tx() {
         let rpc = MockSuiRpc::new(1000);
         rpc.add_transaction(SuiTransactionBlock {
             digest: [1u8; 32],
@@ -335,10 +349,10 @@ mod tests {
         });
 
         assert!(
-            StateProofVerifier::verify_object_consumed_in_tx([1u8; 32], [2u8; 32], &rpc).unwrap()
+            StateProofVerifier::verify_object_consumed_in_tx([1u8; 32], [2u8; 32], &rpc).await.unwrap()
         );
         assert!(
-            !StateProofVerifier::verify_object_consumed_in_tx([1u8; 32], [99u8; 32], &rpc).unwrap()
+            !StateProofVerifier::verify_object_consumed_in_tx([1u8; 32], [99u8; 32], &rpc).await.unwrap()
         );
     }
 
@@ -381,8 +395,8 @@ mod tests {
         assert_eq!(hash, hash2);
     }
 
-    #[test]
-    fn test_verify_event_failed_tx() {
+    #[tokio::test]
+    async fn test_verify_event_failed_tx() {
         let rpc = MockSuiRpc::new(1000);
         rpc.add_transaction(SuiTransactionBlock {
             digest: [1u8; 32],
@@ -397,6 +411,6 @@ mod tests {
         });
 
         // Failed transaction should not verify events
-        assert!(!EventProofVerifier::verify_event_in_tx([1u8; 32], &[], &rpc).unwrap());
+        assert!(!EventProofVerifier::verify_event_in_tx([1u8; 32], &[], &rpc).await.unwrap());
     }
 }

@@ -6,6 +6,7 @@
 //! Sui uses Narwhal consensus, which provides deterministic finality:
 //! once a checkpoint is certified by 2f+1 validators, it cannot be reverted.
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::config::CheckpointConfig;
@@ -34,7 +35,31 @@ impl CheckpointInfo {
     }
 }
 
+/// Trait for checkpoint verification operations
+#[async_trait]
+pub trait CheckpointVerifierTrait: Send + Sync {
+    /// Check if a checkpoint is certified.
+    async fn is_checkpoint_certified(
+        &self,
+        checkpoint_seq: u64,
+        rpc: &dyn SuiRpc,
+    ) -> SuiResult<CheckpointInfo>;
+
+    /// Check if a transaction's checkpoint is finalized.
+    async fn is_tx_finalized(&self, tx_checkpoint: u64, rpc: &dyn SuiRpc) -> SuiResult<bool>;
+
+    /// Get the latest certified checkpoint.
+    async fn latest_certified_checkpoint(&self, rpc: &dyn SuiRpc) -> SuiResult<Option<u64>>;
+
+    /// Get the current epoch from the network.
+    async fn current_epoch(&self, rpc: &dyn SuiRpc) -> SuiResult<u64>;
+
+    /// Verify that an epoch boundary has passed.
+    async fn is_epoch_passed(&self, expected_epoch: u64, rpc: &dyn SuiRpc) -> SuiResult<bool>;
+}
+
 /// Checkpoint finality verifier for Sui
+#[derive(Clone)]
 pub struct CheckpointVerifier {
     /// Configuration for checkpoint verification
     config: CheckpointConfig,
@@ -55,7 +80,10 @@ impl CheckpointVerifier {
     pub fn config(&self) -> &CheckpointConfig {
         &self.config
     }
+}
 
+#[async_trait]
+impl CheckpointVerifierTrait for CheckpointVerifier {
     /// Check if a checkpoint is certified.
     ///
     /// In Sui, a checkpoint is certified when it receives signatures from
@@ -67,7 +95,7 @@ impl CheckpointVerifier {
     ///
     /// # Returns
     /// `Ok(CheckpointInfo)` with certification details, or `Err` on failure.
-    pub fn is_checkpoint_certified(
+    async fn is_checkpoint_certified(
         &self,
         checkpoint_seq: u64,
         rpc: &dyn SuiRpc,
@@ -75,7 +103,7 @@ impl CheckpointVerifier {
         // Check timeout
         let start = std::time::Instant::now();
 
-        let cp = rpc.get_checkpoint(checkpoint_seq).map_err(|e| {
+        let cp = rpc.get_checkpoint(checkpoint_seq).await.map_err(|e| {
             if start.elapsed().as_millis() > self.config.timeout_ms as u128 {
                 SuiError::timeout(
                     &format!("checkpoint_{}", checkpoint_seq),
@@ -110,21 +138,14 @@ impl CheckpointVerifier {
     }
 
     /// Check if a transaction's checkpoint is finalized.
-    ///
-    /// # Arguments
-    /// * `tx_checkpoint` - The checkpoint sequence number containing the transaction
-    /// * `rpc` - RPC client for fetching checkpoint data
-    pub fn is_tx_finalized(&self, tx_checkpoint: u64, rpc: &dyn SuiRpc) -> SuiResult<bool> {
-        let info = self.is_checkpoint_certified(tx_checkpoint, rpc)?;
+    async fn is_tx_finalized(&self, tx_checkpoint: u64, rpc: &dyn SuiRpc) -> SuiResult<bool> {
+        let info = self.is_checkpoint_certified(tx_checkpoint, rpc).await?;
         Ok(info.is_finalized())
     }
 
     /// Get the latest certified checkpoint.
-    ///
-    /// # Arguments
-    /// * `rpc` - RPC client for fetching checkpoint data
-    pub fn latest_certified_checkpoint(&self, rpc: &dyn SuiRpc) -> SuiResult<Option<u64>> {
-        let latest = rpc.get_latest_checkpoint_sequence_number().map_err(|e| {
+    async fn latest_certified_checkpoint(&self, rpc: &dyn SuiRpc) -> SuiResult<Option<u64>> {
+        let latest = rpc.get_latest_checkpoint_sequence_number().await.map_err(|e| {
             SuiError::CheckpointFailed(format!("Failed to get latest checkpoint: {}", e))
         })?;
 
@@ -133,7 +154,7 @@ impl CheckpointVerifier {
         let start = latest.saturating_sub(max_lookback * 1000); // Approximate checkpoints per epoch
 
         for seq in (start..=latest).rev() {
-            if let Some(cp) = rpc.get_checkpoint(seq).ok().flatten() {
+            if let Some(cp) = rpc.get_checkpoint(seq).await.ok().flatten() {
                 if cp.certified {
                     return Ok(Some(seq));
                 }
@@ -143,14 +164,11 @@ impl CheckpointVerifier {
     }
 
     /// Get the current epoch from the network.
-    ///
-    /// # Arguments
-    /// * `rpc` - RPC client for fetching epoch info
-    pub fn current_epoch(&self, rpc: &dyn SuiRpc) -> SuiResult<u64> {
-        let latest = self.latest_certified_checkpoint(rpc)?;
+    async fn current_epoch(&self, rpc: &dyn SuiRpc) -> SuiResult<u64> {
+        let latest = self.latest_certified_checkpoint(rpc).await?;
         match latest {
             Some(seq) => {
-                let cp = rpc.get_checkpoint(seq).map_err(|e| {
+                let cp = rpc.get_checkpoint(seq).await.map_err(|e| {
                     SuiError::CheckpointFailed(format!("Failed to get checkpoint: {}", e))
                 })?;
                 Ok(cp.map(|c| c.epoch).unwrap_or(0))
@@ -160,12 +178,8 @@ impl CheckpointVerifier {
     }
 
     /// Verify that an epoch boundary has passed.
-    ///
-    /// # Arguments
-    /// * `expected_epoch` - The epoch we expect the network to be in
-    /// * `rpc` - RPC client for fetching current epoch
-    pub fn is_epoch_passed(&self, expected_epoch: u64, rpc: &dyn SuiRpc) -> SuiResult<bool> {
-        let current = self.current_epoch(rpc)?;
+    async fn is_epoch_passed(&self, expected_epoch: u64, rpc: &dyn SuiRpc) -> SuiResult<bool> {
+        let current = self.current_epoch(rpc).await?;
         Ok(current >= expected_epoch)
     }
 }
@@ -181,8 +195,8 @@ mod tests {
     use super::*;
     use crate::rpc::{MockSuiRpc, SuiCheckpoint};
 
-    #[test]
-    fn test_certified_checkpoint() {
+    #[tokio::test]
+    async fn test_certified_checkpoint() {
         let rpc = MockSuiRpc::new(1000);
         rpc.add_checkpoint(SuiCheckpoint {
             sequence_number: 500,
@@ -200,19 +214,19 @@ mod tests {
         });
 
         let verifier = CheckpointVerifier::new();
-        let result = verifier.is_checkpoint_certified(500, &rpc).unwrap();
+        let result = verifier.is_checkpoint_certified(500, &rpc).await.unwrap();
         assert!(result.is_certified);
         assert_eq!(result.sequence_number, 500);
         assert_eq!(result.epoch, 1);
 
-        let result = verifier.is_checkpoint_certified(501, &rpc).unwrap();
+        let result = verifier.is_checkpoint_certified(501, &rpc).await.unwrap();
         assert!(!result.is_certified);
 
-        assert!(verifier.is_checkpoint_certified(999, &rpc).is_err());
+        assert!(verifier.is_checkpoint_certified(999, &rpc).await.is_err());
     }
 
-    #[test]
-    fn test_tx_finalization() {
+    #[tokio::test]
+    async fn test_tx_finalization() {
         let rpc = MockSuiRpc::new(1000);
         rpc.add_checkpoint(SuiCheckpoint {
             sequence_number: 500,
@@ -223,12 +237,12 @@ mod tests {
         });
 
         let verifier = CheckpointVerifier::new();
-        assert!(verifier.is_tx_finalized(500, &rpc).unwrap());
-        assert!(verifier.is_tx_finalized(600, &rpc).is_err());
+        assert!(verifier.is_tx_finalized(500, &rpc).await.unwrap());
+        assert!(verifier.is_tx_finalized(600, &rpc).await.is_err());
     }
 
-    #[test]
-    fn test_latest_certified() {
+    #[tokio::test]
+    async fn test_latest_certified() {
         let rpc = MockSuiRpc::new(1000);
         rpc.add_checkpoint(SuiCheckpoint {
             sequence_number: 998,
@@ -253,7 +267,7 @@ mod tests {
         });
 
         let verifier = CheckpointVerifier::new();
-        let latest = verifier.latest_certified_checkpoint(&rpc).unwrap();
+        let latest = verifier.latest_certified_checkpoint(&rpc).await.unwrap();
         assert_eq!(latest, Some(998));
     }
 

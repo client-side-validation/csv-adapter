@@ -3,24 +3,27 @@
 //! Defines the minimal set of Ethereum JSON-RPC calls needed
 //! by the CSV adapter: storage proofs, receipts, block queries, finality.
 
+use async_trait::async_trait;
+
 #[cfg(test)]
 use std::collections::HashMap;
 #[cfg(test)]
 use std::sync::Mutex;
 
 /// Trait for Ethereum RPC operations
+#[async_trait]
 pub trait EthereumRpc: Send + Sync {
     /// Get current block number
-    fn block_number(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>>;
+    async fn block_number(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get block by number (returns block hash)
-    fn get_block_hash(
+    async fn get_block_hash(
         &self,
         block_number: u64,
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get storage proof for a contract's storage slot
-    fn get_proof(
+    async fn get_proof(
         &self,
         address: [u8; 20],
         keys: Vec<[u8; 32]>,
@@ -28,42 +31,42 @@ pub trait EthereumRpc: Send + Sync {
     ) -> Result<StorageProof, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get transaction receipt
-    fn get_transaction_receipt(
+    async fn get_transaction_receipt(
         &self,
         tx_hash: [u8; 32],
     ) -> Result<Option<TransactionReceipt>, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get block by hash (returns state root)
-    fn get_block_state_root(
+    async fn get_block_state_root(
         &self,
         block_hash: [u8; 32],
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get finalized block number (post-merge)
-    fn get_finalized_block_number(
+    async fn get_finalized_block_number(
         &self,
     ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Send raw transaction
-    fn send_raw_transaction(
+    async fn send_raw_transaction(
         &self,
         tx_bytes: Vec<u8>,
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get account balance
-    fn get_balance(
+    async fn get_balance(
         &self,
         address: [u8; 20],
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get transaction count (nonce) for an address
-    fn get_transaction_count(
+    async fn get_transaction_count(
         &self,
         address: [u8; 20],
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get code at an address
-    fn get_code(
+    async fn get_code(
         &self,
         address: [u8; 20],
     ) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>>;
@@ -78,16 +81,16 @@ pub trait EthereumRpc: Send + Sync {
     fn clone_boxed(&self) -> Box<dyn EthereumRpc>;
 
     /// Get current gas price
-    fn get_gas_price(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>>;
+    async fn get_gas_price(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get block by number (returns full block info)
-    fn get_block_by_number(
+    async fn get_block_by_number(
         &self,
         block_number: u64,
     ) -> Result<Option<RpcBlock>, Box<dyn std::error::Error + Send + Sync>>;
 
     /// Get transaction by hash
-    fn get_transaction(
+    async fn get_transaction(
         &self,
         tx_hash: [u8; 32],
     ) -> Result<Option<RpcTransaction>, Box<dyn std::error::Error + Send + Sync>>;
@@ -263,12 +266,13 @@ impl MockEthereumRpc {
 }
 
 #[cfg(test)]
+#[async_trait]
 impl EthereumRpc for MockEthereumRpc {
-    fn block_number(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+    async fn block_number(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
         Ok(self.block_number)
     }
 
-    fn get_block_hash(
+    async fn get_block_hash(
         &self,
         block_number: u64,
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
@@ -277,7 +281,7 @@ impl EthereumRpc for MockEthereumRpc {
         Ok(hash)
     }
 
-    fn get_proof(
+    async fn get_proof(
         &self,
         address: [u8; 20],
         keys: Vec<[u8; 32]>,
@@ -311,7 +315,7 @@ impl EthereumRpc for MockEthereumRpc {
         })
     }
 
-    fn get_transaction_receipt(
+    async fn get_transaction_receipt(
         &self,
         tx_hash: [u8; 32],
     ) -> Result<Option<TransactionReceipt>, Box<dyn std::error::Error + Send + Sync>> {
@@ -319,7 +323,7 @@ impl EthereumRpc for MockEthereumRpc {
         Ok(receipts.get(&tx_hash).cloned())
     }
 
-    fn get_block_state_root(
+    async fn get_block_state_root(
         &self,
         block_hash: [u8; 32],
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
@@ -334,13 +338,13 @@ impl EthereumRpc for MockEthereumRpc {
         )
     }
 
-    fn get_finalized_block_number(
+    async fn get_finalized_block_number(
         &self,
     ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
         Ok(self.finalized_block)
     }
 
-    fn send_raw_transaction(
+    async fn send_raw_transaction(
         &self,
         tx_bytes: Vec<u8>,
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
@@ -348,21 +352,21 @@ impl EthereumRpc for MockEthereumRpc {
         Ok([0xAB; 32])
     }
 
-    fn get_balance(
+    async fn get_balance(
         &self,
         _address: [u8; 20],
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
         Ok(1000000000000000000u64) // Mock 1 ETH balance
     }
 
-    fn get_transaction_count(
+    async fn get_transaction_count(
         &self,
         _address: [u8; 20],
     ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
         Ok(0u64) // Mock nonce
     }
 
-    fn get_code(
+    async fn get_code(
         &self,
         _address: [u8; 20],
     ) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
@@ -387,18 +391,18 @@ impl EthereumRpc for MockEthereumRpc {
         })
     }
 
-    fn get_gas_price(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+    async fn get_gas_price(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
         Ok(self.gas_price)
     }
 
-    fn get_block_by_number(
+    async fn get_block_by_number(
         &self,
         block_number: u64,
     ) -> Result<Option<RpcBlock>, Box<dyn std::error::Error + Send + Sync>> {
         Ok(self.blocks.lock().unwrap().get(&block_number).cloned())
     }
 
-    fn get_transaction(
+    async fn get_transaction(
         &self,
         tx_hash: [u8; 32],
     ) -> Result<Option<RpcTransaction>, Box<dyn std::error::Error + Send + Sync>> {
@@ -410,14 +414,14 @@ impl EthereumRpc for MockEthereumRpc {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_ethereum_rpc_block_number() {
+    #[tokio::test]
+    async fn test_ethereum_rpc_block_number() {
         let rpc = MockEthereumRpc::new(1000);
-        assert_eq!(rpc.block_number().unwrap(), 1000);
+        assert_eq!(rpc.block_number().await.unwrap(), 1000);
     }
 
-    #[test]
-    fn test_ethereum_rpc_storage() {
+    #[tokio::test]
+    async fn test_ethereum_rpc_storage() {
         let rpc = MockEthereumRpc::new(1000);
         let address = [1u8; 20];
         let key = [2u8; 32];
@@ -425,13 +429,13 @@ mod tests {
 
         rpc.set_storage(address, key, value.clone());
 
-        let proof = rpc.get_proof(address, vec![key], 1000).unwrap();
+        let proof = rpc.get_proof(address, vec![key], 1000).await.unwrap();
         assert_eq!(proof.storage_proof.len(), 1);
         assert_eq!(proof.storage_proof[0].value, value);
     }
 
-    #[test]
-    fn test_ethereum_rpc_receipt() {
+    #[tokio::test]
+    async fn test_ethereum_rpc_receipt() {
         let rpc = MockEthereumRpc::new(1000);
         let tx_hash = [3u8; 32];
         let receipt = TransactionReceipt {
@@ -450,23 +454,23 @@ mod tests {
 
         rpc.add_receipt(tx_hash, receipt.clone());
 
-        let fetched = rpc.get_transaction_receipt(tx_hash).unwrap();
+        let fetched = rpc.get_transaction_receipt(tx_hash).await.unwrap();
         assert_eq!(fetched.logs.len(), 1);
         assert_eq!(fetched.status, 1);
     }
 
-    #[test]
-    fn test_ethereum_rpc_finalized() {
+    #[tokio::test]
+    async fn test_ethereum_rpc_finalized() {
         let rpc = MockEthereumRpc::new(1000);
-        let finalized = rpc.get_finalized_block_number().unwrap();
+        let finalized = rpc.get_finalized_block_number().await.unwrap();
         assert!(finalized.is_some());
         assert!(finalized.unwrap() <= 1000);
     }
 
-    #[test]
-    fn test_ethereum_rpc_send_transaction() {
+    #[tokio::test]
+    async fn test_ethereum_rpc_send_transaction() {
         let rpc = MockEthereumRpc::new(1000);
-        let tx_hash = rpc.send_raw_transaction(vec![0x01, 0x02]).unwrap();
+        let tx_hash = rpc.send_raw_transaction(vec![0x01, 0x02]).await.unwrap();
         assert_eq!(tx_hash, [0xAB; 32]);
     }
 }

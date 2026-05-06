@@ -55,10 +55,11 @@ impl RpcClient for SuiRpcClient {
         let signature = signed_tx[4 + tx_len..4 + tx_len + 64].to_vec();
         let public_key = signed_tx[4 + tx_len + 64..4 + tx_len + 64 + 32].to_vec();
 
-        // Submit via execute_signed_transaction
+       // Submit via execute_signed_transaction
         let digest = self
             .inner
             .execute_signed_transaction(tx_bytes, signature, public_key)
+            .await
             .map_err(|e| ChainError::RpcError(format!("Transaction submission failed: {}", e)))?;
 
         Ok(format!("0x{}", hex::encode(digest)))
@@ -69,13 +70,14 @@ impl RpcClient for SuiRpcClient {
         let digest_bytes = hex::decode(hash.trim_start_matches("0x"))
             .map_err(|e| ChainError::InvalidInput(format!("Invalid digest: {}", e)))?;
 
-        let _tx = self
+       let _tx = self
             .inner
             .get_transaction_block(
                 digest_bytes
                     .try_into()
                     .map_err(|_| ChainError::InvalidInput("Invalid digest length".to_string()))?,
             )
+            .await
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))?;
 
         // SuiTransactionBlock doesn't implement Serialize, so we just return the digest
@@ -89,6 +91,7 @@ impl RpcClient for SuiRpcClient {
         let checkpoint_seq = self
             .inner
             .get_latest_checkpoint_sequence_number()
+            .await
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))?;
 
         Ok(checkpoint_seq)
@@ -181,10 +184,11 @@ impl RpcClient for SuiRpcClient {
     }
 
 
-    async fn get_chain_info(&self) -> ChainResult<serde_json::Value> {
+   async fn get_chain_info(&self) -> ChainResult<serde_json::Value> {
         let checkpoint_seq = self
             .inner
             .get_latest_checkpoint_sequence_number()
+            .await
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))?;
 
         Ok(serde_json::json!({
@@ -199,9 +203,10 @@ impl RpcClient for SuiRpcClient {
         let digest: [u8; 32] = digest_bytes.try_into()
             .map_err(|_| ChainError::InvalidInput("Digest must be 32 bytes".to_string()))?;
 
-        let tx = self
+       let tx = self
             .inner
             .get_transaction_block(digest)
+            .await
             .map_err(|e| ChainError::RpcError(format!("Transaction query failed: {}", e)))?;
 
         Ok(tx.is_some())

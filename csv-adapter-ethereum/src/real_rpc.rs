@@ -5,17 +5,15 @@
 
 #[cfg(feature = "rpc")]
 mod real_rpc_impl {
-    use std::sync::Arc;
-
     use alloy::{
         consensus::TxEnvelope,
         eips::eip2718::Encodable2718,
         primitives::{keccak256, Address, TxKind, U256},
         signers::local::PrivateKeySigner,
     };
+    use async_trait::async_trait;
     use csv_adapter_store::SqliteSealStore;
     use serde_json::json;
-    use tokio::runtime::Runtime;
 
     use crate::rpc::{EthereumRpc, LogEntry, RpcBlock, RpcTransaction, SingleStorageProof, StorageProof, TransactionReceipt};
     use crate::seal_contract::CsvSealAbi;
@@ -26,37 +24,27 @@ mod real_rpc_impl {
     pub enum AlloyRpcError {
         #[error("RPC error: {0}")]
         Rpc(String),
-        #[error("Tokio runtime error: {0}")]
-        Runtime(#[from] std::io::Error),
         #[error("Invalid RPC URL: {0}")]
         InvalidUrl(String),
     }
 
     /// Real Ethereum RPC client backed by Alloy's HTTP transport
     pub struct RealEthereumRpc {
-        client: reqwest::blocking::Client,
+        client: reqwest::Client,
         rpc_url: String,
         csv_seal_address: Address,
         signer: Option<PrivateKeySigner>,
         chain_id: Option<u64>,
         seal_store: Option<SqliteSealStore>,
-        runtime: Arc<Runtime>,
     }
 
     impl RealEthereumRpc {
         /// Create a new RPC client connecting to the given URL
-        pub fn new(rpc_url: &str, csv_seal_address: [u8; 20]) -> Result<Self, AlloyRpcError> {
-            let runtime = Arc::new(
-                tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .map_err(std::io::Error::other)?,
-            );
-
-            let client = reqwest::blocking::Client::new();
+        pub async fn new(rpc_url: &str, csv_seal_address: [u8; 20]) -> Result<Self, AlloyRpcError> {
+            let client = reqwest::Client::new();
 
             // Try to get chain_id
-            let chain_id = Self::get_chain_id_impl(&client, rpc_url)?;
+            let chain_id = Self::get_chain_id_impl(&client, rpc_url).await?;
 
             Ok(Self {
                 client,
@@ -65,12 +53,11 @@ mod real_rpc_impl {
                 signer: None,
                 chain_id: Some(chain_id),
                 seal_store: None,
-                runtime,
             })
         }
 
-        fn get_chain_id_impl(
-            client: &reqwest::blocking::Client,
+        async fn get_chain_id_impl(
+            client: &reqwest::Client,
             rpc_url: &str,
         ) -> Result<u64, AlloyRpcError> {
             let req = json!({
@@ -84,10 +71,12 @@ mod real_rpc_impl {
                 .post(rpc_url)
                 .json(&req)
                 .send()
+                .await
                 .map_err(|e| AlloyRpcError::Rpc(e.to_string()))?;
 
             let body: serde_json::Value = response
-                .json()
+                .json::<serde_json::Value>()
+                .await
                 .map_err(|e| AlloyRpcError::Rpc(e.to_string()))?;
 
             let hex_str = body
@@ -129,7 +118,7 @@ mod real_rpc_impl {
         }
 
         /// Make a JSON-RPC call to the Ethereum node
-        fn rpc_call(
+        async fn rpc_call(
             &self,
             method: &str,
             params: serde_json::Value,
@@ -146,11 +135,13 @@ mod real_rpc_impl {
                 .post(&self.rpc_url)
                 .json(&req)
                 .send()
+                .await
                 .map_err(|e| AlloyRpcError::Rpc(e.to_string()))?;
 
             let status = response.status();
             let body: serde_json::Value = response
-                .json()
+                .json::<serde_json::Value>()
+                .await
                 .map_err(|e| AlloyRpcError::Rpc(e.to_string()))?;
 
             if !status.is_success() {
@@ -169,56 +160,57 @@ mod real_rpc_impl {
                 .ok_or_else(|| AlloyRpcError::Rpc("Missing result in RPC response".to_string()))
         }
 
-        fn block_number_raw(&self) -> Result<u64, AlloyRpcError> {
+        async fn block_number_raw(&self) -> Result<u64, AlloyRpcError> {
             let hex_str = self
-                .rpc_call("eth_blockNumber", json!([]))?
+                .rpc_call("eth_blockNumber", json!([]))
+                .await?
                 .as_str()
                 .ok_or_else(|| AlloyRpcError::Rpc("Invalid block number response".to_string()))?
                 .to_string();
             parse_hex_u64(&hex_str)
         }
 
-        fn get_block_by_tag(&self, tag: &str) -> Result<Option<serde_json::Value>, AlloyRpcError> {
-            let result = self.rpc_call("eth_getBlockByNumber", json!([tag, false]))?;
+        async fn get_block_by_tag(&self, tag: &str) -> Result<Option<serde_json::Value>, AlloyRpcError> {
+            let result = self.rpc_call("eth_getBlockByNumber", json!([tag, false])).await?;
             if result.is_null() {
                 return Ok(None);
             }
             Ok(Some(result))
         }
 
-        fn get_block_by_hash_raw(
+        async fn get_block_by_hash_raw(
             &self,
             hash: &str,
         ) -> Result<Option<serde_json::Value>, AlloyRpcError> {
-            let result = self.rpc_call("eth_getBlockByHash", json!([hash, false]))?;
+            let result = self.rpc_call("eth_getBlockByHash", json!([hash, false])).await?;
             if result.is_null() {
                 return Ok(None);
             }
             Ok(Some(result))
         }
 
-        fn get_proof_raw(
+        async fn get_proof_raw(
             &self,
             address: &str,
             keys: Vec<&str>,
             block_tag: &str,
         ) -> Result<serde_json::Value, AlloyRpcError> {
-            self.rpc_call("eth_getProof", json!([address, keys, block_tag]))
+            self.rpc_call("eth_getProof", json!([address, keys, block_tag])).await
         }
 
-        fn get_tx_receipt_raw(
+        async fn get_tx_receipt_raw(
             &self,
             tx_hash: &str,
         ) -> Result<Option<serde_json::Value>, AlloyRpcError> {
-            let result = self.rpc_call("eth_getTransactionReceipt", json!([tx_hash]))?;
+            let result = self.rpc_call("eth_getTransactionReceipt", json!([tx_hash])).await?;
             if result.is_null() {
                 return Ok(None);
             }
             Ok(Some(result))
         }
 
-        fn send_raw_tx_raw(&self, tx_data: &str) -> Result<String, AlloyRpcError> {
-            let val = self.rpc_call("eth_sendRawTransaction", json!([tx_data]))?;
+        async fn send_raw_tx_raw(&self, tx_data: &str) -> Result<String, AlloyRpcError> {
+            let val = self.rpc_call("eth_sendRawTransaction", json!([tx_data])).await?;
             val.as_str()
                 .ok_or_else(|| AlloyRpcError::Rpc("Invalid tx hash response".to_string()))
                 .map(|s| s.to_string())
@@ -258,25 +250,27 @@ mod real_rpc_impl {
         arr
     }
 
+    #[async_trait]
     impl EthereumRpc for RealEthereumRpc {
-        fn block_number(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-            self.block_number_raw().map_err(|e| e.into())
+        async fn block_number(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+            self.block_number_raw().await.map_err(|e| e.into())
         }
 
-        fn get_block_hash(
+        async fn get_block_hash(
             &self,
             block_number: u64,
         ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
             let tag = format!("0x{:x}", block_number);
             let block = self
-                .get_block_by_tag(&tag)?
+                .get_block_by_tag(&tag)
+                .await?
                 .ok_or_else(|| format!("Block {} not found", block_number))?;
 
             let hash_str = block["hash"].as_str().ok_or("Missing block hash")?;
             Ok(parse_hex_bytes32(hash_str))
         }
 
-        fn get_proof(
+        async fn get_proof(
             &self,
             address: [u8; 20],
             keys: Vec<[u8; 32]>,
@@ -293,7 +287,7 @@ mod real_rpc_impl {
                 &addr_hex,
                 keys_hex.iter().map(|s| s.as_str()).collect(),
                 &block_tag,
-            )?;
+            ).await?;
 
             let account_proof: Vec<Vec<u8>> = proof["accountProof"]
                 .as_array()
@@ -342,12 +336,12 @@ mod real_rpc_impl {
             })
         }
 
-        fn get_transaction_receipt(
+        async fn get_transaction_receipt(
             &self,
             tx_hash: [u8; 32],
         ) -> Result<Option<TransactionReceipt>, Box<dyn std::error::Error + Send + Sync>> {
             let hash_hex = format!("0x{}", hex::encode(tx_hash));
-            let receipt = match self.get_tx_receipt_raw(&hash_hex)? {
+            let receipt = match self.get_tx_receipt_raw(&hash_hex).await? {
                 Some(r) => r,
                 None => return Ok(None),
             };
@@ -432,22 +426,21 @@ mod real_rpc_impl {
                 signer: self.signer.clone(),
                 chain_id: self.chain_id,
                 seal_store: None, // SqliteSealStore doesn't implement Clone
-                runtime: Arc::clone(&self.runtime),
             })
         }
 
-        fn get_gas_price(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-            let result = self.rpc_call("eth_gasPrice", json!([]))?;
+        async fn get_gas_price(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+            let result = self.rpc_call("eth_gasPrice", json!([])).await?;
             let hex_str = result.as_str().ok_or("Invalid gas price response")?;
             parse_hex_u64(hex_str).map_err(|e| e.into())
         }
 
-        fn get_block_by_number(
+        async fn get_block_by_number(
             &self,
             block_number: u64,
         ) -> Result<Option<RpcBlock>, Box<dyn std::error::Error + Send + Sync>> {
             let tag = format!("0x{:x}", block_number);
-            let result = self.rpc_call("eth_getBlockByNumber", json!([tag, false]))?;
+            let result = self.rpc_call("eth_getBlockByNumber", json!([tag, false])).await?;
             if result.is_null() {
                 return Ok(None);
             }
@@ -459,23 +452,23 @@ mod real_rpc_impl {
             }))
         }
 
-        fn get_transaction(
+        async fn get_transaction(
             &self,
             tx_hash: [u8; 32],
         ) -> Result<Option<RpcTransaction>, Box<dyn std::error::Error + Send + Sync>> {
             let hash_hex = format!("0x{}", hex::encode(tx_hash));
-            let result = self.rpc_call("eth_getTransactionByHash", json!([hash_hex]))?;
+            let result = self.rpc_call("eth_getTransactionByHash", json!([hash_hex])).await?;
             if result.is_null() {
                 return Ok(None);
             }
-            
+
             let from = parse_hex_bytes20(result["from"].as_str().unwrap_or("0x0"));
             let to = result["to"].as_str().filter(|s| !s.is_empty() && *s != "null").map(parse_hex_bytes20);
             let value = result["value"].as_str().and_then(|s| parse_hex_u64(s).ok());
             let gas_price = result["gasPrice"].as_str().and_then(|s| parse_hex_u64(s).ok());
             let gas = parse_hex_u64(result["gas"].as_str().unwrap_or("0x0")).unwrap_or(0);
             let block_number = result["blockNumber"].as_str().and_then(|s| parse_hex_u64(s).ok());
-            
+
             Ok(Some(RpcTransaction {
                 hash: tx_hash,
                 from,
@@ -487,13 +480,14 @@ mod real_rpc_impl {
             }))
         }
 
-        fn get_block_state_root(
+        async fn get_block_state_root(
             &self,
             block_hash: [u8; 32],
         ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
             let hash_hex = format!("0x{}", hex::encode(block_hash));
             let block = self
-                .get_block_by_hash_raw(&hash_hex)?
+                .get_block_by_hash_raw(&hash_hex)
+                .await?
                 .ok_or_else(|| format!("Block {:?} not found", block_hash))?;
 
             Ok(parse_hex_bytes32(
@@ -501,10 +495,10 @@ mod real_rpc_impl {
             ))
         }
 
-        fn get_finalized_block_number(
+        async fn get_finalized_block_number(
             &self,
         ) -> Result<Option<u64>, Box<dyn std::error::Error + Send + Sync>> {
-            let block = self.get_block_by_tag("finalized")?;
+            let block = self.get_block_by_tag("finalized").await?;
             match block {
                 Some(b) => {
                     let num = b["number"]
@@ -517,32 +511,32 @@ mod real_rpc_impl {
             }
         }
 
-        fn send_raw_transaction(
+        async fn send_raw_transaction(
             &self,
             tx_bytes: Vec<u8>,
         ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
             let tx_hex = format!("0x{}", hex::encode(&tx_bytes));
-            let hash_str = self.send_raw_tx_raw(&tx_hex)?;
+            let hash_str = self.send_raw_tx_raw(&tx_hex).await?;
             Ok(parse_hex_bytes32(&hash_str))
         }
 
-        fn get_balance(
+        async fn get_balance(
             &self,
             address: [u8; 20],
         ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
             let addr_hex = format!("0x{}", hex::encode(address));
-            let result = self.rpc_call("eth_getBalance", json!([addr_hex, "latest"]))?;
+            let result = self.rpc_call("eth_getBalance", json!([addr_hex, "latest"])).await?;
             let hex_str = result.as_str().ok_or("Invalid balance response")?;
             let balance = parse_hex_u64(hex_str)?;
             Ok(balance)
         }
 
-        fn get_transaction_count(
+        async fn get_transaction_count(
             &self,
             address: [u8; 20],
         ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
             let addr_hex = format!("0x{}", hex::encode(address));
-            let result = self.rpc_call("eth_getTransactionCount", json!([addr_hex, "latest"]))?;
+            let result = self.rpc_call("eth_getTransactionCount", json!([addr_hex, "latest"])).await?;
             let hex_str = result
                 .as_str()
                 .ok_or("Invalid transaction count response")?;
@@ -550,12 +544,12 @@ mod real_rpc_impl {
             Ok(count)
         }
 
-        fn get_code(
+        async fn get_code(
             &self,
             address: [u8; 20],
         ) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
             let addr_hex = format!("0x{}", hex::encode(address));
-            let result = self.rpc_call("eth_getCode", json!([addr_hex, "latest"]))?;
+            let result = self.rpc_call("eth_getCode", json!([addr_hex, "latest"])).await?;
             let hex_str = result.as_str().ok_or("Invalid code response")?;
             Ok(parse_hex_bytes(hex_str))
         }
@@ -566,7 +560,7 @@ mod real_rpc_impl {
     }
 
     /// Publishes a seal consumption transaction: builds calldata -> signs -> broadcasts -> returns tx hash.
-    pub fn publish(
+    pub async fn publish(
         rpc: &RealEthereumRpc,
         seal: &EthereumSealRef,
         commitment: [u8; 32],
@@ -583,13 +577,13 @@ mod real_rpc_impl {
 
         // Step 2: Get current nonce
         let signer_addr = format!("0x{}", hex::encode(signer.address()));
-        let nonce_str = rpc.rpc_call("eth_getTransactionCount", json!([signer_addr, "latest"]))?;
+        let nonce_str = rpc.rpc_call("eth_getTransactionCount", json!([signer_addr, "latest"])).await?;
         let nonce_str = nonce_str.as_str().ok_or("Invalid nonce response")?;
         let nonce = u64::from_str_radix(nonce_str.trim_start_matches("0x"), 16)
             .map_err(|e| format!("Failed to parse nonce: {}", e))?;
 
         // Step 3: Get gas prices
-        let gas_prices = rpc.rpc_call("eth_gasPrice", json!([]))?;
+        let gas_prices = rpc.rpc_call("eth_gasPrice", json!([])).await?;
         let max_fee_str = gas_prices.as_str().ok_or("Invalid gas price response")?;
         let base_fee = u128::from_str_radix(max_fee_str.trim_start_matches("0x"), 16)
             .map_err(|e| format!("Failed to parse gas price: {}", e))?;
@@ -634,6 +628,7 @@ mod real_rpc_impl {
         // Step 5: Broadcast
         let tx_hex = format!("0x{}", hex::encode(&tx_bytes));
         rpc.send_raw_tx_raw(&tx_hex)
+            .await
             .map(|h| {
                 let bytes = hex::decode(h.trim_start_matches("0x")).unwrap_or_default();
                 let mut arr = [0u8; 32];
@@ -645,13 +640,13 @@ mod real_rpc_impl {
 
     /// Legacy: Build and send a raw transaction that calls `markSealUsed` on the CSVSeal contract.
     /// Expects pre-signed transaction bytes. For signing + sending, use `publish()`.
-    pub fn publish_seal_consumption(
-        rpc: &impl EthereumRpc,
+    pub async fn publish_seal_consumption(
+        rpc: &dyn EthereumRpc,
         seal: &EthereumSealRef,
         commitment: [u8; 32],
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
         let calldata = CsvSealAbi::encode_mark_seal_used(seal.seal_id, commitment);
-        rpc.send_raw_transaction(calldata)
+        rpc.send_raw_transaction(calldata).await
     }
 
     /// Verify that a transaction receipt contains a valid `SealUsed` event.

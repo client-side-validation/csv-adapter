@@ -82,6 +82,7 @@ impl RpcClient for AptosRpcClient {
             let tx = self
                 .inner
                 .get_transaction(version)
+                .await
                 .map_err(|e| ChainError::RpcError(e.to_string()))?;
 
             if let Some(tx) = tx {
@@ -104,6 +105,7 @@ impl RpcClient for AptosRpcClient {
         let ledger = self
             .inner
             .get_ledger_info()
+            .await
             .map_err(|e| ChainError::RpcError(e.to_string()))?;
 
         Ok(ledger.ledger_version)
@@ -119,6 +121,7 @@ impl RpcClient for AptosRpcClient {
         let resource = self
             .inner
             .get_resource(addr, resource_type, None)
+            .await
             .map_err(|e| ChainError::RpcError(e.to_string()))?;
 
         // Extract balance from resource data
@@ -146,6 +149,7 @@ impl RpcClient for AptosRpcClient {
         let ledger = self
             .inner
             .get_ledger_info()
+            .await
             .map_err(|e| ChainError::RpcError(e.to_string()))?;
 
         Ok(serde_json::json!({
@@ -226,7 +230,8 @@ impl Wallet for AptosWallet {
 
     fn generate_address(&self) -> ChainResult<String> {
         // Generate new Ed25519 keypair
-        let signing_key = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+        let mut csprng = rand_core::OsRng;
+        let signing_key = ed25519_dalek::SigningKey::generate(&mut csprng);
         let verifying_key = signing_key.verifying_key();
 
         // Aptos address is the last 32 bytes of SHA3-256(pubkey) with 0x prefix
@@ -358,6 +363,7 @@ impl ChainAdapter for AptosAnchorLayer {
         let sender = self
             .rpc
             .sender_address()
+            .await
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))?;
 
         let address = format!("0x{}", hex::encode(sender));

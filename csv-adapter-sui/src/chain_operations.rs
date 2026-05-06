@@ -26,6 +26,30 @@ use crate::error::SuiError;
 use crate::proofs::CommitmentEventBuilder;
 use crate::rpc::{SuiRpc, SuiTransactionBlock};
 
+/// Block on an async future in a sync context.
+fn block_on_async<F: std::future::Future<Output = R> + Send + 'static, R: Send + 'static>(
+    future: F,
+) -> ChainOpResult<R> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| ChainOpError::RpcError(format!("Failed to create runtime: {}", e)))?;
+    Ok(rt.block_on(future))
+}
+
+/// Block on an async future that returns Result<T, E> in a sync context.
+fn block_on_async_result<F, T, E>(future: F) -> ChainOpResult<T>
+where
+    F: std::future::Future<Output = Result<T, E>> + Send + 'static,
+    E: std::fmt::Display + Send + 'static,
+{
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| ChainOpError::RpcError(format!("Failed to create runtime: {}", e)))?;
+    rt.block_on(future).map_err(|e| ChainOpError::RpcError(e.to_string()))
+}
+
 /// Sui chain operations implementation
 ///
 /// This struct provides complete implementations of all chain operation traits
@@ -137,6 +161,7 @@ impl ChainQuery for SuiChainOperations {
         let objects = self
             .rpc()
             .get_gas_objects(addr)
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get gas objects: {}", e)))?;
 
         let mut total_balance = 0u64;
@@ -178,6 +203,7 @@ impl ChainQuery for SuiChainOperations {
         let tx = self
             .rpc()
             .get_transaction_block(digest)
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get transaction: {}", e)))?
             .ok_or_else(|| ChainOpError::RpcError("Transaction not found".to_string()))?;
 
@@ -194,6 +220,7 @@ impl ChainQuery for SuiChainOperations {
                 let latest_checkpoint = self
                     .rpc()
                     .get_latest_checkpoint_sequence_number()
+                    .await
                     .map_err(|e| ChainOpError::RpcError(format!("Failed to get checkpoint: {}", e)))?;
 
                 let finality_depth = latest_checkpoint.saturating_sub(block_height);
@@ -218,7 +245,7 @@ impl ChainQuery for SuiChainOperations {
         let package_id = self.parse_address(contract_address)?;
 
         // Try to get the package object
-        let result = self.rpc().get_object(package_id);
+        let result = self.rpc().get_object(package_id).await;
 
         let is_deployed = match result {
             Ok(Some(obj)) => !obj.object_type.is_empty(),
@@ -240,6 +267,7 @@ impl ChainQuery for SuiChainOperations {
     async fn get_latest_block_height(&self) -> ChainOpResult<u64> {
         self.rpc()
             .get_latest_checkpoint_sequence_number()
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get checkpoint: {}", e)))
     }
 
@@ -248,6 +276,7 @@ impl ChainQuery for SuiChainOperations {
         let ledger = self
             .rpc()
             .get_ledger_info()
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger info: {}", e)))?;
 
         Ok(serde_json::json!({
@@ -387,6 +416,7 @@ impl ChainBroadcaster for SuiChainOperations {
         let digest = self
             .rpc()
             .execute_signed_transaction(tx_bytes, signature, public_key)
+            .await
             .map_err(|e| ChainOpError::TransactionError(format!("Submission failed: {}", e)))?;
 
         Ok(format!("0x{}", hex::encode(digest)))
@@ -423,7 +453,7 @@ impl ChainBroadcaster for SuiChainOperations {
                 ));
             }
 
-            match self.rpc().wait_for_transaction(digest, 5000) {
+            match self.rpc().wait_for_transaction(digest, 5000).await {
                 Ok(Some(tx)) => {
                     return Ok(match tx.effects.status {
                         crate::rpc::SuiExecutionStatus::Success => TransactionStatus::Confirmed {
@@ -437,7 +467,7 @@ impl ChainBroadcaster for SuiChainOperations {
                 }
                 Ok(None) => {
                     // Transaction not found yet, wait and retry
-                    std::thread::sleep(poll_interval);
+                    tokio::time::sleep(poll_interval).await;
                 }
                 Err(e) => {
                     return Err(ChainOpError::RpcError(format!(
@@ -536,7 +566,7 @@ impl ChainDeployer for SuiChainOperations {
         program_bytes: &[u8],
         _admin_address: &str,
     ) -> ChainOpResult<DeploymentStatus> {
-        // Use the SDK-based deployer for Move package publishing
+         // Use the SDK-based deployer for Move package publishing
         let deployer = PackageDeployer::new(
             self.config.clone(),
             self.rpc.clone_boxed(),
@@ -596,6 +626,7 @@ impl ChainProofProvider for SuiChainOperations {
         let checkpoint = self
             .rpc()
             .get_checkpoint(block_height)
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get checkpoint: {}", e)))?
             .ok_or_else(|| ChainOpError::RpcError("Checkpoint not found".to_string()))?;
 
@@ -638,9 +669,18 @@ impl ChainProofProvider for SuiChainOperations {
         let mut digest = [0u8; 32];
         digest.copy_from_slice(&digest_bytes);
 
-        // Verify checkpoint exists
-        match self.rpc().get_checkpoint(proof.position) {
-            Ok(Some(cp)) => Ok(cp.digest == digest),
+          // Verify checkpoint exists
+        let rpc = self.rpc.clone_boxed();
+        let position = proof.position;
+        let result = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            rt.block_on(rpc.get_checkpoint(position))
+        }).join();
+        match result {
+            Ok(Ok(Some(cp))) => Ok(cp.digest == digest),
             _ => Ok(false),
         }
     }
@@ -655,6 +695,7 @@ impl ChainProofProvider for SuiChainOperations {
                 let checkpoint = self
                     .rpc()
                     .get_checkpoint(finality_block)
+                    .await
                     .map_err(|e| ChainOpError::RpcError(format!("Failed to get checkpoint: {}", e)))?
                     .ok_or_else(|| ChainOpError::RpcError("Checkpoint not found".to_string()))?;
 
@@ -698,11 +739,19 @@ impl ChainProofProvider for SuiChainOperations {
             return Ok(false);
         }
 
-        // Verify checkpoint is old enough for finality
-        let latest = self
-            .rpc()
-            .get_latest_checkpoint_sequence_number()
-            .map_err(|e| ChainOpError::RpcError(format!("Failed to get latest checkpoint: {}", e)))?;
+           // Verify checkpoint is old enough for finality
+        let rpc = self.rpc.clone_boxed();
+        let result = std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            rt.block_on(rpc.get_latest_checkpoint_sequence_number())
+        }).join();
+        let latest = match result {
+            Ok(v) => v.map_err(|e| ChainOpError::RpcError(format!("Failed to get latest checkpoint: {}", e)))?,
+            Err(e) => return Err(ChainOpError::RpcError(format!("Blocking task failed: {:?}", e))),
+        };
 
         let depth = latest.saturating_sub(checkpoint.sequence_number);
         Ok(depth >= 1) // At least 1 checkpoint deep
@@ -871,7 +920,7 @@ impl ChainRightOps for SuiChainOperations {
         // RightId should map to an object ID
         let object_id = right_id.0.as_bytes();
 
-        let object_info = match self.rpc().get_object(*object_id) {
+        let object_info = match self.rpc().get_object(*object_id).await {
             Ok(Some(obj)) => Some(obj),
             Ok(None) => None,
             Err(e) => return Err(ChainOpError::RpcError(format!(
@@ -969,7 +1018,8 @@ mod tests {
         let config = SuiConfig::new(SuiNetwork::Testnet);
         let ops = SuiChainOperations::new(rpc, config);
 
-        // Generate a keypair
+          // Generate a keypair
+        use ed25519_dalek::{SigningKey, Signer};
         let signing_key = SigningKey::generate(&mut rand::rngs::OsRng);
         let verifying_key = signing_key.verifying_key();
 

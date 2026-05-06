@@ -41,7 +41,6 @@ impl RpcClient for SolanaRpcClient {
         let signature = self
             .inner
             .send_transaction(&tx)
-            .await
             .map_err(|e| ChainError::RpcError(e.to_string()))?;
 
         Ok(signature.to_string())
@@ -54,7 +53,6 @@ impl RpcClient for SolanaRpcClient {
         let tx_data = self
             .inner
             .get_transaction(&signature)
-            .await
             .map_err(|e| ChainError::RpcError(e.to_string()))?;
 
         Ok(serde_json::json!({
@@ -66,7 +64,6 @@ impl RpcClient for SolanaRpcClient {
     async fn get_latest_block(&self) -> ChainResult<u64> {
         self.inner
             .get_latest_slot()
-            .await
             .map_err(|e| ChainError::RpcError(e.to_string()))
     }
 
@@ -77,7 +74,6 @@ impl RpcClient for SolanaRpcClient {
         let account = self
             .inner
             .get_account(&pubkey)
-            .await
             .map_err(|e| ChainError::RpcError(e.to_string()))?;
 
         Ok(account.lamports)
@@ -90,7 +86,6 @@ impl RpcClient for SolanaRpcClient {
         let status = self
             .inner
             .wait_for_confirmation(&signature)
-            .await
             .map_err(|e| ChainError::RpcError(e.to_string()))?;
 
         Ok(matches!(

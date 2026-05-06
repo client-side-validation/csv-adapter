@@ -1,4 +1,7 @@
 //! RPC client for Solana adapter
+//!
+//! All methods are synchronous, matching the pattern used by other chain adapters.
+//! The underlying `solana-rpc-client` provides sync HTTP methods.
 
 use solana_sdk::{
     account::Account, pubkey::Pubkey, signature::Signature, transaction::Transaction,
@@ -8,49 +11,50 @@ use solana_commitment_config::CommitmentConfig;
 use crate::error::{SolanaError, SolanaResult};
 use crate::types::{AccountChange, ConfirmationStatus};
 
-/// Trait for Solana RPC operations
-#[async_trait::async_trait]
+/// Trait for Solana RPC operations (synchronous, matching other chain adapters)
 pub trait SolanaRpc: Send + Sync {
     /// Get account info
-    async fn get_account(&self, pubkey: &Pubkey) -> SolanaResult<Account>;
+    fn get_account(&self, pubkey: &Pubkey) -> SolanaResult<Account>;
 
     /// Get multiple accounts
-    async fn get_multiple_accounts(&self, pubkeys: &[Pubkey])
-        -> SolanaResult<Vec<Option<Account>>>;
+    fn get_multiple_accounts(
+        &self,
+        pubkeys: &[Pubkey],
+    ) -> SolanaResult<Vec<Option<Account>>>;
 
     /// Get transaction with status
-    async fn get_transaction(&self, signature: &Signature) -> SolanaResult<String>;
+    fn get_transaction(&self, signature: &Signature) -> SolanaResult<String>;
 
     /// Send transaction
-    async fn send_transaction(&self, transaction: &Transaction) -> SolanaResult<Signature>;
+    fn send_transaction(&self, transaction: &Transaction) -> SolanaResult<Signature>;
 
     /// Get latest slot
-    async fn get_latest_slot(&self) -> SolanaResult<u64>;
+    fn get_latest_slot(&self) -> SolanaResult<u64>;
 
     /// Get slot with commitment
-    async fn get_slot_with_commitment(&self, commitment: &str) -> SolanaResult<u64>;
+    fn get_slot_with_commitment(&self, commitment: &str) -> SolanaResult<u64>;
 
     /// Get account changes between slots
-    async fn get_account_changes(
+    fn get_account_changes(
         &self,
         from_slot: u64,
         to_slot: u64,
     ) -> SolanaResult<Vec<AccountChange>>;
 
-    /// Wait for transaction confirmation
-    async fn wait_for_confirmation(
+    /// Wait for transaction confirmation (polls with std::thread::sleep)
+    fn wait_for_confirmation(
         &self,
         signature: &Signature,
     ) -> SolanaResult<ConfirmationStatus>;
 
     /// Get minimum balance for rent exemption
-    async fn get_minimum_balance_for_rent_exemption(&self, data_len: usize) -> SolanaResult<u64>;
+    fn get_minimum_balance_for_rent_exemption(&self, data_len: usize) -> SolanaResult<u64>;
 
     /// Get recent blockhash for transaction
-    async fn get_recent_blockhash(&self) -> SolanaResult<solana_sdk::hash::Hash>;
+    fn get_recent_blockhash(&self) -> SolanaResult<solana_sdk::hash::Hash>;
 
     /// Get balance for account
-    async fn get_balance(&self, pubkey: &Pubkey) -> SolanaResult<u64>;
+    fn get_balance(&self, pubkey: &Pubkey) -> SolanaResult<u64>;
 
     /// Clone the RPC client for creating new boxed instances
     fn clone_boxed(&self) -> Box<dyn SolanaRpc>;
@@ -60,6 +64,7 @@ pub trait SolanaRpc: Send + Sync {
 #[cfg(feature = "rpc")]
 pub struct RealSolanaRpc {
     client: solana_rpc_client::rpc_client::RpcClient,
+    url: String,
 }
 
 #[cfg(feature = "rpc")]
@@ -67,7 +72,7 @@ impl RealSolanaRpc {
     /// Create new RPC client with default commitment
     pub fn new(rpc_url: &str) -> Self {
         let client = solana_rpc_client::rpc_client::RpcClient::new(rpc_url.to_string());
-        Self { client }
+        Self { client, url: rpc_url.to_string() }
     }
 
     /// Create with specific commitment level
@@ -82,7 +87,7 @@ impl RealSolanaRpc {
             rpc_url.to_string(),
             commitment_config,
         );
-        Self { client }
+        Self { client, url: rpc_url.to_string() }
     }
 
     /// Get the underlying RPC client for advanced operations
@@ -92,15 +97,14 @@ impl RealSolanaRpc {
 }
 
 #[cfg(feature = "rpc")]
-#[async_trait::async_trait]
 impl SolanaRpc for RealSolanaRpc {
-    async fn get_account(&self, pubkey: &Pubkey) -> SolanaResult<Account> {
+    fn get_account(&self, pubkey: &Pubkey) -> SolanaResult<Account> {
         self.client
             .get_account(pubkey)
             .map_err(|e| SolanaError::Rpc(format!("Failed to get account {}: {}", pubkey, e)))
     }
 
-    async fn get_multiple_accounts(
+    fn get_multiple_accounts(
         &self,
         pubkeys: &[Pubkey],
     ) -> SolanaResult<Vec<Option<Account>>> {
@@ -109,7 +113,7 @@ impl SolanaRpc for RealSolanaRpc {
             .map_err(|e| SolanaError::Rpc(format!("Failed to get multiple accounts: {}", e)))
     }
 
-    async fn get_transaction(&self, signature: &Signature) -> SolanaResult<String> {
+    fn get_transaction(&self, signature: &Signature) -> SolanaResult<String> {
         // Use get_signature_status to check if transaction exists and return status info
         let status = self
             .client
@@ -123,19 +127,19 @@ impl SolanaRpc for RealSolanaRpc {
         }
     }
 
-    async fn send_transaction(&self, transaction: &Transaction) -> SolanaResult<Signature> {
+    fn send_transaction(&self, transaction: &Transaction) -> SolanaResult<Signature> {
         self.client
             .send_transaction(transaction)
             .map_err(|e| SolanaError::Rpc(format!("Failed to send transaction: {}", e)))
     }
 
-    async fn get_latest_slot(&self) -> SolanaResult<u64> {
+    fn get_latest_slot(&self) -> SolanaResult<u64> {
         self.client
             .get_slot()
             .map_err(|e| SolanaError::Rpc(format!("Failed to get slot: {}", e)))
     }
 
-    async fn get_slot_with_commitment(&self, commitment: &str) -> SolanaResult<u64> {
+    fn get_slot_with_commitment(&self, commitment: &str) -> SolanaResult<u64> {
         let commitment_config = match commitment {
             "processed" => CommitmentConfig::processed(),
             "confirmed" => CommitmentConfig::confirmed(),
@@ -148,7 +152,7 @@ impl SolanaRpc for RealSolanaRpc {
             .map_err(|e| SolanaError::Rpc(format!("Failed to get slot with commitment: {}", e)))
     }
 
-    async fn get_account_changes(
+    fn get_account_changes(
         &self,
         _from_slot: u64,
         _to_slot: u64,
@@ -159,11 +163,11 @@ impl SolanaRpc for RealSolanaRpc {
         Ok(vec![])
     }
 
-    async fn wait_for_confirmation(
+    fn wait_for_confirmation(
         &self,
         signature: &Signature,
     ) -> SolanaResult<ConfirmationStatus> {
-        // Poll for confirmation with exponential backoff
+        // Poll for confirmation with exponential backoff using std::thread::sleep
         let mut retries = 0;
         let max_retries = 30;
 
@@ -200,34 +204,34 @@ impl SolanaRpc for RealSolanaRpc {
             }
 
             retries += 1;
-            tokio::time::sleep(tokio::time::Duration::from_millis(500 * retries.min(10))).await;
+            std::thread::sleep(std::time::Duration::from_millis(500 * retries.min(10)));
         }
 
         Err(SolanaError::Timeout("Transaction confirmation timeout".to_string()))
     }
 
-    async fn get_minimum_balance_for_rent_exemption(&self, data_len: usize) -> SolanaResult<u64> {
+    fn get_minimum_balance_for_rent_exemption(&self, data_len: usize) -> SolanaResult<u64> {
         self.client
             .get_minimum_balance_for_rent_exemption(data_len)
             .map_err(|e| SolanaError::Rpc(format!("Failed to get rent exemption: {}", e)))
     }
 
-    async fn get_recent_blockhash(&self) -> SolanaResult<solana_sdk::hash::Hash> {
+    fn get_recent_blockhash(&self) -> SolanaResult<solana_sdk::hash::Hash> {
         self.client
             .get_latest_blockhash()
             .map_err(|e| SolanaError::Rpc(format!("Failed to get recent blockhash: {}", e)))
     }
 
-    async fn get_balance(&self, pubkey: &Pubkey) -> SolanaResult<u64> {
+    fn get_balance(&self, pubkey: &Pubkey) -> SolanaResult<u64> {
         self.client
             .get_balance(pubkey)
             .map_err(|e| SolanaError::Rpc(format!("Failed to get balance for {}: {}", pubkey, e)))
     }
 
     fn clone_boxed(&self) -> Box<dyn SolanaRpc> {
-        // RealSolanaRpc cannot be easily cloned due to RpcClient
-        // In production, you should create a new instance
-        panic!("RealSolanaRpc cannot be cloned. Create a new instance instead.")
+        // Create a new RPC client with the same URL
+        // RpcClient doesn't implement Clone, so we create a new instance
+        Box::new(Self::new(&self.url))
     }
 }
 
@@ -260,16 +264,15 @@ impl MockSolanaRpc {
 }
 
 #[cfg(test)]
-#[async_trait::async_trait]
 impl SolanaRpc for MockSolanaRpc {
-    async fn get_account(&self, pubkey: &Pubkey) -> SolanaResult<Account> {
+    fn get_account(&self, pubkey: &Pubkey) -> SolanaResult<Account> {
         self.accounts
             .get(pubkey)
             .cloned()
             .ok_or_else(|| SolanaError::AccountNotFound(pubkey.to_string()))
     }
 
-    async fn get_multiple_accounts(
+    fn get_multiple_accounts(
         &self,
         pubkeys: &[Pubkey],
     ) -> SolanaResult<Vec<Option<Account>>> {
@@ -279,25 +282,25 @@ impl SolanaRpc for MockSolanaRpc {
             .collect())
     }
 
-    async fn get_transaction(&self, _signature: &Signature) -> SolanaResult<String> {
+    fn get_transaction(&self, _signature: &Signature) -> SolanaResult<String> {
         Err(SolanaError::Rpc(
             "Mock RPC: get_transaction not implemented".to_string(),
         ))
     }
 
-    async fn send_transaction(&self, _transaction: &Transaction) -> SolanaResult<Signature> {
+    fn send_transaction(&self, _transaction: &Transaction) -> SolanaResult<Signature> {
         Ok(Signature::new_unique())
     }
 
-    async fn get_latest_slot(&self) -> SolanaResult<u64> {
+    fn get_latest_slot(&self) -> SolanaResult<u64> {
         Ok(1000)
     }
 
-    async fn get_slot_with_commitment(&self, _commitment: &str) -> SolanaResult<u64> {
+    fn get_slot_with_commitment(&self, _commitment: &str) -> SolanaResult<u64> {
         Ok(1000)
     }
 
-    async fn get_account_changes(
+    fn get_account_changes(
         &self,
         _from_slot: u64,
         _to_slot: u64,
@@ -305,23 +308,23 @@ impl SolanaRpc for MockSolanaRpc {
         Ok(vec![])
     }
 
-    async fn wait_for_confirmation(
+    fn wait_for_confirmation(
         &self,
         _signature: &Signature,
     ) -> SolanaResult<ConfirmationStatus> {
         Ok(ConfirmationStatus::Confirmed)
     }
 
-    async fn get_minimum_balance_for_rent_exemption(&self, _data_len: usize) -> SolanaResult<u64> {
+    fn get_minimum_balance_for_rent_exemption(&self, _data_len: usize) -> SolanaResult<u64> {
         // Test value - rent exemption for typical program size
         Ok(6_900_000_000)
     }
 
-    async fn get_recent_blockhash(&self) -> SolanaResult<solana_sdk::hash::Hash> {
+    fn get_recent_blockhash(&self) -> SolanaResult<solana_sdk::hash::Hash> {
         Ok(solana_sdk::hash::Hash::default())
     }
 
-    async fn get_balance(&self, pubkey: &Pubkey) -> SolanaResult<u64> {
+    fn get_balance(&self, pubkey: &Pubkey) -> SolanaResult<u64> {
         // Return test balance from configured accounts or default
         Ok(self.accounts.get(pubkey).map(|a| a.lamports).unwrap_or(1_000_000_000))
     }

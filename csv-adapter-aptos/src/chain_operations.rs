@@ -24,7 +24,7 @@ use sha3::{Digest, Sha3_256};
 use crate::adapter::AptosAnchorLayer;
 use crate::config::AptosNetwork;
 use crate::proofs::CommitmentEventBuilder;
-use crate::rpc::{AptosRpc, AptosTransaction};
+use crate::rpc::{AptosLedgerInfo, AptosRpc, AptosTransaction};
 
 /// Aptos chain operations implementation
 pub struct AptosChainOperations {
@@ -144,7 +144,7 @@ impl ChainQuery for AptosChainOperations {
             addr,
             "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
             None,
-        );
+        ).await;
 
         if let Ok(Some(resource)) = coin_resource {
             // Parse coin balance from BCS-encoded resource data
@@ -169,6 +169,7 @@ impl ChainQuery for AptosChainOperations {
         let tx = self
             .rpc()
             .get_transaction(version)
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get transaction: {}", e)))?
             .ok_or_else(|| ChainOpError::RpcError("Transaction not found".to_string()))?;
 
@@ -186,6 +187,7 @@ impl ChainQuery for AptosChainOperations {
                 let ledger = self
                     .rpc()
                     .get_ledger_info()
+                    .await
                     .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger: {}", e)))?;
 
                 // If transaction version is in current or older epoch, it's finalized
@@ -211,7 +213,7 @@ impl ChainQuery for AptosChainOperations {
             addr,
             "0x1::account::Account",
             None,
-        );
+        ).await;
 
         let is_deployed = matches!(resource_result, Ok(Some(_)));
 
@@ -231,6 +233,7 @@ impl ChainQuery for AptosChainOperations {
         let ledger = self
             .rpc()
             .get_ledger_info()
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger: {}", e)))?;
 
         Ok(ledger.ledger_version)
@@ -240,6 +243,7 @@ impl ChainQuery for AptosChainOperations {
         let ledger = self
             .rpc()
             .get_ledger_info()
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger: {}", e)))?;
 
         Ok(serde_json::json!({
@@ -357,6 +361,7 @@ impl ChainBroadcaster for AptosChainOperations {
         let hash = self
             .rpc()
             .submit_signed_transaction(signed_json)
+            .await
             .map_err(|e| ChainOpError::TransactionError(format!("Submission failed: {}", e)))?;
 
         Ok(format!("0x{}", hex::encode(hash)))
@@ -383,7 +388,7 @@ impl ChainBroadcaster for AptosChainOperations {
                 ));
             }
 
-            match self.rpc().wait_for_transaction(hash) {
+            match self.rpc().wait_for_transaction(hash).await {
                 Ok(tx) => {
                     return Ok(if tx.success {
                         TransactionStatus::Confirmed {
@@ -397,6 +402,10 @@ impl ChainBroadcaster for AptosChainOperations {
                     });
                 }
                 Err(_) => {
+                    #[cfg(feature = "rpc")]
+                    tokio::time::sleep(poll_interval).await;
+
+                    #[cfg(not(feature = "rpc"))]
                     std::thread::sleep(poll_interval);
                 }
             }
@@ -493,6 +502,7 @@ impl ChainProofProvider for AptosChainOperations {
         let ledger = self
             .rpc()
             .get_ledger_info()
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger: {}", e)))?;
 
         // Build event proof - use a default seal address
@@ -521,10 +531,29 @@ impl ChainProofProvider for AptosChainOperations {
         let _ = commitment;
 
         // Verify ledger version exists
-        let ledger = self
-            .rpc()
-            .get_ledger_info()
-            .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger: {}", e)))?;
+        #[cfg(feature = "rpc")]
+        let ledger = {
+            let rpc = self.rpc().clone_boxed();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| ChainOpError::RpcError(format!("Failed to build runtime: {}", e)))?;
+            rt.block_on(async {
+                rpc.get_ledger_info().await
+            })
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger: {}", e)))?
+        };
+
+        #[cfg(not(feature = "rpc"))]
+        let ledger = AptosLedgerInfo {
+            chain_id: 0,
+            epoch: 0,
+            ledger_version: 0,
+            oldest_ledger_version: 0,
+            ledger_timestamp: 0,
+            oldest_transaction_timestamp: 0,
+            epoch_start_timestamp: 0,
+        };
 
         if ledger.ledger_version < proof.position {
             return Ok(false);
@@ -543,6 +572,7 @@ impl ChainProofProvider for AptosChainOperations {
                 let ledger = self
                     .rpc()
                     .get_ledger_info()
+                    .await
                     .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger: {}", e)))?;
 
                 let proof_data = serde_json::to_vec(&ledger)
@@ -569,10 +599,29 @@ impl ChainProofProvider for AptosChainOperations {
         _tx_hash: &str,
     ) -> ChainOpResult<bool> {
         // Verify epoch and round
-        let latest = self
-            .rpc()
-            .get_ledger_info()
-            .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger: {}", e)))?;
+        #[cfg(feature = "rpc")]
+        let latest = {
+            let rpc = self.rpc().clone_boxed();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| ChainOpError::RpcError(format!("Failed to build runtime: {}", e)))?;
+            rt.block_on(async {
+                rpc.get_ledger_info().await
+            })
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger: {}", e)))?
+        };
+
+        #[cfg(not(feature = "rpc"))]
+        let latest = AptosLedgerInfo {
+            chain_id: 0,
+            epoch: 0,
+            ledger_version: 0,
+            oldest_ledger_version: 0,
+            ledger_timestamp: 0,
+            oldest_transaction_timestamp: 0,
+            epoch_start_timestamp: 0,
+        };
 
         // Check if finality proof confirms is at least 1 (deterministic finality in Aptos)
         let _confirmations = _proof.confirmations;
@@ -721,10 +770,7 @@ impl ChainRightOps for AptosChainOperations {
 
         // Query account resources via RPC
         // Check if the account exists and has the expected resource
-        let account_exists = self
-            .rpc
-            .get_account_sequence_number(address_bytes)
-            .is_ok();
+        let account_exists = self.rpc().get_account_sequence_number(address_bytes).await.is_ok();
 
         if !account_exists {
             // Account doesn't exist - either never created or deleted

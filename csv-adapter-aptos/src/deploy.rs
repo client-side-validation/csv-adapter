@@ -70,6 +70,7 @@ impl ModuleDeployer {
         let sequence_number = self
             .rpc
             .get_account_sequence_number(sender_bytes)
+            .await
             .map_err(|e| {
                 AptosError::SerializationError(format!("Failed to get sequence: {:?}", e))
             })?;
@@ -195,8 +196,18 @@ impl ModuleDeployer {
     pub fn verify_module(&self, address: [u8; 32], module_name: &str) -> AptosResult<bool> {
         let module_resource = format!("0x1::code::PackageRegistry");
 
-        match self.rpc.get_resource(address, &module_resource, None) {
-            Ok(Some(_)) => {
+        let resource = {
+            let rpc = self.rpc.clone_boxed();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| AptosError::RpcError(format!("Failed to build runtime: {}", e)))?;
+            rt.block_on(async { rpc.get_resource(address, &module_resource, None).await })
+        }
+        .map_err(|e| AptosError::RpcError(format!("Failed to get resource: {}", e)))?;
+
+        match resource {
+            Some(_) => {
                 // Module exists, check if specific module is in package
                 // Real implementation would parse the PackageRegistry
                 let _ = module_name;
@@ -250,7 +261,7 @@ impl ModuleDeployer {
         use ed25519_dalek::Signer;
 
         // Get chain ID and ledger info
-        let ledger = self.rpc.get_ledger_info().map_err(|e| {
+        let ledger = self.rpc.get_ledger_info().await.map_err(|e| {
             AptosError::SerializationError(format!("Failed to get ledger: {:?}", e))
         })?;
 

@@ -103,7 +103,6 @@ impl ChainQuery for SolanaChainOperations {
         let balance = self
             .rpc()
             .get_balance(&pubkey)
-            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get balance: {}", e)))?;
 
         // get_block is not available in SolanaRpc trait
@@ -128,7 +127,6 @@ impl ChainQuery for SolanaChainOperations {
         let tx_str = self
             .rpc()
             .get_transaction(&sig)
-            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get transaction: {}", e)))?;
 
         // Parse the transaction string to build TransactionInfo
@@ -158,7 +156,6 @@ impl ChainQuery for SolanaChainOperations {
                 let latest_slot = self
                     .rpc()
                     .get_latest_slot()
-                    .await
                     .map_err(|e| ChainOpError::RpcError(format!("Failed to get slot: {}", e)))?;
 
                 let confirmations = latest_slot.saturating_sub(block_height);
@@ -185,7 +182,6 @@ impl ChainQuery for SolanaChainOperations {
         let account = self
             .rpc()
             .get_account(&program_id)
-            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get account: {}", e)))?;
 
         let is_deployed = account.executable;
@@ -207,7 +203,6 @@ impl ChainQuery for SolanaChainOperations {
     async fn get_latest_block_height(&self) -> ChainOpResult<u64> {
         self.rpc()
             .get_latest_slot()
-            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get slot: {}", e)))
     }
 
@@ -318,7 +313,6 @@ impl ChainBroadcaster for SolanaChainOperations {
         let sig = self
             .rpc()
             .send_transaction(&transaction)
-            .await
             .map_err(|e| ChainOpError::TransactionError(format!("Submission failed: {}", e)))?;
 
         Ok(sig.to_string())
@@ -343,9 +337,9 @@ impl ChainBroadcaster for SolanaChainOperations {
             }
 
             // Use wait_for_confirmation for better status detection
-            match self.rpc().wait_for_confirmation(&sig).await {
+            match self.rpc().wait_for_confirmation(&sig) {
                 Ok(ConfirmationStatus::Finalized) => {
-                    let slot = self.rpc().get_latest_slot().await
+                    let slot = self.rpc().get_latest_slot()
                         .unwrap_or(0);
                     return Ok(TransactionStatus::Confirmed {
                         block_height: slot,
@@ -353,7 +347,7 @@ impl ChainBroadcaster for SolanaChainOperations {
                     });
                 }
                 Ok(ConfirmationStatus::Confirmed) => {
-                    let slot = self.rpc().get_latest_slot().await
+                    let slot = self.rpc().get_latest_slot()
                         .unwrap_or(0);
                     return Ok(TransactionStatus::Confirmed {
                         block_height: slot,
@@ -376,7 +370,6 @@ impl ChainBroadcaster for SolanaChainOperations {
         let fee = self
             .rpc()
             .get_recent_blockhash()
-            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get blockhash: {}", e)))?;
 
         // Would parse fee from blockhash response
@@ -454,7 +447,6 @@ impl ChainDeployer for SolanaChainOperations {
         let rent = self
             .rpc()
             .get_minimum_balance_for_rent_exemption(program_bytes.len())
-            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get rent: {}", e)))?;
 
         let tx_fees = 5000u64; // Transaction fees
@@ -544,7 +536,6 @@ impl ChainProofProvider for SolanaChainOperations {
                 let latest_slot = self
                     .rpc()
                     .get_latest_slot()
-                    .await
                     .map_err(|e| ChainOpError::RpcError(format!("Failed to get slot: {}", e)))?;
 
                 let confirmations = latest_slot.saturating_sub(finality_block) + 1;
@@ -566,20 +557,15 @@ impl ChainProofProvider for SolanaChainOperations {
         }
     }
 
-    fn verify_finality_proof(
+     fn verify_finality_proof(
         &self,
         _proof: &FinalityProof,
         _tx_hash: &str,
     ) -> ChainOpResult<bool> {
-        // Get current slot - block on async call since this is a sync function
-        let rt = tokio::runtime::Handle::try_current()
-            .map_err(|e| ChainOpError::RpcError(format!("No tokio runtime: {}", e)))?;
-        let _latest = rt.block_on(async {
-            self.rpc()
-                .get_latest_slot()
-                .await
-                .map_err(|e| ChainOpError::RpcError(format!("Failed to get slot: {}", e)))
-        })?;
+        // Get current slot using sync RPC call
+        let _latest = self.rpc()
+            .get_latest_slot()
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to get slot: {}", e)))?;
 
         // Check confirmations from the proof
         if _proof.confirmations < 32 && !_proof.is_deterministic {
@@ -725,7 +711,6 @@ impl ChainRightOps for SolanaChainOperations {
         let account_info = self
             .rpc()
             .get_account(&seal_address)
-            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to query seal account: {}", e)))?;
 
         // Determine state from account info

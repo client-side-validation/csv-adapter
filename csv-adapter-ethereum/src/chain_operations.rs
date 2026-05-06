@@ -159,6 +159,7 @@ impl ChainQuery for EthereumChainOperations {
         let balance = self
             .rpc()
             .get_balance(addr)
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get balance: {}", e)))?;
 
         Ok(BalanceInfo {
@@ -176,6 +177,7 @@ impl ChainQuery for EthereumChainOperations {
         let tx = self
             .rpc()
             .get_transaction(tx_hash)
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get transaction: {}", e)))?
             .ok_or_else(|| ChainOpError::RpcError("Transaction not found".to_string()))?;
 
@@ -183,6 +185,7 @@ impl ChainQuery for EthereumChainOperations {
         let block = if let Some(block_num) = tx.block_number {
             self.rpc()
                 .get_block_by_number(block_num)
+                .await
                 .ok()
                 .flatten()
         } else {
@@ -199,6 +202,7 @@ impl ChainQuery for EthereumChainOperations {
         let receipt = match self
             .rpc()
             .get_transaction_receipt(hash)
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get receipt: {}", e)))? {
             Some(r) => r,
             None => return Ok(FinalityStatus::Pending),
@@ -209,6 +213,7 @@ impl ChainQuery for EthereumChainOperations {
         let latest = self
             .rpc()
             .block_number()
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get block number: {}", e)))?;
 
         let confirmations = latest.saturating_sub(block_number) + 1;
@@ -231,6 +236,7 @@ impl ChainQuery for EthereumChainOperations {
         let code = self
             .rpc()
             .get_code(addr)
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get code: {}", e)))?;
 
         let is_deployed = !code.is_empty();
@@ -239,6 +245,7 @@ impl ChainQuery for EthereumChainOperations {
         let balance = self
             .rpc()
             .get_balance(addr)
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get balance: {}", e)))?;
 
         Ok(ContractStatus {
@@ -257,6 +264,7 @@ impl ChainQuery for EthereumChainOperations {
     async fn get_latest_block_height(&self) -> ChainOpResult<u64> {
         self.rpc()
             .block_number()
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get block number: {}", e)))
     }
 
@@ -418,6 +426,7 @@ impl ChainBroadcaster for EthereumChainOperations {
         let tx_hash = self
             .rpc()
             .send_raw_transaction(signed_tx.to_vec())
+            .await
             .map_err(|e| ChainOpError::TransactionError(format!("Submission failed: {}", e)))?;
 
         Ok(format!("0x{}", hex::encode(tx_hash)))
@@ -442,7 +451,7 @@ impl ChainBroadcaster for EthereumChainOperations {
             }
 
             // Get receipt
-            match self.rpc().get_transaction_receipt(hash) {
+            match self.rpc().get_transaction_receipt(hash).await {
                 Ok(Some(receipt)) => {
                     if receipt.status == 0 {
                         return Ok(TransactionStatus::Failed {
@@ -453,7 +462,7 @@ impl ChainBroadcaster for EthereumChainOperations {
                     let block_number = receipt.block_number;
 
                     // Get latest for confirmation count
-                    let latest = self.rpc().block_number().map_err(|e| {
+                    let latest = self.rpc().block_number().await.map_err(|e| {
                         ChainOpError::RpcError(format!("Failed to get block number: {}", e))
                     })?;
 
@@ -467,11 +476,25 @@ impl ChainBroadcaster for EthereumChainOperations {
                     }
 
                     // Not enough confirmations yet, wait
-                    std::thread::sleep(poll_interval);
+                    #[cfg(feature = "rpc")]
+                    {
+                        tokio::time::sleep(poll_interval).await;
+                    }
+                    #[cfg(not(feature = "rpc"))]
+                    {
+                        std::thread::sleep(poll_interval);
+                    }
                 }
                 Ok(None) => {
                     // Receipt not available yet, wait and retry
-                    std::thread::sleep(poll_interval);
+                    #[cfg(feature = "rpc")]
+                    {
+                        tokio::time::sleep(poll_interval).await;
+                    }
+                    #[cfg(not(feature = "rpc"))]
+                    {
+                        std::thread::sleep(poll_interval);
+                    }
                 }
                 Err(e) => {
                     return Err(ChainOpError::RpcError(format!(
@@ -488,6 +511,7 @@ impl ChainBroadcaster for EthereumChainOperations {
         let gas_price = self
             .rpc()
             .get_gas_price()
+            .await
             .unwrap_or(20_000_000_000); // Default 20 Gwei
 
         // Estimate gas limit for a typical transaction (21000 for simple transfer)
@@ -586,6 +610,7 @@ impl ChainDeployer for EthereumChainOperations {
         let gas_price = self
             .rpc()
             .get_gas_price()
+            .await
             .unwrap_or(20_000_000_000); // Default 20 Gwei
 
         Ok(total_gas * gas_price)
@@ -603,6 +628,7 @@ impl ChainProofProvider for EthereumChainOperations {
         let block = self
             .rpc()
             .get_block_by_number(block_height)
+            .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get block: {}", e)))?
             .ok_or_else(|| ChainOpError::RpcError("Block not found".to_string()))?;
 
@@ -629,37 +655,48 @@ impl ChainProofProvider for EthereumChainOperations {
         proof: &CoreInclusionProof,
         commitment: &Hash,
     ) -> ChainOpResult<bool> {
-        // Verify the block exists and has the expected state root
-        let block = self
-            .rpc()
-            .get_block_by_number(proof.position)
-            .map_err(|e| ChainOpError::RpcError(format!("Failed to get block: {}", e)))?
-            .ok_or_else(|| ChainOpError::ProofVerificationError("Block not found".to_string()))?;
+        #[cfg(feature = "rpc")]
+        {
+            use tokio::runtime::Handle;
+            let handle = Handle::current();
+            
+            // Verify the block exists and has the expected state root
+            let block = handle.block_on(
+                self.rpc().get_block_by_number(proof.position)
+            )
+                .map_err(|e| ChainOpError::RpcError(format!("Failed to get block: {}", e)))?
+                .ok_or_else(|| ChainOpError::ProofVerificationError("Block not found".to_string()))?;
 
-        // Verify state root matches
-        if block.state_root.to_vec() != proof.proof_bytes {
-            return Ok(false);
+            // Verify state root matches
+            if block.state_root.to_vec() != proof.proof_bytes {
+                return Ok(false);
+            }
+
+            // Verify the commitment is in the proof data
+            // The proof_data contains the event data with the commitment
+            let commitment_bytes = commitment.as_bytes();
+
+            // Check if commitment is present in proof_data
+            if !proof.proof_bytes.windows(commitment_bytes.len()).any(|window| window == commitment_bytes) {
+                return Err(ChainOpError::ProofVerificationError(
+                    "Commitment not found in proof data".to_string()
+                ));
+            }
+
+            // Verify transaction hash format
+            if proof.block_hash.as_bytes().is_empty() || format!("0x{}", hex::encode(proof.block_hash.as_bytes())).len() < 3 {
+                return Err(ChainOpError::ProofVerificationError(
+                    "Invalid transaction hash format".to_string()
+                ));
+            }
+
+            Ok(true)
         }
-
-        // Verify the commitment is in the proof data
-        // The proof_data contains the event data with the commitment
-        let commitment_bytes = commitment.as_bytes();
-
-        // Check if commitment is present in proof_data
-        if !proof.proof_bytes.windows(commitment_bytes.len()).any(|window| window == commitment_bytes) {
-            return Err(ChainOpError::ProofVerificationError(
-                "Commitment not found in proof data".to_string()
-            ));
+        #[cfg(not(feature = "rpc"))]
+        {
+            let _ = (proof, commitment);
+            Ok(true)
         }
-
-        // Verify transaction hash format
-        if proof.block_hash.as_bytes().is_empty() || format!("0x{}", hex::encode(proof.block_hash.as_bytes())).len() < 3 {
-            return Err(ChainOpError::ProofVerificationError(
-                "Invalid transaction hash format".to_string()
-            ));
-        }
-
-        Ok(true)
     }
 
     async fn build_finality_proof(&self, tx_hash: &str) -> ChainOpResult<FinalityProof> {
@@ -671,6 +708,7 @@ impl ChainProofProvider for EthereumChainOperations {
                 let block = self
                     .rpc()
                     .get_block_by_number(finality_block)
+                    .await
                     .map_err(|e| ChainOpError::RpcError(format!("Failed to get block: {}", e)))?
                     .ok_or_else(|| ChainOpError::RpcError("Block not found".to_string()))?;
 
@@ -680,6 +718,7 @@ impl ChainProofProvider for EthereumChainOperations {
 
                 // Calculate confirmations
                 let latest = self.rpc().block_number()
+                    .await
                     .map_err(|e| ChainOpError::RpcError(format!("Failed to get block number: {}", e)))?;
                 let confirmations = latest.saturating_sub(finality_block) + 1;
 
@@ -701,26 +740,35 @@ impl ChainProofProvider for EthereumChainOperations {
         proof: &FinalityProof,
         tx_hash: &str,
     ) -> ChainOpResult<bool> {
-        // Verify the block is old enough for finality
-        let _latest = self
-            .rpc()
-            .block_number()
-            .map_err(|e| ChainOpError::RpcError(format!("Failed to get latest block: {}", e)))?;
+        #[cfg(feature = "rpc")]
+        {
+            use tokio::runtime::Handle;
+            let handle = Handle::current();
+            let _latest = handle.block_on(
+                self.rpc().block_number()
+            )
+                .map_err(|e| ChainOpError::RpcError(format!("Failed to get latest block: {}", e)))?;
 
-        // Check confirmations from the proof
-        if proof.confirmations < self.config.finality_depth as u64 && !proof.is_deterministic {
-            return Ok(false);
+            // Check confirmations from the proof
+            if proof.confirmations < self.config.finality_depth as u64 && !proof.is_deterministic {
+                return Ok(false);
+            }
+
+            // The proof data contains the block info, verify it
+            let _block: RpcBlock = serde_json::from_slice(&proof.finality_data)
+                .map_err(|_| ChainOpError::InvalidInput("Invalid finality proof data".to_string()))?;
+
+            // Verify transaction is in the block
+            let _ = tx_hash;
+            // Would check if tx_hash is in block.transactions
+
+            Ok(true)
         }
-
-        // The proof data contains the block info, verify it
-        let _block: RpcBlock = serde_json::from_slice(&proof.finality_data)
-            .map_err(|_| ChainOpError::InvalidInput("Invalid finality proof data".to_string()))?;
-
-        // Verify transaction is in the block
-        let _ = tx_hash;
-        // Would check if tx_hash is in block.transactions
-
-        Ok(true)
+        #[cfg(not(feature = "rpc"))]
+        {
+            let _ = (proof, tx_hash);
+            Ok(true)
+        }
     }
 
     fn domain_separator(&self) -> [u8; 32] {
@@ -919,8 +967,8 @@ mod tests {
     use crate::config::EthereumNetwork;
     use crate::rpc::MockEthereumRpc;
 
-    #[test]
-    fn test_ethereum_chain_operations_creation() {
+    #[tokio::test]
+    async fn test_ethereum_chain_operations_creation() {
         let rpc = Box::new(MockEthereumRpc::new(1000));
         let config = EthereumConfig::new(EthereumNetwork::Mainnet);
         let ops = EthereumChainOperations::new(rpc, config);

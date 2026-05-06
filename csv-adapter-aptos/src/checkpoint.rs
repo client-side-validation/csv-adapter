@@ -77,7 +77,62 @@ impl CheckpointVerifier {
         // Check timeout
         let start = std::time::Instant::now();
 
-        let block = rpc.get_block_by_version(version).map_err(|e| {
+        let block = {
+            let rpc = rpc.clone_boxed();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| AptosError::CheckpointFailed(format!("Failed to build runtime: {}", e)))?;
+            rt.block_on(async { rpc.get_block_by_version(version).await })
+        };
+
+        let block = block.map_err(|e| {
+            if start.elapsed().as_millis() > self.config.timeout_ms as u128 {
+                AptosError::timeout(&format!("version_{}", version), self.config.timeout_ms)
+            } else {
+                AptosError::CheckpointFailed(format!("Failed to get block: {}", e))
+            }
+        })?;
+
+        match block {
+            Some(block) => {
+                // In production: verify block header signatures
+                // The block should have 2f+1 validator signatures
+                let is_certified = if self.config.require_certified {
+                    // Check if the round indicates certification
+                    // Aptos blocks are certified when they have 2f+1 signatures
+                    required_signatures > 0 && block.round > 0
+                } else {
+                    // Just check block exists
+                    true
+                };
+
+                Ok(CheckpointInfo {
+                    version,
+                    epoch: block.epoch,
+                    round: block.round,
+                    signatures_count: required_signatures,
+                    is_certified,
+                })
+            }
+            None => Err(AptosError::CheckpointFailed(format!(
+                "Block containing version {} not found",
+                version
+            ))),
+        }
+    }
+
+    /// Async version of is_version_finalized for use in async contexts.
+    pub async fn is_version_finalized_async(
+        &self,
+        version: u64,
+        rpc: &dyn AptosRpc,
+        required_signatures: u64,
+    ) -> AptosResult<CheckpointInfo> {
+        // Check timeout
+        let start = std::time::Instant::now();
+
+        let block = rpc.get_block_by_version(version).await.map_err(|e| {
             if start.elapsed().as_millis() > self.config.timeout_ms as u128 {
                 AptosError::timeout(&format!("version_{}", version), self.config.timeout_ms)
             } else {
@@ -127,7 +182,15 @@ impl CheckpointVerifier {
         resource_type: &str,
         rpc: &dyn AptosRpc,
     ) -> AptosResult<bool> {
-        let resource = rpc.get_resource(address, resource_type, None)?;
+        let resource = {
+            let rpc = rpc.clone_boxed();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| AptosError::CheckpointFailed(format!("Failed to build runtime: {}", e)))?;
+            rt.block_on(async { rpc.get_resource(address, resource_type, None).await })
+        }
+        .map_err(|e| AptosError::CheckpointFailed(format!("Failed to get resource: {}", e)))?;
         Ok(resource.is_some())
     }
 
@@ -143,7 +206,15 @@ impl CheckpointVerifier {
         expected_event_data: &[u8],
         rpc: &dyn AptosRpc,
     ) -> AptosResult<bool> {
-        let tx = rpc.get_transaction_by_version(tx_version)?;
+        let tx = {
+            let rpc = rpc.clone_boxed();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| AptosError::CheckpointFailed(format!("Failed to build runtime: {}", e)))?;
+            rt.block_on(async { rpc.get_transaction_by_version(tx_version).await })
+        }
+        .map_err(|e| AptosError::CheckpointFailed(format!("Failed to get transaction: {}", e)))?;
         match tx {
             Some(tx) => {
                 if !tx.success {
@@ -163,7 +234,15 @@ impl CheckpointVerifier {
     /// # Arguments
     /// * `rpc` - RPC client for fetching epoch info
     pub fn current_epoch(&self, rpc: &dyn AptosRpc) -> AptosResult<u64> {
-        let ledger = rpc.get_ledger_info()?;
+        let ledger = {
+            let rpc = rpc.clone_boxed();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| AptosError::CheckpointFailed(format!("Failed to build runtime: {}", e)))?;
+            rt.block_on(async { rpc.get_ledger_info().await })
+        }
+        .map_err(|e| AptosError::CheckpointFailed(format!("Failed to get ledger: {}", e)))?;
         Ok(ledger.epoch)
     }
 

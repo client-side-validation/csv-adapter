@@ -410,7 +410,7 @@ impl CsvClient {
         match chain {
             #[cfg(feature = "bitcoin")]
             Chain::Bitcoin => {
-                log::warn!("Building Bitcoin adapter for {:?} network", network);
+                log::info!("Building Bitcoin adapter for {:?} network", network);
                 let rpc_url = _config
                     .chains
                     .get("bitcoin")
@@ -428,7 +428,7 @@ impl CsvClient {
                 } else {
                     csv_adapter_bitcoin::Network::Mainnet
                 };
-                log::warn!("Building Bitcoin adapter with RPC URL: {}", rpc_url);
+                log::info!("Building Bitcoin adapter with RPC URL: {}", rpc_url);
                 let btc_config = csv_adapter_bitcoin::config::BitcoinConfig {
                     network: btc_network,
                     finality_depth: 6,
@@ -470,9 +470,10 @@ impl CsvClient {
                     rpc_url: rpc_url.clone(),
                 };
                 let csv_seal_address = [0u8; 20]; // Default, should be configured
-                let rpc = Box::new(csv_adapter_ethereum::real_rpc::RealEthereumRpc::new(&rpc_url, csv_seal_address)
-                    .map_err(|e| CsvError::AdapterError { chain: Chain::Ethereum, message: e.to_string() })?);
-                _builder.ethereum_from_config(eth_config, rpc, csv_seal_address).await.map(Some)
+                let rpc = csv_adapter_ethereum::real_rpc::RealEthereumRpc::new(&rpc_url, csv_seal_address)
+                    .await
+                    .map_err(|e| CsvError::AdapterError { chain: Chain::Ethereum, message: format!("Failed to create Ethereum RPC client: {}", e) })?;
+                _builder.ethereum_from_config(eth_config, Box::new(rpc) as Box<dyn csv_adapter_ethereum::rpc::EthereumRpc>, csv_seal_address).await.map(Some)
             }
             #[cfg(feature = "sui")]
             Chain::Sui => {
@@ -497,8 +498,8 @@ impl CsvClient {
                 sui_config.rpc_url = rpc_url.clone();
                 // Seal contract package ID is required but not available - using placeholder
                 sui_config.seal_contract.package_id = Some("0x0000000000000000000000000000000000000000000000000000000000000000".to_string());
-                let rpc = Box::new(csv_adapter_sui::real_rpc::SuiRpcClient::new(&rpc_url));
-                _builder.sui_from_config(sui_config, rpc).await.map(Some)
+                let rpc = csv_adapter_sui::real_rpc::SuiRpcClient::new(&rpc_url);
+                _builder.sui_from_config(sui_config, Box::new(rpc) as Box<dyn csv_adapter_sui::rpc::SuiRpc>).await.map(Some)
             }
             #[cfg(feature = "aptos")]
             Chain::Aptos => {
@@ -521,8 +522,8 @@ impl CsvClient {
                     csv_adapter_aptos::config::AptosNetwork::Mainnet
                 };
                 aptos_config.rpc_url = rpc_url.clone();
-                let rpc = Box::new(csv_adapter_aptos::real_rpc::AptosRpcClient::new(&rpc_url));
-                _builder.aptos_from_config(aptos_config, rpc).await.map(Some)
+                let rpc = csv_adapter_aptos::real_rpc::AptosRpcClient::new(&rpc_url);
+                _builder.aptos_from_config(aptos_config, Box::new(rpc) as Box<dyn csv_adapter_aptos::rpc::AptosRpc>).await.map(Some)
             }
             #[cfg(feature = "solana")]
             Chain::Solana => {

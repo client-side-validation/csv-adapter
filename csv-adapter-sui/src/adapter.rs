@@ -26,15 +26,40 @@ use csv_adapter_core::seal::SealRef as CoreSealRef;
 use csv_adapter_core::AnchorLayer;
 use csv_adapter_core::Hash;
 
-use crate::checkpoint::CheckpointVerifier;
+use crate::checkpoint::{CheckpointVerifier, CheckpointVerifierTrait};
 use crate::config::SuiConfig;
 use crate::error::{SuiError, SuiResult};
-use crate::proofs::{CommitmentEventBuilder, EventProofVerifier, StateProofVerifier};
+use crate::proofs::{CommitmentEventBuilder, EventProofVerifier, EventProofVerifierTrait, StateProofVerifier, StateProofVerifierTrait};
 #[cfg(feature = "rpc")]
 use crate::rpc::SuiObject;
 use crate::rpc::SuiRpc;
 use crate::seal::SealRegistry;
 use crate::types::{SuiAnchorRef, SuiFinalityProof, SuiInclusionProof, SuiSealRef};
+
+/// Block on an async future in a sync context.
+/// Uses a new tokio runtime to avoid interfering with existing runtimes.
+fn block_on_async<F: std::future::Future<Output = R> + Send + 'static, R: Send + 'static>(
+    future: F,
+) -> Result<R, SuiError> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| SuiError::RpcError(format!("Failed to create runtime: {}", e)))?;
+    Ok(rt.block_on(future))
+}
+
+/// Block on an async future that returns Result<T, E> in a sync context.
+fn block_on_async_result<F, T, E>(future: F) -> Result<T, SuiError>
+where
+    F: std::future::Future<Output = Result<T, E>> + Send + 'static,
+    E: std::fmt::Display + Send + 'static,
+{
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| SuiError::RpcError(format!("Failed to create runtime: {}", e)))?;
+    rt.block_on(future).map_err(|e| SuiError::RpcError(e.to_string()))
+}
 
 /// Sui implementation of the AnchorLayer trait
 pub struct SuiAnchorLayer {
@@ -195,6 +220,16 @@ fn build_sui_transaction_data(
 }
 
 impl SuiAnchorLayer {
+    /// Run an async operation that borrows from self, by cloning the RPC client.
+    fn run_with_rpc<F, T, E>(&self, op: impl FnOnce(Box<dyn SuiRpc>) -> F) -> Result<T, SuiError>
+    where
+        F: std::future::Future<Output = Result<T, E>> + Send + 'static,
+        E: std::fmt::Display + Send + 'static,
+    {
+        let rpc = self.rpc.clone_boxed();
+        block_on_async_result(op(rpc))
+    }
+
     /// Create a new adapter from configuration and RPC client.
     ///
     /// # Arguments
@@ -311,8 +346,12 @@ impl SuiAnchorLayer {
             )));
         }
 
-        // Check on-chain object exists
-        let obj = StateProofVerifier::verify_object_exists(seal.object_id, self.rpc.as_ref())?;
+// Check on-chain object exists
+        let obj_id = seal.object_id;
+        let obj = self.run_with_rpc(move |rpc| async move {
+            StateProofVerifier::verify_object_exists(obj_id, rpc.as_ref()).await
+        })
+        .map_err(|e| SuiError::StateProofFailed(e.to_string()))?;
         if obj.is_none() {
             return Err(SuiError::StateProofFailed(format!(
                 "Seal object {} does not exist on-chain",
@@ -392,16 +431,13 @@ impl SuiAnchorLayer {
             hex::encode(commitment),
         );
 
-        // Get gas objects and sender address from RPC
-        let sender = self
-            .rpc
-            .sender_address()
-            .map_err(|e| format!("Failed to get sender address: {}", e))?;
-
-        let gas_objects = self
-            .rpc
-            .get_gas_objects(sender)
-            .map_err(|e| format!("Failed to get gas objects: {}", e))?;
+           // Get gas objects and sender address from RPC
+        let (sender, gas_objects) = self.run_with_rpc(|rpc| async move {
+            let sender = rpc.sender_address().await?;
+            let gas_objects = rpc.get_gas_objects(sender).await?;
+            Ok::<_, Box<dyn std::error::Error + Send + Sync>>((sender, gas_objects))
+        })
+        .map_err(|e| format!("Failed to get gas data: {}", e))?;
 
         if gas_objects.is_empty() {
             return Err("No gas objects available for transaction".into());
@@ -446,12 +482,13 @@ impl SuiAnchorLayer {
             .event_builder
             .build(*expected_commitment.as_bytes(), expected_seal.object_id);
 
-        let valid = EventProofVerifier::verify_event_in_tx(
-            anchor.tx_digest,
-            &expected_event_data,
-            self.rpc.as_ref(),
-        )
-        .map_err(|e: SuiError| AdapterError::InclusionProofFailed(e.to_string()))?;
+          let valid = self.run_with_rpc(|rpc| {
+                let expected_event_data = expected_event_data.to_vec();
+                let tx_digest = anchor.tx_digest;
+                async move {
+                    EventProofVerifier::verify_event_in_tx(tx_digest, &expected_event_data, rpc.as_ref()).await
+                }
+            }).map_err(|e: SuiError| AdapterError::InclusionProofFailed(e.to_string()))?;
 
         if !valid {
             return Err(AdapterError::InclusionProofFailed(
@@ -501,29 +538,23 @@ impl AnchorLayer for SuiAnchorLayer {
                     ))
                 })?;
 
-            // Submit signed transaction via RPC
-            let tx_digest = self
-                .rpc
-                .execute_signed_transaction(tx_bytes, signature, public_key)
-                .map_err(|e| {
-                    AdapterError::PublishFailed(format!("Failed to execute transaction: {}", e))
-                })?;
-
-            // Wait for confirmation
-            let block = self
-                .rpc
-                .wait_for_transaction(tx_digest, 30_000)
-                .map_err(|e| AdapterError::NetworkError(e.to_string()))?
-                .ok_or_else(|| {
-                    AdapterError::PublishFailed(
-                        "Transaction not found after submission".to_string(),
-                    )
-                })?;
+ // Submit signed transaction via RPC
+            let (tx_digest, block) = self.run_with_rpc(|rpc| async move {
+                let tx_digest = rpc.execute_signed_transaction(tx_bytes, signature, public_key).await?;
+                let block = rpc.wait_for_transaction(tx_digest, 30_000).await?
+                    .ok_or_else(|| SuiError::RpcError("Transaction not found after submission".to_string()))?;
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>((tx_digest, block))
+            })
+            .map_err(|e| AdapterError::PublishFailed(format!("Transaction failed: {}", e)))?;
 
             // Verify the emitted event matches the expected commitment
-            let valid =
-                EventProofVerifier::verify_event_in_tx(tx_digest, &event_data, self.rpc.as_ref())
-                    .map_err(|e: SuiError| AdapterError::InclusionProofFailed(e.to_string()))?;
+            let valid = self.run_with_rpc(|rpc| {
+                let event_data = event_data.clone();
+                let tx_digest = tx_digest;
+                async move {
+                    EventProofVerifier::verify_event_in_tx(tx_digest, &event_data, rpc.as_ref()).await
+                }
+            }).map_err(|e: SuiError| AdapterError::InclusionProofFailed(e.to_string()))?;
 
             if !valid {
                 return Err(AdapterError::PublishFailed(
@@ -565,38 +596,28 @@ impl AnchorLayer for SuiAnchorLayer {
             anchor.checkpoint
         );
 
-        // Fetch checkpoint info from the Sui node
-        let checkpoint_info = match self.rpc.get_checkpoint(anchor.checkpoint) {
-            Ok(Some(info)) => info,
-            Ok(None) => {
-                return Err(AdapterError::InclusionProofFailed(format!(
-                    "Checkpoint {} not found",
-                    anchor.checkpoint
-                )));
-            }
-            Err(e) => {
-                return Err(AdapterError::InclusionProofFailed(format!(
-                    "Failed to fetch checkpoint {}: {}",
-                    anchor.checkpoint, e
-                )));
-            }
-        };
+// Fetch checkpoint info from the Sui node
+        let checkpoint_info = self.run_with_rpc(|rpc| async move {
+            rpc.get_checkpoint(anchor.checkpoint).await
+        }).map_err(|e| AdapterError::InclusionProofFailed(format!("Failed to fetch checkpoint: {}", e)))?
+        .ok_or_else(|| {
+            AdapterError::InclusionProofFailed(format!(
+                "Checkpoint {} not found",
+                anchor.checkpoint
+            ))
+        })?;
 
         // Verify the checkpoint is certified
         if !checkpoint_info.certified {
-            // Double-check via verifier
-            let is_certified = match self
-                .checkpoint_verifier
-                .is_checkpoint_certified(anchor.checkpoint, self.rpc.as_ref())
-            {
-                Ok(info) => info.is_certified,
-                Err(e) => {
-                    log::warn!("Checkpoint certification check failed: {}", e);
-                    false
+            let verifier = self.checkpoint_verifier.clone();
+            let is_certified = self.run_with_rpc(move |rpc| {
+                let cp_seq = anchor.checkpoint;
+                async move {
+                    verifier.is_checkpoint_certified(cp_seq, rpc.as_ref()).await
                 }
-            };
+            }).map_err(|e| AdapterError::InclusionProofFailed(format!("Checkpoint check failed: {}", e)))?;
 
-            if !is_certified {
+            if !is_certified.is_certified {
                 return Err(AdapterError::InclusionProofFailed(format!(
                     "Checkpoint {} is not yet certified",
                     anchor.checkpoint
@@ -620,16 +641,14 @@ impl AnchorLayer for SuiAnchorLayer {
             anchor.checkpoint
         );
 
-        let is_certified = match self
-            .checkpoint_verifier
-            .is_checkpoint_certified(anchor.checkpoint, self.rpc.as_ref())
-        {
-            Ok(info) => info.is_certified,
-            Err(e) => {
-                log::warn!("Finality check failed: {}", e);
-                false
+        let verifier = self.checkpoint_verifier.clone();
+        let is_certified = self.run_with_rpc(move |rpc| {
+            let cp_seq = anchor.checkpoint;
+            async move {
+                verifier.is_checkpoint_certified(cp_seq, rpc.as_ref()).await
             }
-        };
+        }).map_err(|e| AdapterError::InclusionProofFailed(format!("Finality check failed: {}", e)))?
+        .is_certified;
 
         Ok(SuiFinalityProof::new(anchor.checkpoint, is_certified))
     }
@@ -729,10 +748,9 @@ impl AnchorLayer for SuiAnchorLayer {
             "Rollback requested for anchor at checkpoint {}",
             anchor.checkpoint
         );
-        let current_checkpoint = self
-            .rpc
-            .get_latest_checkpoint_sequence_number()
-            .map_err(|e| AdapterError::NetworkError(e.to_string()))?;
+         let current_checkpoint = self.run_with_rpc(|rpc| async move {
+            rpc.get_latest_checkpoint_sequence_number().await
+        }).map_err(|e| AdapterError::NetworkError(e.to_string()))?;
 
         // If anchor checkpoint is beyond current tip, rollback
         if anchor.checkpoint > current_checkpoint {

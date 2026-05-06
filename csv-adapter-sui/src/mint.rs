@@ -9,7 +9,7 @@ use csv_adapter_core::hash::Hash as CsvHash;
 ///
 /// This uses Sui's transaction building and execution via JSON-RPC.
 #[cfg(feature = "rpc")]
-pub fn mint_right(
+pub async fn mint_right(
     rpc_url: &str,
     package_id: &str,
     private_key_hex: &str,
@@ -43,7 +43,7 @@ pub fn mint_right(
     let sender_address = format!("0x{}", hex::encode(public_key.as_bytes()));
 
     // Build the Move call transaction via JSON-RPC
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::Client::new();
 
     // 1. Get a reference gas price
     let gas_price_resp = client
@@ -55,10 +55,12 @@ pub fn mint_right(
             "id": 1
         }))
         .send()
+        .await
         .map_err(|e| SuiError::RpcError(format!("Gas price request failed: {}", e)))?;
 
     let gas_price: u64 = gas_price_resp
         .json::<serde_json::Value>()
+        .await
         .ok()
         .and_then(|v| {
             v.get("result")
@@ -96,12 +98,13 @@ pub fn mint_right(
 
     // Execute the transaction
     let tx_resp =
-        client.post(rpc_url).json(&tx_data).send().map_err(|e| {
+        client.post(rpc_url).json(&tx_data).send().await.map_err(|e| {
             SuiError::TransactionFailed(format!("Transaction request failed: {}", e))
         })?;
 
     let tx_result: serde_json::Value = tx_resp
         .json()
+        .await
         .map_err(|e| SuiError::TransactionFailed(format!("Failed to parse response: {}", e)))?;
 
     // Extract transaction digest

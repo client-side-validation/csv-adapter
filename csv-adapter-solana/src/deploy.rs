@@ -82,7 +82,6 @@ impl ProgramDeployer {
         let rent = self
             .rpc
             .get_minimum_balance_for_rent_exemption(programdata_len)
-            .await
             .map_err(|e| SolanaError::Rpc(format!("Failed to get rent: {}", e)))?;
 
         // Build deployment instructions
@@ -138,7 +137,7 @@ impl ProgramDeployer {
 
     /// Verify a program is deployed
     pub async fn verify_program(&self, program_id: Pubkey) -> SolanaResult<bool> {
-        match self.rpc.get_account(&program_id).await {
+        match self.rpc.get_account(&program_id) {
             Ok(account) => {
                 // Check if it's an executable program
                 Ok(account.executable)
@@ -157,7 +156,6 @@ impl ProgramDeployer {
         let rent = self
             .rpc
             .get_minimum_balance_for_rent_exemption(program_size)
-            .await
             .map_err(|e| SolanaError::Rpc(format!("Failed to get rent: {}", e)))?;
 
         let tx_fees = 5000u64; // Estimated transaction fees

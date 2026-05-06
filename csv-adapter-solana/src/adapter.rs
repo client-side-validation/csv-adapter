@@ -79,7 +79,7 @@ impl SolanaAnchorLayer {
                     ))?)
             }
             None => {
-                log::warn!("No keypair provided in config, wallet operations will be unavailable");
+                log::debug!("No keypair provided in config, wallet operations will be unavailable");
                 None
             }
         };
@@ -202,48 +202,40 @@ impl AnchorLayer for SolanaAnchorLayer {
         // Create the seal account via RPC
         let rpc = self.check_rpc()?;
 
-        // Build and send transaction to create the seal account
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| SolanaError::Rpc(format!("Failed to create runtime: {}", e)))?;
+        // Get recent blockhash
+        let recent_blockhash = rpc.get_recent_blockhash()
+            .map_err(|e| SolanaError::Rpc(format!("Failed to get recent blockhash: {}", e)))?;
 
-        let _anchor_ref = rt.block_on(async {
-            // Get recent blockhash
-            let recent_blockhash = rpc.get_recent_blockhash().await
-                .map_err(|e| SolanaError::Rpc(format!("Failed to get recent blockhash: {}", e)))?;
+        // Create system program instruction to transfer lamports and create account
+        let create_account_ix = system_instruction::create_account(
+            &owner,
+            &seal_pda,
+            lamports,
+            32, // data size for seal
+            &owner, // owner program
+        );
 
-            // Create system program instruction to transfer lamports and create account
-            let create_account_ix = system_instruction::create_account(
-                &owner,
-                &seal_pda,
-                lamports,
-                32, // data size for seal
-                &owner, // owner program
-            );
+        // Build transaction
+        let mut transaction = solana_sdk::transaction::Transaction::new_with_payer(
+            &[create_account_ix],
+            Some(&owner),
+        );
+        transaction.message.recent_blockhash = recent_blockhash;
 
-            // Build transaction
-            let mut transaction = solana_sdk::transaction::Transaction::new_with_payer(
-                &[create_account_ix],
-                Some(&owner),
-            );
-            transaction.message.recent_blockhash = recent_blockhash;
+        // Sign transaction
+        transaction.sign(&[&wallet.keypair], recent_blockhash);
 
-            // Sign transaction
-            transaction.sign(&[&wallet.keypair], recent_blockhash);
+        // Send transaction via RPC
+        let signature = rpc.send_transaction(&transaction)
+            .map_err(|e| SolanaError::Rpc(format!("Failed to send transaction: {}", e)))?;
 
-            // Send transaction via RPC
-            let signature = rpc.send_transaction(&transaction).await
-                .map_err(|e| SolanaError::Rpc(format!("Failed to send transaction: {}", e)))?;
+        // Wait for confirmation
+        let _status = rpc.wait_for_confirmation(&signature)
+            .map_err(|e| SolanaError::Rpc(format!("Transaction confirmation failed: {}", e)))?;
 
-            // Wait for confirmation
-            let _status = rpc.wait_for_confirmation(&signature).await
-                .map_err(|e| SolanaError::Rpc(format!("Transaction confirmation failed: {}", e)))?;
-
-            // Get slot information
-            let _slot = rpc.get_latest_slot().await
-                .map_err(|e| SolanaError::Rpc(format!("Failed to get slot: {}", e)))?;
-
-            Ok::<(), SolanaError>(())
-        }).map_err(|e: SolanaError| AdapterError::NetworkError(e.to_string()))?;
+        // Get slot information
+        let _slot = rpc.get_latest_slot()
+            .map_err(|e| SolanaError::Rpc(format!("Failed to get slot: {}", e)))?;
 
         // Store seal reference locally for tracking
         self.store_seal(seal_ref.clone());
@@ -262,76 +254,70 @@ impl AnchorLayer for SolanaAnchorLayer {
         let owner = wallet.pubkey();
         let commitment_pda = self.derive_commitment_pda(&hash);
 
-        // Build and send transaction to publish commitment
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| SolanaError::Rpc(format!("Failed to create runtime: {}", e)))?;
+        // Get recent blockhash
+        let recent_blockhash = rpc.get_recent_blockhash()
+            .map_err(|e| SolanaError::Rpc(format!("Failed to get recent blockhash: {}", e)))?;
 
-        let anchor_ref = rt.block_on(async {
-            // Get recent blockhash
-            let recent_blockhash = rpc.get_recent_blockhash().await
-                .map_err(|e| SolanaError::Rpc(format!("Failed to get recent blockhash: {}", e)))?;
+        // Build instruction data with discriminator and commitment hash
+        let mut instruction_data = vec![INSTRUCTION_PUBLISH_COMMITMENT];
+        instruction_data.extend_from_slice(hash.as_bytes());
 
-            // Build instruction data with discriminator and commitment hash
-            let mut instruction_data = vec![INSTRUCTION_PUBLISH_COMMITMENT];
-            instruction_data.extend_from_slice(hash.as_bytes());
+        // Create instruction to publish commitment to the seal account
+        let publish_ix = solana_sdk::instruction::Instruction::new_with_bytes(
+            seal_ref.account, // seal program
+            &instruction_data,
+            vec![
+                solana_sdk::instruction::AccountMeta::new(seal_ref.account, false),
+                solana_sdk::instruction::AccountMeta::new(commitment_pda, false),
+                solana_sdk::instruction::AccountMeta::new_readonly(owner, true),
+            ],
+        );
 
-            // Create instruction to publish commitment to the seal account
-            let publish_ix = solana_sdk::instruction::Instruction::new_with_bytes(
-                seal_ref.account, // seal program
-                &instruction_data,
-                vec![
-                    solana_sdk::instruction::AccountMeta::new(seal_ref.account, false),
-                    solana_sdk::instruction::AccountMeta::new(commitment_pda, false),
-                    solana_sdk::instruction::AccountMeta::new_readonly(owner, true),
-                ],
-            );
+        // Build transaction
+        let mut transaction = solana_sdk::transaction::Transaction::new_with_payer(
+            &[publish_ix],
+            Some(&owner),
+        );
+        transaction.message.recent_blockhash = recent_blockhash;
 
-            // Build transaction
-            let mut transaction = solana_sdk::transaction::Transaction::new_with_payer(
-                &[publish_ix],
-                Some(&owner),
-            );
-            transaction.message.recent_blockhash = recent_blockhash;
+        // Sign transaction
+        transaction.sign(&[&wallet.keypair], recent_blockhash);
 
-            // Sign transaction
-            transaction.sign(&[&wallet.keypair], recent_blockhash);
+        // Send transaction via RPC
+        let signature = rpc.send_transaction(&transaction)
+            .map_err(|e| SolanaError::Rpc(format!("Failed to send transaction: {}", e)))?;
 
-            // Send transaction via RPC
-            let signature = rpc.send_transaction(&transaction).await
-                .map_err(|e| SolanaError::Rpc(format!("Failed to send transaction: {}", e)))?;
+        // Wait for confirmation
+        let _status = rpc.wait_for_confirmation(&signature)
+            .map_err(|e| SolanaError::Rpc(format!("Transaction confirmation failed: {}", e)))?;
 
-            // Wait for confirmation
-            let _status = rpc.wait_for_confirmation(&signature).await
-                .map_err(|e| SolanaError::Rpc(format!("Transaction confirmation failed: {}", e)))?;
+        // Get slot information
+        let slot = rpc.get_latest_slot()
+            .map_err(|e| SolanaError::Rpc(format!("Failed to get slot: {}", e)))?;
 
-            // Get slot information
-            let slot = rpc.get_latest_slot().await
-                .map_err(|e| SolanaError::Rpc(format!("Failed to get slot: {}", e)))?;
-
-            Ok::<SolanaAnchorRef, SolanaError>(SolanaAnchorRef {
-                signature,
-                slot,
-                block_height: slot,
-                account_changes: vec![
-                    AccountChange {
-                        pubkey: seal_ref.account,
-                        prev_lamports: seal_ref.lamports,
-                        new_lamports: 0, // Seal is consumed
-                        prev_data: seal_ref.seed.clone(),
-                        new_data: None,
-                        closed: true,
-                    },
-                    AccountChange {
-                        pubkey: commitment_pda,
-                        prev_lamports: 0,
-                        new_lamports: 1_000_000,
-                        prev_data: None,
-                        new_data: Some(hash.as_bytes().to_vec()),
-                        closed: false,
-                    },
-                ],
-            })
-        }).map_err(|e: SolanaError| AdapterError::NetworkError(e.to_string()))?;
+        let anchor_ref = SolanaAnchorRef {
+            signature,
+            slot,
+            block_height: slot,
+            account_changes: vec![
+                AccountChange {
+                    pubkey: seal_ref.account,
+                    prev_lamports: seal_ref.lamports,
+                    new_lamports: 0, // Seal is consumed
+                    prev_data: seal_ref.seed.clone(),
+                    new_data: None,
+                    closed: true,
+                },
+                AccountChange {
+                    pubkey: commitment_pda,
+                    prev_lamports: 0,
+                    new_lamports: 1_000_000,
+                    prev_data: None,
+                    new_data: Some(hash.as_bytes().to_vec()),
+                    closed: false,
+                },
+            ],
+        };
 
         // Remove seal from active tracking since it's now consumed
         if let Ok(mut seals) = self.active_seals.lock() {
