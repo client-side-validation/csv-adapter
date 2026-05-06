@@ -1,6 +1,6 @@
 //! Ethereum adapter error types
 
-use csv_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::mcp::{error_codes, FixAction, HasErrorSuggestion};
 use thiserror::Error;
 
 /// Ethereum adapter specific errors

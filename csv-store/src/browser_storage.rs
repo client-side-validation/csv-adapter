@@ -3,7 +3,7 @@
 //! This module provides browser-specific localStorage persistence for the unified
 //! storage format, enabling csv-wallet to share data with csv-cli.
 
-use csv_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::mcp::{error_codes, FixAction, HasErrorSuggestion};
 use serde::{Deserialize, Serialize};
 
 use crate::state::{StateStorage, StorageError};

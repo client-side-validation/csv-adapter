@@ -59,13 +59,13 @@ pub mod tagged_hash;
 pub mod title;      // New: Sanad/Title types (replaces right)
 
 // Advanced commitment types
-pub mod advanced_commitments;
+pub mod commitments_ext;
 
 // Protocol version and canonical contract (🔒 STABLE + 🟡 BETA)
 pub mod protocol_version;
 
 // Agent-friendly types (AI agent support) - 🟡 BETA
-pub mod agent_types;
+pub mod mcp;
 
 // Production hardening - 🔒 STABLE
 pub mod hardening;
@@ -87,7 +87,7 @@ pub mod vm;
 // DAG and proof types - 🔒 STABLE
 pub mod dag;
 pub mod proof;
-pub mod proof_verify;
+pub mod verifier;
 pub mod signature;
 
 // Error handling and traits - 🔒 STABLE
@@ -124,7 +124,7 @@ pub mod chain_plugin;
 
 // RGB protocol compatibility (Sprint 5) - 🧪 EXPERIMENTAL
 #[cfg(feature = "experimental")]
-pub mod rgb_compat;
+pub mod rgb;
 
 // Tapret verification (Sprint 0.5) - requires bitcoin dependency
 #[cfg(feature = "tapret")]
@@ -156,7 +156,7 @@ pub use signature::{parse_signatures_from_bytes, verify_signatures, Signature, S
 // DAG and proofs
 pub use dag::{DAGNode, DAGSegment};
 pub use proof::{FinalityProof, InclusionProof, ProofBundle};
-pub use proof_verify::verify_proof;
+pub use verifier::verify_proof;
 
 // Errors and traits
 pub use error::{AdapterError, Result};
@@ -202,12 +202,12 @@ pub use nullifier::{
 // ===========================================================================
 
 // Advanced commitment types
-pub use advanced_commitments::{
+pub use commitments_ext::{
     CommitmentScheme, EnhancedCommitment, FinalityProofType, InclusionProofType, ProofMetadata,
 };
 
 // Agent-friendly types
-pub use agent_types::{ErrorSuggestion, FixAction, HasErrorSuggestion, error_codes};
+pub use mcp::{ErrorSuggestion, FixAction, HasErrorSuggestion, error_codes};
 
 // Production hardening
 pub use hardening::{
@@ -268,4 +268,4 @@ pub use vm::{
 /// Experimental module — feature-gated behind `experimental`.
 /// These APIs may change or be removed without notice.
 #[cfg(feature = "experimental")]
-pub use rgb_compat::{RgbConsignmentValidator, RgbValidationError, RgbValidationResult};
+pub use rgb::{RgbConsignmentValidator, RgbValidationError, RgbValidationResult};

@@ -17,7 +17,7 @@
 use crate::pages::common::*;
 use crate::routes::Route;
 use csv_core::proof::ProofBundle;
-use csv_core::proof_verify::verify_proof;
+use csv_core::verifier::verify_proof;
 use csv_core::signature::SignatureScheme;
 use dioxus::prelude::*;
 

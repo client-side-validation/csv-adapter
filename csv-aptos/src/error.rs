@@ -3,7 +3,7 @@
 //! This module provides a comprehensive error taxonomy for the Aptos adapter,
 //! with chain-specific error variants and recovery guidance.
 
-use csv_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::mcp::{error_codes, FixAction, HasErrorSuggestion};
 use thiserror::Error;
 
 /// Comprehensive error types for the Aptos adapter.

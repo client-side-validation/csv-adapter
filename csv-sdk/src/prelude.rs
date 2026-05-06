@@ -26,7 +26,7 @@ pub use csv_core::{
 };
 
 // Agent-friendly types
-pub use csv_core::agent_types::{Chain, ErrorSuggestion, FixAction};
+pub use csv_core::mcp::{Chain, ErrorSuggestion, FixAction};
 
 // Unified result type
 pub use crate::Result;

@@ -1,6 +1,6 @@
 //! Error types for Solana adapter
 
-use csv_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::mcp::{error_codes, FixAction, HasErrorSuggestion};
 use thiserror::Error;
 
 /// Solana-specific errors

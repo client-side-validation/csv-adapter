@@ -106,7 +106,7 @@ pub use csv_core::{AdapterError, Result as CoreResult, StoreError};
 #[cfg(feature = "experimental")]
 pub mod experimental {
     pub use csv_core::commit_mux::{MuxLeaf, MuxProof, CommitMux};
-    pub use csv_core::rgb_compat::{
+    pub use csv_core::rgb::{
         CrossChainError, RgbValidationError, RgbValidationResult,
     };
     pub use csv_core::vm::{

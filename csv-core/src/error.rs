@@ -1,7 +1,7 @@
 //! Error types for CSV adapters
 
 use thiserror::Error;
-use crate::agent_types::{HasErrorSuggestion, FixAction, error_codes};
+use crate::mcp::{HasErrorSuggestion, FixAction, error_codes};
 
 /// Result type alias for adapter operations
 pub type Result<T> = core::result::Result<T, AdapterError>;

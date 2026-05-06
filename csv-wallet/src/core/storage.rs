@@ -3,7 +3,7 @@
 //! Simple storage manager for wallets.
 
 use super::encryption::{EncryptedWallet, encrypt, decrypt, EncryptionError};
-use csv_core::agent_types::{HasErrorSuggestion, FixAction, error_codes};
+use csv_core::mcp::{HasErrorSuggestion, FixAction, error_codes};
 use std::collections::HashMap;
 use std::sync::Mutex;
 

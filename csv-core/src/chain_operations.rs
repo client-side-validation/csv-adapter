@@ -627,3 +627,4 @@ mod tests {
         assert_ne!(ChainCapability::QueryBalance, ChainCapability::SignTransactions);
     }
 }
+
