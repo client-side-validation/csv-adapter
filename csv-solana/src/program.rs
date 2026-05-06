@@ -48,11 +48,11 @@ impl SolanaProgram {
         &self,
         seal_account: Pubkey,
         authority: Pubkey,
-        right_id: csv_core::Hash,
+        sanad_id: csv_core::Hash,
         commitment: csv_core::Hash,
     ) -> SolanaResult<Instruction> {
-        let instruction_data = CsvInstruction::CreateRight {
-            right_id,
+        let instruction_data = CsvInstruction::CreateSanad {
+            sanad_id,
             owner: authority,
             commitment,
         };
@@ -76,12 +76,12 @@ impl SolanaProgram {
         anchor_account: Pubkey,
         authority: Pubkey,
         commitment: csv_core::Hash,
-        right_id: csv_core::Hash,
+        sanad_id: csv_core::Hash,
         metadata: Vec<u8>,
     ) -> SolanaResult<Instruction> {
         let instruction_data = CsvInstruction::PublishCommitment {
             commitment,
-            right_id,
+            sanad_id,
             metadata,
         };
 
@@ -103,12 +103,12 @@ impl SolanaProgram {
         &self,
         seal_account: Pubkey,
         authority: Pubkey,
-        right_id: csv_core::Hash,
+        sanad_id: csv_core::Hash,
         new_owner: Pubkey,
     ) -> SolanaResult<Instruction> {
         let instruction_data = CsvInstruction::ConsumeSeal {
             seal_account,
-            right_id,
+            sanad_id,
             new_owner,
         };
 
@@ -126,17 +126,17 @@ impl SolanaProgram {
         ))
     }
 
-    /// Create verification instruction for transferring a right
+    /// Create verification instruction for transferring a sanad
     pub fn create_verification_instruction(
         &self,
-        right_account: Pubkey,
+        sanad_account: Pubkey,
         from_owner: Pubkey,
         to_owner: Pubkey,
-        right_id: csv_core::Hash,
+        sanad_id: csv_core::Hash,
         destination_chain: String,
     ) -> SolanaResult<Instruction> {
-        let instruction_data = CsvInstruction::TransferRight {
-            right_id,
+        let instruction_data = CsvInstruction::TransferSanad {
+            sanad_id,
             from_owner,
             to_owner,
             destination_chain,
@@ -149,7 +149,7 @@ impl SolanaProgram {
             self.program_id,
             &data,
             vec![
-                AccountMeta::new(right_account, false),
+                AccountMeta::new(sanad_account, false),
                 AccountMeta::new_readonly(from_owner, true),
                 AccountMeta::new(to_owner, false),
             ],

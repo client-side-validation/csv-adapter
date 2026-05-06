@@ -12,7 +12,7 @@ use crate::storage::{asset_storage, LocalStorageManager};
 /// An asset record stored locally.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetRecord {
-    pub right_id: String,
+    pub sanad_id: String,
     pub chain: String,
     pub commitment: String,
     pub owner_address: String,
@@ -117,13 +117,13 @@ impl AssetManager {
 
     /// Add a new asset record and persist it.
     pub fn add_asset(&self, record: &AssetRecord) -> Result<(), AssetError> {
-        self.storage.save(&record.right_id, record)?;
+        self.storage.save(&record.sanad_id, record)?;
         Ok(())
     }
 
-    /// Get an asset record by its right_id.
-    pub fn get_asset(&self, right_id: &str) -> Result<AssetRecord, AssetError> {
-        let record = self.storage.load::<AssetRecord>(right_id)?;
+    /// Get an asset record by its sanad_id.
+    pub fn get_asset(&self, sanad_id: &str) -> Result<AssetRecord, AssetError> {
+        let record = self.storage.load::<AssetRecord>(sanad_id)?;
         Ok(record)
     }
 
@@ -164,14 +164,14 @@ impl AssetManager {
     /// Update the value of an existing asset.
     pub fn update_value(
         &self,
-        right_id: &str,
+        sanad_id: &str,
         new_value: Option<f64>,
         currency: &str,
     ) -> Result<AssetRecord, AssetError> {
-        let mut record = self.get_asset(right_id)?;
+        let mut record = self.get_asset(sanad_id)?;
         record.value = new_value;
         record.value_currency = currency.to_string();
-        self.storage.save(&record.right_id, &record)?;
+        self.storage.save(&record.sanad_id, &record)?;
         Ok(record)
     }
 
@@ -192,9 +192,9 @@ impl AssetManager {
         Ok(totals.into_iter().collect())
     }
 
-    /// Delete an asset by right_id.
-    pub fn delete_asset(&self, right_id: &str) -> Result<(), AssetError> {
-        self.storage.delete(right_id)?;
+    /// Delete an asset by sanad_id.
+    pub fn delete_asset(&self, sanad_id: &str) -> Result<(), AssetError> {
+        self.storage.delete(sanad_id)?;
         Ok(())
     }
 }
@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn asset_record_serialization() {
         let record = AssetRecord {
-            right_id: "asset-001".to_string(),
+            sanad_id: "asset-001".to_string(),
             chain: "bitcoin".to_string(),
             commitment: "commit-xyz".to_string(),
             owner_address: "addr123".to_string(),
@@ -223,7 +223,7 @@ mod tests {
 
         let json = serde_json::to_string(&record).unwrap();
         let decoded: AssetRecord = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.right_id, record.right_id);
+        assert_eq!(decoded.sanad_id, record.sanad_id);
         assert_eq!(decoded.chain, "bitcoin");
         assert_eq!(decoded.value, Some(1.5));
         assert_eq!(decoded.value_currency, "BTC");
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn asset_record_with_no_value() {
         let record = AssetRecord {
-            right_id: "asset-002".to_string(),
+            sanad_id: "asset-002".to_string(),
             chain: "ethereum".to_string(),
             commitment: "commit-abc".to_string(),
             owner_address: "addr456".to_string(),

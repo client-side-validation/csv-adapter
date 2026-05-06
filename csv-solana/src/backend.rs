@@ -1,11 +1,11 @@
-//! ChainAdapter implementation for SolanaSealProtocol
+//! ChainDriver implementation for SolanaSealProtocol
 //!
-//! This module implements the `ChainAdapter` trait from `csv-adapter-core`,
+//! This module implements the `ChainDriver` trait from `csv-adapter-core`,
 //! enabling Solana to be used through the unified chain adapter interface.
 
 use async_trait::async_trait;
 use csv_core::chain_adapter::{
-    AccountModel, ChainAdapter, ChainCapabilities, ChainError, ChainResult, RpcClient, Wallet,
+    AccountModel, ChainDriver, ChainCapabilities, ChainError, ChainResult, RpcClient, Wallet,
 };
 use csv_core::chain_config::ChainConfig;
 use csv_core::Chain;
@@ -230,7 +230,7 @@ fn solana_capabilities() -> ChainCapabilities {
 }
 
 #[async_trait]
-impl ChainAdapter for SolanaSealProtocol {
+impl ChainDriver for SolanaSealProtocol {
     fn chain_id(&self) -> &'static str {
         "solana"
     }

@@ -13,9 +13,9 @@ use csv_core::dag::DAGSegment;
 use csv_core::error::AdapterError;
 use csv_core::error::Result as CoreResult;
 use csv_core::proof::{FinalityProof, ProofBundle};
-use csv_core::seal::AnchorRef as CoreAnchorRef;
-use csv_core::seal::SealRef as CoreSealRef;
-use csv_core::AnchorLayer;
+use csv_core::seal::CommitAnchor as CoreCommitAnchor;
+use csv_core::seal::SealPoint as CoreSealPoint;
+use csv_core::SealProtocol;
 use csv_core::Hash;
 
 use crate::config::EthereumConfig;
@@ -24,7 +24,7 @@ use crate::finality::{FinalityChecker, FinalityCheckerTrait};
 use crate::rpc::EthereumRpc;
 use crate::seal::SealRegistry;
 use crate::types::{
-    EthereumAnchorRef, EthereumFinalityProof, EthereumInclusionProof, EthereumSealRef,
+    EthereumCommitAnchor, EthereumFinalityProof, EthereumInclusionProof, EthereumSealPoint,
 };
 
 /// Ethereum implementation of the SealProtocol trait
@@ -94,7 +94,7 @@ impl EthereumSealProtocol {
         Err("rpc feature not enabled".into())
     }
 
-    fn verify_slot_available(&self, seal: &EthereumSealRef) -> EthereumResult<()> {
+    fn verify_slot_available(&self, seal: &EthereumSealPoint) -> EthereumResult<()> {
         let registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
         if registry.is_seal_used(seal) {
             return Err(EthereumError::SlotUsed(
@@ -117,9 +117,9 @@ impl EthereumSealProtocol {
     pub async fn publish_with_rpc(
         &self,
         commitment: Hash,
-        seal: EthereumSealRef,
+        seal: EthereumSealPoint,
         signed_tx_bytes: Vec<u8>,
-    ) -> Result<EthereumAnchorRef, AdapterError> {
+    ) -> Result<EthereumCommitAnchor, AdapterError> {
         use crate::node::verify_seal_consumption_in_receipt;
 
         // Step 1: Verify slot is available
@@ -157,7 +157,7 @@ impl EthereumSealProtocol {
 
         // Step 6: Return anchor
         let log_index = receipt.logs.first().map(|l| l.log_index).unwrap_or(0);
-        let anchor = EthereumAnchorRef::new(tx_hash, receipt.block_number, log_index);
+        let anchor = EthereumCommitAnchor::new(tx_hash, receipt.block_number, log_index);
 
         // Mark seal as consumed
         let registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
@@ -167,13 +167,13 @@ impl EthereumSealProtocol {
     }
 }
 
-impl AnchorLayer for EthereumSealProtocol {
-    type SealRef = EthereumSealRef;
-    type AnchorRef = EthereumAnchorRef;
+impl SealProtocol for EthereumSealProtocol {
+    type SealPoint = EthereumSealPoint;
+    type CommitAnchor = EthereumCommitAnchor;
     type InclusionProof = EthereumInclusionProof;
     type FinalityProof = EthereumFinalityProof;
 
-    fn publish(&self, commitment: Hash, seal: Self::SealRef) -> CoreResult<Self::AnchorRef> {
+    fn publish(&self, commitment: Hash, seal: Self::SealPoint) -> CoreResult<Self::CommitAnchor> {
         self.verify_slot_available(&seal)
             .map_err(AdapterError::from)?;
 
@@ -221,7 +221,7 @@ impl AnchorLayer for EthereumSealProtocol {
             }
 
             let log_index = receipt.logs.first().map(|l| l.log_index).unwrap_or(0);
-            let anchor = EthereumAnchorRef::new(tx_hash, receipt.block_number, log_index);
+            let anchor = EthereumCommitAnchor::new(tx_hash, receipt.block_number, log_index);
 
             // Mark seal as consumed in local registry
             let registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
@@ -237,11 +237,11 @@ impl AnchorLayer for EthereumSealProtocol {
             tx_hash[..8].copy_from_slice(b"sim-tx-");
             tx_hash[8..].copy_from_slice(commitment.as_bytes());
 
-            Ok(EthereumAnchorRef::new(tx_hash, 0, 0))
+            Ok(EthereumCommitAnchor::new(tx_hash, 0, 0))
         }
     }
 
-    fn verify_inclusion(&self, anchor: Self::AnchorRef) -> CoreResult<Self::InclusionProof> {
+    fn verify_inclusion(&self, anchor: Self::CommitAnchor) -> CoreResult<Self::InclusionProof> {
         #[cfg(feature = "rpc")]
         {
             // Try to get real proof data from RPC
@@ -315,7 +315,7 @@ impl AnchorLayer for EthereumSealProtocol {
         Ok(proof)
     }
 
-    fn verify_finality(&self, anchor: Self::AnchorRef) -> CoreResult<Self::FinalityProof> {
+    fn verify_finality(&self, anchor: Self::CommitAnchor) -> CoreResult<Self::FinalityProof> {
         #[cfg(feature = "rpc")]
         {
             use tokio::runtime::Handle;
@@ -345,17 +345,17 @@ impl AnchorLayer for EthereumSealProtocol {
         }
     }
 
-    fn enforce_seal(&self, seal: Self::SealRef) -> CoreResult<()> {
+    fn enforce_seal(&self, seal: Self::SealPoint) -> CoreResult<()> {
         let registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
         registry.mark_seal_used(&seal).map_err(AdapterError::from)
     }
 
-    fn create_seal(&self, value: Option<u64>) -> CoreResult<Self::SealRef> {
+    fn create_seal(&self, value: Option<u64>) -> CoreResult<Self::SealPoint> {
         // Derive a seal from the CSVSeal contract address and a deterministic slot
         // The seal represents a nullifier slot in the contract's usedSeals mapping
         let nonce = value.unwrap_or(0);
 
-        Ok(EthereumSealRef::new(self.csv_seal_address, 0, nonce))
+        Ok(EthereumSealPoint::new(self.csv_seal_address, 0, nonce))
     }
 
     fn hash_commitment(
@@ -363,9 +363,9 @@ impl AnchorLayer for EthereumSealProtocol {
         contract_id: Hash,
         previous_commitment: Hash,
         transition_payload_hash: Hash,
-        seal_ref: &Self::SealRef,
+        seal_ref: &Self::SealPoint,
     ) -> Hash {
-        let core_seal = CoreSealRef::new(seal_ref.to_vec(), Some(seal_ref.nonce))
+        let core_seal = CoreSealPoint::new(seal_ref.to_vec(), Some(seal_ref.nonce))
             .expect("valid seal reference");
         Commitment::simple(
             contract_id,
@@ -379,16 +379,16 @@ impl AnchorLayer for EthereumSealProtocol {
 
     fn build_proof_bundle(
         &self,
-        anchor: Self::AnchorRef,
+        anchor: Self::CommitAnchor,
         transition_dag: DAGSegment,
     ) -> CoreResult<ProofBundle> {
         let inclusion = self.verify_inclusion(anchor.clone())?;
         let finality = self.verify_finality(anchor.clone())?;
 
-        let seal_ref = CoreSealRef::new(anchor.tx_hash.to_vec(), Some(anchor.log_index))
+        let seal_ref = CoreSealPoint::new(anchor.tx_hash.to_vec(), Some(anchor.log_index))
             .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
-        let anchor_ref = CoreAnchorRef::new(anchor.tx_hash.to_vec(), anchor.block_number, vec![])
+        let anchor_ref = CoreCommitAnchor::new(anchor.tx_hash.to_vec(), anchor.block_number, vec![])
             .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
         let inclusion_proof = csv_core::InclusionProof::new(
@@ -423,7 +423,7 @@ impl AnchorLayer for EthereumSealProtocol {
         .map_err(|e| AdapterError::Generic(e.to_string()))
     }
 
-    fn rollback(&self, anchor: Self::AnchorRef) -> CoreResult<()> {
+    fn rollback(&self, anchor: Self::CommitAnchor) -> CoreResult<()> {
         #[cfg(feature = "rpc")]
         {
             use tokio::runtime::Handle;
@@ -445,7 +445,7 @@ impl AnchorLayer for EthereumSealProtocol {
                 let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
                 // Derive the seal that was used for this anchor
                 // The nonce is tracked via the log_index
-                let seal = EthereumSealRef::new(self.csv_seal_address, 0, anchor.log_index);
+                let seal = EthereumSealPoint::new(self.csv_seal_address, 0, anchor.log_index);
                 registry.clear_seal(&seal);
             }
 
@@ -541,7 +541,7 @@ mod tests {
     #[test]
     fn test_verify_finality() {
         let adapter = test_adapter();
-        let anchor = EthereumAnchorRef::new([5u8; 32], 900, 0);
+        let anchor = EthereumCommitAnchor::new([5u8; 32], 900, 0);
         let result = adapter.verify_finality(anchor);
         assert!(result.is_ok());
     }

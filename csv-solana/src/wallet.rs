@@ -7,14 +7,14 @@ use solana_sdk::{
 };
 
 use crate::error::{SolanaError, SolanaResult};
-use crate::types::SolanaAnchorRef;
+use crate::types::SolanaCommitAnchor;
 
 /// Solana program wallet
 pub struct ProgramWallet {
     /// Keypair
     pub keypair: Keypair,
     /// Anchor reference
-    pub anchor_ref: Option<SolanaAnchorRef>,
+    pub anchor_ref: Option<SolanaCommitAnchor>,
 }
 
 impl ProgramWallet {
@@ -41,12 +41,12 @@ impl ProgramWallet {
     }
 
     /// Get anchor reference
-    pub fn anchor_ref(&self) -> Option<&SolanaAnchorRef> {
+    pub fn anchor_ref(&self) -> Option<&SolanaCommitAnchor> {
         self.anchor_ref.as_ref()
     }
 
     /// Set anchor reference
-    pub fn set_anchor_ref(&mut self, anchor_ref: SolanaAnchorRef) {
+    pub fn set_anchor_ref(&mut self, anchor_ref: SolanaCommitAnchor) {
         self.anchor_ref = Some(anchor_ref);
     }
 

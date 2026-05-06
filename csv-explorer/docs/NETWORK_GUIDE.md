@@ -36,7 +36,7 @@ NETWORK=testnet ./start.sh
 ## UI Features
 
 ### Network Selector
-- Located in the header (top-right)
+- Located in the header (top-sanad)
 - Dropdown to switch between Mainnet/Testnet
 - Badge shows current network (blue for mainnet, purple for testnet)
 - Clicking opens the selected network in a new tab
@@ -109,13 +109,13 @@ tail -f /tmp/csv-explorer-ui-testnet.log
 ### Mainnet
 - Health: http://localhost:8080/health
 - Stats: http://localhost:8080/api/v1/stats
-- Rights: http://localhost:8080/api/v1/rights
+- Sanads: http://localhost:8080/api/v1/sanads
 - Transfers: http://localhost:8080/api/v1/transfers
 - Seals: http://localhost:8080/api/v1/seals
 
 ### Testnet
 - Health: http://localhost:8081/health
 - Stats: http://localhost:8081/api/v1/stats
-- Rights: http://localhost:8081/api/v1/rights
+- Sanads: http://localhost:8081/api/v1/sanads
 - Transfers: http://localhost:8081/api/v1/transfers
 - Seals: http://localhost:8081/api/v1/seals

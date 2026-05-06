@@ -50,8 +50,8 @@ pub fn SealDetail(id: String) -> Element {
                         DetailRow { label: "Seal Type", value: s.seal_type.to_string() }
                         DetailRow { label: "Seal Reference", value: s.seal_ref.clone() }
                         DetailRow { label: "Block Height", value: s.block_height.to_string() }
-                        if let Some(ref right_id) = s.right_id {
-                            DetailRow { label: "Linked Right", value: right_id.clone() }
+                        if let Some(ref sanad_id) = s.sanad_id {
+                            DetailRow { label: "Linked Sanad", value: sanad_id.clone() }
                         }
                         DetailRow { label: "Status", value: s.status.to_string() }
                         if let Some(consumed_at) = s.consumed_at {
@@ -70,11 +70,11 @@ pub fn SealDetail(id: String) -> Element {
                 }
 
                 // Related links
-                if let Some(ref right_id) = s.right_id {
+                if let Some(ref sanad_id) = s.sanad_id {
                     div { class: "flex items-center gap-4",
-                        Link { to: Route::RightDetail { id: right_id.clone() },
+                        Link { to: Route::SanadDetail { id: sanad_id.clone() },
                             button { class: "px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors",
-                                "View Linked Right →"
+                                "View Linked Sanad →"
                             }
                         }
                     }
@@ -121,24 +121,24 @@ fn StatusBadge(status: String) -> Element {
 fn SealTypeInfo(seal_type: String) -> Element {
     let (description, example) = match seal_type.as_str() {
         "utxo" => (
-            "A UTXO-based seal that locks a right in a specific unspent transaction output on Bitcoin.",
-            "Created by committing a right to a Taproot output with a specific spending condition.",
+            "A UTXO-based seal that locks a sanad in a specific unspent transaction output on Bitcoin.",
+            "Created by committing a sanad to a Taproot output with a specific spending condition.",
         ),
         "object" => (
-            "An object-based seal that stores a right in a Sui object on the Sui blockchain.",
-            "Created by wrapping a right in a Sui object with sealed transfer capabilities.",
+            "An object-based seal that stores a sanad in a Sui object on the Sui blockchain.",
+            "Created by wrapping a sanad in a Sui object with sealed transfer capabilities.",
         ),
         "resource" => (
-            "A resource-based seal that embeds a right in an Aptos resource.",
-            "Created by storing a right in an Aptos account resource with access controls.",
+            "A resource-based seal that embeds a sanad in an Aptos resource.",
+            "Created by storing a sanad in an Aptos account resource with access controls.",
         ),
         "nullifier" => (
             "A nullifier-based seal that prevents double-spending by recording a nullifier.",
-            "Created by generating a cryptographic nullifier from the right's commitment.",
+            "Created by generating a cryptographic nullifier from the sanad's commitment.",
         ),
         "account" => (
-            "An account-based seal that associates a right with a Solana account state.",
-            "Created by storing a right in a Solana program-derived account (PDA).",
+            "An account-based seal that associates a sanad with a Solana account state.",
+            "Created by storing a sanad in a Solana program-derived account (PDA).",
         ),
         _ => (
             "Unknown seal type. This may indicate a new or unsupported seal mechanism.",

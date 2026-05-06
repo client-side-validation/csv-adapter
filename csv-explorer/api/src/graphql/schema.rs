@@ -6,7 +6,7 @@ use async_graphql::*;
 use sqlx::SqlitePool;
 
 use csv_explorer_storage::repositories::{
-    AdvancedProofRepository, ContractsRepository, RightsRepository, SealsRepository,
+    AdvancedProofRepository, ContractsRepository, SanadsRepository, SealsRepository,
     StatsRepository, TransfersRepository,
 };
 
@@ -25,42 +25,42 @@ pub struct Query;
 
 #[Object]
 impl Query {
-    /// Get a single right by ID.
-    async fn right(&self, ctx: &Context<'_>, id: String) -> Result<Option<Right>> {
+    /// Get a single sanad by ID.
+    async fn sanad(&self, ctx: &Context<'_>, id: String) -> Result<Option<Sanad>> {
         let gql_ctx = ctx
             .data::<GraphqlContext>()
             .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
-        let repo = RightsRepository::new(gql_ctx.pool.clone());
+        let repo = SanadsRepository::new(gql_ctx.pool.clone());
         let record = repo
             .get(&id)
             .await
             .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
-        Ok(record.map(Right::from))
+        Ok(record.map(Sanad::from))
     }
 
-    /// List rights with optional filtering and pagination.
-    async fn rights(
+    /// List sanads with optional filtering and pagination.
+    async fn sanads(
         &self,
         ctx: &Context<'_>,
-        filter: Option<RightFilterInput>,
-    ) -> Result<RightConnection> {
+        filter: Option<SanadFilterInput>,
+    ) -> Result<SanadConnection> {
         let gql_ctx = ctx
             .data::<GraphqlContext>()
             .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
-        let repo = RightsRepository::new(gql_ctx.pool.clone());
+        let repo = SanadsRepository::new(gql_ctx.pool.clone());
 
         let filter = filter.unwrap_or_default();
         let limit = filter.limit.unwrap_or(20) as usize;
         let offset = filter.offset.unwrap_or(0) as usize;
 
-        let shared_filter = csv_explorer_shared::RightFilter {
+        let shared_filter = csv_explorer_shared::SanadFilter {
             chain: filter.chain,
             owner: filter.owner,
             status: filter.status.as_deref().map(|s| match s {
-                "active" => csv_explorer_shared::RightStatus::Active,
-                "spent" => csv_explorer_shared::RightStatus::Spent,
-                "pending" => csv_explorer_shared::RightStatus::Pending,
-                _ => csv_explorer_shared::RightStatus::Active,
+                "active" => csv_explorer_shared::SanadStatus::Active,
+                "spent" => csv_explorer_shared::SanadStatus::Spent,
+                "pending" => csv_explorer_shared::SanadStatus::Pending,
+                _ => csv_explorer_shared::SanadStatus::Active,
             }),
             limit: Some(limit),
             offset: Some(offset),
@@ -75,11 +75,11 @@ impl Query {
             .await
             .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
 
-        let edges: Vec<RightEdge> = records
+        let edges: Vec<SanadEdge> = records
             .into_iter()
             .enumerate()
-            .map(|(i, r)| RightEdge {
-                node: Right::from(r),
+            .map(|(i, r)| SanadEdge {
+                node: Sanad::from(r),
                 cursor: (offset + i).to_string(),
             })
             .collect();
@@ -89,7 +89,7 @@ impl Query {
         let start_cursor = edges.first().map(|e| e.cursor.clone());
         let end_cursor = edges.last().map(|e| e.cursor.clone());
 
-        Ok(RightConnection {
+        Ok(SanadConnection {
             edges,
             page_info: PageInfo::new(has_next_page, has_previous_page, start_cursor, end_cursor),
             total_count: total_count as i64,
@@ -125,7 +125,7 @@ impl Query {
         let offset = filter.offset.unwrap_or(0) as usize;
 
         let shared_filter = csv_explorer_shared::TransferFilter {
-            right_id: filter.right_id,
+            sanad_id: filter.sanad_id,
             from_chain: filter.from_chain,
             to_chain: filter.to_chain,
             status: filter.status.as_deref().map(|s| match s {
@@ -215,7 +215,7 @@ impl Query {
                 "consumed" => csv_explorer_shared::SealStatus::Consumed,
                 _ => csv_explorer_shared::SealStatus::Available,
             }),
-            right_id: filter.right_id,
+            sanad_id: filter.sanad_id,
             limit: Some(limit),
             offset: Some(offset),
         };
@@ -303,7 +303,7 @@ impl Query {
             contract_type: filter.contract_type.as_deref().map(|s| match s {
                 "nullifier_registry" => csv_explorer_shared::ContractType::NullifierRegistry,
                 "state_commitment" => csv_explorer_shared::ContractType::StateCommitment,
-                "right_registry" => csv_explorer_shared::ContractType::RightRegistry,
+                "sanad_registry" => csv_explorer_shared::ContractType::SanadRegistry,
                 "bridge" => csv_explorer_shared::ContractType::Bridge,
                 _ => csv_explorer_shared::ContractType::Other,
             }),
@@ -367,44 +367,44 @@ impl Query {
         Ok(Vec::new())
     }
 
-    /// Get rights by owner address.
-    async fn rights_by_owner(&self, ctx: &Context<'_>, owner: String) -> Result<Vec<Right>> {
+    /// Get sanads by owner address.
+    async fn sanads_by_owner(&self, ctx: &Context<'_>, owner: String) -> Result<Vec<Sanad>> {
         let gql_ctx = ctx
             .data::<GraphqlContext>()
             .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
-        let repo = RightsRepository::new(gql_ctx.pool.clone());
+        let repo = SanadsRepository::new(gql_ctx.pool.clone());
         let records = repo
             .by_owner(&owner)
             .await
             .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
-        Ok(records.into_iter().map(Right::from).collect())
+        Ok(records.into_iter().map(Sanad::from).collect())
     }
 
-    /// Get transfers for a specific right.
-    async fn transfers_by_right(
+    /// Get transfers for a specific sanad.
+    async fn transfers_by_sanad(
         &self,
         ctx: &Context<'_>,
-        right_id: String,
+        sanad_id: String,
     ) -> Result<Vec<Transfer>> {
         let gql_ctx = ctx
             .data::<GraphqlContext>()
             .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = TransfersRepository::new(gql_ctx.pool.clone());
         let records = repo
-            .by_right(&right_id)
+            .by_sanad(&sanad_id)
             .await
             .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         Ok(records.into_iter().map(Transfer::from).collect())
     }
 
-    /// Get seals for a specific right.
-    async fn seals_by_right(&self, ctx: &Context<'_>, right_id: String) -> Result<Vec<Seal>> {
+    /// Get seals for a specific sanad.
+    async fn seals_by_sanad(&self, ctx: &Context<'_>, sanad_id: String) -> Result<Vec<Seal>> {
         let gql_ctx = ctx
             .data::<GraphqlContext>()
             .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = SealsRepository::new(gql_ctx.pool.clone());
         let records = repo
-            .by_right(&right_id)
+            .by_sanad(&sanad_id)
             .await
             .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         Ok(records.into_iter().map(Seal::from).collect())
@@ -414,21 +414,21 @@ impl Query {
     // Advanced commitment and proof queries
     // -----------------------------------------------------------------------
 
-    /// Get enhanced rights with commitment scheme and proof metadata.
-    async fn enhanced_rights(
+    /// Get enhanced sanads with commitment scheme and proof metadata.
+    async fn enhanced_sanads(
         &self,
         ctx: &Context<'_>,
         scheme: Option<String>,
         proof_type: Option<String>,
         limit: Option<i32>,
         offset: Option<i32>,
-    ) -> Result<Vec<EnhancedRight>> {
+    ) -> Result<Vec<EnhancedSanad>> {
         let gql_ctx = ctx
             .data::<GraphqlContext>()
             .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
         let repo = AdvancedProofRepository::new(gql_ctx.pool.clone());
 
-        let filter = csv_explorer_shared::RightProofFilter {
+        let filter = csv_explorer_shared::SanadProofFilter {
             chain: None,
             owner: None,
             commitment_scheme: scheme
@@ -443,10 +443,10 @@ impl Query {
         };
 
         let records = repo
-            .query_enhanced_rights(filter)
+            .query_enhanced_sanads(filter)
             .await
             .map_err(|e| ServerError::new(format!("{:?}", e), None))?;
-        Ok(records.into_iter().map(EnhancedRight::from).collect())
+        Ok(records.into_iter().map(EnhancedSanad::from).collect())
     }
 
     /// Get enhanced seals with proof metadata.

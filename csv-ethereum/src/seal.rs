@@ -4,7 +4,7 @@
 //! Seals are persisted in SQLite when a SqliteSealStore is attached.
 
 use crate::error::{EthereumError, EthereumResult};
-use crate::types::EthereumSealRef;
+use crate::types::EthereumSealPoint;
 use csv_core::hardening::{BoundedQueue, MAX_SEAL_NULLIFIER_SIZE};
 #[cfg(feature = "rpc")]
 use csv_core::Hash;
@@ -66,7 +66,7 @@ impl SealRegistry {
     }
 
     /// Build the seal registry key
-    fn seal_key(seal: &EthereumSealRef) -> Vec<u8> {
+    fn seal_key(seal: &EthereumSealPoint) -> Vec<u8> {
         let mut key = Vec::with_capacity(28);
         key.extend_from_slice(&seal.contract_address);
         key.extend_from_slice(&seal.slot_index.to_le_bytes());
@@ -92,14 +92,14 @@ impl SealRegistry {
     }
 
     /// Check if a seal has been used
-    pub fn is_seal_used(&self, seal: &EthereumSealRef) -> bool {
+    pub fn is_seal_used(&self, seal: &EthereumSealPoint) -> bool {
         let key = Self::seal_key(seal);
         let cache = self.used_seals.lock().unwrap_or_else(|e| e.into_inner());
         cache.contains(&key)
     }
 
     /// Mark a seal as used - persists if store is attached
-    pub fn mark_seal_used(&self, seal: &EthereumSealRef) -> EthereumResult<()> {
+    pub fn mark_seal_used(&self, seal: &EthereumSealPoint) -> EthereumResult<()> {
         if self.is_seal_used(seal) {
             return Err(EthereumError::SlotUsed(format!(
                 "Storage slot {} at contract {:?} has already been used",
@@ -154,7 +154,7 @@ impl SealRegistry {
     }
 
     /// Clear a seal from the registry (for reorg rollback)
-    pub fn clear_seal(&self, seal: &EthereumSealRef) {
+    pub fn clear_seal(&self, seal: &EthereumSealPoint) {
         {
             let mut cache = self.used_seals.lock().unwrap_or_else(|e| e.into_inner());
             let key = Self::seal_key(seal);
@@ -171,7 +171,7 @@ impl SealRegistry {
     }
 
     /// Get all used seals
-    pub fn get_all_seals(&self) -> Vec<EthereumSealRef> {
+    pub fn get_all_seals(&self) -> Vec<EthereumSealPoint> {
         let cache = self.used_seals.lock().unwrap_or_else(|e| e.into_inner());
         cache
             .iter()
@@ -182,7 +182,7 @@ impl SealRegistry {
                     let slot_index = u64::from_le_bytes([
                         key[20], key[21], key[22], key[23], key[24], key[25], key[26], key[27],
                     ]);
-                    Some(EthereumSealRef::new(address, slot_index, 0))
+                    Some(EthereumSealPoint::new(address, slot_index, 0))
                 } else {
                     None
                 }
@@ -190,7 +190,7 @@ impl SealRegistry {
             .collect()
     }
 
-    fn build_seal_id_bytes(&self, seal: &EthereumSealRef) -> Vec<u8> {
+    fn build_seal_id_bytes(&self, seal: &EthereumSealPoint) -> Vec<u8> {
         let mut id = Vec::with_capacity(28);
         id.extend_from_slice(&seal.contract_address);
         id.extend_from_slice(&seal.slot_index.to_le_bytes());
@@ -234,24 +234,24 @@ mod tests {
     #[test]
     fn test_seal_registry() {
         let registry = SealRegistry::new();
-        let seal = EthereumSealRef::new([1u8; 20], 42, 1);
+        let seal = EthereumSealPoint::new([1u8; 20], 42, 1);
 
         assert!(!registry.is_seal_used(&seal));
         registry.mark_seal_used(&seal).unwrap();
         assert!(registry.is_seal_used(&seal));
 
-        let seal2 = EthereumSealRef::new([1u8; 20], 42, 2);
+        let seal2 = EthereumSealPoint::new([1u8; 20], 42, 2);
         assert!(registry.mark_seal_used(&seal2).is_err());
 
-        let seal3 = EthereumSealRef::new([1u8; 20], 43, 1);
+        let seal3 = EthereumSealPoint::new([1u8; 20], 43, 1);
         assert!(registry.mark_seal_used(&seal3).is_ok());
     }
 
     #[test]
     fn test_seal_registry_get_all() {
         let registry = SealRegistry::new();
-        let seal1 = EthereumSealRef::new([1u8; 20], 10, 1);
-        let seal2 = EthereumSealRef::new([2u8; 20], 20, 1);
+        let seal1 = EthereumSealPoint::new([1u8; 20], 10, 1);
+        let seal2 = EthereumSealPoint::new([2u8; 20], 20, 1);
 
         registry.mark_seal_used(&seal1).unwrap();
         registry.mark_seal_used(&seal2).unwrap();
@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn test_seal_registry_clear() {
         let registry = SealRegistry::new();
-        let seal = EthereumSealRef::new([1u8; 20], 42, 1);
+        let seal = EthereumSealPoint::new([1u8; 20], 42, 1);
 
         registry.mark_seal_used(&seal).unwrap();
         assert!(registry.is_seal_used(&seal));
@@ -279,9 +279,9 @@ mod tests {
         let registry = SealRegistry::with_max_size(2);
         assert_eq!(registry.max_size(), 2);
 
-        let seal1 = EthereumSealRef::new([1u8; 20], 10, 1);
-        let seal2 = EthereumSealRef::new([2u8; 20], 20, 1);
-        let seal3 = EthereumSealRef::new([3u8; 20], 30, 1);
+        let seal1 = EthereumSealPoint::new([1u8; 20], 10, 1);
+        let seal2 = EthereumSealPoint::new([2u8; 20], 20, 1);
+        let seal3 = EthereumSealPoint::new([3u8; 20], 30, 1);
 
         registry.mark_seal_used(&seal1).unwrap();
         registry.mark_seal_used(&seal2).unwrap();

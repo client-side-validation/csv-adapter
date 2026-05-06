@@ -8,7 +8,7 @@ use dioxus::prelude::*;
 /// Wallet user modes - defines the navigation structure
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum WalletMode {
-    /// End users holding tokenized rights. Simple navigation.
+    /// End users holding tokenized sanads. Simple navigation.
     #[default]
     User,
     /// Developers building on CSV protocol. Advanced tools exposed.
@@ -151,7 +151,7 @@ pub fn Sidebar(sidebar_open: bool) -> Element {
                 // Collapsed sidebar - icons only (common links)
                 nav { class: "flex-1 py-3 px-2 flex flex-col items-center gap-1",
                     Link { to: Route::Dashboard {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Dashboard", "\u{1F4CA}" }
-                    Link { to: Route::Rights {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Rights", "\u{1F48E}" }
+                    Link { to: Route::Sanads {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Sanads", "\u{1F48E}" }
                     Link { to: Route::WalletPage {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Wallet", "\u{1F4B3}" }
                     Link { to: Route::Settings {}, class: "p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors", title: "Settings", "\u{2699}\u{FE0F}" }
                 }
@@ -172,13 +172,13 @@ fn user_mode_nav(mode: WalletMode) -> Element {
             {sidebar_link(Route::Dashboard {}, "\u{1F4CA}", "Overview")}
         })}
 
-        {sidebar_section("My Rights", rsx! {
-            {sidebar_link(Route::Rights {}, "\u{1F48E}", "All Rights")}
-            {sidebar_link(Route::CreateRight {}, "\u{2795}", "Create Right")}
+        {sidebar_section("My Sanads", rsx! {
+            {sidebar_link(Route::Sanads {}, "\u{1F48E}", "All Sanads")}
+            {sidebar_link(Route::CreateSanad {}, "\u{2795}", "Create Sanad")}
         })}
 
         {sidebar_section("Send / Receive", rsx! {
-            {sidebar_link(Route::TransferRight {}, "\u{1F4E4}", "Send Right")}
+            {sidebar_link(Route::TransferSanad {}, "\u{1F4E4}", "Send Sanad")}
             {sidebar_link(Route::CrossChainTransfer {}, "\u{1F504}", "Cross-Chain")}
         })}
 
@@ -201,11 +201,11 @@ fn developer_mode_nav(mode: WalletMode) -> Element {
             {sidebar_link(Route::Transactions {}, "\u{1F4B8}", "Transactions")}
         })}
 
-        {sidebar_section("Rights & Assets", rsx! {
-            {sidebar_link(Route::Rights {}, "\u{1F48E}", "All Rights")}
-            {sidebar_link(Route::CreateRight {}, "\u{2795}", "Create Right")}
-            {sidebar_link(Route::TransferRight {}, "\u{27A1}", "Transfer Right")}
-            {sidebar_link(Route::ConsumeRight {}, "\u{1F525}", "Consume Right")}
+        {sidebar_section("Sanads & Assets", rsx! {
+            {sidebar_link(Route::Sanads {}, "\u{1F48E}", "All Sanads")}
+            {sidebar_link(Route::CreateSanad {}, "\u{2795}", "Create Sanad")}
+            {sidebar_link(Route::TransferSanad {}, "\u{27A1}", "Transfer Sanad")}
+            {sidebar_link(Route::ConsumeSanad {}, "\u{1F525}", "Consume Sanad")}
         })}
 
         {sidebar_section("Cross-Chain Transfer", rsx! {

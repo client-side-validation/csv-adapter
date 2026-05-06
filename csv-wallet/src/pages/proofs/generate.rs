@@ -11,7 +11,7 @@ use std::rc::Rc;
 pub fn GenerateProof() -> Element {
     let mut wallet_ctx = use_wallet_context();
     let mut selected_chain = use_signal(|| Chain::Bitcoin);
-    let mut right_id = use_signal(String::new);
+    let mut sanad_id = use_signal(String::new);
     let mut result = use_signal(|| Option::<String>::None);
 
     let proof_type = match *selected_chain.read() {
@@ -35,10 +35,10 @@ pub fn GenerateProof() -> Element {
                     if let Ok(c) = v.value().parse::<Chain>() { selected_chain.set(c); }
                 }, *selected_chain.read()))}
 
-                {form_field("Right ID", rsx! {
+                {form_field("Sanad ID", rsx! {
                     input {
-                        value: "{right_id.read()}",
-                        oninput: move |evt| { right_id.set(evt.value()); },
+                        value: "{sanad_id.read()}",
+                        oninput: move |evt| { sanad_id.set(evt.value()); },
                         class: "{input_mono_class()}",
                         r#type: "text"
                     }
@@ -56,24 +56,24 @@ pub fn GenerateProof() -> Element {
 
                 button {
                     onclick: move |_| {
-                        // Get the real seal_ref from the wallet context for this right
-                        let right_id_str = right_id.read().clone();
-                        let seal_ref = wallet_ctx.seal_for_right(&right_id_str)
+                        // Get the real seal_ref from the wallet context for this sanad
+                        let sanad_id_str = sanad_id.read().clone();
+                        let seal_ref = wallet_ctx.seal_for_sanad(&sanad_id_str)
                             .map(|s| s.seal_ref.clone())
                             .unwrap_or_else(|| {
                                 // If no seal found, cannot generate proof - this is a protocol requirement
-                                web_sys::console::error_1(&"No seal found for right - cannot generate proof without real chain-native seal".into());
+                                web_sys::console::error_1(&"No seal found for sanad - cannot generate proof without real chain-native seal".into());
                                 String::new()
                             });
 
                         if seal_ref.is_empty() {
-                            result.set(Some("Error: No seal found for this right. Create a seal first.".to_string()));
+                            result.set(Some("Error: No seal found for this sanad. Create a seal first.".to_string()));
                             return;
                         }
 
                         let proof_json = serde_json::json!({
                             "chain": selected_chain.read().to_string(),
-                            "right_id": right_id_str.clone(),
+                            "sanad_id": sanad_id_str.clone(),
                             "seal_ref": seal_ref.clone(),
                             "proof_type": proof_type,
                             "data": "proof_data_value"
@@ -82,7 +82,7 @@ pub fn GenerateProof() -> Element {
                         result.set(Some(formatted));
                         wallet_ctx.add_proof(ProofRecord {
                             chain: *selected_chain.read(),
-                            right_id: right_id_str,
+                            sanad_id: sanad_id_str,
                             seal_ref,
                             proof_type: proof_type.to_string(),
                             status: ProofStatus::Generated,

@@ -60,7 +60,7 @@ pub struct MuxProof {
 pub struct MerkleBranchNode {
     /// Sibling hash
     pub hash: Hash,
-    /// Whether this sibling is on the left (true) or right (false)
+    /// Whether this sibling is on the left (true) or sanad (false)
     pub is_left: bool,
 }
 
@@ -139,8 +139,8 @@ impl CommitMux {
                     // Odd node: promote to next level
                     next_level.push(*left);
                 } else {
-                    let right = &chunk[1];
-                    next_level.push(hash_pair(left, right));
+                    let sanad = &chunk[1];
+                    next_level.push(hash_pair(left, sanad));
                 }
             }
             hashes = next_level;
@@ -186,7 +186,7 @@ impl CommitMux {
         let mut idx = leaf_index;
         for level in levels.iter().take(levels.len() - 1) {
             let (sibling_idx, is_left) = if idx % 2 == 0 {
-                (idx + 1, false) // Sibling is to the right
+                (idx + 1, false) // Sibling is to the sanad
             } else {
                 (idx - 1, true) // Sibling is to the left
             };
@@ -226,10 +226,10 @@ impl CommitMux {
 }
 
 /// Hash two nodes together (internal helper using tagged hashing)
-fn hash_pair(left: &Hash, right: &Hash) -> Hash {
+fn hash_pair(left: &Hash, sanad: &Hash) -> Hash {
     let mut data = [0u8; 64];
     data[..32].copy_from_slice(left.as_bytes());
-    data[32..].copy_from_slice(right.as_bytes());
+    data[32..].copy_from_slice(sanad.as_bytes());
     Hash::new(csv_tagged_hash("mpc-internal", &data))
 }
 

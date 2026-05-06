@@ -16,12 +16,12 @@ The core insight: blockchains already enforce single-use guarantees. Bitcoin's U
 
 2. **Client verifies proof** — The receiving side validates cryptographic evidence, not bridge attestations.
 
-3. **Right stays portable** — The "Right" (the asset representation) lives off-chain in the client, making it chain-agnostic until anchoring.
+3. **Sanad stays portable** — The "Sanad" (the asset representation) lives off-chain in the client, making it chain-agnostic until anchoring.
 
 ## How It Works
 
 ```
-Right (off-chain) → Seal (on-chain) → Consumed (proof) → Re-anchored (new chain)
+Sanad (off-chain) → Seal (on-chain) → Consumed (proof) → Re-anchored (new chain)
 ```
 
 A "Seal" is a cryptographic proof of single-use commitment. Once a seal is consumed on the source chain, it generates a proof bundle that can be verified anywhere—no bridge required.

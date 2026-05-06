@@ -12,9 +12,9 @@ use serde::{Deserialize, Serialize};
 use super::chain_indexer::{AddressIndexingResult, ChainIndexer, ChainResult};
 use super::rpc_manager::RpcManager;
 use csv_explorer_shared::{
-    ChainConfig, CommitmentScheme, ContractStatus, ContractType, CsvContract, EnhancedRightRecord,
+    ChainConfig, CommitmentScheme, ContractStatus, ContractType, CsvContract, EnhancedSanadRecord,
     EnhancedSealRecord, EnhancedTransferRecord, ExplorerError, FinalityProofType,
-    InclusionProofType, Network, PriorityLevel, RightRecord, SealRecord, SealStatus, SealType,
+    InclusionProofType, Network, PriorityLevel, SanadRecord, SealRecord, SealStatus, SealType,
     TransferRecord,
 };
 
@@ -93,20 +93,20 @@ impl ChainIndexer for SolanaIndexer {
         Ok(0)
     }
 
-    async fn index_rights(&self, block: u64) -> ChainResult<Vec<RightRecord>> {
+    async fn index_sanads(&self, block: u64) -> ChainResult<Vec<SanadRecord>> {
         let txns = self.get_transactions_for_slot(block).await?;
-        let mut rights = Vec::new();
+        let mut sanads = Vec::new();
 
         for txn_info in &txns {
             if let Some(meta) = &txn_info.meta {
                 if let Some(logs) = meta.get("logMessages").and_then(|v| v.as_array()) {
                     for log in logs {
                         if let Some(log_str) = log.as_str() {
-                            if log_str.contains("csv_right_created")
-                                || log_str.contains("RightCreated")
+                            if log_str.contains("csv_sanad_created")
+                                || log_str.contains("SanadCreated")
                             {
-                                if let Some(right) = self.parse_right_from_log(txn_info, log_str) {
-                                    rights.push(right);
+                                if let Some(sanad) = self.parse_sanad_from_log(txn_info, log_str) {
+                                    sanads.push(sanad);
                                 }
                             }
                         }
@@ -118,10 +118,10 @@ impl ChainIndexer for SolanaIndexer {
         tracing::debug!(
             chain = "solana",
             block,
-            count = rights.len(),
-            "Indexed rights"
+            count = sanads.len(),
+            "Indexed sanads"
         );
-        Ok(rights)
+        Ok(sanads)
     }
 
     async fn index_seals(&self, block: u64) -> ChainResult<Vec<SealRecord>> {
@@ -188,7 +188,7 @@ impl ChainIndexer for SolanaIndexer {
         Ok(vec![CsvContract {
             id: "sol-csv-program".to_string(),
             chain: "solana".to_string(),
-            contract_type: ContractType::RightRegistry,
+            contract_type: ContractType::SanadRegistry,
             address: "CsvRegistry111111111111111111111111111".to_string(),
             deployed_tx: "genesis".to_string(),
             deployed_at: chrono::Utc::now(),
@@ -197,23 +197,23 @@ impl ChainIndexer for SolanaIndexer {
         }])
     }
 
-    async fn index_enhanced_rights(&self, block: u64) -> ChainResult<Vec<EnhancedRightRecord>> {
+    async fn index_enhanced_sanads(&self, block: u64) -> ChainResult<Vec<EnhancedSanadRecord>> {
         Ok(self
-            .index_rights(block)
+            .index_sanads(block)
             .await?
             .into_iter()
-            .map(|right| EnhancedRightRecord {
-                id: right.id.clone(),
-                chain: right.chain.clone(),
-                seal_ref: right.seal_ref.clone(),
-                commitment: right.commitment.clone(),
-                owner: right.owner.clone(),
-                created_at: right.created_at,
-                created_tx: right.created_tx.clone(),
-                status: right.status.to_string(),
-                metadata: right.metadata,
-                transfer_count: right.transfer_count,
-                last_transfer_at: right.last_transfer_at,
+            .map(|sanad| EnhancedSanadRecord {
+                id: sanad.id.clone(),
+                chain: sanad.chain.clone(),
+                seal_ref: sanad.seal_ref.clone(),
+                commitment: sanad.commitment.clone(),
+                owner: sanad.owner.clone(),
+                created_at: sanad.created_at,
+                created_tx: sanad.created_tx.clone(),
+                status: sanad.status.to_string(),
+                metadata: sanad.metadata,
+                transfer_count: sanad.transfer_count,
+                last_transfer_at: sanad.last_transfer_at,
                 commitment_scheme: CommitmentScheme::HashBased,
                 commitment_version: 1,
                 protocol_id: "csv-sol".to_string(),
@@ -237,7 +237,7 @@ impl ChainIndexer for SolanaIndexer {
                 chain: s.chain.clone(),
                 seal_type: s.seal_type.to_string(),
                 seal_ref: s.seal_ref.clone(),
-                right_id: s.right_id.clone(),
+                sanad_id: s.sanad_id.clone(),
                 status: s.status.to_string(),
                 consumed_at: s.consumed_at,
                 consumed_tx: s.consumed_tx.clone(),
@@ -258,7 +258,7 @@ impl ChainIndexer for SolanaIndexer {
             .into_iter()
             .map(|t| EnhancedTransferRecord {
                 id: t.id.clone(),
-                right_id: t.right_id.clone(),
+                sanad_id: t.sanad_id.clone(),
                 from_chain: t.from_chain.clone(),
                 to_chain: t.to_chain.clone(),
                 from_owner: t.from_owner.clone(),
@@ -289,7 +289,7 @@ impl ChainIndexer for SolanaIndexer {
         FinalityProofType::FinalizedBlock
     }
 
-    async fn index_rights_by_address(&self, _address: &str) -> ChainResult<Vec<RightRecord>> {
+    async fn index_sanads_by_address(&self, _address: &str) -> ChainResult<Vec<SanadRecord>> {
         Ok(Vec::new())
     }
 
@@ -309,15 +309,15 @@ impl ChainIndexer for SolanaIndexer {
     ) -> ChainResult<AddressIndexingResult> {
         let mut result = AddressIndexingResult {
             addresses_processed: 0,
-            rights_indexed: 0,
+            sanads_indexed: 0,
             seals_indexed: 0,
             transfers_indexed: 0,
             contracts_indexed: 0,
             errors: Vec::new(),
         };
         for address in addresses {
-            if let Ok(rights) = self.index_rights_by_address(address).await {
-                result.rights_indexed += rights.len() as u64;
+            if let Ok(sanads) = self.index_sanads_by_address(address).await {
+                result.sanads_indexed += sanads.len() as u64;
                 result.addresses_processed += 1;
             }
         }
@@ -412,11 +412,11 @@ impl SolanaIndexer {
             .to_string()
     }
 
-    fn parse_right_from_log(
+    fn parse_sanad_from_log(
         &self,
         txn_info: &TransactionInfo,
         _log_str: &str,
-    ) -> Option<RightRecord> {
+    ) -> Option<SanadRecord> {
         let sig = Self::tx_signature(txn_info);
         let slot = txn_info.slot.unwrap_or(0);
 
@@ -435,15 +435,15 @@ impl SolanaIndexer {
         // Use first account as potential seal reference, or "unknown" if unavailable
         let seal_ref = first_account.unwrap_or_else(|| "unknown".to_string());
 
-        Some(RightRecord {
-            id: format!("sol-right-{}", sig),
+        Some(SanadRecord {
+            id: format!("sol-sanad-{}", sig),
             chain: "solana".to_string(),
             seal_ref,
             commitment: format!("sol-commitment-{}", sig),
             owner: "unknown".to_string(),
             created_at: chrono::Utc::now(),
             created_tx: sig,
-            status: csv_explorer_shared::RightStatus::Active,
+            status: csv_explorer_shared::SanadStatus::Active,
             metadata: Some(serde_json::json!({
                 "protocol_id": "csv-sol",
                 "commitment_scheme": "hash_based",
@@ -478,7 +478,7 @@ impl SolanaIndexer {
             chain: "solana".to_string(),
             seal_type: SealType::Account,
             seal_ref,
-            right_id: None,
+            sanad_id: None,
             status: SealStatus::Consumed,
             consumed_at: Some(chrono::Utc::now()),
             consumed_tx: Some(sig),
@@ -490,7 +490,7 @@ impl SolanaIndexer {
         let sig = Self::tx_signature(txn_info);
         Some(TransferRecord {
             id: format!("sol-xfer-{}", sig),
-            right_id: format!("sol-right-{}", sig),
+            sanad_id: format!("sol-sanad-{}", sig),
             from_chain: "solana".to_string(),
             to_chain: "unknown".to_string(),
             from_owner: "unknown".to_string(),

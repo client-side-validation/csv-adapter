@@ -51,8 +51,8 @@ proptest = "1.4"
 tempfile = "3.8"
 
 [[example]]
-name = "basic_right"
-path = "examples/basic_right.rs"
+name = "basic_sanad"
+path = "examples/basic_sanad.rs"
 
 [[example]]
 name = "commitment_chain"

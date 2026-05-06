@@ -9,7 +9,7 @@ use std::sync::Arc;
 pub struct WalletState {
     pub is_connected: bool,
     pub address: Option<String>,
-    pub rights_count: u64,
+    pub sanads_count: u64,
 }
 
 /// Hook for managing wallet connection.
@@ -35,9 +35,9 @@ impl WalletHook {
         self.state.address.as_deref()
     }
 
-    /// Get the number of rights owned by the wallet.
-    pub fn rights_count(&self) -> u64 {
-        self.state.rights_count
+    /// Get the number of sanads owned by the wallet.
+    pub fn sanads_count(&self) -> u64 {
+        self.state.sanads_count
     }
 
     /// Simulate connecting a wallet.
@@ -47,7 +47,7 @@ impl WalletHook {
         // For now, use a test connection
         self.state.is_connected = true;
         self.state.address = Some("bc1qexampleaddress".to_string());
-        self.state.rights_count = 0;
+        self.state.sanads_count = 0;
         Ok(())
     }
 
@@ -56,14 +56,14 @@ impl WalletHook {
         self.state = WalletState::default();
     }
 
-    /// Refresh wallet data (rights count, etc.).
+    /// Refresh wallet data (sanads count, etc.).
     pub async fn refresh(&mut self) -> Result<(), WalletError> {
         if !self.state.is_connected {
             return Err(WalletError::NotConnected);
         }
 
         // In production: fetch wallet data from API
-        self.state.rights_count = 0;
+        self.state.sanads_count = 0;
         Ok(())
     }
 }

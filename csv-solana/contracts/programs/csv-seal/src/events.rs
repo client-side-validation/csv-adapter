@@ -11,18 +11,18 @@ pub struct RegistryInitialized {
     pub refund_timeout: u32,
 }
 
-/// Emitted when a new Right is created
+/// Emitted when a new Sanad is created
 #[event]
-pub struct RightCreated {
-    /// Unique Right identifier
-    pub right_id: [u8; 32],
+pub struct SanadCreated {
+    /// Unique Sanad identifier
+    pub sanad_id: [u8; 32],
     /// Commitment hash
     pub commitment: [u8; 32],
-    /// Owner of the right
+    /// Owner of the sanad
     pub owner: Pubkey,
     /// Account address (PDA)
     pub account: Pubkey,
-    /// Asset class: 0 unspecified, 1 fungible token, 2 NFT, 3 proof right
+    /// Asset class: 0 unspecified, 1 fungible token, 2 NFT, 3 proof sanad
     pub asset_class: u8,
     /// Chain-native token mint, NFT collection/item id, or proof family id
     pub asset_id: [u8; 32],
@@ -34,27 +34,27 @@ pub struct RightCreated {
     pub proof_root: [u8; 32],
 }
 
-/// Emitted when a Right is consumed
+/// Emitted when a Sanad is consumed
 #[event]
-pub struct RightConsumed {
-    /// Unique Right identifier
-    pub right_id: [u8; 32],
+pub struct SanadConsumed {
+    /// Unique Sanad identifier
+    pub sanad_id: [u8; 32],
     /// Commitment hash
     pub commitment: [u8; 32],
-    /// Address that consumed the right
+    /// Address that consumed the sanad
     pub consumer: Pubkey,
     /// Account address
     pub account: Pubkey,
 }
 
-/// Emitted when a Right is locked for cross-chain transfer
+/// Emitted when a Sanad is locked for cross-chain transfer
 #[event]
 pub struct CrossChainLock {
-    /// Unique Right identifier
-    pub right_id: [u8; 32],
+    /// Unique Sanad identifier
+    pub sanad_id: [u8; 32],
     /// Commitment hash
     pub commitment: [u8; 32],
-    /// Owner of the right
+    /// Owner of the sanad
     pub owner: Pubkey,
     /// Destination chain ID
     pub destination_chain: u8,
@@ -76,20 +76,20 @@ pub struct CrossChainLock {
     pub proof_root: [u8; 32],
 }
 
-/// Emitted when a Right is minted from a cross-chain transfer
+/// Emitted when a Sanad is minted from a cross-chain transfer
 #[event]
 pub struct CrossChainMint {
-    /// Unique Right identifier (from source chain)
-    pub right_id: [u8; 32],
+    /// Unique Sanad identifier (from source chain)
+    pub sanad_id: [u8; 32],
     /// Commitment hash
     pub commitment: [u8; 32],
-    /// Owner of the new right
+    /// Owner of the new sanad
     pub owner: Pubkey,
     /// Source chain ID
     pub source_chain: u8,
     /// Source chain seal reference
     pub source_seal_ref: [u8; 32],
-    /// Account address of the new right
+    /// Account address of the new sanad
     pub account: Pubkey,
     /// Asset class
     pub asset_class: u8,
@@ -103,11 +103,11 @@ pub struct CrossChainMint {
     pub proof_root: [u8; 32],
 }
 
-/// Emitted when a locked Right is refunded
+/// Emitted when a locked Sanad is refunded
 #[event]
 pub struct CrossChainRefund {
-    /// Unique Right identifier
-    pub right_id: [u8; 32],
+    /// Unique Sanad identifier
+    pub sanad_id: [u8; 32],
     /// Commitment hash
     pub commitment: [u8; 32],
     /// Address that claimed the refund
@@ -116,11 +116,11 @@ pub struct CrossChainRefund {
     pub refunded_at: i64,
 }
 
-/// Emitted when a Right is transferred to a new owner
+/// Emitted when a Sanad is transferred to a new owner
 #[event]
-pub struct RightTransferred {
-    /// Unique Right identifier
-    pub right_id: [u8; 32],
+pub struct SanadTransferred {
+    /// Unique Sanad identifier
+    pub sanad_id: [u8; 32],
     /// Previous owner
     pub from: Pubkey,
     /// New owner
@@ -132,15 +132,15 @@ pub struct RightTransferred {
 pub struct NullifierRegistered {
     /// The nullifier hash
     pub nullifier: [u8; 32],
-    /// The Right identifier
-    pub right_id: [u8; 32],
+    /// The Sanad identifier
+    pub sanad_id: [u8; 32],
 }
 
 /// Emitted whenever metadata/proof context is recorded for traceability.
 #[event]
-pub struct RightMetadataRecorded {
-    /// Unique Right identifier
-    pub right_id: [u8; 32],
+pub struct SanadMetadataRecorded {
+    /// Unique Sanad identifier
+    pub sanad_id: [u8; 32],
     /// Asset class
     pub asset_class: u8,
     /// Chain-native asset id

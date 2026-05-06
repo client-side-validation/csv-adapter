@@ -10,13 +10,13 @@ use crate::state::UnifiedStateManager;
 
 #[derive(Subcommand)]
 pub enum ProofAction {
-    /// Generate inclusion proof for a Right
+    /// Generate inclusion proof for a Sanad
     Generate {
         /// Source chain
         #[arg(value_enum)]
         chain: Chain,
-        /// Right ID (hex)
-        right_id: String,
+        /// Sanad ID (hex)
+        sanad_id: String,
         /// Output file (prints to stdout if not specified)
         #[arg(short, long)]
         output: Option<String>,
@@ -47,9 +47,9 @@ pub fn execute(action: ProofAction, config: &Config, state: &UnifiedStateManager
     match action {
         ProofAction::Generate {
             chain,
-            right_id,
+            sanad_id,
             output,
-        } => cmd_generate(chain, right_id, output, config, state),
+        } => cmd_generate(chain, sanad_id, output, config, state),
         ProofAction::Verify { chain, proof } => cmd_verify(chain, proof, config, state),
         ProofAction::VerifyCrossChain {
             source,
@@ -61,7 +61,7 @@ pub fn execute(action: ProofAction, config: &Config, state: &UnifiedStateManager
 
 fn cmd_generate(
     chain: Chain,
-    right_id: String,
+    sanad_id: String,
     output: Option<String>,
     config: &Config,
     _state: &UnifiedStateManager,
@@ -69,21 +69,21 @@ fn cmd_generate(
     use csv_adapter::prelude::CsvClient;
     use csv_core::Chain as AdapterChain;
     
-    use csv_core::right::RightId;
+    use csv_core::sanad::SanadId;
 
     output::header(&format!("Generating Proof on {}", chain));
 
-    let bytes = hex::decode(right_id.trim_start_matches("0x"))
-        .map_err(|e| anyhow::anyhow!("Invalid Right ID: {}", e))?;
+    let bytes = hex::decode(sanad_id.trim_start_matches("0x"))
+        .map_err(|e| anyhow::anyhow!("Invalid Sanad ID: {}", e))?;
     if bytes.len() < 32 {
-        return Err(anyhow::anyhow!("Right ID must be at least 32 bytes"));
+        return Err(anyhow::anyhow!("Sanad ID must be at least 32 bytes"));
     }
     let mut hash_bytes = [0u8; 32];
     hash_bytes.copy_from_slice(&bytes[..32]);
-    let right_id_obj = RightId::new(hash_bytes);
+    let sanad_id_obj = SanadId::new(hash_bytes);
 
     output::kv("Chain", &chain.to_string());
-    output::kv_hash("Right ID", &hash_bytes);
+    output::kv_hash("Sanad ID", &hash_bytes);
 
     // Get chain configuration
     let _chain_config = config.chain(&chain)?;
@@ -114,7 +114,7 @@ fn cmd_generate(
         let facade = client.chain_facade();
 
         // Generate the proof using the facade
-        facade.generate_proof(adapter_chain, &right_id_obj).await
+        facade.generate_proof(adapter_chain, &sanad_id_obj).await
             .map_err(|e| anyhow::anyhow!("Proof generation failed: {}", e))
     })?;
 
@@ -123,7 +123,7 @@ fn cmd_generate(
     // Serialize the proof bundle
     let proof_json = serde_json::json!({
         "chain": chain.to_string(),
-        "right_id": right_id,
+        "sanad_id": sanad_id,
         "proof_type": match chain {
             Chain::Bitcoin => "merkle",
             Chain::Ethereum => "mpt",
@@ -160,7 +160,7 @@ fn cmd_verify(
 ) -> Result<()> {
     use csv_adapter::prelude::CsvClient;
     use csv_core::Chain as AdapterChain;
-    use csv_core::{right::RightId, proof::ProofBundle};
+    use csv_core::{sanad::SanadId, proof::ProofBundle};
 
     output::header(&format!("Verifying Proof on {}", chain));
 
@@ -191,20 +191,20 @@ fn cmd_verify(
             .unwrap_or("unknown"),
     );
 
-    // Extract right_id from proof
-    let right_id_str = proof_json
-        .get("right_id")
+    // Extract sanad_id from proof
+    let sanad_id_str = proof_json
+        .get("sanad_id")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("Proof missing right_id"))?;
+        .ok_or_else(|| anyhow::anyhow!("Proof missing sanad_id"))?;
 
-    let bytes = hex::decode(right_id_str.trim_start_matches("0x"))
-        .map_err(|e| anyhow::anyhow!("Invalid Right ID in proof: {}", e))?;
+    let bytes = hex::decode(sanad_id_str.trim_start_matches("0x"))
+        .map_err(|e| anyhow::anyhow!("Invalid Sanad ID in proof: {}", e))?;
     if bytes.len() < 32 {
-        return Err(anyhow::anyhow!("Right ID in proof must be at least 32 bytes"));
+        return Err(anyhow::anyhow!("Sanad ID in proof must be at least 32 bytes"));
     }
     let mut hash_bytes = [0u8; 32];
     hash_bytes.copy_from_slice(&bytes[..32]);
-    let right_id = RightId::new(hash_bytes);
+    let sanad_id = SanadId::new(hash_bytes);
 
     output::progress(1, 4, "Building CSV client...");
 
@@ -238,7 +238,7 @@ fn cmd_verify(
             dag::{DAGNode, DAGSegment},
             hash::Hash,
             proof::{FinalityProof, InclusionProof},
-            seal::{AnchorRef, SealRef},
+            seal::{CommitAnchor, SealPoint},
         };
 
         let dag_root = proof_json
@@ -263,10 +263,10 @@ fn cmd_verify(
         let dag_node = DAGNode::new(dag_root, vec![], vec![], vec![], vec![]);
         let dag_segment = DAGSegment::new(vec![dag_node], dag_root);
 
-        let seal_ref = SealRef::new(seal_id.clone(), None)
+        let seal_ref = SealPoint::new(seal_id.clone(), None)
             .map_err(|e| anyhow::anyhow!("Failed to create seal ref: {}", e))?;
 
-        let anchor_ref = AnchorRef::new(seal_id, anchor_height, inclusion_proof_bytes.clone())
+        let anchor_ref = CommitAnchor::new(seal_id, anchor_height, inclusion_proof_bytes.clone())
             .map_err(|e| anyhow::anyhow!("Failed to create anchor ref: {}", e))?;
 
         let inclusion_proof = InclusionProof::new(inclusion_proof_bytes, dag_root, 0)
@@ -297,7 +297,7 @@ fn cmd_verify(
     let rt = tokio::runtime::Runtime::new()?;
     let valid = rt.block_on(async {
         let facade = client.chain_facade();
-        facade.verify_proof_bundle(adapter_chain, &proof_bundle, &right_id).await
+        facade.verify_proof_bundle(adapter_chain, &proof_bundle, &sanad_id).await
             .map_err(|e| anyhow::anyhow!("Proof verification error: {}", e))
     })?;
 

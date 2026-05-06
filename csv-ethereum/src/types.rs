@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Ethereum seal reference (storage slot with one-time write)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct EthereumSealRef {
+pub struct EthereumSealPoint {
     /// Contract address
     pub contract_address: [u8; 20],
     /// Storage slot index
@@ -15,7 +15,7 @@ pub struct EthereumSealRef {
     pub seal_id: [u8; 32],
 }
 
-impl EthereumSealRef {
+impl EthereumSealPoint {
     /// Create a new Ethereum seal reference
     pub fn new(contract_address: [u8; 20], slot_index: u64, nonce: u64) -> Self {
         let mut seal_id = [0u8; 32];
@@ -42,7 +42,7 @@ impl EthereumSealRef {
 
 /// Ethereum anchor reference (Transaction + log index)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct EthereumAnchorRef {
+pub struct EthereumCommitAnchor {
     /// Transaction hash
     pub tx_hash: [u8; 32],
     /// Log index within the transaction
@@ -51,7 +51,7 @@ pub struct EthereumAnchorRef {
     pub block_number: u64,
 }
 
-impl EthereumAnchorRef {
+impl EthereumCommitAnchor {
     /// Create a new Ethereum anchor reference
     pub fn new(tx_hash: [u8; 32], log_index: u64, block_number: u64) -> Self {
         Self {
@@ -134,14 +134,14 @@ mod tests {
 
     #[test]
     fn test_seal_ref_creation() {
-        let seal = EthereumSealRef::new([1u8; 20], 42, 1);
+        let seal = EthereumSealPoint::new([1u8; 20], 42, 1);
         assert_eq!(seal.slot_index, 42);
         assert_eq!(seal.nonce, 1);
     }
 
     #[test]
     fn test_anchor_ref_creation() {
-        let anchor = EthereumAnchorRef::new([2u8; 32], 5, 1000);
+        let anchor = EthereumCommitAnchor::new([2u8; 32], 5, 1000);
         assert_eq!(anchor.log_index, 5);
         assert_eq!(anchor.block_number, 1000);
     }

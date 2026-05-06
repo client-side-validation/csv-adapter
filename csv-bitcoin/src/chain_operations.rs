@@ -8,18 +8,18 @@ use bitcoin::Network;
 use bitcoin_hashes::Hash as BitcoinHash;
 use csv_core::chain_operations::{
     BalanceInfo, ChainBroadcaster, ChainDeployer, ChainOpError, ChainOpResult, ChainProofProvider,
-    ChainQuery, ChainRightOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus,
-    RightOperation, RightOperationResult, TransactionStatus,
+    ChainQuery, ChainSanadOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus,
+    SanadOperation, SanadOperationResult, TransactionStatus,
 };
 use csv_core::hash::Hash;
 use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
-use csv_core::right::RightId;
+use csv_core::title::SanadId;
 use csv_core::signature::SignatureScheme;
 
 use crate::seal_protocol::BitcoinSealProtocol;
 use crate::rpc::BitcoinRpc;
-use crate::types::BitcoinSealRef;
-use csv_core::AnchorLayer;
+use crate::types::BitcoinSealPoint;
+use csv_core::SealProtocol;
 
 /// Encode a value as a Bitcoin-style variable length integer (varint)
 fn encode_varint(value: u64) -> Vec<u8> {
@@ -490,7 +490,7 @@ impl ChainProofProvider for BitcoinChainProofProvider {
 
         // Add one level of proof (simulated)
         let sibling_hash = sha256d::Hash::hash(&block_hash);
-        proof_bytes.push(1u8); // Direction: 1 = right
+        proof_bytes.push(1u8); // Direction: 1 = sanad
         proof_bytes.extend_from_slice(sibling_hash.as_ref());
 
         // The root is the block hash
@@ -523,7 +523,7 @@ impl ChainProofProvider for BitcoinChainProofProvider {
         let mut current_hash = sha256d::Hash::hash(commitment.as_bytes());
 
         // Process each level of the Merkle path
-        // Each sibling is 32 bytes, prepended with a 1-byte direction flag (0=left, 1=right)
+        // Each sibling is 32 bytes, prepended with a 1-byte direction flag (0=left, 1=sanad)
         let path_data = &proof.proof_bytes;
         let mut offset = 0;
 
@@ -541,7 +541,7 @@ impl ChainProofProvider for BitcoinChainProofProvider {
                 combined.extend_from_slice(sibling_hash.as_ref());
                 combined.extend_from_slice(current_hash.as_ref());
             } else {
-                // Sibling is on the right
+                // Sibling is on the sanad
                 combined.extend_from_slice(current_hash.as_ref());
                 combined.extend_from_slice(sibling_hash.as_ref());
             }
@@ -757,13 +757,13 @@ impl ChainDeployer for BitcoinChainDeployer {
     }
 }
 
-/// Bitcoin implementation of ChainRightOps trait
-pub struct BitcoinChainRightOps {
+/// Bitcoin implementation of ChainSanadOps trait
+pub struct BitcoinChainSanadOps {
     adapter: BitcoinSealProtocol,
 }
 
-impl BitcoinChainRightOps {
-    /// Create a new Bitcoin chain right ops instance
+impl BitcoinChainSanadOps {
+    /// Create a new Bitcoin chain sanad ops instance
     pub fn new(adapter: BitcoinSealProtocol) -> Self {
         Self { adapter }
     }
@@ -771,7 +771,7 @@ impl BitcoinChainRightOps {
     /// Build refund transaction after CSV timeout
     fn build_refund_transaction(
         &self,
-        lock_seal: BitcoinSealRef,
+        lock_seal: BitcoinSealPoint,
         _owner_key: &[u8],
     ) -> Result<bitcoin::Transaction, String> {
       let lock_outpoint = bitcoin::OutPoint {
@@ -847,7 +847,7 @@ impl BitcoinChainRightOps {
     /// Build metadata recording transaction with OP_RETURN
     fn build_metadata_transaction(
         &self,
-        seal: BitcoinSealRef,
+        seal: BitcoinSealPoint,
         _metadata: &[u8],
         _owner_key: &[u8],
     ) -> Result<bitcoin::Transaction, String> {
@@ -888,23 +888,23 @@ impl BitcoinChainRightOps {
 }
 
 #[async_trait]
-impl ChainRightOps for BitcoinChainRightOps {
-    async fn create_right(
+impl ChainSanadOps for BitcoinChainSanadOps {
+    async fn create_sanad(
         &self,
         owner: &str,
         _asset_class: &str,
         _asset_id: &str,
         metadata: serde_json::Value,
-    ) -> ChainOpResult<RightOperationResult> {
-        // Create a new right by creating a UTXO seal
+    ) -> ChainOpResult<SanadOperationResult> {
+        // Create a new sanad by creating a UTXO seal
         let seal = self
             .adapter
             .create_seal(None)
             .map_err(|e| ChainOpError::InvalidInput(format!("Failed to create seal: {}", e)))?;
 
-        Ok(RightOperationResult {
-            right_id: RightId(Hash::from([0u8; 32])), // Implementation note: compute from asset hash
-            operation: csv_core::chain_operations::RightOperation::Create,
+        Ok(SanadOperationResult {
+            sanad_id: SanadId(Hash::from([0u8; 32])), // Implementation note: compute from asset hash
+            operation: csv_core::chain_operations::SanadOperation::Create,
             transaction_hash: hex::encode(seal.txid),
             block_height: 0,
             chain_id: "bitcoin".to_string(),
@@ -916,33 +916,33 @@ impl ChainRightOps for BitcoinChainRightOps {
         })
     }
 
-    async fn consume_right(
+    async fn consume_sanad(
         &self,
-        _right_id: &RightId,
+        _sanad_id: &SanadId,
         _owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        // Consume a right by spending the UTXO
+    ) -> ChainOpResult<SanadOperationResult> {
+        // Consume a sanad by spending the UTXO
         Err(ChainOpError::CapabilityUnavailable(
-            "Right consumption requires transaction building".to_string(),
+            "Sanad consumption requires transaction building".to_string(),
         ))
     }
 
-    async fn lock_right(
+    async fn lock_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         destination_chain: &str,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        // Lock a right for cross-chain transfer by creating a lock UTXO
+    ) -> ChainOpResult<SanadOperationResult> {
+        // Lock a sanad for cross-chain transfer by creating a lock UTXO
         // The lock UTXO contains the destination chain hash in its script
         
         // Parse the destination chain to ensure it's valid
         let _destination = destination_chain.parse::<csv_core::Chain>()
             .map_err(|_| ChainOpError::InvalidInput(format!("Invalid destination chain: {}", destination_chain)))?;
         
-        // Get the right's associated UTXO (seal)
-        let seal = self.adapter.find_seal_for_right(right_id)
-            .ok_or_else(|| ChainOpError::InvalidInput(format!("Failed to find seal for right: {}", hex::encode(right_id.as_bytes()))))?;
+        // Get the sanad's associated UTXO (seal)
+        let seal = self.adapter.find_seal_for_sanad(sanad_id)
+            .ok_or_else(|| ChainOpError::InvalidInput(format!("Failed to find seal for sanad: {}", hex::encode(sanad_id.as_bytes()))))?;
         
         // Build lock transaction that:
         // 1. Spends the seal UTXO
@@ -978,9 +978,9 @@ impl ChainRightOps for BitcoinChainRightOps {
         // Sign and broadcast the lock transaction
         let signed_tx = self.sign_and_broadcast_lock(lock_tx, &key_bytes).await?;
         
-        Ok(RightOperationResult {
-            right_id: right_id.clone(),
-            operation: csv_core::chain_operations::RightOperation::Lock,
+        Ok(SanadOperationResult {
+            sanad_id: sanad_id.clone(),
+            operation: csv_core::chain_operations::SanadOperation::Lock,
             transaction_hash: signed_tx,
             block_height: self.adapter.get_current_height(),
             chain_id: "bitcoin".to_string(),
@@ -992,25 +992,25 @@ impl ChainRightOps for BitcoinChainRightOps {
         })
      }
 
-     async fn mint_right(
+     async fn mint_sanad(
         &self,
         _source_chain: &str,
-        _source_right_id: &RightId,
+        _source_sanad_id: &SanadId,
         _lock_proof: &CoreInclusionProof,
         _new_owner: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        // Mint a wrapped right on this chain - Bitcoin is the source, not destination
+    ) -> ChainOpResult<SanadOperationResult> {
+        // Mint a wrapped sanad on this chain - Bitcoin is the source, not destination
         Err(ChainOpError::UnsupportedChain(
-            "Bitcoin cannot mint wrapped rights - it is a source chain".to_string(),
+            "Bitcoin cannot mint wrapped sanads - it is a source chain".to_string(),
         ))
     }
 
-    async fn refund_right(
+    async fn refund_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        // Refund a locked right after CSV timeout expires
+    ) -> ChainOpResult<SanadOperationResult> {
+        // Refund a locked sanad after CSV timeout expires
         // This spends the lock UTXO back to the owner
         
         // Parse owner key
@@ -1021,9 +1021,9 @@ impl ChainRightOps for BitcoinChainRightOps {
             return Err(ChainOpError::InvalidInput("Owner key must be 32 bytes".to_string()));
         }
         
-        // Get the lock UTXO for this right
-        let lock_seal = self.adapter.find_seal_for_right(right_id)
-            .ok_or_else(|| ChainOpError::InvalidInput(format!("Failed to find lock seal for right: {}", hex::encode(right_id.as_bytes()))))?;
+        // Get the lock UTXO for this sanad
+        let lock_seal = self.adapter.find_seal_for_sanad(sanad_id)
+            .ok_or_else(|| ChainOpError::InvalidInput(format!("Failed to find lock seal for sanad: {}", hex::encode(sanad_id.as_bytes()))))?;
         
         // Verify CSV timeout has expired (144 blocks = ~24 hours)
         let current_height = self.adapter.get_current_height();
@@ -1045,9 +1045,9 @@ impl ChainRightOps for BitcoinChainRightOps {
         // Sign and broadcast
         let signed_tx = self.sign_and_broadcast_refund(refund_tx, &key_bytes).await?;
         
-        Ok(RightOperationResult {
-            right_id: right_id.clone(),
-            operation: RightOperation::Refund,
+        Ok(SanadOperationResult {
+            sanad_id: sanad_id.clone(),
+            operation: SanadOperation::Refund,
             transaction_hash: format!("0x{}", hex::encode(signed_tx.as_bytes())),
             block_height: self.adapter.get_current_height(),
             chain_id: "bitcoin".to_string(),
@@ -1059,13 +1059,13 @@ impl ChainRightOps for BitcoinChainRightOps {
         })
     }
 
-    async fn record_right_metadata(
+    async fn record_sanad_metadata(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         metadata: serde_json::Value,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        // Record metadata for a right using OP_RETURN
+    ) -> ChainOpResult<SanadOperationResult> {
+        // Record metadata for a sanad using OP_RETURN
         // This creates a transaction with metadata in the witness or OP_RETURN
         
         // Parse owner key
@@ -1076,9 +1076,9 @@ impl ChainRightOps for BitcoinChainRightOps {
             return Err(ChainOpError::InvalidInput("Owner key must be 32 bytes".to_string()));
         }
         
-        // Get the seal for this right
-        let seal = self.adapter.find_seal_for_right(right_id)
-            .ok_or_else(|| ChainOpError::InvalidInput(format!("Failed to find seal for right: {}", hex::encode(right_id.as_bytes()))))?;
+        // Get the seal for this sanad
+        let seal = self.adapter.find_seal_for_sanad(sanad_id)
+            .ok_or_else(|| ChainOpError::InvalidInput(format!("Failed to find seal for sanad: {}", hex::encode(sanad_id.as_bytes()))))?;
         
         // Serialize metadata to JSON and hash it
         let metadata_bytes = serde_json::to_vec(&metadata)
@@ -1097,9 +1097,9 @@ impl ChainRightOps for BitcoinChainRightOps {
         // Sign and broadcast
         let signed_tx = self.sign_and_broadcast_metadata(metadata_tx, &key_bytes).await?;
         
-        Ok(RightOperationResult {
-            right_id: right_id.clone(),
-            operation: RightOperation::RecordMetadata,
+        Ok(SanadOperationResult {
+            sanad_id: sanad_id.clone(),
+            operation: SanadOperation::RecordMetadata,
             transaction_hash: signed_tx,
             block_height: self.adapter.get_current_height(),
             chain_id: "bitcoin".to_string(),
@@ -1107,19 +1107,19 @@ impl ChainRightOps for BitcoinChainRightOps {
        })
      }
 
-     async fn verify_right_state(
+     async fn verify_sanad_state(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         expected_state: &str,
     ) -> ChainOpResult<bool> {
-        // Verify the current state of a right
-        // This checks if the right's UTXO is still unspent and matches the expected state
+        // Verify the current state of a sanad
+        // This checks if the sanad's UTXO is still unspent and matches the expected state
         
-        // Get the seal for this right
-        let seal = match self.adapter.find_seal_for_right(right_id) {
+        // Get the seal for this sanad
+        let seal = match self.adapter.find_seal_for_sanad(sanad_id) {
             Some(s) => s,
             None => {
-                // Right not found - check if it was consumed
+                // Sanad not found - check if it was consumed
                 return match expected_state {
                     "consumed" | "spent" | "transferred" => Ok(true),
                     _ => Ok(false),
@@ -1152,7 +1152,7 @@ impl ChainRightOps for BitcoinChainRightOps {
     }
 }
 
-/// Unified Bitcoin chain operations implementing FullChainAdapter.
+/// Unified Bitcoin chain operations implementing ChainBackend.
 ///
 /// This is the standard facade pattern implementation that combines all chain operation
 /// traits into a single type. Created from BitcoinSealProtocol via `from_anchor_layer()`.
@@ -1168,9 +1168,9 @@ pub struct BitcoinBackend {
     network: Network,
     /// Domain separator for proof generation (preserved from anchor layer)
     domain_separator: [u8; 32],
-    /// Config for right operations
+    /// Config for sanad operations
     config: crate::config::BitcoinConfig,
-    // Note: Right operations require the anchor layer which is created on-demand
+    // Note: Sanad operations require the anchor layer which is created on-demand
 }
 
 impl std::fmt::Debug for BitcoinBackend {
@@ -1209,7 +1209,7 @@ impl BitcoinBackend {
         // Extract domain separator from anchor layer (preserves cross-chain replay protection)
         let domain_separator = anchor.domain();
 
-        // Store config for later right operations
+        // Store config for later sanad operations
         let config = anchor.config().clone();
 
         Ok(Self {
@@ -1433,84 +1433,84 @@ impl ChainProofProvider for BitcoinBackend {
 }
 
 #[async_trait]
-impl ChainRightOps for BitcoinBackend {
-    async fn create_right(
+impl ChainSanadOps for BitcoinBackend {
+    async fn create_sanad(
         &self,
         owner: &str,
         asset_class: &str,
         asset_id: &str,
         metadata: serde_json::Value,
-    ) -> ChainOpResult<RightOperationResult> {
-        // Right creation requires HD wallet with xpub
+    ) -> ChainOpResult<SanadOperationResult> {
+        // Sanad creation requires HD wallet with xpub
         // This would need to be done through the anchor layer directly
         // For facade operations, we return capability unavailable
         let _ = (owner, asset_class, asset_id, metadata);
         Err(ChainOpError::CapabilityUnavailable(
-            "Right creation requires HD wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
+            "Sanad creation requires HD wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
 
-    async fn consume_right(
+    async fn consume_sanad(
         &self,
-        _right_id: &RightId,
+        _sanad_id: &SanadId,
         _owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
+    ) -> ChainOpResult<SanadOperationResult> {
         Err(ChainOpError::CapabilityUnavailable(
-            "Right consumption requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
+            "Sanad consumption requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
 
-    async fn lock_right(
+    async fn lock_sanad(
         &self,
-        _right_id: &RightId,
+        _sanad_id: &SanadId,
         _destination_chain: &str,
         _owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
+    ) -> ChainOpResult<SanadOperationResult> {
         Err(ChainOpError::CapabilityUnavailable(
-            "Right locking requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
+            "Sanad locking requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
 
-    async fn mint_right(
+    async fn mint_sanad(
         &self,
         _source_chain: &str,
-        _source_right_id: &RightId,
+        _source_sanad_id: &SanadId,
         _lock_proof: &CoreInclusionProof,
         _new_owner: &str,
-    ) -> ChainOpResult<RightOperationResult> {
+    ) -> ChainOpResult<SanadOperationResult> {
         Err(ChainOpError::UnsupportedChain(
-            "Bitcoin cannot mint wrapped rights - it is a source chain".to_string()
+            "Bitcoin cannot mint wrapped sanads - it is a source chain".to_string()
         ))
     }
 
-    async fn refund_right(
+    async fn refund_sanad(
         &self,
-        _right_id: &RightId,
+        _sanad_id: &SanadId,
         _owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
+    ) -> ChainOpResult<SanadOperationResult> {
         Err(ChainOpError::CapabilityUnavailable(
             "Refund requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
 
-    async fn record_right_metadata(
+    async fn record_sanad_metadata(
         &self,
-        _right_id: &RightId,
+        _sanad_id: &SanadId,
         _metadata: serde_json::Value,
         _owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
+    ) -> ChainOpResult<SanadOperationResult> {
         Err(ChainOpError::CapabilityUnavailable(
             "Metadata recording requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
 
-    async fn verify_right_state(
+    async fn verify_sanad_state(
         &self,
-        _right_id: &RightId,
+        _sanad_id: &SanadId,
         _expected_state: &str,
     ) -> ChainOpResult<bool> {
         Err(ChainOpError::CapabilityUnavailable(
-            "Right state verification requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
+            "Sanad state verification requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
 }

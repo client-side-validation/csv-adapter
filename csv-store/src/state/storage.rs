@@ -5,7 +5,7 @@
 
 use super::core::{Chain, ChainConfig, Network};
 use super::domain::{
-    ContractRecord, ProofRecord, RightRecord, SealRecord, TransactionRecord, TransferRecord,
+    ContractRecord, ProofRecord, SanadRecord, SealRecord, TransactionRecord, TransferRecord,
 };
 use super::wallet::{FaucetConfig, GasAccount};
 use super::wallet::{WalletAccount, WalletConfig};
@@ -42,9 +42,9 @@ pub struct StateStorage {
     #[serde(default)]
     pub faucets: HashMap<Chain, FaucetConfig>,
 
-    /// Tracked rights (both CLI and Wallet).
+    /// Tracked sanads (both CLI and Wallet).
     #[serde(default)]
-    pub rights: Vec<RightRecord>,
+    pub sanads: Vec<SanadRecord>,
 
     /// Tracked transfers (both CLI and Wallet).
     #[serde(default)]
@@ -144,21 +144,21 @@ impl StateStorage {
         faucets
     }
 
-    // ===== Right operations =====
+    // ===== Sanad operations =====
 
-    /// Find a right by ID.
-    pub fn get_right(&self, id: &str) -> Option<&RightRecord> {
-        self.rights.iter().find(|r| r.id == id)
+    /// Find a sanad by ID.
+    pub fn get_sanad(&self, id: &str) -> Option<&SanadRecord> {
+        self.sanads.iter().find(|r| r.id == id)
     }
 
-    /// Find a right by ID (mutable).
-    pub fn get_right_mut(&mut self, id: &str) -> Option<&mut RightRecord> {
-        self.rights.iter_mut().find(|r| r.id == id)
+    /// Find a sanad by ID (mutable).
+    pub fn get_sanad_mut(&mut self, id: &str) -> Option<&mut SanadRecord> {
+        self.sanads.iter_mut().find(|r| r.id == id)
     }
 
-    /// Add a right.
-    pub fn add_right(&mut self, right: RightRecord) {
-        self.rights.push(right);
+    /// Add a sanad.
+    pub fn add_sanad(&mut self, sanad: SanadRecord) {
+        self.sanads.push(sanad);
     }
 
     // ===== Transfer operations =====

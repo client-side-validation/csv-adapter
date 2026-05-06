@@ -1,9 +1,9 @@
-//! Cross-Chain Right Transfer
+//! Cross-Chain Sanad Transfer
 //!
-//! Implements the lock-and-prove protocol for transferring Rights between chains:
+//! Implements the lock-and-prove protocol for transferring Sanads between chains:
 //! 1. Lock — Source chain consumes seal, emits CrossChainLockEvent
 //! 2. Prove — Client generates inclusion proof
-//! 3. Verify — Destination chain verifies proof, checks registry, mints new Right
+//! 3. Verify — Destination chain verifies proof, checks registry, mints new Sanad
 //! 4. Registry — Records transfer, prevents cross-chain double-spend
 
 use alloc::vec::Vec;
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hash::Hash;
 use crate::protocol_version::Chain;
-use crate::right::{OwnershipProof, Right};
+use crate::title::{TitleOwnershipProof as TitleOwnershipProof, Sanad};
 use crate::seal::SealPoint;
 
 /// Chain identifier alias for cross-chain transfers.
@@ -20,21 +20,21 @@ use crate::seal::SealPoint;
 /// All cross-chain operations use this type.
 pub type ChainId = Chain;
 
-/// Event emitted when a Right is locked on the source chain for cross-chain transfer.
+/// Event emitted when a Sanad is locked on the source chain for cross-chain transfer.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrossChainLockEvent {
-    /// The Right being locked
-    pub right_id: Hash,
-    /// The commitment hash of the Right
+    /// The Sanad being locked
+    pub sanad_id: Hash,
+    /// The commitment hash of the Sanad
     pub commitment: Hash,
     /// The owner who initiated the lock
-    pub owner: OwnershipProof,
-    /// Source chain where the Right is being locked
+    pub owner: TitleOwnershipProof,
+    /// Source chain where the Sanad is being locked
     pub source_chain: ChainId,
     /// Destination chain for the transfer
     pub destination_chain: ChainId,
     /// Destination owner (may differ from source owner)
-    pub destination_owner: OwnershipProof,
+    pub destination_owner: TitleOwnershipProof,
     /// Source chain's seal reference (consumed during lock)
     pub source_seal: SealPoint,
     /// Source transaction hash
@@ -276,8 +276,8 @@ pub struct CrossChainTransferProof {
 /// Entry in the cross-chain seal registry recording a completed transfer.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrossChainRegistryEntry {
-    /// The Right's unique ID (preserved across chains)
-    pub right_id: Hash,
+    /// The Sanad's unique ID (preserved across chains)
+    pub sanad_id: Hash,
     /// Source chain identifier
     pub source_chain: ChainId,
     /// Source chain's seal reference
@@ -297,8 +297,8 @@ pub struct CrossChainRegistryEntry {
 /// Result of a successful cross-chain transfer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CrossChainTransferResult {
-    /// The new Right created on the destination chain
-    pub destination_right: Right,
+    /// The new Sanad created on the destination chain
+    pub destination_sanad: Sanad,
     /// The destination chain's seal reference
     pub destination_seal: SealPoint,
     /// Registry entry recording the transfer
@@ -309,9 +309,9 @@ pub struct CrossChainTransferResult {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[allow(missing_docs)]
 pub enum CrossChainError {
-    #[error("Right already locked on source chain")]
+    #[error("Sanad already locked on source chain")]
     AlreadyLocked,
-    #[error("Right already exists on destination chain")]
+    #[error("Sanad already exists on destination chain")]
     AlreadyMinted,
     #[error("Invalid inclusion proof")]
     InvalidInclusionProof,
@@ -327,28 +327,28 @@ pub enum CrossChainError {
     UnsupportedChainPair(ChainId, ChainId),
 }
 
-/// Trait for locking a Right on a source chain.
+/// Trait for locking a Sanad on a source chain.
 ///
-/// Consumes the Right's seal and returns the lock event data + inclusion proof.
+/// Consumes the Sanad's seal and returns the lock event data + inclusion proof.
 pub trait LockProvider {
-    /// Lock a Right for cross-chain transfer.
+    /// Lock a Sanad for cross-chain transfer.
     ///
     /// # Arguments
-    /// * `right_id` — The unique identifier of the Right
-    /// * `commitment` — The Right's commitment hash
+    /// * `sanad_id` — The unique identifier of the Sanad
+    /// * `commitment` — The Sanad's commitment hash
     /// * `owner` — Current owner's ownership proof
     /// * `destination_chain` — Target chain ID
     /// * `destination_owner` — New owner on destination chain
     ///
     /// # Returns
     /// Lock event data and inclusion proof (chain-specific format)
-    fn lock_right(
+    fn lock_sanad(
         &self,
-        right_id: Hash,
+        sanad_id: Hash,
         commitment: Hash,
-        owner: OwnershipProof,
+        owner: TitleOwnershipProof,
         destination_chain: ChainId,
-        destination_owner: OwnershipProof,
+        destination_owner: TitleOwnershipProof,
     ) -> Result<(CrossChainLockEvent, InclusionProof), CrossChainError>;
 }
 
@@ -360,18 +360,18 @@ pub trait TransferVerifier {
     /// 1. Inclusion proof is valid (source chain finalized)
     /// 2. Seal NOT in CrossChainSealRegistry (no double-spend)
     /// 3. Ownership proof valid (owner signature matches)
-    /// 4. Lock event matches expected right_id and commitment
+    /// 4. Lock event matches expected sanad_id and commitment
     fn verify_transfer_proof(&self, proof: &CrossChainTransferProof)
         -> Result<(), CrossChainError>;
 }
 
-/// Trait for minting a Right on a destination chain.
+/// Trait for minting a Sanad on a destination chain.
 pub trait MintProvider {
-    /// Mint a new Right from a verified cross-chain transfer proof.
+    /// Mint a new Sanad from a verified cross-chain transfer proof.
     ///
-    /// Creates a new Right with the same commitment and state
+    /// Creates a new Sanad with the same commitment and state
     /// but a new seal on the destination chain.
-    fn mint_right(
+    fn mint_sanad(
         &self,
         proof: &CrossChainTransferProof,
     ) -> Result<CrossChainTransferResult, CrossChainError>;
@@ -393,10 +393,10 @@ impl CrossChainTransfer {
 
     /// Execute a full cross-chain transfer.
     ///
-    /// 1. Lock the Right on the source chain
+    /// 1. Lock the Sanad on the source chain
     /// 2. Build the transfer proof
     /// 3. Verify on the destination chain
-    /// 4. Mint the new Right
+    /// 4. Mint the new Sanad
     /// 5. Record in the registry
     #[allow(clippy::too_many_arguments)]
     pub fn execute(
@@ -404,17 +404,17 @@ impl CrossChainTransfer {
         locker: &dyn LockProvider,
         verifier: &dyn TransferVerifier,
         minter: &dyn MintProvider,
-        right_id: Hash,
+        sanad_id: Hash,
         commitment: Hash,
-        owner: OwnershipProof,
+        owner: TitleOwnershipProof,
         destination_chain: ChainId,
-        destination_owner: OwnershipProof,
+        destination_owner: TitleOwnershipProof,
         current_block_height: u64,
         finality_depth: u64,
     ) -> Result<CrossChainTransferResult, CrossChainError> {
         // Step 1: Lock on source chain
-        let (lock_event, inclusion_proof) = locker.lock_right(
-            right_id,
+        let (lock_event, inclusion_proof) = locker.lock_sanad(
+            sanad_id,
             commitment,
             owner.clone(),
             destination_chain,
@@ -445,11 +445,11 @@ impl CrossChainTransfer {
         verifier.verify_transfer_proof(&transfer_proof)?;
 
         // Step 4: Mint on destination
-        let result = minter.mint_right(&transfer_proof)?;
+        let result = minter.mint_sanad(&transfer_proof)?;
 
         // Step 5: Record in registry
         let entry = CrossChainRegistryEntry {
-            right_id,
+            sanad_id,
             source_chain,
             source_seal: transfer_proof.lock_event.source_seal.clone(),
             destination_chain: transfer_proof.lock_event.destination_chain,
@@ -485,8 +485,8 @@ impl CrossChainRegistry {
         &mut self,
         entry: CrossChainRegistryEntry,
     ) -> Result<(), CrossChainError> {
-        // Check if this Right has already been transferred
-        if self.entries.contains_key(&entry.right_id) {
+        // Check if this Sanad has already been transferred
+        if self.entries.contains_key(&entry.sanad_id) {
             return Err(CrossChainError::AlreadyMinted);
         }
 
@@ -497,13 +497,13 @@ impl CrossChainRegistry {
             }
         }
 
-        self.entries.insert(entry.right_id, entry);
+        self.entries.insert(entry.sanad_id, entry);
         Ok(())
     }
 
-    /// Check if a Right has already been transferred.
-    pub fn is_right_transferred(&self, right_id: &Hash) -> bool {
-        self.entries.contains_key(right_id)
+    /// Check if a Sanad has already been transferred.
+    pub fn is_sanad_transferred(&self, sanad_id: &Hash) -> bool {
+        self.entries.contains_key(sanad_id)
     }
 
     /// Check if a source seal has already been consumed.
@@ -511,9 +511,9 @@ impl CrossChainRegistry {
         self.entries.values().any(|e| &e.source_seal == seal)
     }
 
-    /// Get the registry entry for a Right.
-    pub fn get_entry(&self, right_id: &Hash) -> Option<&CrossChainRegistryEntry> {
-        self.entries.get(right_id)
+    /// Get the registry entry for a Sanad.
+    pub fn get_entry(&self, sanad_id: &Hash) -> Option<&CrossChainRegistryEntry> {
+        self.entries.get(sanad_id)
     }
 
     /// Get the number of recorded transfers.
@@ -557,10 +557,10 @@ mod tests {
     #[test]
     fn test_registry_prevents_double_mint() {
         let mut registry = CrossChainRegistry::new();
-        let right_id = Hash::new([0xAB; 32]);
+        let sanad_id = Hash::new([0xAB; 32]);
 
         let entry = CrossChainRegistryEntry {
-            right_id,
+            sanad_id,
             source_chain: ChainId::Bitcoin,
             source_seal: SealPoint::new(vec![0x01], None).unwrap(),
             destination_chain: ChainId::Sui,
@@ -572,7 +572,7 @@ mod tests {
 
         registry.record_transfer(entry.clone()).unwrap();
 
-        // Second transfer of same Right should fail
+        // Second transfer of same Sanad should fail
         let result = registry.record_transfer(entry);
         assert!(matches!(result, Err(CrossChainError::AlreadyMinted)));
     }
@@ -583,7 +583,7 @@ mod tests {
         let seal = SealPoint::new(vec![0x01], None).unwrap();
 
         let entry1 = CrossChainRegistryEntry {
-            right_id: Hash::new([0xAB; 32]),
+            sanad_id: Hash::new([0xAB; 32]),
             source_chain: ChainId::Bitcoin,
             source_seal: seal.clone(),
             destination_chain: ChainId::Sui,
@@ -597,7 +597,7 @@ mod tests {
 
         // Second transfer using same source seal should fail
         let entry2 = CrossChainRegistryEntry {
-            right_id: Hash::new([0xCD; 32]),
+            sanad_id: Hash::new([0xCD; 32]),
             source_chain: ChainId::Bitcoin,
             source_seal: seal.clone(),
             destination_chain: ChainId::Aptos,
@@ -617,7 +617,7 @@ mod tests {
         assert_eq!(registry.transfer_count(), 0);
 
         let entry = CrossChainRegistryEntry {
-            right_id: Hash::new([0xAB; 32]),
+            sanad_id: Hash::new([0xAB; 32]),
             source_chain: ChainId::Bitcoin,
             source_seal: SealPoint::new(vec![0x01], None).unwrap(),
             destination_chain: ChainId::Sui,
@@ -629,6 +629,6 @@ mod tests {
 
         registry.record_transfer(entry).unwrap();
         assert_eq!(registry.transfer_count(), 1);
-        assert!(registry.is_right_transferred(&Hash::new([0xAB; 32])));
+        assert!(registry.is_sanad_transferred(&Hash::new([0xAB; 32])));
     }
 }

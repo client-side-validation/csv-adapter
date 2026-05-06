@@ -5,17 +5,17 @@
 //!
 //! # Cross-Chain Transfer Protocol
 //!
-//! 1. **Lock** — Source chain consumes the Right's seal, emits a lock event
+//! 1. **Lock** — Source chain consumes the Sanad's seal, emits a lock event
 //! 2. **Prove** — Client generates an inclusion proof of the lock event
 //! 3. **Verify** — Destination chain verifies the proof (client-side)
-//! 4. **Claim** — New Right created on destination chain with new seal
+//! 4. **Claim** — New Sanad created on destination chain with new seal
 //!
 //! No bridges, no wrapped tokens, no cross-chain messaging.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use csv_core::{Chain, RightId};
+use csv_core::{Chain, SanadId};
 
 use crate::client::ClientRef;
 use crate::errors::CsvError;
@@ -66,7 +66,7 @@ pub enum Priority {
 ///
 /// // Start a cross-chain transfer
 /// let transfer = transfers
-///     .cross_chain(right_id, Chain::Sui)
+///     .cross_chain(sanad_id, Chain::Sui)
 ///     .to_address("0xabc...".to_string())
 ///     .with_priority(Priority::High)
 ///     .execute()?;
@@ -95,10 +95,10 @@ impl TransferManager {
     ///
     /// # Arguments
     ///
-    /// * `right_id` — The Right to transfer.
+    /// * `sanad_id` — The Sanad to transfer.
     /// * `to_chain` — The destination chain.
-    pub fn cross_chain(&self, right_id: RightId, to_chain: Chain) -> TransferBuilder {
-        TransferBuilder::new(self.transfers.clone(), right_id, to_chain)
+    pub fn cross_chain(&self, sanad_id: SanadId, to_chain: Chain) -> TransferBuilder {
+        TransferBuilder::new(self.transfers.clone(), sanad_id, to_chain)
     }
 
     /// Get the current status of a transfer.
@@ -142,8 +142,8 @@ impl TransferManager {
 pub struct TransferRecord {
     /// Unique transfer identifier.
     pub transfer_id: String,
-    /// The Right being transferred.
-    pub right_id: RightId,
+    /// The Sanad being transferred.
+    pub sanad_id: SanadId,
     /// Source chain.
     pub from_chain: Chain,
     /// Destination chain.
@@ -159,7 +159,7 @@ pub struct TransferRecord {
 /// Created via [`TransferManager::cross_chain()`].
 pub struct TransferBuilder {
     transfers: std::sync::Arc<std::sync::Mutex<HashMap<String, TransferRecord>>>,
-    right_id: RightId,
+    sanad_id: SanadId,
     to_chain: Chain,
     to_address: Option<String>,
     priority: Priority,
@@ -169,12 +169,12 @@ pub struct TransferBuilder {
 impl TransferBuilder {
     pub(crate) fn new(
         transfers: std::sync::Arc<std::sync::Mutex<HashMap<String, TransferRecord>>>,
-        right_id: RightId,
+        sanad_id: SanadId,
         to_chain: Chain,
     ) -> Self {
         Self {
             transfers,
-            right_id,
+            sanad_id,
             to_chain,
             to_address: None,
             priority: Priority::default(),
@@ -206,7 +206,7 @@ impl TransferBuilder {
     /// Execute the cross-chain transfer.
     ///
     /// This initiates the lock-and-prove protocol:
-    /// 1. Locks the Right on the source chain (consumes the seal)
+    /// 1. Locks the Sanad on the source chain (consumes the seal)
     /// 2. Generates the inclusion proof
     /// 3. Returns a transfer ID for tracking progress
     ///
@@ -217,8 +217,8 @@ impl TransferBuilder {
     ///
     /// # Errors
     ///
-    /// - [`CsvError::RightNotFound`] if the Right ID is unknown
-    /// - [`CsvError::RightAlreadyConsumed`] if the seal was already used
+    /// - [`CsvError::SanadNotFound`] if the Sanad ID is unknown
+    /// - [`CsvError::SanadAlreadyConsumed`] if the seal was already used
     /// - [`CsvError::ChainNotSupported`] if the destination chain is not enabled
     /// - [`CsvError::InsufficientFunds`] if the wallet lacks funds
     pub fn execute(self) -> Result<String, CsvError> {
@@ -237,7 +237,7 @@ impl TransferBuilder {
         // Create and store the transfer record
         let record = TransferRecord {
             transfer_id: transfer_id.clone(),
-            right_id: self.right_id,
+            sanad_id: self.sanad_id,
             from_chain,
             to_chain: self.to_chain,
             to_address: to_address.clone(),

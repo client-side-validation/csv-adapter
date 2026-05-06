@@ -1,19 +1,19 @@
-//! Mint operations for CSV rights on Sui
+//! Mint operations for CSV sanads on Sui
 //!
 //! This module provides SDK-based minting using Sui's JSON-RPC with proper transaction building.
 
 use crate::error::{SuiError, SuiResult};
 use csv_core::hash::Hash as CsvHash;
 
-/// Mint a right on Sui using direct JSON-RPC transaction submission
+/// Mint a sanad on Sui using direct JSON-RPC transaction submission
 ///
 /// This uses Sui's transaction building and execution via JSON-RPC.
 #[cfg(feature = "rpc")]
-pub async fn mint_right(
+pub async fn mint_sanad(
     rpc_url: &str,
     package_id: &str,
     private_key_hex: &str,
-    right_id: CsvHash,
+    sanad_id: CsvHash,
     commitment: CsvHash,
     source_chain: u8,
     source_seal_ref: CsvHash,
@@ -71,7 +71,7 @@ pub async fn mint_right(
 
     // 2. Build the transaction bytes for a Move call
     // Convert hashes to Sui address format (0x + 64 hex chars)
-    let right_id_hex = format!("0x{}", hex::encode(right_id.as_bytes()));
+    let sanad_id_hex = format!("0x{}", hex::encode(sanad_id.as_bytes()));
     let commitment_hex = format!("0x{}", hex::encode(commitment.as_bytes()));
     let source_seal_hex = format!("0x{}", hex::encode(source_seal_ref.as_bytes()));
 
@@ -82,10 +82,10 @@ pub async fn mint_right(
             sender_address,
             package_id,
             "csv_seal",
-            "mint_right",
+            "mint_sanad",
             [], // type arguments
             [
-                right_id_hex,
+                sanad_id_hex,
                 commitment_hex,
                 source_chain.to_string(),
                 source_seal_hex

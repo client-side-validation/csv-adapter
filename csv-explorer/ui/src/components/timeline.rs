@@ -23,7 +23,7 @@ pub fn TransferTimeline(
         },
         TimelineStep {
             label: "Mint Completed".to_string(),
-            description: "Right minted on destination chain".to_string(),
+            description: "Sanad minted on destination chain".to_string(),
             time: completed_at.unwrap_or_default(),
             completed: status.to_lowercase() == "completed",
         },

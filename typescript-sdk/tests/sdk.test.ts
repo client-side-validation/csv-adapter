@@ -6,7 +6,7 @@ import {
   numberToHex,
 } from '../src/types';
 import { sealRefFromHex, sealRefToJson, sealRefFromJson } from '../src/seal';
-import { rightFromHex, rightToJson, rightFromJson } from '../src/right';
+import { sanadFromHex, sanadToJson, sanadFromJson } from '../src/sanad';
 import { proofBundleFromJson, proofBundleToJson } from '../src/proof';
 import { verifyProofBundle, verifyProofBundleFromJson } from '../src/verify';
 import { BitcoinChain } from '../src/chains/bitcoin';
@@ -45,7 +45,7 @@ describe('Type utilities', () => {
   });
 });
 
-describe('SealRef', () => {
+describe('SealPoint', () => {
   test('sealRefFromHex creates seal from hex', () => {
     const seal = sealRefFromHex('00112233445566778899aabbccddeeff', 42);
     expect(seal.sealId).toEqual(hexToBytes('00112233445566778899aabbccddeeff'));
@@ -67,9 +67,9 @@ describe('SealRef', () => {
   });
 });
 
-describe('Right', () => {
-  test('rightFromHex creates right from hex', () => {
-    const right = rightFromHex(
+describe('Sanad', () => {
+  test('sanadFromHex creates sanad from hex', () => {
+    const sanad = sanadFromHex(
       'aa'.repeat(32),
       'bb'.repeat(32),
       {
@@ -79,13 +79,13 @@ describe('Right', () => {
       },
       'ee'.repeat(32),
     );
-    expect(right.id).toBe('aa'.repeat(32));
-    expect(right.commitment).toBe('bb'.repeat(32));
-    expect(right.nullifier).toBeNull();
+    expect(sanad.id).toBe('aa'.repeat(32));
+    expect(sanad.commitment).toBe('bb'.repeat(32));
+    expect(sanad.nullifier).toBeNull();
   });
 
-  test('rightToJson serializes right', () => {
-    const right = rightFromHex(
+  test('sanadToJson serializes sanad', () => {
+    const sanad = sanadFromHex(
       'aa'.repeat(32),
       'bb'.repeat(32),
       {
@@ -95,7 +95,7 @@ describe('Right', () => {
       },
       'ee'.repeat(32),
     );
-    const json = rightToJson(right);
+    const json = sanadToJson(sanad);
     expect(json.id).toBe('aa'.repeat(32));
     expect(json.owner.scheme).toBe('Ed25519');
   });

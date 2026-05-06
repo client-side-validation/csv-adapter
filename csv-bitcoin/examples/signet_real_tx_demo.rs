@@ -11,8 +11,8 @@
 use bitcoin::Network as BtcNetwork;
 use csv_adapter_bitcoin::mempool_rpc::MempoolSignetRpc;
 use csv_adapter_bitcoin::wallet::{Bip86Path, SealWallet};
-use csv_adapter_bitcoin::{BitcoinAnchorLayer, BitcoinConfig, Network};
-use csv_core::{AnchorLayer, Hash};
+use csv_adapter_bitcoin::{BitcoinSealProtocol, BitcoinConfig, Network};
+use csv_core::{SealProtocol, Hash};
 
 fn main() {
     println!("=== Bitcoin Signet Real Transaction Demo ===\n");
@@ -68,7 +68,7 @@ fn main() {
 
     let required_depth = config.finality_depth;
 
-    let adapter = BitcoinAnchorLayer::with_wallet(config, wallet)
+    let adapter = BitcoinSealProtocol::with_wallet(config, wallet)
         .expect("Failed to create adapter")
         .with_rpc(Box::new(rpc));
 

@@ -1,22 +1,22 @@
-//! Chain adapter facade implementations.
+//! Chain facade implementations.
 //!
 //! This module provides unified facade functions that delegate to the appropriate
-//! chain adapters while providing a consistent API across all supported chains.
+//! chain backends while providing a consistent API across all supported chains.
 //!
 //! # Clean Architecture
 //!
 //! Following the Clean Architecture documented in `docs/ARCHITECTURE.md` and `docs/BLUEPRINT.md`:
 //!
-//! 1. **csv-adapter-core**: Defines `AnchorLayer` trait (protocol primitives) and 
+//! 1. **csv-core**: Defines `SealProtocol` trait (protocol primitives) and
 //!    `ChainBackend` trait (chain operations like ChainQuery, ChainSigner, etc.)
 //!
-//! 2. **csv-adapter-{chain}**: Each chain provides:
-//!    - `AnchorLayer` implementation (e.g., `EthereumAnchorLayer`)
-//!    - `ChainOperations` type (e.g., `EthereumChainOperations`) implementing `ChainBackend`
-//!    - ChainOperations can be created FROM AnchorLayer via `from_anchor_layer()`
+//! 2. **csv-{chain}**: Each chain provides:
+//!    - `SealProtocol` implementation (e.g., `EthereumSealProtocol`)
+//!    - `Backend` type (e.g., `EthereumBackend`) implementing `ChainBackend`
+//!    - Backend can be created via driver registration
 //!
-//! 3. **csv-adapter (this facade)**: 
-//!    - Works with `Arc<dyn ChainBackend>` (ChainOperations, NOT AnchorLayer)
+//! 3. **csv-sdk (this facade)**:
+//!    - Works with `Arc<dyn ChainBackend>` (Backend implementations)
 //!    - Provides `AdapterBuilder` for constructing adapters with chain-specific configs
 //!    - `ChainFacade` delegates operations to registered adapters
 //!
@@ -47,7 +47,6 @@ use csv_core::{
     OpsBalanceInfo as BalanceInfo, OpsTransactionInfo as TransactionInfo, OpsTransactionStatus as TransactionStatus,
     OpsDeploymentStatus as DeploymentStatus, SanadOperationResult,
     SanadId, Hash, ProofBundle,
-    RightId
 };
 
 use crate::client::ClientRef;
@@ -62,7 +61,7 @@ use crate::errors::CsvError;
 /// # Architecture
 ///
 /// The facade holds `Arc<dyn ChainBackend>` instances which are the chain-specific
-/// `ChainOperations` types (e.g., `EthereumChainOperations`), NOT the `AnchorLayer` types.
+/// `ChainOperations` types (e.g., `EthereumChainOperations`), NOT the `SealProtocol` types.
 /// This distinction is crucial for Clean Architecture compliance.
 ///
 /// Use `AdapterBuilder` to construct adapters properly with chain-specific configuration.
@@ -75,7 +74,7 @@ pub struct ChainFacade {
 /// Pre-fetched seal consumption data for verification.
 /// This avoids capturing the store lock in the closure passed to verify_proof.
 struct SealCheckData {
-    right_id: SanadId,
+    sanad_id: SanadId,
     is_consumed: bool,
 }
 
@@ -262,10 +261,10 @@ impl ChainFacade {
             })
     }
 
-    /// Create a new right on the specified chain.
+    /// Create a new sanad on the specified chain.
     ///
     /// Delegates to ChainSanadOps::create_sanad.
-    pub async fn create_right(
+    pub async fn create_sanad(
         &self,
         chain: Chain,
         owner: &str,
@@ -280,62 +279,62 @@ impl ChainFacade {
             .await
             .map_err(|e| CsvError::AdapterError {
                 chain,
-                message: format!("Right creation failed: {}", e),
+                message: format!("Sanad creation failed: {}", e),
             })
     }
 
-    /// Consume a right on the specified chain.
+    /// Consume a sanad on the specified chain.
     ///
     /// Delegates to ChainSanadOps::consume_sanad.
-    pub async fn consume_right(
+    pub async fn consume_sanad(
         &self,
         chain: Chain,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         owner_key_id: &str,
     ) -> Result<SanadOperationResult, CsvError> {
         let adapter = self.get_adapter(chain).await?;
         
         adapter
-            .consume_sanad(&right_id.into(), owner_key_id)
+            .consume_sanad(&sanad_id.into(), owner_key_id)
             .await
             .map_err(|e| CsvError::AdapterError {
                 chain,
-                message: format!("Right consumption failed: {}", e),
+                message: format!("Sanad consumption failed: {}", e),
             })
     }
 
-    /// Lock a right for cross-chain transfer.
+    /// Lock a sanad for cross-chain transfer.
     ///
     /// Delegates to ChainSanadOps::lock_sanad.
-    pub async fn lock_right(
+    pub async fn lock_sanad(
         &self,
         chain: Chain,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         destination_chain: &str,
         owner_key_id: &str,
     ) -> Result<SanadOperationResult, CsvError> {
         let adapter = self.get_adapter(chain).await?;
         
         adapter
-            .lock_sanad(&right_id.into(), destination_chain, owner_key_id)
+            .lock_sanad(&sanad_id.into(), destination_chain, owner_key_id)
             .await
             .map_err(|e| CsvError::AdapterError {
                 chain,
-                message: format!("Right lock failed: {}", e),
+                message: format!("Sanad lock failed: {}", e),
             })
     }
 
     /// Create a new seal on the specified chain.
     ///
     /// This is the primary facade function for seal creation. It delegates to the
-    /// chain adapter's AnchorLayer::create_seal method to create a real chain-native seal.
+    /// chain adapter's SealProtocol::create_seal method to create a real chain-native seal.
     ///
     /// # Arguments
     /// * `chain` - The blockchain where the seal will be created
     /// * `value` - Optional value/funding for the seal (chain-specific units like satoshis, wei, etc.)
     ///
     /// # Returns
-    /// * `Ok(SealRef)` - The real chain-native seal reference
+    /// * `Ok(SealPoint)` - The real chain-native seal reference
     /// * `Err` - If seal creation fails
     ///
     /// # Example
@@ -347,7 +346,7 @@ impl ChainFacade {
         &self,
         chain: Chain,
         value: Option<u64>,
-    ) -> Result<csv_core::SealRef, CsvError> {
+    ) -> Result<csv_core::SealPoint, CsvError> {
         let adapter = self.get_adapter(chain).await?;
         
         // Delegate to the adapter's create_seal method
@@ -359,25 +358,25 @@ impl ChainFacade {
             })
     }
 
-    /// Mint a right on the destination chain.
+    /// Mint a sanad on the destination chain.
     ///
     /// Delegates to ChainSanadOps::mint_sanad.
-    pub async fn mint_right(
+    pub async fn mint_sanad(
         &self,
         chain: Chain,
         source_chain: &str,
-        source_right_id: &RightId,
+        source_sanad_id: &SanadId,
         lock_proof: &csv_core::InclusionProof,
         new_owner: &str,
     ) -> Result<SanadOperationResult, CsvError> {
         let adapter = self.get_adapter(chain).await?;
         
         adapter
-            .mint_sanad(source_chain, &source_right_id.into(), lock_proof, new_owner)
+            .mint_sanad(source_chain, &sanad_id.into(), lock_proof, new_owner)
             .await
             .map_err(|e| CsvError::AdapterError {
                 chain,
-                message: format!("Right mint failed: {}", e),
+                message: format!("Sanad mint failed: {}", e),
             })
     }
 
@@ -490,7 +489,7 @@ impl ChainFacade {
         adapters.keys().copied().collect()
     }
 
-    /// Generate a proof for a right on the specified chain.
+    /// Generate a proof for a sanad on the specified chain.
     ///
     /// This implementation queries the chain for inclusion proof data and constructs
     /// a complete ProofBundle for cross-chain transfers.
@@ -503,7 +502,7 @@ impl ChainFacade {
     pub async fn generate_proof(
         &self,
         chain: Chain,
-        right_id: &RightId,
+        sanad_id: &SanadId,
     ) -> Result<ProofBundle, CsvError> {
         let adapter = self.get_adapter(chain).await?;
 
@@ -515,8 +514,8 @@ impl ChainFacade {
             }
         })?;
 
-        // Create commitment from right_id (the right's hash is the commitment)
-        let commitment = csv_core::hash::Hash::new(*right_id.as_bytes());
+        // Create commitment from sanad_id (the sanad's hash is the commitment)
+        let commitment = csv_core::hash::Hash::new(*sanad_id.as_bytes());
 
         // Build inclusion proof from chain state
         let inclusion_proof = adapter
@@ -528,12 +527,12 @@ impl ChainFacade {
             })?;
 
         // Get the transaction info to build finality proof
-        // For proof generation, we use the right_id as the lookup key
-        let tx_hash_lookup = hex::encode(right_id.as_bytes());
+        // For proof generation, we use the sanad_id as the lookup key
+        let tx_hash_lookup = hex::encode(sanad_id.as_bytes());
         let tx_info = adapter.get_transaction(tx_hash_lookup.as_str()).await;
         let tx_hash = match &tx_info {
             Ok(info) => info.hash.clone(),
-            Err(_) => hex::encode(right_id.as_bytes()), // Fallback to right_id as hex
+            Err(_) => hex::encode(sanad_id.as_bytes()), // Fallback to sanad_id as hex
         };
 
         // Build finality proof using the transaction hash
@@ -545,7 +544,7 @@ impl ChainFacade {
                 message: format!("Failed to build finality proof: {}", e),
             })?;
 
-        // Create a simple DAG segment with the right commitment
+        // Create a simple DAG segment with the sanad commitment
         use csv_core::dag::{DAGNode, DAGSegment};
         let dag_node = DAGNode::new(
             commitment,
@@ -557,16 +556,16 @@ impl ChainFacade {
         let dag_segment = DAGSegment::new(vec![dag_node], commitment);
 
         // Create the proof bundle
-        let seal_id = right_id.as_bytes().to_vec();
+        let seal_id = sanad_id.as_bytes().to_vec();
         let proof_bundle = ProofBundle::new(
             dag_segment,
             vec![], // Signatures will be added by the caller
-            csv_core::seal::SealRef::new(seal_id.clone(), None)
+            csv_core::seal::SealPoint::new(seal_id.clone(), None)
                 .map_err(|e| CsvError::AdapterError {
                     chain,
                     message: format!("Failed to create seal ref: {}", e),
                 })?,
-            csv_core::seal::AnchorRef::new(seal_id, block_height, inclusion_proof.proof_bytes.clone())
+            csv_core::seal::CommitAnchor::new(seal_id, block_height, inclusion_proof.proof_bytes.clone())
                 .map_err(|e| CsvError::AdapterError {
                     chain,
                     message: format!("Failed to create anchor ref: {}", e),
@@ -580,8 +579,8 @@ impl ChainFacade {
         })?;
 
         log::info!(
-            "Generated proof bundle for right {:?} on {:?} at block {}",
-            right_id, chain, block_height
+            "Generated proof bundle for sanad {:?} on {:?} at block {}",
+            sanad_id, chain, block_height
         );
 
         Ok(proof_bundle)
@@ -601,7 +600,7 @@ impl ChainFacade {
         &self,
         chain: Chain,
         proof_bundle: &ProofBundle,
-        right_id: &SanadId,
+        sanad_id: &SanadId,
     ) -> Result<bool, CsvError> {
         let adapter = self.get_adapter(chain).await?;
 
@@ -609,7 +608,7 @@ impl ChainFacade {
         let signature_scheme = adapter.signature_scheme();
 
         // First verify the inclusion proof using the chain's native verification
-        let commitment = csv_core::hash::Hash::new(*right_id.as_bytes());
+        let commitment = csv_core::hash::Hash::new(*sanad_id.as_bytes());
         let inclusion_valid = adapter
             .verify_inclusion_proof(&proof_bundle.inclusion_proof, &commitment)
             .map_err(|e| CsvError::AdapterError {
@@ -618,12 +617,12 @@ impl ChainFacade {
             })?;
 
         if !inclusion_valid {
-            log::warn!("Inclusion proof invalid for right {:?} on {:?}", right_id, chain);
+            log::warn!("Inclusion proof invalid for sanad {:?} on {:?}", sanad_id, chain);
             return Ok(false);
         }
 
         // Verify the finality proof
-        let tx_hash = hex::encode(right_id.as_bytes());
+        let tx_hash = hex::encode(sanad_id.as_bytes());
         let finality_valid = adapter
             .verify_finality_proof(&proof_bundle.finality_proof, &tx_hash)
             .map_err(|e| CsvError::AdapterError {
@@ -632,20 +631,20 @@ impl ChainFacade {
             })?;
 
         if !finality_valid {
-            log::warn!("Finality proof invalid for right {:?} on {:?}", right_id, chain);
+            log::warn!("Finality proof invalid for sanad {:?} on {:?}", sanad_id, chain);
             return Ok(false);
         }
 
         // Pre-fetch seal consumption data BEFORE creating the closure
         // This avoids capturing self (which contains the sync Mutex) in the async context
-        let seal_check_data = self.pre_fetch_seal_data(right_id).await?;
+        let seal_check_data = self.pre_fetch_seal_data(sanad_id).await?;
 
         // Create a seal registry checker for replay protection
         // The closure now only captures pre-fetched data, not self
         let seal_checker = move |seal_id: &[u8]| {
-            let check_right_id = csv_core::SanadId::from_bytes(seal_id);
-            // Only return consumed if the seal_id matches the pre-fetched right_id AND it was consumed
-            if check_right_id == seal_check_data.right_id {
+            let check_sanad_id = csv_core::SanadId::from_bytes(seal_id);
+            // Only return consumed if the seal_id matches the pre-fetched sanad_id AND it was consumed
+            if check_sanad_id == seal_check_data.sanad_id {
                 if seal_check_data.is_consumed {
                     log::warn!("Seal {} has already been consumed", hex::encode(seal_id));
                 }
@@ -664,11 +663,11 @@ impl ChainFacade {
             signature_scheme,
         ) {
             Ok(()) => {
-                log::info!("Proof bundle verified successfully for right {:?} on {:?}", right_id, chain);
+                log::info!("Proof bundle verified successfully for sanad {:?} on {:?}", sanad_id, chain);
                 Ok(true)
             }
             Err(e) => {
-                log::warn!("Proof verification failed for right {:?} on {:?}: {}", right_id, chain, e);
+                log::warn!("Proof verification failed for sanad {:?} on {:?}: {}", sanad_id, chain, e);
                 Ok(false)
             }
         }
@@ -676,19 +675,19 @@ impl ChainFacade {
 
     /// Pre-fetch seal consumption data to avoid locking in async closure.
     /// 
-    /// This fetches the right record from the store synchronously BEFORE entering
+    /// This fetches the sanad record from the store synchronously BEFORE entering
     /// the verification closure, preventing the async deadlock risk.
-    async fn pre_fetch_seal_data(&self, right_id: &SanadId) -> Result<SealCheckData, CsvError> {
+    async fn pre_fetch_seal_data(&self, sanad_id: &SanadId) -> Result<SealCheckData, CsvError> {
         // Clone the Arc to avoid capturing self in the spawned task
         let store_arc = Arc::clone(&self.client.store);
-        let right_id_clone: csv_core::right::RightId = right_id.clone().into();
+        let sanad_id_clone: csv_core::sanad::SanadId = sanad_id.clone().into();
         
         // Run the store access in a blocking task since it uses std::sync::Mutex
         let is_consumed = tokio::task::spawn_blocking(move || {
             let store = store_arc.lock().map_err(|e| e.to_string())?;
-            match store.get_right(&right_id_clone) {
+            match store.get_sanad(&sanad_id_clone) {
                 Ok(Some(record)) => Ok(record.consumed_at.is_some()),
-                Ok(None) => Ok(false), // Right not found = not consumed
+                Ok(None) => Ok(false), // Sanad not found = not consumed
                 Err(e) => Err(format!("Store error: {}", e)),
             }
         })
@@ -697,7 +696,7 @@ impl ChainFacade {
         .map_err(|e| CsvError::StoreError(e))?;
         
         Ok(SealCheckData {
-            right_id: right_id.clone(),
+            sanad_id: sanad_id.clone(),
             is_consumed,
         })
     }
@@ -751,7 +750,7 @@ impl AdapterBuilder {
     /// Build an Ethereum adapter from its specific configuration.
     ///
     /// Uses `EthereumChainOperations::from_anchor_layer()` internally which creates
-    /// the ChainBackend implementation from an EthereumAnchorLayer.
+    /// the ChainBackend implementation from an EthereumSealProtocol.
     #[cfg(feature = "ethereum")]
     pub async fn ethereum_from_config(
         &self,
@@ -760,16 +759,16 @@ impl AdapterBuilder {
         csv_seal_address: [u8; 20],
     ) -> Result<Arc<dyn ChainBackend>, CsvError> {
         use csv_ethereum::chain_operations::EthereumChainOperations;
-        use csv_ethereum::adapter::EthereumAnchorLayer;
+        use csv_ethereum::adapter::EthereumSealProtocol;
 
-        // Create the AnchorLayer first (this is the protocol primitive)
-        let anchor_layer = EthereumAnchorLayer::from_config(config, rpc, csv_seal_address)
+        // Create the SealProtocol first (this is the protocol primitive)
+        let anchor_layer = EthereumSealProtocol::from_config(config, rpc, csv_seal_address)
             .map_err(|e| CsvError::AdapterError {
                 chain: Chain::Ethereum,
                 message: format!("Failed to create Ethereum anchor layer: {}", e),
             })?;
 
-        // Create ChainOperations from AnchorLayer (this implements ChainBackend)
+        // Create ChainOperations from SealProtocol (this implements ChainBackend)
         let operations = EthereumChainOperations::from_anchor_layer(&anchor_layer)
             .map_err(|e| CsvError::AdapterError {
                 chain: Chain::Ethereum,
@@ -787,9 +786,9 @@ impl AdapterBuilder {
         rpc: Box<dyn csv_sui::rpc::SuiRpc>,
     ) -> Result<Arc<dyn ChainBackend>, CsvError> {
         use csv_sui::chain_operations::SuiChainOperations;
-        use csv_sui::adapter::SuiAnchorLayer;
+        use csv_sui::adapter::SuiSealProtocol;
 
-        let anchor_layer = SuiAnchorLayer::from_config(config, rpc)
+        let anchor_layer = SuiSealProtocol::from_config(config, rpc)
             .map_err(|e| CsvError::AdapterError {
                 chain: Chain::Sui,
                 message: format!("Failed to create Sui anchor layer: {}", e),
@@ -812,9 +811,9 @@ impl AdapterBuilder {
         rpc: Box<dyn csv_aptos::rpc::AptosRpc>,
     ) -> Result<Arc<dyn ChainBackend>, CsvError> {
         use csv_aptos::chain_operations::AptosChainOperations;
-        use csv_aptos::adapter::AptosAnchorLayer;
+        use csv_aptos::adapter::AptosSealProtocol;
 
-        let anchor_layer = AptosAnchorLayer::from_config(config, rpc)
+        let anchor_layer = AptosSealProtocol::from_config(config, rpc)
             .map_err(|e| CsvError::AdapterError {
                 chain: Chain::Aptos,
                 message: format!("Failed to create Aptos anchor layer: {}", e),
@@ -837,10 +836,10 @@ impl AdapterBuilder {
         rpc: Box<dyn csv_solana::rpc::SolanaRpc>,
     ) -> Result<Arc<dyn ChainBackend>, CsvError> {
         use csv_solana::chain_operations::SolanaChainOperations;
-        use csv_solana::adapter::SolanaAnchorLayer;
+        use csv_solana::adapter::SolanaSealProtocol;
 
         // Solana now uses from_config() following the standard facade pattern
-        let anchor_layer = SolanaAnchorLayer::from_config(config, rpc)
+        let anchor_layer = SolanaSealProtocol::from_config(config, rpc)
             .map_err(|e| CsvError::AdapterError {
                 chain: Chain::Solana,
                 message: format!("Failed to create Solana anchor layer: {}", e),

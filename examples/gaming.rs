@@ -1,6 +1,6 @@
 //! Gaming Assets Cross-Chain Example
 //!
-//! This example demonstrates how gaming assets can be represented as rights
+//! This example demonstrates how gaming assets can be represented as sanads
 //! and transferred between chains for different game ecosystems.
 //!
 //! Run with: `cargo run --example gaming --features "all-chains,tokio"`
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating gaming asset (Legendary Sword)...");
     let sword_commitment = Hash::from([1u8; 32]);
 
-    let sword = client.rights().create(sword_commitment, Chain::Bitcoin)?;
+    let sword = client.sanads().create(sword_commitment, Chain::Bitcoin)?;
 
     println!("✓ Created sword asset: {:?}", sword.id);
     println!("  Owner: {:?}", sword.owner);
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating shield asset (Aegis of Protection)...");
     let shield_commitment = Hash::from([2u8; 32]);
 
-    let shield = client.rights().create(shield_commitment, Chain::Sui)?;
+    let shield = client.sanads().create(shield_commitment, Chain::Sui)?;
 
     println!("✓ Created shield asset: {:?}", shield.id);
     println!("  Chain: Sui (Sui Defenders game)\n");
@@ -53,9 +53,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Player Asset Inventory:");
     println!("------------------------");
 
-    let rights = client.rights().list(RightFilters::default())?;
-    for right in rights {
-        println!("  - {:?} ({})", right.id, "active");
+    let sanads = client.sanads().list(SanadFilters::default())?;
+    for sanad in sanads {
+        println!("  - {:?} ({})", sanad.id, "active");
     }
 
     println!("\n=== Gaming Integration Points ===");

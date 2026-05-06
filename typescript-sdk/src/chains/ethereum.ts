@@ -1,4 +1,4 @@
-import { SealRef } from '../seal';
+import { SealPoint } from '../seal';
 import { hexToBytes, bytesToHex } from '../types';
 
 /**
@@ -13,9 +13,9 @@ export namespace EthereumChain {
    *
    * @param contractAddress - Contract address (hex string, with 0x prefix)
    * @param storageSlot - Storage slot number
-   * @returns SealRef
+   * @returns SealPoint
    */
-  export function createSeal(contractAddress: string, storageSlot: number): SealRef {
+  export function createSeal(contractAddress: string, storageSlot: number): SealPoint {
     const address = contractAddress.startsWith('0x')
       ? contractAddress.slice(2)
       : contractAddress;
@@ -40,9 +40,9 @@ export namespace EthereumChain {
    * Create an Ethereum seal from a nullifier hash.
    *
    * @param nullifierHash - 32-byte nullifier hash (hex string)
-   * @returns SealRef
+   * @returns SealPoint
    */
-  export function createSealFromNullifier(nullifierHash: string): SealRef {
+  export function createSealFromNullifier(nullifierHash: string): SealPoint {
     return {
       sealId: hexToBytes(nullifierHash.startsWith('0x') ? nullifierHash.slice(2) : nullifierHash),
       nonce: null,

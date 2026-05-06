@@ -7,7 +7,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::chain_adapter::{ChainAdapter, ChainCapabilities};
+use crate::chain_adapter::{ChainDriver, ChainCapabilities};
 use crate::chain_config::ChainConfig;
 
 /// Metadata about a chain plugin
@@ -41,7 +41,7 @@ pub trait ChainPlugin: Send + Sync + Any {
     ///
     /// # Arguments
     /// * `config` - Optional chain configuration
-    fn create_adapter(&self, config: Option<ChainConfig>) -> Box<dyn ChainAdapter>;
+    fn create_adapter(&self, config: Option<ChainConfig>) -> Box<dyn ChainDriver>;
 
     /// Get default configuration for this chain
     fn default_config(&self) -> ChainConfig;
@@ -100,7 +100,7 @@ impl ChainPluginRegistry {
     /// use csv_core::chain_plugin::{ChainPluginRegistry, ChainPlugin, ChainPluginMetadata};
     /// use csv_core::adapters::ScalableBitcoinAdapter;
     /// use csv_core::chain_config::ChainConfig;
-    /// use csv_core::chain_adapter::{ChainAdapter, ChainCapabilities, AccountModel};
+    /// use csv_core::chain_adapter::{ChainDriver, ChainCapabilities, AccountModel};
     ///
     /// struct BitcoinPlugin;
     /// impl ChainPlugin for BitcoinPlugin {
@@ -125,7 +125,7 @@ impl ChainPluginRegistry {
     ///         }
     ///     }
     ///
-    ///     fn create_adapter(&self, _config: Option<ChainConfig>) -> Box<dyn ChainAdapter> {
+    ///     fn create_adapter(&self, _config: Option<ChainConfig>) -> Box<dyn ChainDriver> {
     ///         Box::new(ScalableBitcoinAdapter::new())
     ///     }
     ///
@@ -215,7 +215,7 @@ impl ChainPluginRegistry {
         &self,
         chain_id: &str,
         config: Option<ChainConfig>,
-    ) -> Option<Box<dyn ChainAdapter>> {
+    ) -> Option<Box<dyn ChainDriver>> {
         self.plugins.get(chain_id).map(|p| p.create_adapter(config))
     }
 
@@ -244,7 +244,7 @@ impl Default for ChainPluginRegistry {
 }
 
 /// Type alias for adapter factory functions
-type AdapterFactoryFn = dyn Fn(Option<ChainConfig>) -> Box<dyn ChainAdapter> + Send + Sync;
+type AdapterFactoryFn = dyn Fn(Option<ChainConfig>) -> Box<dyn ChainDriver> + Send + Sync;
 
 /// Type alias for config factory functions
 type ConfigFactoryFn = dyn Fn() -> ChainConfig + Send + Sync;
@@ -316,7 +316,7 @@ impl ChainPluginBuilder {
     /// Set the adapter factory
     pub fn adapter_factory<F>(mut self, factory: F) -> Self
     where
-        F: Fn(Option<ChainConfig>) -> Box<dyn ChainAdapter> + Send + Sync + 'static,
+        F: Fn(Option<ChainConfig>) -> Box<dyn ChainDriver> + Send + Sync + 'static,
     {
         self.adapter_factory = Some(Box::new(factory));
         self
@@ -371,7 +371,7 @@ impl std::error::Error for ChainPluginBuildError {}
 /// Built chain plugin from builder
 struct BuiltChainPlugin {
     metadata: ChainPluginMetadata,
-    adapter_factory: Box<dyn Fn(Option<ChainConfig>) -> Box<dyn ChainAdapter> + Send + Sync>,
+    adapter_factory: Box<dyn Fn(Option<ChainConfig>) -> Box<dyn ChainDriver> + Send + Sync>,
     config_factory: Box<dyn Fn() -> ChainConfig + Send + Sync>,
 }
 
@@ -380,7 +380,7 @@ impl ChainPlugin for BuiltChainPlugin {
         self.metadata.clone()
     }
 
-    fn create_adapter(&self, config: Option<ChainConfig>) -> Box<dyn ChainAdapter> {
+    fn create_adapter(&self, config: Option<ChainConfig>) -> Box<dyn ChainDriver> {
         (self.adapter_factory)(config)
     }
 

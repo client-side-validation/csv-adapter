@@ -3,15 +3,15 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 
 use csv_core::{
-    AccountModel, AdapterFactory, Chain, ChainAdapter, ChainCapabilities, ChainConfig, ChainError,
+    AccountModel, AdapterFactory, Chain, ChainDriver, ChainCapabilities, ChainConfig, ChainError,
     ChainPluginBuilder, ChainResult, RpcClient, Wallet,
 };
 
 #[derive(Debug, Clone)]
-struct ExampleChainAdapter;
+struct ExampleChainDriver;
 
 #[async_trait]
-impl ChainAdapter for ExampleChainAdapter {
+impl ChainDriver for ExampleChainDriver {
     fn chain_id(&self) -> &'static str {
         "example-chain"
     }
@@ -62,7 +62,7 @@ fn example_config() -> ChainConfig {
         rpc_endpoints: vec!["https://rpc.example-chain.devnet".to_string()],
         program_id: Some("example-program".to_string()),
         block_explorer_urls: vec!["https://explorer.example-chain.devnet".to_string()],
-        capabilities: ExampleChainAdapter.capabilities(),
+        capabilities: ExampleChainDriver.capabilities(),
         custom_settings: HashMap::new(),
     }
 }
@@ -72,7 +72,7 @@ fn main() {
         .version(csv_core::PROTOCOL_VERSION)
         .author("csv-adapter")
         .description("Example custom chain plugin registered at runtime")
-        .capabilities(ExampleChainAdapter.capabilities())
+        .capabilities(ExampleChainDriver.capabilities())
         .adapter_factory(|config| {
             if let Some(config) = config {
                 println!(
@@ -80,7 +80,7 @@ fn main() {
                     config.chain_name, config.default_network
                 );
             }
-            Box::new(ExampleChainAdapter)
+            Box::new(ExampleChainDriver)
         })
         .config_factory(example_config)
         .build()

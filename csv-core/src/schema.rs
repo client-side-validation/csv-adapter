@@ -173,7 +173,7 @@ impl GlobalStateType {
 /// Definition of an owned state type in the schema
 ///
 /// Owned state types represent state that is controlled by a specific
-/// owner (tied to a seal). These are the primary vehicle for rights.
+/// owner (tied to a seal). These are the primary vehicle for sanads.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OwnedStateType {
     /// Type ID (unique within schema)

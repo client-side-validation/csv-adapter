@@ -1,6 +1,6 @@
 //! Parallel Operations Example
 //!
-//! This example demonstrates concurrent Right creation and queries,
+//! This example demonstrates concurrent Sanad creation and queries,
 //! useful for high-throughput scenarios like batch processing or gaming.
 //!
 //! Run with: `cargo run --example parallel_verification --features "all-chains,tokio" --release`
@@ -19,29 +19,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
 
     // Sequential creation benchmark
-    println!("Sequential Right Creation:");
+    println!("Sequential Sanad Creation:");
     println!("-------------------------");
 
-    let num_rights = 100;
+    let num_sanads = 100;
     let start = Instant::now();
 
-    for i in 0..num_rights {
+    for i in 0..num_sanads {
         let commitment = Hash::from([i as u8; 32]);
-        let _ = client.rights().create(commitment, Chain::Bitcoin);
+        let _ = client.sanads().create(commitment, Chain::Bitcoin);
     }
 
     let seq_duration = start.elapsed();
-    println!("  Created {} rights in {:.2?}", num_rights, seq_duration);
-    println!("  Throughput: {:.0} rights/sec\n",
-        num_rights as f64 / seq_duration.as_secs_f64());
+    println!("  Created {} sanads in {:.2?}", num_sanads, seq_duration);
+    println!("  Throughput: {:.0} sanads/sec\n",
+        num_sanads as f64 / seq_duration.as_secs_f64());
 
     // Parallel creation using threads
-    println!("Parallel Right Creation (using threads):");
+    println!("Parallel Sanad Creation (using threads):");
     println!("----------------------------------------");
 
     let client_arc = Arc::new(client);
     let num_threads = 4;
-    let rights_per_thread = 25;
+    let sanads_per_thread = 25;
 
     let start = Instant::now();
 
@@ -49,11 +49,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|thread_id| {
             let client_ref = Arc::clone(&client_arc);
             thread::spawn(move || {
-                for i in 0..rights_per_thread {
-                    let commitment = Hash::from([(thread_id * rights_per_thread + i) as u8; 32]);
-                    let _ = client_ref.rights().create(commitment, Chain::Ethereum);
+                for i in 0..sanads_per_thread {
+                    let commitment = Hash::from([(thread_id * sanads_per_thread + i) as u8; 32]);
+                    let _ = client_ref.sanads().create(commitment, Chain::Ethereum);
                 }
-                rights_per_thread
+                sanads_per_thread
             })
         })
         .collect();
@@ -63,17 +63,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sum();
 
     let par_duration = start.elapsed();
-    println!("  Created {} rights across {} threads in {:.2?}",
+    println!("  Created {} sanads across {} threads in {:.2?}",
         total_created, num_threads, par_duration);
-    println!("  Throughput: {:.0} rights/sec\n",
+    println!("  Throughput: {:.0} sanads/sec\n",
         total_created as f64 / par_duration.as_secs_f64());
 
     // Query benchmark
     println!("Parallel Query Benchmark:");
     println!("-------------------------");
 
-    // First create a right to query repeatedly
-    let test_right = client_arc.rights().create(
+    // First create a sanad to query repeatedly
+    let test_sanad = client_arc.sanads().create(
         Hash::from([255u8; 32]),
         Chain::Bitcoin,
     )?;
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
 
     for _ in 0..num_queries {
-        let _ = client_arc.rights().get(&test_right.id);
+        let _ = client_arc.sanads().get(&test_sanad.id);
     }
 
     let query_duration = start.elapsed();
@@ -95,9 +95,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let speedup = seq_duration.as_secs_f64() / par_duration.as_secs_f64();
     println!("=== Results ===");
     println!("Parallel speedup: {:.2}x", speedup);
-    println!("Sequential throughput: {:.0} rights/sec",
-        num_rights as f64 / seq_duration.as_secs_f64());
-    println!("Parallel throughput: {:.0} rights/sec",
+    println!("Sequential throughput: {:.0} sanads/sec",
+        num_sanads as f64 / seq_duration.as_secs_f64());
+    println!("Parallel throughput: {:.0} sanads/sec",
         total_created as f64 / par_duration.as_secs_f64());
     println!("Query latency: {:?}", avg_query_time);
 

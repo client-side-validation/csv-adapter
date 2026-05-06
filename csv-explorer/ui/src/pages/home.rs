@@ -1,4 +1,4 @@
-use csv_explorer_shared::{ExplorerStats, RightRecord, SealRecord, TransferRecord};
+use csv_explorer_shared::{ExplorerStats, SanadRecord, SealRecord, TransferRecord};
 /// Home / landing page with stats, recent activity, and chain status.
 use dioxus::prelude::*;
 use dioxus_router::components::Link;
@@ -10,7 +10,7 @@ use crate::hooks::use_api::ApiClient;
 #[component]
 pub fn Home() -> Element {
     let mut stats = use_signal(|| Option::<ExplorerStats>::None);
-    let mut recent_rights = use_signal(|| Vec::<RightRecord>::new());
+    let mut recent_sanads = use_signal(|| Vec::<SanadRecord>::new());
     let mut recent_transfers = use_signal(|| Vec::<TransferRecord>::new());
     let mut recent_seals = use_signal(|| Vec::<SealRecord>::new());
     let mut api_health = use_signal(|| "unknown".to_string());
@@ -24,9 +24,9 @@ pub fn Home() -> Element {
                 stats.set(Some(s));
             }
 
-            // Fetch recent rights
-            if let Ok(rights) = client.get_rights(None, None, Some(5), Some(0)).await {
-                recent_rights.set(rights);
+            // Fetch recent sanads
+            if let Ok(sanads) = client.get_sanads(None, None, Some(5), Some(0)).await {
+                recent_sanads.set(sanads);
             }
 
             // Fetch recent transfers
@@ -79,19 +79,19 @@ pub fn Home() -> Element {
             // Hero
             div { class: "text-center py-12",
                 h1 { class: "text-4xl font-bold mb-4",
-                    "Cross-Chain Sealed Verifiable Rights Explorer"
+                    "Cross-Chain Sealed Verifiable Sanads Explorer"
                 }
                 p { class: "text-gray-400 text-lg max-w-2xl mx-auto",
-                    "Track, search, and analyze CSV rights, transfers, and seals across Bitcoin, Ethereum, Sui, Aptos, and Solana."
+                    "Track, search, and analyze CSV sanads, transfers, and seals across Bitcoin, Ethereum, Sui, Aptos, and Solana."
                 }
             }
 
             // Stats cards
             div { class: "grid grid-cols-1 md:grid-cols-4 gap-4",
                 StatCard {
-                    label: "Total Rights",
+                    label: "Total Sanads",
                     value: stats.with(|s| s.as_ref().map(|s| {
-                        s.rights_by_chain.iter().map(|c| c.count).sum::<u64>().to_string()
+                        s.sanads_by_chain.iter().map(|c| c.count).sum::<u64>().to_string()
                     }).unwrap_or_else(|| "Loading...".to_string())),
                     icon: "◆"
                 }
@@ -136,12 +136,12 @@ pub fn Home() -> Element {
                 }
                 div { class: "bg-gray-900 rounded-xl border border-gray-800 overflow-hidden",
                     div { class: "divide-y divide-gray-800",
-                        for right in recent_rights.read().clone() {
+                        for sanad in recent_sanads.read().clone() {
                             ActivityRow {
-                                action: "Right Created".to_string(),
-                                chain: right.chain.clone(),
-                                id: right.id.clone(),
-                                time: format!("{} ago", format_datetime(right.created_at))
+                                action: "Sanad Created".to_string(),
+                                chain: sanad.chain.clone(),
+                                id: sanad.id.clone(),
+                                time: format!("{} ago", format_datetime(sanad.created_at))
                             }
                         }
                         for transfer in recent_transfers.read().clone() {
@@ -160,7 +160,7 @@ pub fn Home() -> Element {
                                 time: format!("Block {} ago", seal.block_height)
                             }
                         }
-                        if recent_rights.read().is_empty() && recent_transfers.read().is_empty() && recent_seals.read().is_empty() {
+                        if recent_sanads.read().is_empty() && recent_transfers.read().is_empty() && recent_seals.read().is_empty() {
                             div { class: "px-6 py-12 text-center text-gray-500",
                                 "No recent activity. Start the indexer to begin syncing data."
                             }
@@ -172,7 +172,7 @@ pub fn Home() -> Element {
             // Quick search
             div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
                 h2 { class: "text-xl font-semibold mb-4", "Quick Search" }
-                p { class: "text-gray-400 mb-4", "Search by Right ID, Transfer ID, Seal ID, or Owner Address" }
+                p { class: "text-gray-400 mb-4", "Search by Sanad ID, Transfer ID, Seal ID, or Owner Address" }
                 div { class: "flex gap-2",
                     input {
                         r#type: "text",
@@ -252,7 +252,7 @@ fn ActivityRow(action: String, chain: String, id: String, time: String) -> Eleme
                     div { class: "text-xs text-gray-500 mt-0.5", "{chain}" }
                 }
             }
-            div { class: "text-right",
+            div { class: "text-sanad",
                 div { class: "font-mono text-sm text-gray-300", "{id}" }
                 div { class: "text-xs text-gray-500", "{time}" }
             }

@@ -74,7 +74,7 @@ pub use rpc::{
     AptosBlockInfo, AptosEvent, AptosLedgerInfo, AptosResource, AptosRpc, AptosTransaction,
 };
 pub use seal::{SealRecord, SealRegistry, SealStore};
-pub use types::{AptosAnchorRef, AptosFinalityProof, AptosInclusionProof, AptosSealRef};
+pub use types::{AptosCommitAnchor, AptosFinalityProof, AptosInclusionProof, AptosSealPoint};
 
 // Chain operations exports
 pub use chain_operations::AptosBackend;

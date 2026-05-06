@@ -16,8 +16,8 @@ use crate::config::SolanaConfig;
 use crate::error::{SolanaError, SolanaResult};
 use crate::rpc::SolanaRpc;
 use crate::types::{
-    AccountChange, ConfirmationStatus, SolanaAnchorRef, SolanaFinalityProof, SolanaInclusionProof,
-    SolanaSealRef,
+    AccountChange, ConfirmationStatus, SolanaCommitAnchor, SolanaFinalityProof, SolanaInclusionProof,
+    SolanaSealPoint,
 };
 use crate::wallet::ProgramWallet;
 
@@ -41,7 +41,7 @@ pub struct SolanaSealProtocol {
     /// Wallet
     pub wallet: Option<ProgramWallet>,
     /// In-memory seal tracking for this session
-    active_seals: std::sync::Mutex<Vec<SolanaSealRef>>,
+    active_seals: std::sync::Mutex<Vec<SolanaSealPoint>>,
 }
 
 impl SolanaSealProtocol {
@@ -124,15 +124,15 @@ impl SolanaSealProtocol {
         self.wallet.as_ref()
     }
 
-    /// Derive seal PDA from right ID and owner
-    fn derive_seal_pda(&self, right_id: &Hash, owner: &Pubkey) -> Pubkey {
-        let _seeds = [b"csv-seal", right_id.as_slice(), owner.as_ref()];
+    /// Derive seal PDA from sanad ID and owner
+    fn derive_seal_pda(&self, sanad_id: &Hash, owner: &Pubkey) -> Pubkey {
+        let _seeds = [b"csv-seal", sanad_id.as_slice(), owner.as_ref()];
         // In production, this would use find_program_address with the actual CSV program
         // For now, we compute a deterministic hash-based address
         let mut hasher = Sha256::new();
         hasher.update(SOLANA_DOMAIN_SEPARATOR);
         hasher.update(b"seal");
-        hasher.update(right_id.as_bytes());
+        hasher.update(sanad_id.as_bytes());
         hasher.update(owner.as_ref());
         let hash = hasher.finalize();
 
@@ -157,14 +157,14 @@ impl SolanaSealProtocol {
     }
 
     /// Store seal reference
-    fn store_seal(&self, seal: SolanaSealRef) {
+    fn store_seal(&self, seal: SolanaSealPoint) {
         if let Ok(mut seals) = self.active_seals.lock() {
             seals.push(seal);
         }
     }
 
     /// Find seal by account
-    fn find_seal(&self, account: &Pubkey) -> Option<SolanaSealRef> {
+    fn find_seal(&self, account: &Pubkey) -> Option<SolanaSealPoint> {
         if let Ok(seals) = self.active_seals.lock() {
             seals.iter().find(|s| &s.account == account).cloned()
         } else {
@@ -173,30 +173,30 @@ impl SolanaSealProtocol {
     }
 }
 
-impl AnchorLayer for SolanaSealProtocol {
-    type SealRef = SolanaSealRef;
-    type AnchorRef = SolanaAnchorRef;
+impl SealProtocol for SolanaSealProtocol {
+    type SealPoint = SolanaSealPoint;
+    type CommitAnchor = SolanaCommitAnchor;
     type InclusionProof = SolanaInclusionProof;
     type FinalityProof = SolanaFinalityProof;
 
-    /// Create a new seal account (PDA) for a right
-    fn create_seal(&self, amount: Option<u64>) -> Result<Self::SealRef> {
+    /// Create a new seal account (PDA) for a sanad
+    fn create_seal(&self, amount: Option<u64>) -> Result<Self::SealPoint> {
         let wallet = self
             .wallet
             .as_ref()
             .ok_or_else(|| SolanaError::Wallet("No wallet configured".to_string()))?;
 
         let owner = wallet.pubkey();
-        let right_id = Hash::new(Self::generate_right_id());
-        let seal_pda = self.derive_seal_pda(&right_id, &owner);
+        let sanad_id = Hash::new(Self::generate_sanad_id());
+        let seal_pda = self.derive_seal_pda(&sanad_id, &owner);
 
         let lamports = amount.unwrap_or(1_000_000); // Default 0.001 SOL rent exemption
 
-        let seal_ref = SolanaSealRef {
+        let seal_ref = SolanaSealPoint {
             account: seal_pda,
             owner,
             lamports,
-            seed: Some(right_id.as_bytes().to_vec()),
+            seed: Some(sanad_id.as_bytes().to_vec()),
         };
 
         // Create the seal account via RPC
@@ -244,7 +244,7 @@ impl AnchorLayer for SolanaSealProtocol {
     }
 
     /// Publish a commitment to the seal account
-    fn publish(&self, hash: Hash, seal_ref: Self::SealRef) -> Result<Self::AnchorRef> {
+    fn publish(&self, hash: Hash, seal_point: Self::SealPoint) -> Result<Self::CommitAnchor> {
         let rpc = self.check_rpc()?;
         let wallet = self
             .wallet
@@ -295,7 +295,7 @@ impl AnchorLayer for SolanaSealProtocol {
         let slot = rpc.get_latest_slot()
             .map_err(|e| SolanaError::Rpc(format!("Failed to get slot: {}", e)))?;
 
-        let anchor_ref = SolanaAnchorRef {
+        let anchor_ref = SolanaCommitAnchor {
             signature,
             slot,
             block_height: slot,
@@ -328,7 +328,7 @@ impl AnchorLayer for SolanaSealProtocol {
     }
 
     /// Verify inclusion by checking the transaction is in a block
-    fn verify_inclusion(&self, anchor_ref: Self::AnchorRef) -> Result<Self::InclusionProof> {
+    fn verify_inclusion(&self, anchor_ref: Self::CommitAnchor) -> Result<Self::InclusionProof> {
         let _rpc = self.check_rpc()?;
 
         // In production, this would:
@@ -362,7 +362,7 @@ impl AnchorLayer for SolanaSealProtocol {
     }
 
     /// Verify finality by checking block depth
-    fn verify_finality(&self, anchor_ref: Self::AnchorRef) -> Result<Self::FinalityProof> {
+    fn verify_finality(&self, anchor_ref: Self::CommitAnchor) -> Result<Self::FinalityProof> {
         let _rpc = self.check_rpc()?;
 
         // Solana has deterministic finality after ~32 slots (12-16 seconds)
@@ -391,7 +391,7 @@ impl AnchorLayer for SolanaSealProtocol {
     }
 
     /// Enforce seal by closing the account (consuming it)
-    fn enforce_seal(&self, seal_ref: Self::SealRef) -> Result<()> {
+    fn enforce_seal(&self, seal_point: Self::SealPoint) -> Result<()> {
         let _rpc = self.check_rpc()?;
         let _wallet = self
             .wallet
@@ -420,7 +420,7 @@ impl AnchorLayer for SolanaSealProtocol {
         preimage: Hash,
         seal: Hash,
         anchor: Hash,
-        seal_ref: &Self::SealRef,
+        seal_point: &Self::SealPoint,
     ) -> Hash {
         let mut hasher = Sha256::new();
 
@@ -445,7 +445,7 @@ impl AnchorLayer for SolanaSealProtocol {
     /// Build a complete proof bundle
     fn build_proof_bundle(
         &self,
-        anchor_ref: Self::AnchorRef,
+        anchor_ref: Self::CommitAnchor,
         segment: DAGSegment,
     ) -> Result<ProofBundle> {
         let solana_inclusion = self.verify_inclusion(anchor_ref.clone())?;
@@ -457,21 +457,21 @@ impl AnchorLayer for SolanaSealProtocol {
             seals
                 .first()
                 .map(|s| {
-                    csv_core::seal::SealRef::new_unchecked(
+                    csv_core::seal::SealPoint::new_unchecked(
                         s.account.to_bytes().to_vec(),
                         Some(s.lamports),
                     )
                 })
                 .unwrap_or_else(|| {
-                    csv_core::seal::SealRef::new_unchecked(
+                    csv_core::seal::SealPoint::new_unchecked(
                         anchor_ref.signature.as_ref()[..32].to_vec(),
                         None,
                     )
                 })
         };
 
-        // Create anchor_ref from SolanaAnchorRef
-        let core_anchor_ref = csv_core::seal::AnchorRef::new_unchecked(
+        // Create anchor_ref from SolanaCommitAnchor
+        let core_anchor_ref = csv_core::seal::CommitAnchor::new_unchecked(
             anchor_ref.signature.as_ref().to_vec(),
             anchor_ref.block_height,
             serde_json::to_vec(&anchor_ref.account_changes).unwrap_or_default(),
@@ -513,7 +513,7 @@ impl AnchorLayer for SolanaSealProtocol {
     }
 
     /// Handle rollback for reorgs
-    fn rollback(&self, anchor_ref: Self::AnchorRef) -> Result<()> {
+    fn rollback(&self, anchor_ref: Self::CommitAnchor) -> Result<()> {
         // Solana has very rare reorgs due to deterministic finality
         // But we still need to handle them
 
@@ -578,8 +578,8 @@ struct SolanaProofData {
 }
 
 impl SolanaSealProtocol {
-    /// Generate a unique right ID
-    fn generate_right_id() -> [u8; 32] {
+    /// Generate a unique sanad ID
+    fn generate_sanad_id() -> [u8; 32] {
         let mut bytes = [0u8; 32];
         rand::Rng::fill(&mut rand::thread_rng(), &mut bytes);
         bytes
@@ -600,11 +600,11 @@ mod tests {
     fn test_derive_seal_pda() {
         let config = SolanaConfig::default();
         let adapter = SolanaSealProtocol::new(config);
-        let right_id = Hash::new([1u8; 32]);
+        let sanad_id = Hash::new([1u8; 32]);
         let owner = Pubkey::new_unique();
 
-        let pda1 = adapter.derive_seal_pda(&right_id, &owner);
-        let pda2 = adapter.derive_seal_pda(&right_id, &owner);
+        let pda1 = adapter.derive_seal_pda(&sanad_id, &owner);
+        let pda2 = adapter.derive_seal_pda(&sanad_id, &owner);
 
         assert_eq!(pda1, pda2, "PDA derivation should be deterministic");
     }

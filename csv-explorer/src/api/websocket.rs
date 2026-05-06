@@ -209,10 +209,10 @@ impl WebSocketManager {
 
         // Send initial data based on subscription type
         match subscription_type {
-            "rights" => {
-                if let Ok(owner) = indexing_manager.get_rights_by_owner("default").await {
+            "sanads" => {
+                if let Ok(owner) = indexing_manager.get_sanads_by_owner("default").await {
                     let update = WebSocketMessage::Update {
-                        subscription_type: "rights".to_string(),
+                        subscription_type: "sanads".to_string(),
                         data: serde_json::json!(owner),
                     };
                     Self::send_message_to_connection(connection_id, update, connections).await;
@@ -350,7 +350,7 @@ mod tests {
     #[test]
     fn test_websocket_message_serialization() {
         let message = WebSocketMessage::Subscribe {
-            subscription_type: "rights".to_string(),
+            subscription_type: "sanads".to_string(),
             filters: serde_json::json!({"owner": "test"}),
         };
 
@@ -362,7 +362,7 @@ mod tests {
                 subscription_type,
                 filters,
             } => {
-                assert_eq!(subscription_type, "rights");
+                assert_eq!(subscription_type, "sanads");
                 assert_eq!(filters, serde_json::json!({"owner": "test"}));
             }
             _ => panic!("Expected Subscribe message"),

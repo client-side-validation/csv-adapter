@@ -46,7 +46,7 @@ pub fn TransferDetail(id: String) -> Element {
                 div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
                     div { class: "grid grid-cols-1 md:grid-cols-2 gap-6",
                         DetailRow { label: "Transfer ID", value: t.id.clone() }
-                        DetailRow { label: "Right ID", value: t.right_id.clone() }
+                        DetailRow { label: "Sanad ID", value: t.sanad_id.clone() }
                         DetailRow { label: "From Chain", value: t.from_chain.clone() }
                         DetailRow { label: "To Chain", value: t.to_chain.clone() }
                         DetailRow { label: "From Owner", value: t.from_owner.clone() }
@@ -84,9 +84,9 @@ pub fn TransferDetail(id: String) -> Element {
 
                 // Related links
                 div { class: "flex items-center gap-4",
-                    Link { to: Route::RightDetail { id: t.right_id.clone() },
+                    Link { to: Route::SanadDetail { id: t.sanad_id.clone() },
                         button { class: "px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-medium transition-colors",
-                            "View Right →"
+                            "View Sanad →"
                         }
                     }
                 }
@@ -153,7 +153,7 @@ fn TransferTimeline(
         },
         TimelineStep {
             label: "Mint Completed".to_string(),
-            description: "Right minted on destination chain".to_string(),
+            description: "Sanad minted on destination chain".to_string(),
             time: completed_at
                 .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
                 .unwrap_or_default(),

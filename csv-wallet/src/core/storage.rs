@@ -41,7 +41,7 @@ impl HasErrorSuggestion for StorageError {
                 format!(
                     "Wallet '{}' not found in storage. Check: \
                      1) The wallet ID is correct, 2) You have created a wallet, \
-                     3) You are looking in the right storage location.",
+                     3) You are looking in the sanad storage location.",
                     id
                 )
             }

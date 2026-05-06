@@ -103,7 +103,7 @@ fn test_proof_verification_privacy() {
 fn test_cross_chain_validation() {
     // Cross-chain transfers should validate that:
     // 1. Source and destination chains are supported
-    // 2. The right exists on source chain
+    // 2. The sanad exists on source chain
     // 3. The destination address is valid for the destination chain
 
     // This is a placeholder for cross-chain validation tests
@@ -139,7 +139,7 @@ fn test_chain_capabilities() {
 fn test_seal_validation() {
     // Seal operations should validate:
     // 1. Seal ID format
-    // 2. Right ID format
+    // 2. Sanad ID format
     // 3. Chain compatibility
 
     // This is a placeholder for seal validation tests

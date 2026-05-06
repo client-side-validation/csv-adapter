@@ -13,7 +13,7 @@ use tokio::time::sleep;
 
 use csv_explorer_shared::{
     ExplorerError, Network, PriorityAddress, PriorityIndexingStatus, PriorityLevel, Result,
-    RightRecord, SealRecord, TransferRecord,
+    SanadRecord, SealRecord, TransferRecord,
 };
 
 use crate::chain_indexer::ChainIndexer;
@@ -144,25 +144,25 @@ impl WalletIndexerBridge {
             .map_err(|e| ExplorerError::Internal(format!("Failed to get wallet addresses: {}", e)))
     }
 
-    /// Get indexed rights for a specific address across all chains.
-    pub async fn get_rights_by_address(&self, address: &str) -> Result<Vec<RightRecord>> {
-        let mut all_rights = Vec::new();
+    /// Get indexed sanads for a specific address across all chains.
+    pub async fn get_sanads_by_address(&self, address: &str) -> Result<Vec<SanadRecord>> {
+        let mut all_sanads = Vec::new();
 
         for indexer in &self.indexers {
-            match indexer.index_rights_by_address(address).await {
-                Ok(rights) => all_rights.extend(rights),
+            match indexer.index_sanads_by_address(address).await {
+                Ok(sanads) => all_sanads.extend(sanads),
                 Err(e) => {
                     tracing::warn!(
                         chain = %indexer.chain_id(),
                         address = %address,
                         error = %e,
-                        "Failed to index rights for address"
+                        "Failed to index sanads for address"
                     );
                 }
             }
         }
 
-        Ok(all_rights)
+        Ok(all_sanads)
     }
 
     /// Get indexed seals for a specific address across all chains.
@@ -207,15 +207,15 @@ impl WalletIndexerBridge {
         Ok(all_transfers)
     }
 
-    /// Get complete data (rights, seals, transfers) for an address.
+    /// Get complete data (sanads, seals, transfers) for an address.
     pub async fn get_address_data(&self, address: &str) -> Result<AddressDataResult> {
-        let rights = self.get_rights_by_address(address).await?;
+        let sanads = self.get_sanads_by_address(address).await?;
         let seals = self.get_seals_by_address(address).await?;
         let transfers = self.get_transfers_by_address(address).await?;
 
         Ok(AddressDataResult {
             address: address.to_string(),
-            rights,
+            sanads,
             seals,
             transfers,
         })
@@ -346,8 +346,8 @@ impl WalletIndexerBridge {
                                         addr,
                                         &chain_id,
                                         network,
-                                        "rights",
-                                        result.rights_indexed,
+                                        "sanads",
+                                        result.sanads_indexed,
                                         result.errors.is_empty(),
                                     )
                                     .with_error(
@@ -414,7 +414,7 @@ impl WalletIndexerBridge {
                             chain = %chain_id,
                             priority = ?priority,
                             addresses = batch.len(),
-                            rights = result.rights_indexed,
+                            sanads = result.sanads_indexed,
                             seals = result.seals_indexed,
                             transfers = result.transfers_indexed,
                             "Priority address indexing completed"
@@ -466,8 +466,8 @@ impl WalletIndexerBridge {
 pub struct AddressDataResult {
     /// The address this data belongs to.
     pub address: String,
-    /// All rights associated with this address.
-    pub rights: Vec<RightRecord>,
+    /// All sanads associated with this address.
+    pub sanads: Vec<SanadRecord>,
     /// All seals associated with this address.
     pub seals: Vec<SealRecord>,
     /// All transfers associated with this address.

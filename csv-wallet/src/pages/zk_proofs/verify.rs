@@ -86,7 +86,7 @@ pub fn ZkVerifyProof() -> Element {
                                 if valid {
                                     let proof_record = ProofRecord {
                                         chain,
-                                        right_id: hex::encode(&seal_id[..8.min(seal_id.len())]),
+                                        sanad_id: hex::encode(&seal_id[..8.min(seal_id.len())]),
                                         seal_ref: hex::encode(&seal_id),
                                         proof_type: "zk_verified".to_string(),
                                         status: ProofStatus::Verified,

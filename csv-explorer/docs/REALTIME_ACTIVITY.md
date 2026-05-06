@@ -18,8 +18,8 @@ The home page now displays a **real-time activity feed** showing the latest CSV 
 
 The feed aggregates and displays:
 
-1. **📜 Right Created**
-   - Shows right ID
+1. **📜 Sanad Created**
+   - Shows sanad ID
    - Owner address (truncated)
    - Chain name
    - Status badge (active/spent/pending)
@@ -27,7 +27,7 @@ The feed aggregates and displays:
 
 2. **🔄 Transfer (Status)**
    - Shows route (from_chain → to_chain)
-   - Right ID (truncated)
+   - Sanad ID (truncated)
    - Status badge (completed/in_progress/pending/failed)
    - Chain name
    - Relative timestamp
@@ -55,13 +55,13 @@ The feed aggregates and displays:
 ┌─────────────────────────────────────────────────────────────────┐
 │ Recent CSV Activity                              🔴 Live ↻ Refresh│
 ├─────────────────────────────────────────────────────────────────┤
-│ 📜 Right Created                     [Active]    bitcoin  Just now│
-│    right_btc_001                                                │
+│ 📜 Sanad Created                     [Active]    bitcoin  Just now│
+│    sanad_btc_001                                                │
 │    Owner: bc1qxy2kgdygjrsqtzq2...                               │
 ├─────────────────────────────────────────────────────────────────┤
 │ 🔄 Transfer Completed                [Completed] ethereum  5m ago │
 │    bitcoin → ethereum                                           │
-│    Right: right_btc_001...                                      │
+│    Sanad: sanad_btc_001...                                      │
 ├─────────────────────────────────────────────────────────────────┤
 │ 🔒 Seal Created                      [UTXO]     bitcoin  12m ago │
 │    seal_btc_003                                                 │
@@ -73,7 +73,7 @@ The feed aggregates and displays:
 ├─────────────────────────────────────────────────────────────────┤
 │ 🔄 Transfer In Progress              [In Progress] aptos  2h ago  │
 │    ethereum → sui                                               │
-│    Right: right_eth_002...                                      │
+│    Sanad: sanad_eth_002...                                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -85,15 +85,15 @@ The feed aggregates and displays:
 
 ```javascript
 // 1. Fetch from 3 API endpoints in parallel
-const [rightsResp, transfersResp, sealsResp] = await Promise.all([
-    fetch(`${API_URL}/api/v1/rights?limit=10`),
+const [sanadsResp, transfersResp, sealsResp] = await Promise.all([
+    fetch(`${API_URL}/api/v1/sanads?limit=10`),
     fetch(`${API_URL}/api/v1/transfers?limit=10`),
     fetch(`${API_URL}/api/v1/seals?limit=10`)
 ]);
 
 // 2. Merge into unified activity objects
 const activities = [
-    ...rights.map(r => ({ type: 'right', ... })),
+    ...sanads.map(r => ({ type: 'sanad', ... })),
     ...transfers.map(t => ({ type: 'transfer', ... })),
     ...seals.map(s => ({ type: 'seal', ... }))
 ];
@@ -128,7 +128,7 @@ setInterval(loadActivity, 30000);
 The feed makes 3 parallel API calls:
 
 ```bash
-GET /api/v1/rights?limit=10
+GET /api/v1/sanads?limit=10
 GET /api/v1/transfers?limit=10
 GET /api/v1/seals?limit=10
 ```
@@ -161,7 +161,7 @@ GET /api/v1/seals?limit=10
 
 1. **GraphQL Subscriptions**: Real-time push updates instead of polling
 2. **Filter by chain**: Show only specific chains
-3. **Filter by type**: Show only rights/transfers/seals
+3. **Filter by type**: Show only sanads/transfers/seals
 4. **Click-through**: Click activity to view details
 5. **Infinite scroll**: Load more activities on scroll
 6. **Sound notifications**: Optional alert for new activities
@@ -175,7 +175,7 @@ Verify the feed works:
 
 ```bash
 # 1. Ensure API is running
-curl http://localhost:8080/api/v1/rights?limit=2
+curl http://localhost:8080/api/v1/sanads?limit=2
 
 # 2. Open UI
 open http://localhost:3000

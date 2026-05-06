@@ -1,4 +1,4 @@
-import { SealRef, AnchorRef, sealRefFromHex, anchorRefFromHex } from '../seal';
+import { SealPoint, CommitAnchor, sealRefFromHex, anchorRefFromHex } from '../seal';
 import { hexToBytes, bytesToHex } from '../types';
 
 /**
@@ -13,9 +13,9 @@ export namespace BitcoinChain {
    *
    * @param txid - Transaction ID (hex string, 64 chars)
    * @param vout - Output index
-   * @returns SealRef
+   * @returns SealPoint
    */
-  export function createSeal(txid: string, vout: number): SealRef {
+  export function createSeal(txid: string, vout: number): SealPoint {
     const txidBytes = hexToBytes(txid);
     // Pad to at least 32 bytes
     while (txidBytes.length < 32) {
@@ -38,9 +38,9 @@ export namespace BitcoinChain {
    * Parse a Bitcoin seal from hex.
    *
    * @param hex - Hex string (txid + vout)
-   * @returns SealRef
+   * @returns SealPoint
    */
-  export function parseSeal(hex: string): SealRef {
+  export function parseSeal(hex: string): SealPoint {
     const bytes = hexToBytes(hex);
     if (bytes.length < 36) {
       throw new Error(`Invalid Bitcoin seal: expected at least 36 bytes, got ${bytes.length}`);
@@ -63,13 +63,13 @@ export namespace BitcoinChain {
    * @param txid - Transaction ID (hex string)
    * @param blockHeight - Block height
    * @param metadata - Optional metadata (hex string)
-   * @returns AnchorRef
+   * @returns CommitAnchor
    */
   export function createAnchor(
     txid: string,
     blockHeight: number,
     metadata?: string,
-  ): AnchorRef {
+  ): CommitAnchor {
     return anchorRefFromHex(txid, blockHeight, metadata);
   }
 

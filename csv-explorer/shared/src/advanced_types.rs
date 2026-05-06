@@ -13,10 +13,10 @@ pub use csv_core::{CommitmentScheme, FinalityProofType, InclusionProofType};
 // Enhanced Record Types for Indexer/API
 // ---------------------------------------------------------------------------
 
-/// Enhanced right record with commitment scheme and proof metadata.
+/// Enhanced sanad record with commitment scheme and proof metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnhancedRightRecord {
-    // Basic fields (same as RightRecord)
+pub struct EnhancedSanadRecord {
+    // Basic fields (same as SanadRecord)
     pub id: String,
     pub chain: String,
     pub seal_ref: String,
@@ -58,7 +58,7 @@ pub struct EnhancedSealRecord {
     pub chain: String,
     pub seal_type: String,
     pub seal_ref: String,
-    pub right_id: Option<String>,
+    pub sanad_id: Option<String>,
     pub status: String,
     pub consumed_at: Option<DateTime<Utc>>,
     pub consumed_tx: Option<String>,
@@ -74,8 +74,8 @@ pub struct EnhancedSealRecord {
 /// Enhanced inclusion proof record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnhancedInclusionProof {
-    /// Right ID this proof is for
-    pub right_id: String,
+    /// Sanad ID this proof is for
+    pub sanad_id: String,
     /// Chain where proof is included
     pub chain: String,
     /// Block/anchor reference
@@ -97,7 +97,7 @@ pub struct EnhancedInclusionProof {
 pub struct EnhancedTransferRecord {
     // Basic fields (same as TransferRecord)
     pub id: String,
-    pub right_id: String,
+    pub sanad_id: String,
     pub from_chain: String,
     pub to_chain: String,
     pub from_owner: String,
@@ -123,9 +123,9 @@ pub struct EnhancedTransferRecord {
 // Filter Types for Advanced Queries
 // ---------------------------------------------------------------------------
 
-/// Filter for querying rights by commitment scheme and proof type.
+/// Filter for querying sanads by commitment scheme and proof type.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct RightProofFilter {
+pub struct SanadProofFilter {
     pub chain: Option<String>,
     pub owner: Option<String>,
     pub commitment_scheme: Option<CommitmentScheme>,
@@ -153,16 +153,16 @@ pub struct SealProofFilter {
 /// Statistics on commitment scheme and proof usage.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProofStatistics {
-    /// Total rights indexed
-    pub total_rights: u64,
+    /// Total sanads indexed
+    pub total_sanads: u64,
     /// Total seals indexed
     pub total_seals: u64,
-    /// Rights by commitment scheme
-    pub rights_by_commitment_scheme: Vec<SchemeCount>,
-    /// Rights by inclusion proof type
-    pub rights_by_inclusion_proof: Vec<InclusionProofCount>,
-    /// Rights by finality proof type
-    pub rights_by_finality_proof: Vec<FinalityProofCount>,
+    /// Sanads by commitment scheme
+    pub sanads_by_commitment_scheme: Vec<SchemeCount>,
+    /// Sanads by inclusion proof type
+    pub sanads_by_inclusion_proof: Vec<InclusionProofCount>,
+    /// Sanads by finality proof type
+    pub sanads_by_finality_proof: Vec<FinalityProofCount>,
     /// Seals by proof type
     pub seals_by_proof_type: Vec<SealProofCount>,
 }

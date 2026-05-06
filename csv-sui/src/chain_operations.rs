@@ -6,16 +6,16 @@
 //! - ChainBroadcaster: Transaction broadcasting
 //! - ChainDeployer: Contract deployment
 //! - ChainProofProvider: Proof building and verification
-//! - ChainRightOps: Right management operations
+//! - ChainSanadOps: Sanad management operations
 
 use async_trait::async_trait;
 use csv_core::chain_operations::{
     BalanceInfo, ChainBroadcaster, ChainDeployer, ChainOpError, ChainOpResult, ChainProofProvider,
-    ChainQuery, ChainRightOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus, RightOperationResult, TransactionInfo, TransactionStatus,
+    ChainQuery, ChainSanadOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus, SanadOperationResult, TransactionInfo, TransactionStatus,
 };
 use csv_core::hash::Hash;
 use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
-use csv_core::right::RightId;
+use csv_core::title::SanadId;
 use csv_core::signature::SignatureScheme;
 use ed25519_dalek::{VerifyingKey, Verifier};
 
@@ -534,7 +534,7 @@ impl ChainDeployer for SuiBackend {
         config: serde_json::Value,
     ) -> ChainOpResult<DeploymentStatus> {
         // Sui doesn't have traditional "lock contracts" like EVM chains
-        // Instead, rights are locked by transferring objects to a shared object
+        // Instead, sanads are locked by transferring objects to a shared object
         // or by using the CSV seal package
         //
         // For Sui, we would:
@@ -785,16 +785,16 @@ impl ChainProofProvider for SuiBackend {
 }
 
 #[async_trait]
-impl ChainRightOps for SuiBackend {
-    async fn create_right(
+impl ChainSanadOps for SuiBackend {
+    async fn create_sanad(
         &self,
         owner: &str,
         asset_class: &str,
         asset_id: &str,
         metadata: serde_json::Value,
-    ) -> ChainOpResult<RightOperationResult> {
-        // In Sui, creating a right involves:
-        // 1. Creating a new object representing the right
+    ) -> ChainOpResult<SanadOperationResult> {
+        // In Sui, creating a sanad involves:
+        // 1. Creating a new object representing the sanad
         // 2. Transferring it to the owner
         // 3. Recording the commitment
 
@@ -803,136 +803,136 @@ impl ChainRightOps for SuiBackend {
         let _ = asset_id;
         let _ = metadata;
 
-        // This requires a transaction to create the right object
+        // This requires a transaction to create the sanad object
         // The transaction needs to be constructed and signed externally
         Err(ChainOpError::CapabilityUnavailable(
-            "Right creation requires a signed transaction. \
-             Construct a transaction to create the right object, \
+            "Sanad creation requires a signed transaction. \
+             Construct a transaction to create the sanad object, \
              then use submit_transaction() to execute.".to_string(),
         ))
     }
 
-    async fn consume_right(
+    async fn consume_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        let _ = right_id;
+    ) -> ChainOpResult<SanadOperationResult> {
+        let _ = sanad_id;
         let _ = owner_key_id;
 
-        // Consuming a right in Sui means:
-        // 1. Taking the right object
+        // Consuming a sanad in Sui means:
+        // 1. Taking the sanad object
         // 2. Deleting it or marking it consumed
         // 3. Recording the nullifier
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right consumption requires a signed transaction. \
-             Construct a transaction to consume the right object, \
+            "Sanad consumption requires a signed transaction. \
+             Construct a transaction to consume the sanad object, \
              then use submit_transaction() to execute.".to_string(),
         ))
     }
 
-    async fn lock_right(
+    async fn lock_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         destination_chain: &str,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        let _ = right_id;
+    ) -> ChainOpResult<SanadOperationResult> {
+        let _ = sanad_id;
         let _ = destination_chain;
         let _ = owner_key_id;
 
-        // Locking a right:
-        // 1. Transfer right object to a shared lock object
+        // Locking a sanad:
+        // 1. Transfer sanad object to a shared lock object
         // 2. Record lock with destination chain
         // 3. Generate lock proof
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right locking requires a signed transaction. \
-             Construct a transaction to lock the right object, \
+            "Sanad locking requires a signed transaction. \
+             Construct a transaction to lock the sanad object, \
              then use submit_transaction() to execute.".to_string(),
         ))
     }
 
-    async fn mint_right(
+    async fn mint_sanad(
         &self,
         source_chain: &str,
-        source_right_id: &RightId,
+        source_sanad_id: &SanadId,
         lock_proof: &CoreInclusionProof,
         new_owner: &str,
-    ) -> ChainOpResult<RightOperationResult> {
+    ) -> ChainOpResult<SanadOperationResult> {
         let _ = source_chain;
-        let _ = source_right_id;
+        let _ = source_sanad_id;
         let _ = lock_proof;
         let _ = new_owner;
 
-        // Minting a right on destination chain:
+        // Minting a sanad on destination chain:
         // 1. Verify the lock proof from source chain
-        // 2. Create new right object
+        // 2. Create new sanad object
         // 3. Transfer to new owner
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right minting requires a signed transaction. \
-             Construct a transaction to mint the right object after \
+            "Sanad minting requires a signed transaction. \
+             Construct a transaction to mint the sanad object after \
              verifying the lock proof, then use submit_transaction() to execute.".to_string(),
         ))
     }
 
-    async fn refund_right(
+    async fn refund_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        let _ = right_id;
+    ) -> ChainOpResult<SanadOperationResult> {
+        let _ = sanad_id;
         let _ = owner_key_id;
 
-        // Refunding a locked right:
+        // Refunding a locked sanad:
         // 1. Verify lock timeout exceeded
-        // 2. Return right to owner
+        // 2. Return sanad to owner
         // 3. Remove from lock state
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right refund requires a signed transaction. \
-             Construct a transaction to refund the locked right, \
+            "Sanad refund requires a signed transaction. \
+             Construct a transaction to refund the locked sanad, \
              then use submit_transaction() to execute.".to_string(),
         ))
     }
 
-    async fn record_right_metadata(
+    async fn record_sanad_metadata(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         metadata: serde_json::Value,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        let _ = right_id;
+    ) -> ChainOpResult<SanadOperationResult> {
+        let _ = sanad_id;
         let _ = metadata;
         let _ = owner_key_id;
 
         // Recording metadata:
-        // 1. Update the right object with new metadata
-        // 2. Or create a metadata object linked to the right
+        // 1. Update the sanad object with new metadata
+        // 2. Or create a metadata object linked to the sanad
 
         Err(ChainOpError::CapabilityUnavailable(
             "Metadata recording requires a signed transaction. \
-             Construct a transaction to update the right metadata, \
+             Construct a transaction to update the sanad metadata, \
              then use submit_transaction() to execute.".to_string(),
         ))
     }
 
-    async fn verify_right_state(
+    async fn verify_sanad_state(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         expected_state: &str,
     ) -> ChainOpResult<bool> {
-        // Verify right exists by querying the object
-        // RightId should map to an object ID
-        let object_id = right_id.0.as_bytes();
+        // Verify sanad exists by querying the object
+        // SanadId should map to an object ID
+        let object_id = sanad_id.0.as_bytes();
 
         let object_info = match self.rpc().get_object(*object_id).await {
             Ok(Some(obj)) => Some(obj),
             Ok(None) => None,
             Err(e) => return Err(ChainOpError::RpcError(format!(
-                "Failed to query right state: {}", e
+                "Failed to query sanad state: {}", e
             ))),
         };
 

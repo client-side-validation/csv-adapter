@@ -17,7 +17,7 @@ use csv_explorer_indexer::ChainIndexer;
 use csv_explorer_shared::{ChainConfig, ChainInfo, ChainStatus, ExplorerError, IndexerStatus};
 
 use csv_explorer_storage::repositories::{
-    AdvancedProofRepository, ContractsRepository, RightsRepository, SealsRepository,
+    AdvancedProofRepository, ContractsRepository, SanadsRepository, SealsRepository,
     SyncRepository, TransfersRepository,
 };
 use sqlx::SqlitePool;
@@ -27,7 +27,7 @@ pub struct SyncCoordinator {
     indexers: Vec<Arc<dyn ChainIndexer>>,
     pool: SqlitePool,
     sync_repo: SyncRepository,
-    rights_repo: RightsRepository,
+    sanads_repo: SanadsRepository,
     seals_repo: SealsRepository,
     transfers_repo: TransfersRepository,
     contracts_repo: ContractsRepository,
@@ -96,7 +96,7 @@ impl SyncCoordinator {
             indexers: arc_indexers,
             pool: pool.clone(),
             sync_repo: SyncRepository::new(pool.clone()),
-            rights_repo: RightsRepository::new(pool.clone()),
+            sanads_repo: SanadsRepository::new(pool.clone()),
             seals_repo: SealsRepository::new(pool.clone()),
             transfers_repo: TransfersRepository::new(pool.clone()),
             contracts_repo: ContractsRepository::new(pool.clone()),
@@ -120,7 +120,7 @@ impl SyncCoordinator {
         &self,
         chain_configs: &std::collections::HashMap<String, ChainConfig>,
     ) -> Result<(), ExplorerError> {
-        // FIX: create enhanced_rights / enhanced_seals / enhanced_transfers tables
+        // FIX: create enhanced_sanads / enhanced_seals / enhanced_transfers tables
         self.advanced_repo
             .init()
             .await
@@ -166,7 +166,7 @@ impl SyncCoordinator {
                 let indexer = Arc::clone(indexer);
                 let chain_config = self.chain_configs.get(indexer.chain_id()).cloned();
                 let sync_repo = self.sync_repo.clone();
-                let rights_repo = self.rights_repo.clone();
+                let sanads_repo = self.sanads_repo.clone();
                 let seals_repo = self.seals_repo.clone();
                 let transfers_repo = self.transfers_repo.clone();
                 let contracts_repo = self.contracts_repo.clone();
@@ -180,7 +180,7 @@ impl SyncCoordinator {
                     let _permit = sem.acquire().await.expect("semaphore closed");
                     let ctx = SyncContext::new(
                         &sync_repo,
-                        &rights_repo,
+                        &sanads_repo,
                         &seals_repo,
                         &transfers_repo,
                         &contracts_repo,
@@ -281,7 +281,7 @@ impl SyncCoordinator {
 
         let ctx = SyncContext::new(
             &self.sync_repo,
-            &self.rights_repo,
+            &self.sanads_repo,
             &self.seals_repo,
             &self.transfers_repo,
             &self.contracts_repo,
@@ -318,8 +318,8 @@ impl SyncCoordinator {
 pub struct SyncContext<'a> {
     /// Repository for sync progress tracking
     pub sync_repo: &'a SyncRepository,
-    /// Repository for rights data
-    pub rights_repo: &'a RightsRepository,
+    /// Repository for sanads data
+    pub sanads_repo: &'a SanadsRepository,
     /// Repository for seals data
     pub seals_repo: &'a SealsRepository,
     /// Repository for transfers data
@@ -343,7 +343,7 @@ impl<'a> SyncContext<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         sync_repo: &'a SyncRepository,
-        rights_repo: &'a RightsRepository,
+        sanads_repo: &'a SanadsRepository,
         seals_repo: &'a SealsRepository,
         transfers_repo: &'a TransfersRepository,
         contracts_repo: &'a ContractsRepository,
@@ -355,7 +355,7 @@ impl<'a> SyncContext<'a> {
     ) -> Self {
         Self {
             sync_repo,
-            rights_repo,
+            sanads_repo,
             seals_repo,
             transfers_repo,
             contracts_repo,
@@ -437,29 +437,29 @@ async fn sync_chain(
         // -------------------------------------------------------------------
         // FIX: use parallel fetches per block; no double-fetch via process_block
         // -------------------------------------------------------------------
-        let (rights_res, seals_res, transfers_res, contracts_res) = tokio::join!(
-            indexer.index_rights(current),
+        let (sanads_res, seals_res, transfers_res, contracts_res) = tokio::join!(
+            indexer.index_sanads(current),
             indexer.index_seals(current),
             indexer.index_transfers(current),
             indexer.index_contracts(current),
         );
-        let (enh_rights_res, enh_seals_res, enh_transfers_res) = tokio::join!(
-            indexer.index_enhanced_rights(current),
+        let (enh_sanads_res, enh_seals_res, enh_transfers_res) = tokio::join!(
+            indexer.index_enhanced_sanads(current),
             indexer.index_enhanced_seals(current),
             indexer.index_enhanced_transfers(current),
         );
 
         // Store basic records
-        match rights_res {
-            Ok(rights) => {
-                for right in &rights {
-                    if let Err(e) = ctx.rights_repo.insert(right).await {
-                        tracing::warn!(chain = chain_id, block = current, right_id = %right.id, error = %e, "Failed to insert right");
+        match sanads_res {
+            Ok(sanads) => {
+                for sanad in &sanads {
+                    if let Err(e) = ctx.sanads_repo.insert(sanad).await {
+                        tracing::warn!(chain = chain_id, block = current, sanad_id = %sanad.id, error = %e, "Failed to insert sanad");
                     }
                 }
             }
             Err(e) => {
-                tracing::warn!(chain = chain_id, block = current, error = %e, "index_rights failed")
+                tracing::warn!(chain = chain_id, block = current, error = %e, "index_sanads failed")
             }
         }
 
@@ -503,10 +503,10 @@ async fn sync_chain(
         }
 
         // Store enhanced records
-        if let Ok(enhanced_rights) = enh_rights_res {
-            for right in &enhanced_rights {
-                if let Err(e) = ctx.advanced_repo.insert_enhanced_right(right).await {
-                    tracing::warn!(chain = chain_id, block = current, right_id = %right.id, error = %e, "Failed to insert enhanced right");
+        if let Ok(enhanced_sanads) = enh_sanads_res {
+            for sanad in &enhanced_sanads {
+                if let Err(e) = ctx.advanced_repo.insert_enhanced_sanad(sanad).await {
+                    tracing::warn!(chain = chain_id, block = current, sanad_id = %sanad.id, error = %e, "Failed to insert enhanced sanad");
                 }
             }
         }

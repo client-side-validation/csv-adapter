@@ -31,7 +31,7 @@ use csv_core::hash::Hash;
 use csv_core::commit_mux::{MpcLeaf, MpcProof, MpcTree};
 
 use crate::error::{BitcoinError, BitcoinResult};
-use crate::types::BitcoinSealRef;
+use crate::types::BitcoinSealPoint;
 
 /// Protocol ID for CSV Bitcoin commitments (32 bytes)
 pub const CSV_BTC_PROTOCOL_ID: [u8; 32] = [
@@ -47,7 +47,7 @@ pub struct PendingCommitment {
     /// The commitment hash to publish
     pub commitment: Hash,
     /// The seal that authorizes this commitment
-    pub seal: BitcoinSealRef,
+    pub seal: BitcoinSealPoint,
     /// Unique identifier for this commitment request
     pub request_id: String,
     /// Timestamp when this was queued
@@ -116,7 +116,7 @@ impl MpcBatcher {
     /// Queue a commitment for batching
     ///
     /// Returns true if the batch is ready to publish (reached batch_size)
-    pub fn queue(&self, commitment: Hash, seal: BitcoinSealRef, request_id: String) -> bool {
+    pub fn queue(&self, commitment: Hash, seal: BitcoinSealPoint, request_id: String) -> bool {
         let pending_commitment = PendingCommitment {
             commitment,
             seal,
@@ -260,18 +260,18 @@ impl MpcTreeExt for MpcTree {
                     // Odd node - promote to next level
                     next_level.push(left);
                 } else {
-                    let right = chunk[1];
+                    let sanad = chunk[1];
 
                     // Check if this pair contains our target
                     let pair_start_index = next_level.len() * 2;
                     if current_index == pair_start_index {
-                        // Target is left, sibling is right
+                        // Target is left, sibling is sanad
                         branch.push(csv_core::commit_mux::MerkleBranchNode {
-                            hash: right,
+                            hash: sanad,
                             is_left: false,
                         });
                     } else if current_index == pair_start_index + 1 {
-                        // Target is right, sibling is left
+                        // Target is sanad, sibling is left
                         branch.push(csv_core::commit_mux::MerkleBranchNode {
                             hash: left,
                             is_left: true,
@@ -282,7 +282,7 @@ impl MpcTreeExt for MpcTree {
                     use csv_core::tagged_hash::csv_tagged_hash;
                     let mut data = [0u8; 64];
                     data[..32].copy_from_slice(left.as_bytes());
-                    data[32..].copy_from_slice(right.as_bytes());
+                    data[32..].copy_from_slice(sanad.as_bytes());
                     let parent_hash = csv_tagged_hash("mpc-internal", &data);
                     next_level.push(csv_core::hash::Hash::new(parent_hash));
                 }
@@ -314,7 +314,7 @@ mod tests {
         let batcher = MpcBatcher::new(2, 1, 0);
 
         let commitment = Hash::new([1u8; 32]);
-        let seal = BitcoinSealRef::new([0u8; 32], 0, None);
+        let seal = BitcoinSealPoint::new([0u8; 32], 0, None);
 
         assert!(!batcher.queue(commitment, seal.clone(), "test-1".to_string()));
         assert_eq!(batcher.pending_count(), 1);
@@ -331,7 +331,7 @@ mod tests {
         // Queue 3 commitments
         for i in 0..3 {
             let commitment = Hash::new([i as u8; 32]);
-            let seal = BitcoinSealRef::new([0u8; 32], i, None);
+            let seal = BitcoinSealPoint::new([0u8; 32], i, None);
             batcher.queue(commitment, seal, format!("test-{}", i));
         }
 

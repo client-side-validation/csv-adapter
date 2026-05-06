@@ -6,7 +6,7 @@ use solana_sdk::{pubkey::Pubkey, signature::Signature};
 
 /// Solana-specific seal reference
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SolanaSealRef {
+pub struct SolanaSealPoint {
     /// Account address used as seal
     pub account: Pubkey,
     /// Account owner program
@@ -19,7 +19,7 @@ pub struct SolanaSealRef {
 
 /// Solana-specific anchor reference
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SolanaAnchorRef {
+pub struct SolanaCommitAnchor {
     /// Transaction signature
     pub signature: Signature,
     /// Slot number
@@ -100,21 +100,21 @@ pub struct SolanaFinalityProof {
 /// CSV program instruction types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CsvInstruction {
-    /// Create a new right
-    CreateRight {
-        right_id: Hash,
+    /// Create a new sanad
+    CreateSanad {
+        sanad_id: Hash,
         owner: Pubkey,
         commitment: Hash,
     },
     /// Consume a seal
     ConsumeSeal {
         seal_account: Pubkey,
-        right_id: Hash,
+        sanad_id: Hash,
         new_owner: Pubkey,
     },
-    /// Transfer a right
-    TransferRight {
-        right_id: Hash,
+    /// Transfer a sanad
+    TransferSanad {
+        sanad_id: Hash,
         from_owner: Pubkey,
         to_owner: Pubkey,
         destination_chain: String,
@@ -122,7 +122,7 @@ pub enum CsvInstruction {
     /// Publish commitment
     PublishCommitment {
         commitment: Hash,
-        right_id: Hash,
+        sanad_id: Hash,
         metadata: Vec<u8>,
     },
 }
@@ -132,10 +132,10 @@ pub enum CsvInstruction {
 pub struct SealAccount {
     /// Account address
     pub pubkey: Pubkey,
-    /// Owner of the right
+    /// Owner of the sanad
     pub owner: Pubkey,
-    /// Right ID
-    pub right_id: Hash,
+    /// Sanad ID
+    pub sanad_id: Hash,
     /// Commitment hash
     pub commitment: Hash,
     /// Seal status
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_solana_seal_ref() {
-        let seal = SolanaSealRef {
+        let seal = SolanaSealPoint {
             account: Pubkey::new_unique(),
             owner: Pubkey::new_unique(),
             lamports: 1000,

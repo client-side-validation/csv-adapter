@@ -22,10 +22,10 @@ use csv_core::Hash as CoreHash;
 
 /// Double-SHA256 hash of two 32-byte inputs (Bitcoin Merkle node hash).
 #[inline]
-fn double_sha256(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
+fn double_sha256(left: &[u8; 32], sanad: &[u8; 32]) -> [u8; 32] {
     let mut h = Sha256::new();
     h.update(left);
-    h.update(right);
+    h.update(sanad);
     let first = h.finalize_reset();
     let mut h2 = Sha256::new();
     h2.update(first);
@@ -56,12 +56,12 @@ pub fn compute_merkle_root(txids: &[[u8; 32]]) -> Option<[u8; 32]> {
         let mut next_level = Vec::with_capacity((current_level.len() + 1) / 2);
         for i in (0..current_level.len()).step_by(2) {
             let left = current_level[i];
-            let right = if i + 1 < current_level.len() {
+            let sanad = if i + 1 < current_level.len() {
                 current_level[i + 1]
             } else {
                 left // duplicate odd node
             };
-            next_level.push(double_sha256(&left, &right));
+            next_level.push(double_sha256(&left, &sanad));
         }
         current_level = next_level;
     }
@@ -101,17 +101,17 @@ pub fn compute_merkle_branch(
         let mut next_level = Vec::with_capacity((current_level.len() + 1) / 2);
         for i in (0..current_level.len()).step_by(2) {
             let left = current_level[i];
-            let right = if i + 1 < current_level.len() {
+            let sanad = if i + 1 < current_level.len() {
                 current_level[i + 1]
             } else {
                 left
             };
             // Collect sibling hash when current node is in this pair
             if i == idx || i + 1 == idx {
-                let sibling = if i == idx { right } else { left };
+                let sibling = if i == idx { sanad } else { left };
                 branch.push(sibling);
             }
-            next_level.push(double_sha256(&left, &right));
+            next_level.push(double_sha256(&left, &sanad));
         }
         current_level = next_level;
         idx /= 2;
@@ -415,16 +415,16 @@ fn extract_merkle_branch_from_pmt(pmt: &PartialMerkleTree, target_index: usize) 
             let mut next_level = Vec::with_capacity((current_level.len() + 1) / 2);
             for i in (0..current_level.len()).step_by(2) {
                 let left = current_level[i];
-                let right = if i + 1 < current_level.len() {
+                let sanad = if i + 1 < current_level.len() {
                     current_level[i + 1]
                 } else {
                     left
                 };
                 if i == idx || i + 1 == idx {
-                    let sibling = if i == idx { right } else { left };
+                    let sibling = if i == idx { sanad } else { left };
                     branch.push(sibling);
                 }
-                next_level.push(double_sha256(&left, &right));
+                next_level.push(double_sha256(&left, &sanad));
             }
             current_level = next_level;
             idx /= 2;

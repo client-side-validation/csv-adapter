@@ -4,7 +4,7 @@
 /// 1. Event signatures computed via real keccak256 (sha3 crate) — temporary hex strings removed.
 /// 2. `fetch_block` supplemented with `eth_getLogs` — transactions don't carry logs in
 ///    `eth_getBlockByNumber`; logs come from a separate RPC call.
-/// 3. `parse_right_from_log` — owner read from topics[3] (indexed), not the contract address.
+/// 3. `parse_sanad_from_log` — owner read from topics[3] (indexed), not the contract address.
 /// 4. RPC client obtained via `rpc_manager.get_client()` which now builds authenticated clients.
 use async_trait::async_trait;
 use reqwest::Client;
@@ -15,9 +15,9 @@ use std::collections::HashMap;
 use super::chain_indexer::{AddressIndexingResult, ChainIndexer, ChainResult};
 use super::rpc_manager::RpcManager;
 use csv_explorer_shared::{
-    ChainConfig, CommitmentScheme, ContractStatus, ContractType, CsvContract, EnhancedRightRecord,
+    ChainConfig, CommitmentScheme, ContractStatus, ContractType, CsvContract, EnhancedSanadRecord,
     EnhancedSealRecord, EnhancedTransferRecord, ExplorerError, FinalityProofType,
-    InclusionProofType, Network, PriorityLevel, RightRecord, SealRecord, SealStatus, SealType,
+    InclusionProofType, Network, PriorityLevel, SanadRecord, SealRecord, SealStatus, SealType,
     TransferRecord,
 };
 
@@ -30,9 +30,9 @@ fn sig_seal_used() -> String {
     keccak256_selector("SealUsed(bytes32,bytes32)")
 }
 
-/// keccak256("RightCreated(bytes32,bytes32,address)")
-fn sig_right_created() -> String {
-    keccak256_selector("RightCreated(bytes32,bytes32,address)")
+/// keccak256("SanadCreated(bytes32,bytes32,address)")
+fn sig_sanad_created() -> String {
+    keccak256_selector("SanadCreated(bytes32,bytes32,address)")
 }
 
 /// keccak256("CrossChainLock(bytes32,bytes32,address,uint8,bytes,bytes32,uint8,bytes32,bytes32,uint8,bytes32)")
@@ -40,10 +40,10 @@ fn sig_cross_chain_lock() -> String {
     keccak256_selector("CrossChainLock(bytes32,bytes32,address,uint8,bytes,bytes32,uint8,bytes32,bytes32,uint8,bytes32)")
 }
 
-/// keccak256("RightMinted(bytes32,bytes32,address,uint8,bytes,uint8,bytes32,bytes32,uint8,bytes32)")
-fn sig_right_minted() -> String {
+/// keccak256("SanadMinted(bytes32,bytes32,address,uint8,bytes,uint8,bytes32,bytes32,uint8,bytes32)")
+fn sig_sanad_minted() -> String {
     keccak256_selector(
-        "RightMinted(bytes32,bytes32,address,uint8,bytes,uint8,bytes32,bytes32,uint8,bytes32)",
+        "SanadMinted(bytes32,bytes32,address,uint8,bytes,uint8,bytes32,bytes32,uint8,bytes32)",
     )
 }
 
@@ -155,18 +155,18 @@ impl ChainIndexer for EthereumIndexer {
         Ok(0)
     }
 
-    async fn index_rights(&self, block: u64) -> ChainResult<Vec<RightRecord>> {
+    async fn index_sanads(&self, block: u64) -> ChainResult<Vec<SanadRecord>> {
         let logs = self
-            .fetch_logs(block, &[sig_seal_used(), sig_right_created()])
+            .fetch_logs(block, &[sig_seal_used(), sig_sanad_created()])
             .await?;
-        let mut rights = Vec::new();
+        let mut sanads = Vec::new();
 
         for log in &logs {
             if log.topics.first().map(String::as_str) == Some(&sig_seal_used())
-                || log.topics.first().map(String::as_str) == Some(&sig_right_created())
+                || log.topics.first().map(String::as_str) == Some(&sig_sanad_created())
             {
-                if let Some(right) = self.parse_right_from_log(log) {
-                    rights.push(right);
+                if let Some(sanad) = self.parse_sanad_from_log(log) {
+                    sanads.push(sanad);
                 }
             }
         }
@@ -174,10 +174,10 @@ impl ChainIndexer for EthereumIndexer {
         tracing::debug!(
             chain = "ethereum",
             block,
-            count = rights.len(),
-            "Indexed rights"
+            count = sanads.len(),
+            "Indexed sanads"
         );
-        Ok(rights)
+        Ok(sanads)
     }
 
     async fn index_seals(&self, block: u64) -> ChainResult<Vec<SealRecord>> {
@@ -202,13 +202,13 @@ impl ChainIndexer for EthereumIndexer {
     }
 
     async fn index_transfers(&self, block: u64) -> ChainResult<Vec<TransferRecord>> {
-        let sigs = vec![sig_cross_chain_lock(), sig_right_minted()];
+        let sigs = vec![sig_cross_chain_lock(), sig_sanad_minted()];
         let logs = self.fetch_logs(block, &sigs).await?;
         let mut transfers = Vec::new();
 
         for log in &logs {
             let topic0 = log.topics.first().map(String::as_str);
-            if topic0 == Some(&sig_cross_chain_lock()) || topic0 == Some(&sig_right_minted()) {
+            if topic0 == Some(&sig_cross_chain_lock()) || topic0 == Some(&sig_sanad_minted()) {
                 if let Some(transfer) = self.parse_transfer_from_log(log) {
                     transfers.push(transfer);
                 }
@@ -241,7 +241,7 @@ impl ChainIndexer for EthereumIndexer {
             .collect())
     }
 
-    async fn index_rights_by_address(&self, _address: &str) -> ChainResult<Vec<RightRecord>> {
+    async fn index_sanads_by_address(&self, _address: &str) -> ChainResult<Vec<SanadRecord>> {
         Ok(Vec::new())
     }
 
@@ -261,38 +261,38 @@ impl ChainIndexer for EthereumIndexer {
     ) -> ChainResult<AddressIndexingResult> {
         let mut result = AddressIndexingResult {
             addresses_processed: 0,
-            rights_indexed: 0,
+            sanads_indexed: 0,
             seals_indexed: 0,
             transfers_indexed: 0,
             contracts_indexed: 0,
             errors: Vec::new(),
         };
         for address in addresses {
-            if let Ok(rights) = self.index_rights_by_address(address).await {
-                result.rights_indexed += rights.len() as u64;
+            if let Ok(sanads) = self.index_sanads_by_address(address).await {
+                result.sanads_indexed += sanads.len() as u64;
                 result.addresses_processed += 1;
             }
         }
         Ok(result)
     }
 
-    async fn index_enhanced_rights(&self, block: u64) -> ChainResult<Vec<EnhancedRightRecord>> {
+    async fn index_enhanced_sanads(&self, block: u64) -> ChainResult<Vec<EnhancedSanadRecord>> {
         Ok(self
-            .index_rights(block)
+            .index_sanads(block)
             .await?
             .into_iter()
-            .map(|right| EnhancedRightRecord {
-                id: right.id.clone(),
-                chain: right.chain.clone(),
-                seal_ref: right.seal_ref.clone(),
-                commitment: right.commitment.clone(),
-                owner: right.owner.clone(),
-                created_at: right.created_at,
-                created_tx: right.created_tx.clone(),
-                status: right.status.to_string(),
-                metadata: right.metadata,
-                transfer_count: right.transfer_count,
-                last_transfer_at: right.last_transfer_at,
+            .map(|sanad| EnhancedSanadRecord {
+                id: sanad.id.clone(),
+                chain: sanad.chain.clone(),
+                seal_ref: sanad.seal_ref.clone(),
+                commitment: sanad.commitment.clone(),
+                owner: sanad.owner.clone(),
+                created_at: sanad.created_at,
+                created_tx: sanad.created_tx.clone(),
+                status: sanad.status.to_string(),
+                metadata: sanad.metadata,
+                transfer_count: sanad.transfer_count,
+                last_transfer_at: sanad.last_transfer_at,
                 commitment_scheme: CommitmentScheme::KZG,
                 commitment_version: 2,
                 protocol_id: "csv-eth".to_string(),
@@ -316,7 +316,7 @@ impl ChainIndexer for EthereumIndexer {
                 chain: s.chain.clone(),
                 seal_type: s.seal_type.to_string(),
                 seal_ref: s.seal_ref.clone(),
-                right_id: s.right_id.clone(),
+                sanad_id: s.sanad_id.clone(),
                 status: s.status.to_string(),
                 consumed_at: s.consumed_at,
                 consumed_tx: s.consumed_tx.clone(),
@@ -337,7 +337,7 @@ impl ChainIndexer for EthereumIndexer {
             .into_iter()
             .map(|t| EnhancedTransferRecord {
                 id: t.id.clone(),
-                right_id: t.right_id.clone(),
+                sanad_id: t.sanad_id.clone(),
                 from_chain: t.from_chain.clone(),
                 to_chain: t.to_chain.clone(),
                 from_owner: t.from_owner.clone(),
@@ -378,7 +378,7 @@ impl EthereumIndexer {
         );
         csv_contracts.insert(
             "0x0000000000000000000000000000000000000001".to_string(),
-            ContractType::RightRegistry,
+            ContractType::SanadRegistry,
         );
         csv_contracts.insert(
             "0x0000000000000000000000000000000000000002".to_string(),
@@ -448,7 +448,7 @@ impl EthereumIndexer {
     // FIX: owner comes from topics[3] (indexed address param), not log.address
     // -----------------------------------------------------------------------
 
-    fn parse_right_from_log(&self, log: &LogData) -> Option<RightRecord> {
+    fn parse_sanad_from_log(&self, log: &LogData) -> Option<SanadRecord> {
         if log.topics.len() < 2 {
             return None;
         }
@@ -462,7 +462,7 @@ impl EthereumIndexer {
             .get(3)
             .or_else(|| log.topics.get(2))
             .map(|t| {
-                // Ethereum addresses are right-aligned in 32-byte topic → take last 20 bytes
+                // Ethereum addresses are sanad-aligned in 32-byte topic → take last 20 bytes
                 if t.len() >= 42 {
                     t[t.len() - 40..].to_string()
                 } else {
@@ -481,7 +481,7 @@ impl EthereumIndexer {
         } else {
             &seal_id
         };
-        Some(RightRecord {
+        Some(SanadRecord {
             id: format!("eth-{}-{}", log.transaction_hash, id_suffix),
             chain: "ethereum".to_string(),
             seal_ref: seal_id.clone(),
@@ -489,7 +489,7 @@ impl EthereumIndexer {
             owner,
             created_at: chrono::Utc::now(),
             created_tx: log.transaction_hash.clone(),
-            status: csv_explorer_shared::RightStatus::Active,
+            status: csv_explorer_shared::SanadStatus::Active,
             metadata: Some(serde_json::json!({
                 "protocol_id": "csv-eth",
                 "commitment_scheme": "kzg",
@@ -513,7 +513,7 @@ impl EthereumIndexer {
             chain: "ethereum".to_string(),
             seal_type: SealType::Nullifier,
             seal_ref: seal_id.clone(),
-            right_id: None,
+            sanad_id: None,
             status: SealStatus::Consumed,
             consumed_at: Some(chrono::Utc::now()),
             consumed_tx: Some(log.transaction_hash.clone()),
@@ -525,11 +525,11 @@ impl EthereumIndexer {
         if log.topics.len() < 4 {
             return None;
         }
-        let right_id = log.topics.get(1).cloned().unwrap_or_default();
+        let sanad_id = log.topics.get(1).cloned().unwrap_or_default();
         let from_owner = log.topics.get(3).cloned().unwrap_or_default();
         Some(TransferRecord {
             id: format!("eth-xfer-{}", log.transaction_hash),
-            right_id,
+            sanad_id,
             from_chain: "ethereum".to_string(),
             to_chain: "unknown".to_string(),
             from_owner,

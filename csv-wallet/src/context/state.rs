@@ -10,7 +10,7 @@ pub struct AppState {
     pub wallet: WalletData,
     pub selected_chain: Chain,
     pub selected_network: Network,
-    pub rights: Vec<TrackedRight>,
+    pub sanads: Vec<TrackedSanad>,
     pub transfers: Vec<TrackedTransfer>,
     pub contracts: Vec<DeployedContract>,
     pub seals: Vec<SealRecord>,
@@ -28,7 +28,7 @@ impl Default for AppState {
             wallet: WalletData::default(),
             selected_chain: Chain::Bitcoin,
             selected_network: Network::Test,
-            rights: Vec::new(),
+            sanads: Vec::new(),
             transfers: Vec::new(),
             contracts: Vec::new(),
             seals: Vec::new(),
@@ -47,7 +47,7 @@ impl PartialEq for AppState {
         self.selected_chain == other.selected_chain
             && self.selected_network == other.selected_network
             && self.wallet.total_accounts() == other.wallet.total_accounts()
-            && self.rights.len() == other.rights.len()
+            && self.sanads.len() == other.sanads.len()
             && self.seals.len() == other.seals.len()
             && self.proofs.len() == other.proofs.len()
             && self.transfers.len() == other.transfers.len()

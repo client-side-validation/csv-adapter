@@ -90,8 +90,8 @@ While the Web UI is being set up, you can use the fully functional API:
 # Statistics
 curl http://localhost:8080/api/v1/stats
 
-# List Rights
-curl http://localhost:8080/api/v1/rights?limit=5
+# List Sanads
+curl http://localhost:8080/api/v1/sanads?limit=5
 
 # List Transfers
 curl http://localhost:8080/api/v1/transfers?limit=5
@@ -110,13 +110,13 @@ curl http://localhost:8080/api/v1/chains
 ```bash
 curl -X POST http://localhost:8080/graphql \
   -H "Content-Type: application/json" \
-  -d '{"query": "{ stats { totalRights totalTransfers totalSeals totalContracts } }"}'
+  -d '{"query": "{ stats { totalSanads totalTransfers totalSeals totalContracts } }"}'
 ```
 
 ### Test Data Available
 
 The database is seeded with:
-- 8 Rights across 5 chains
+- 8 Sanads across 5 chains
 - 7 Cross-chain transfers
 - 11 Seals (all types)
 - 11 Deployed contracts
@@ -214,7 +214,7 @@ pkill -f csv-explorer-api
   - All CRUD operations
 
 ✅ Database (seeded with test data)
-  - 8 rights
+  - 8 sanads
   - 7 transfers
   - 11 seals
   - 11 contracts

@@ -342,7 +342,7 @@ impl WalletManager {
     pub async fn query_balance(&self, chain: Chain, address: &str) -> Result<u64, crate::CsvError> {
         // Validate the address format for the chain
         if address.is_empty() {
-            return Err(crate::CsvError::InvalidRightId(
+            return Err(crate::CsvError::InvalidSanadId(
                 "Address cannot be empty".to_string(),
             ));
         }

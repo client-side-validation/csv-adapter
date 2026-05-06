@@ -95,7 +95,7 @@ pub fn SealRegistry() -> Element {
                                     th { class: "px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase", "Seal Reference" }
                                     th { class: "px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase", "Chain" }
                                     th { class: "px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase", "Status" }
-                                    th { class: "px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase", "Right" }
+                                    th { class: "px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase", "Sanad" }
                                     th { class: "px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase", "Value" }
                                     th { class: "px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase", "Actions" }
                                 }
@@ -149,12 +149,12 @@ fn seal_row(seal: &SealRecord) -> Element {
                 }
             }
             td { class: "px-4 py-3",
-                if seal.right_id.is_empty() {
+                if seal.sanad_id.is_empty() {
                     span { class: "text-gray-500", "-" }
                 } else {
-                    Link { to: Route::RightJourney { id: seal.right_id.clone() },
+                    Link { to: Route::SanadJourney { id: seal.sanad_id.clone() },
                         class: "font-mono text-xs text-blue-400 hover:underline",
-                        "{truncate_address(&seal.right_id, 8)}"
+                        "{truncate_address(&seal.sanad_id, 8)}"
                     }
                 }
             }
@@ -230,7 +230,7 @@ fn security_info_section() -> Element {
                     ul { class: "text-sm text-gray-400 list-disc list-inside space-y-1",
                         li { "Creation timestamp and block" }
                         li { "Consumption transaction hash" }
-                        li { "Right ID that consumed the seal" }
+                        li { "Sanad ID that consumed the seal" }
                         li { "Chain where consumption occurred" }
                     }
                 }

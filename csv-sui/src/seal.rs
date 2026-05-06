@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{SuiError, SuiResult};
-use crate::types::SuiSealRef;
+use crate::types::SuiSealPoint;
 use csv_core::hardening::{BoundedQueue, MAX_SEAL_NULLIFIER_SIZE};
 
 /// A persisted seal record that can be serialized.
@@ -28,7 +28,7 @@ pub struct SealRecord {
 
 impl SealRecord {
     /// Create a new seal record from a seal reference and consumption details.
-    pub fn new(seal: &SuiSealRef, consumed_at_checkpoint: u64) -> Self {
+    pub fn new(seal: &SuiSealPoint, consumed_at_checkpoint: u64) -> Self {
         Self {
             object_id: seal.object_id,
             object_version: seal.version,
@@ -82,7 +82,7 @@ impl SealRegistry {
     }
 
     /// Check if a seal has already been used.
-    pub fn is_seal_used(&self, seal: &SuiSealRef) -> bool {
+    pub fn is_seal_used(&self, seal: &SuiSealPoint) -> bool {
         let key = format!(
             "{}-{}-{}",
             hex::encode(seal.object_id),
@@ -102,7 +102,7 @@ impl SealRegistry {
     /// `Ok(())` if the seal was successfully marked, or `Err` if already used.
     pub fn mark_seal_used(
         &mut self,
-        seal: &SuiSealRef,
+        seal: &SuiSealPoint,
         consumed_at_checkpoint: u64,
     ) -> SuiResult<()> {
         if self.is_seal_used(seal) {
@@ -139,7 +139,7 @@ impl SealRegistry {
     ///
     /// # Returns
     /// `Ok(())` if the seal was found and cleared, or `Err` if not found.
-    pub fn clear_seal(&mut self, seal: &SuiSealRef) -> SuiResult<()> {
+    pub fn clear_seal(&mut self, seal: &SuiSealPoint) -> SuiResult<()> {
         let key = format!(
             "{}-{}-{}",
             hex::encode(seal.object_id),
@@ -233,8 +233,8 @@ pub trait SealStore: Send + Sync {
 mod tests {
     use super::*;
 
-    fn test_seal() -> SuiSealRef {
-        SuiSealRef::new([1u8; 32], 1, 0)
+    fn test_seal() -> SuiSealPoint {
+        SuiSealPoint::new([1u8; 32], 1, 0)
     }
 
     #[test]
@@ -269,8 +269,8 @@ mod tests {
     #[test]
     fn test_different_seals() {
         let mut registry = SealRegistry::new();
-        let seal1 = SuiSealRef::new([1u8; 32], 1, 0);
-        let seal2 = SuiSealRef::new([2u8; 32], 1, 0);
+        let seal1 = SuiSealPoint::new([1u8; 32], 1, 0);
+        let seal2 = SuiSealPoint::new([2u8; 32], 1, 0);
 
         registry.mark_seal_used(&seal1, 100).unwrap();
         registry.mark_seal_used(&seal2, 200).unwrap();
@@ -283,8 +283,8 @@ mod tests {
     #[test]
     fn test_same_object_different_version() {
         let mut registry = SealRegistry::new();
-        let seal1 = SuiSealRef::new([1u8; 32], 1, 0);
-        let seal2 = SuiSealRef::new([1u8; 32], 2, 0);
+        let seal1 = SuiSealPoint::new([1u8; 32], 1, 0);
+        let seal2 = SuiSealPoint::new([1u8; 32], 2, 0);
 
         registry.mark_seal_used(&seal1, 100).unwrap();
         registry.mark_seal_used(&seal2, 200).unwrap();

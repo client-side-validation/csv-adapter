@@ -1,8 +1,8 @@
 /**
- * SealRef — single-use seal reference.
- * Mirrors csv_adapter_core::seal::SealRef
+ * SealPoint — single-use seal reference.
+ * Mirrors csv_adapter_core::seal::SealPoint
  *
- * A seal is the on-chain mechanism that enforces a Right's single-use property.
+ * A seal is the on-chain mechanism that enforces a Sanad's single-use property.
  * Each chain has its own seal format:
  * - Bitcoin: OutPoint (txid + vout)
  * - Ethereum: (contract_address, storage_slot) or nullifier hash
@@ -10,7 +10,7 @@
  * - Aptos: (resource_address, key)
  * - Solana: Pubkey of the seal account
  */
-export interface SealRef {
+export interface SealPoint {
   /** Chain-specific seal identifier (max 1024 bytes) */
   sealId: Uint8Array;
   /** Optional nonce for replay resistance */
@@ -18,12 +18,12 @@ export interface SealRef {
 }
 
 /**
- * AnchorRef — on-chain anchor reference.
- * Mirrors csv_adapter_core::seal::AnchorRef
+ * CommitAnchor — on-chain anchor reference.
+ * Mirrors csv_adapter_core::seal::CommitAnchor
  *
  * Points to where a commitment was published on-chain.
  */
-export interface AnchorRef {
+export interface CommitAnchor {
   /** Chain-specific anchor identifier (max 1024 bytes) */
   anchorId: Uint8Array;
   /** Block height or equivalent ordering */
@@ -33,9 +33,9 @@ export interface AnchorRef {
 }
 
 /**
- * Create a SealRef from hex strings.
+ * Create a SealPoint from hex strings.
  */
-export function sealRefFromHex(sealId: string, nonce?: number): SealRef {
+export function sealRefFromHex(sealId: string, nonce?: number): SealPoint {
   return {
     sealId: hexToBytes(sealId),
     nonce: nonce ?? null,
@@ -43,9 +43,9 @@ export function sealRefFromHex(sealId: string, nonce?: number): SealRef {
 }
 
 /**
- * Serialize a SealRef to JSON-compatible format.
+ * Serialize a SealPoint to JSON-compatible format.
  */
-export function sealRefToJson(seal: SealRef): { sealId: string; nonce: number | null } {
+export function sealRefToJson(seal: SealPoint): { sealId: string; nonce: number | null } {
   return {
     sealId: bytesToHex(seal.sealId),
     nonce: seal.nonce,
@@ -53,20 +53,20 @@ export function sealRefToJson(seal: SealRef): { sealId: string; nonce: number | 
 }
 
 /**
- * Deserialize a SealRef from JSON.
+ * Deserialize a SealPoint from JSON.
  */
-export function sealRefFromJson(json: { sealId: string; nonce: number | null }): SealRef {
+export function sealRefFromJson(json: { sealId: string; nonce: number | null }): SealPoint {
   return sealRefFromHex(json.sealId, json.nonce ?? undefined);
 }
 
 /**
- * Create an AnchorRef from hex strings.
+ * Create an CommitAnchor from hex strings.
  */
 export function anchorRefFromHex(
   anchorId: string,
   blockHeight: number,
   metadata?: string,
-): AnchorRef {
+): CommitAnchor {
   return {
     anchorId: hexToBytes(anchorId),
     blockHeight,
@@ -75,9 +75,9 @@ export function anchorRefFromHex(
 }
 
 /**
- * Serialize an AnchorRef to JSON-compatible format.
+ * Serialize an CommitAnchor to JSON-compatible format.
  */
-export function anchorRefToJson(anchor: AnchorRef): {
+export function anchorRefToJson(anchor: CommitAnchor): {
   anchorId: string;
   blockHeight: number;
   metadata: string;
@@ -90,12 +90,12 @@ export function anchorRefToJson(anchor: AnchorRef): {
 }
 
 /**
- * Deserialize an AnchorRef from JSON.
+ * Deserialize an CommitAnchor from JSON.
  */
 export function anchorRefFromJson(json: {
   anchorId: string;
   blockHeight: number;
   metadata: string;
-}): AnchorRef {
+}): CommitAnchor {
   return anchorRefFromHex(json.anchorId, json.blockHeight, json.metadata);
 }

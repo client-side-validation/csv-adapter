@@ -28,9 +28,9 @@ pub async fn init_pool(database_url: &str, max_connections: u32) -> Result<Sqlit
 
 /// Apply the schema DDL if tables do not yet exist.
 async fn apply_schema(pool: &SqlitePool) -> Result<()> {
-    // Check if the rights table exists; if not, apply the full schema.
+    // Check if the sanads table exists; if not, apply the full schema.
     let exists: Option<i64> = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='rights'",
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sanads'",
     )
     .fetch_one(pool)
     .await?;

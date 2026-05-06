@@ -1,6 +1,6 @@
-//! Cross-chain operations for CSV rights.
+//! Cross-chain operations for CSV sanads.
 //!
-//! This module provides functionality for minting rights on destination chains
+//! This module provides functionality for minting sanads on destination chains
 //! as part of cross-chain transfers.
 
 use crate::CsvError;
@@ -39,7 +39,7 @@ impl From<CrossChainError> for CsvError {
     }
 }
 
-/// Mint a right on the destination chain as part of a cross-chain transfer.
+/// Mint a sanad on the destination chain as part of a cross-chain transfer.
 ///
 /// # Arguments
 ///
@@ -47,8 +47,8 @@ impl From<CrossChainError> for CsvError {
 /// * `rpc_url` - RPC endpoint URL for the destination chain.
 /// * `contract` - Contract/package address on the destination chain.
 /// * `private_key` - Private key for signing (hex-encoded, with or without 0x prefix).
-/// * `right_id` - Unique identifier of the right being minted.
-/// * `commitment` - Commitment hash for the right.
+/// * `sanad_id` - Unique identifier of the sanad being minted.
+/// * `commitment` - Commitment hash for the sanad.
 /// * `source_chain` - Identifier of the source chain.
 /// * `source_seal_ref` - Reference to the seal on the source chain.
 ///
@@ -62,12 +62,12 @@ impl From<CrossChainError> for CsvError {
 /// - The chain is not supported
 /// - The RPC call fails
 /// - The transaction cannot be built or submitted
-pub async fn mint_right_on_chain(
+pub async fn mint_sanad_on_chain(
     chain: Chain,
     rpc_url: &str,
     contract: &str,
     private_key: &str,
-    right_id: Hash,
+    sanad_id: Hash,
     commitment: Hash,
     source_chain: u8,
     source_seal_ref: Hash,
@@ -75,13 +75,13 @@ pub async fn mint_right_on_chain(
     match chain {
         #[cfg(all(feature = "sui", feature = "rpc"))]
         Chain::Sui => {
-            use csv_sui::mint::mint_right;
+            use csv_sui::mint::mint_sanad;
             
-            mint_right(
+            mint_sanad(
                 rpc_url,
                 contract,
                 private_key,
-                right_id,
+                sanad_id,
                 commitment,
                 source_chain,
                 source_seal_ref,
@@ -93,7 +93,7 @@ pub async fn mint_right_on_chain(
         #[cfg(not(all(feature = "sui", feature = "rpc")))]
         Chain::Sui => {
             // Suppress unused variable warnings when feature is not enabled
-            let _ = (rpc_url, contract, private_key, right_id, commitment, source_chain, source_seal_ref);
+            let _ = (rpc_url, contract, private_key, sanad_id, commitment, source_chain, source_seal_ref);
             Err(CrossChainError::FeatureNotEnabled(
                 "Sui cross-chain mint requires 'sui' and 'rpc' features.".to_string()
             ))
@@ -101,15 +101,15 @@ pub async fn mint_right_on_chain(
         
         #[cfg(feature = "solana")]
         Chain::Solana => {
-            use csv_solana::mint::mint_right_from_hex_key;
+            use csv_solana::mint::mint_sanad_from_hex_key;
             // Solana requires state_root parameter - use zero hash as default
             let state_root = Hash::new([0u8; 32]);
             
-            mint_right_from_hex_key(
+            mint_sanad_from_hex_key(
                 rpc_url,
                 contract,
                 private_key,
-                right_id,
+                sanad_id,
                 commitment,
                 state_root,
                 source_chain,
@@ -121,7 +121,7 @@ pub async fn mint_right_on_chain(
         #[cfg(not(feature = "solana"))]
         Chain::Solana => {
             // Suppress unused variable warnings when feature is not enabled
-            let _ = (rpc_url, contract, private_key, right_id, commitment, source_chain, source_seal_ref);
+            let _ = (rpc_url, contract, private_key, sanad_id, commitment, source_chain, source_seal_ref);
             Err(CrossChainError::FeatureNotEnabled(
                 "Solana cross-chain mint requires 'solana' feature.".to_string()
             ))
@@ -129,7 +129,7 @@ pub async fn mint_right_on_chain(
         
         _ => {
             // Suppress unused variable warnings for unsupported chains
-            let _ = (rpc_url, contract, private_key, right_id, commitment, source_chain, source_seal_ref);
+            let _ = (rpc_url, contract, private_key, sanad_id, commitment, source_chain, source_seal_ref);
             Err(CrossChainError::ChainNotSupported(format!(
                 "Cross-chain mint not available for {:?}",
                 chain

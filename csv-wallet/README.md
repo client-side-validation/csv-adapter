@@ -1,6 +1,6 @@
 # CSV Wallet — Standalone Multi-Chain Wallet
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)]()
+[![Build](https://img.shields.io/badge/build-passing-bsanadgreen)]()
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)]()
 
 **CSV Wallet** is a standalone multi-chain wallet for the **CSV (Client-Side Validation)** ecosystem. Built with [Dioxus](https://dioxuslabs.com/), it provides a modern web-based interface for managing wallets, seals, assets, and transfers across multiple blockchain networks.
@@ -23,7 +23,7 @@
 
 ### 💎 Asset Tracking
 
-- **View Assets**: See all owned Rights across all chains
+- **View Assets**: See all owned Sanads across all chains
 - **Valuation**: Real-time USD value tracking for all assets
 - **Asset Details**: Detailed information about each asset including commitment, ownership, and seal data
 - **Portfolio Overview**: Total portfolio value at a glance
@@ -253,7 +253,7 @@ let is_consumed = manager.is_seal_consumed(&seal.id)?;
 
 CSV Wallet integrates seamlessly with the broader CSV Adapter ecosystem:
 
-- **csv-adapter-core**: Core types (Right, Chain, etc.)
+- **csv-adapter-core**: Core types (Sanad, Chain, etc.)
 - **csv-adapter-bitcoin**: Bitcoin seal operations
 - **csv-adapter-ethereum**: Ethereum seal operations
 - **csv-adapter-sui**: Sui seal operations

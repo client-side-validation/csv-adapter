@@ -18,10 +18,10 @@ pub fn RunTests() -> Element {
 
     let test_steps = [
         "Checking chain connectivity...",
-        "Creating Right on source...",
-        "Locking Right on source...",
+        "Creating Sanad on source...",
+        "Locking Sanad on source...",
         "Verifying proof on destination...",
-        "Minting Right on destination...",
+        "Minting Sanad on destination...",
     ];
 
     rsx! {

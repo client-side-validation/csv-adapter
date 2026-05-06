@@ -1,5 +1,5 @@
-use csv_explorer_shared::RightRecord;
-/// Rights list page with filtering, sorting, and pagination.
+use csv_explorer_shared::SanadRecord;
+/// Sanads list page with filtering, sorting, and pagination.
 use dioxus::prelude::*;
 use dioxus_router::components::Link;
 
@@ -8,17 +8,17 @@ use crate::components::ChainBadge;
 use crate::hooks::use_api::ApiClient;
 
 #[component]
-pub fn RightsList() -> Element {
+pub fn SanadsList() -> Element {
     let mut chain_filter = use_signal(|| String::new());
     let mut status_filter = use_signal(|| String::new());
     let mut search_query = use_signal(|| String::new());
     let mut page = use_signal(|| 1u64);
-    let mut rights = use_signal(|| Vec::<RightRecord>::new());
+    let mut sanads = use_signal(|| Vec::<SanadRecord>::new());
     let mut loading = use_signal(|| false);
 
     let limit = 20;
 
-    // Fetch rights when component mounts or filters change
+    // Fetch sanads when component mounts or filters change
     use_effect(move || {
         spawn(async move {
             loading.set(true);
@@ -38,10 +38,10 @@ pub fn RightsList() -> Element {
             let offset = ((*page.read() - 1) * limit as u64) as usize;
 
             if let Ok(records) = client
-                .get_rights(chain, status, Some(limit), Some(offset))
+                .get_sanads(chain, status, Some(limit), Some(offset))
                 .await
             {
-                rights.set(records);
+                sanads.set(records);
             }
             loading.set(false);
         });
@@ -51,9 +51,9 @@ pub fn RightsList() -> Element {
         div { class: "space-y-6",
             // Header
             div { class: "flex items-center justify-between",
-                h1 { class: "text-2xl font-bold text-gray-100", "Rights" }
+                h1 { class: "text-2xl font-bold text-gray-100", "Sanads" }
                 span { class: "text-gray-400 text-sm",
-                    if loading() { "Loading..." } else { "{rights.read().len()} rights found" }
+                    if loading() { "Loading..." } else { "{sanads.read().len()} sanads found" }
                 }
             }
 
@@ -98,7 +98,7 @@ pub fn RightsList() -> Element {
                 table { class: "w-full",
                     thead {
                         tr { class: "border-b border-gray-800 text-left text-sm text-gray-400",
-                            th { class: "px-6 py-3 font-medium", "Right ID" }
+                            th { class: "px-6 py-3 font-medium", "Sanad ID" }
                             th { class: "px-6 py-3 font-medium", "Chain" }
                             th { class: "px-6 py-3 font-medium", "Owner" }
                             th { class: "px-6 py-3 font-medium", "Status" }
@@ -110,25 +110,25 @@ pub fn RightsList() -> Element {
                         if loading() {
                             tr {
                                 td { colspan: 6, class: "px-6 py-12 text-center text-gray-500",
-                                    "Loading rights..."
+                                    "Loading sanads..."
                                 }
                             }
-                        } else if rights.read().is_empty() {
+                        } else if sanads.read().is_empty() {
                             tr {
                                 td { colspan: 6, class: "px-6 py-12 text-center text-gray-500",
-                                    "No rights found. Start the indexer to begin syncing data."
+                                    "No sanads found. Start the indexer to begin syncing data."
                                 }
                             }
                         } else {
-                            for right in rights.read().clone() {
-                                RightRow {
-                                    key: "{right.id}",
-                                    id: right.id.clone(),
-                                    chain: right.chain.clone(),
-                                    owner: right.owner.clone(),
-                                    status: right.status.to_string(),
-                                    created_at: right.created_at,
-                                    transfer_count: right.transfer_count,
+                            for sanad in sanads.read().clone() {
+                                SanadRow {
+                                    key: "{sanad.id}",
+                                    id: sanad.id.clone(),
+                                    chain: sanad.chain.clone(),
+                                    owner: sanad.owner.clone(),
+                                    status: sanad.status.to_string(),
+                                    created_at: sanad.created_at,
+                                    transfer_count: sanad.transfer_count,
                                 }
                             }
                         }
@@ -164,7 +164,7 @@ pub fn RightsList() -> Element {
 }
 
 #[component]
-fn RightRow(
+fn SanadRow(
     id: String,
     chain: String,
     owner: String,
@@ -176,7 +176,7 @@ fn RightRow(
         tr { class: "hover:bg-gray-800/50 transition-colors",
             td { class: "px-6 py-4",
                 Link {
-                    to: Route::RightDetail { id: id.clone() },
+                    to: Route::SanadDetail { id: id.clone() },
                     class: "font-mono text-sm text-blue-400 hover:text-blue-300",
                     "{id}"
                 }

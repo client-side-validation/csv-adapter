@@ -11,18 +11,18 @@ use serde::{Deserialize, Serialize};
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IndexingEvent {
-    /// Right created on a chain
-    RightCreated {
-        right_id: Hash,
+    /// Sanad created on a chain
+    SanadCreated {
+        sanad_id: Hash,
         chain: Chain,
         owner: String,
         created_at: DateTime<Utc>,
         metadata: serde_json::Value,
     },
 
-    /// Right transferred between chains
-    RightTransferred {
-        right_id: Hash,
+    /// Sanad transferred between chains
+    SanadTransferred {
+        sanad_id: Hash,
         from_chain: Chain,
         to_chain: Chain,
         transfer_id: Hash,
@@ -38,9 +38,9 @@ pub enum IndexingEvent {
         updated_at: DateTime<Utc>,
     },
 
-    /// Right metadata updated
-    RightUpdated {
-        right_id: Hash,
+    /// Sanad metadata updated
+    SanadUpdated {
+        sanad_id: Hash,
         chain: Chain,
         old_metadata: serde_json::Value,
         new_metadata: serde_json::Value,
@@ -68,10 +68,10 @@ impl IndexingEvent {
     /// Get event type name
     pub fn event_type(&self) -> &'static str {
         match self {
-            IndexingEvent::RightCreated { .. } => "right_created",
-            IndexingEvent::RightTransferred { .. } => "right_transferred",
+            IndexingEvent::SanadCreated { .. } => "sanad_created",
+            IndexingEvent::SanadTransferred { .. } => "sanad_transferred",
             IndexingEvent::TransferUpdated { .. } => "transfer_updated",
-            IndexingEvent::RightUpdated { .. } => "right_updated",
+            IndexingEvent::SanadUpdated { .. } => "sanad_updated",
             IndexingEvent::ChainSynced { .. } => "chain_synced",
             IndexingEvent::Error { .. } => "error",
         }
@@ -80,10 +80,10 @@ impl IndexingEvent {
     /// Get chain associated with event
     pub fn chain(&self) -> Option<&Chain> {
         match self {
-            IndexingEvent::RightCreated { chain, .. } => Some(chain),
-            IndexingEvent::RightTransferred { from_chain, .. } => Some(from_chain),
+            IndexingEvent::SanadCreated { chain, .. } => Some(chain),
+            IndexingEvent::SanadTransferred { from_chain, .. } => Some(from_chain),
             IndexingEvent::TransferUpdated { .. } => None,
-            IndexingEvent::RightUpdated { chain, .. } => Some(chain),
+            IndexingEvent::SanadUpdated { chain, .. } => Some(chain),
             IndexingEvent::ChainSynced { chain, .. } => Some(chain),
             IndexingEvent::Error { chain, .. } => chain.as_ref(),
         }
@@ -92,10 +92,10 @@ impl IndexingEvent {
     /// Get timestamp for event
     pub fn timestamp(&self) -> DateTime<Utc> {
         match self {
-            IndexingEvent::RightCreated { created_at, .. } => *created_at,
-            IndexingEvent::RightTransferred { created_at, .. } => *created_at,
+            IndexingEvent::SanadCreated { created_at, .. } => *created_at,
+            IndexingEvent::SanadTransferred { created_at, .. } => *created_at,
             IndexingEvent::TransferUpdated { updated_at, .. } => *updated_at,
-            IndexingEvent::RightUpdated { updated_at, .. } => *updated_at,
+            IndexingEvent::SanadUpdated { updated_at, .. } => *updated_at,
             IndexingEvent::ChainSynced { synced_at, .. } => *synced_at,
             IndexingEvent::Error { timestamp, .. } => *timestamp,
         }
@@ -105,10 +105,10 @@ impl IndexingEvent {
     pub fn is_critical(&self) -> bool {
         matches!(
             self,
-            IndexingEvent::RightCreated { .. }
-                | IndexingEvent::RightTransferred { .. }
+            IndexingEvent::SanadCreated { .. }
+                | IndexingEvent::SanadTransferred { .. }
                 | IndexingEvent::TransferUpdated { .. }
-                | IndexingEvent::RightUpdated { .. }
+                | IndexingEvent::SanadUpdated { .. }
         )
     }
 
@@ -246,10 +246,10 @@ impl EventBatch {
 #[derive(Debug, Clone, Default)]
 pub struct EventStats {
     pub total_events: u64,
-    pub right_created: u64,
-    pub right_transferred: u64,
+    pub sanad_created: u64,
+    pub sanad_transferred: u64,
     pub transfer_updated: u64,
-    pub right_updated: u64,
+    pub sanad_updated: u64,
     pub chain_synced: u64,
     pub errors: u64,
     pub average_events_per_second: f64,
@@ -266,10 +266,10 @@ impl EventStats {
         self.total_events += 1;
 
         match event {
-            IndexingEvent::RightCreated { .. } => self.right_created += 1,
-            IndexingEvent::RightTransferred { .. } => self.right_transferred += 1,
+            IndexingEvent::SanadCreated { .. } => self.sanad_created += 1,
+            IndexingEvent::SanadTransferred { .. } => self.sanad_transferred += 1,
             IndexingEvent::TransferUpdated { .. } => self.transfer_updated += 1,
-            IndexingEvent::RightUpdated { .. } => self.right_updated += 1,
+            IndexingEvent::SanadUpdated { .. } => self.sanad_updated += 1,
             IndexingEvent::ChainSynced { .. } => self.chain_synced += 1,
             IndexingEvent::Error { .. } => self.errors += 1,
         }
@@ -293,10 +293,10 @@ mod tests {
     fn test_event_filter() {
         let filter = EventFilter::new()
             .chains(vec![Chain::Ethereum])
-            .event_types(vec!["right_created".to_string()]);
+            .event_types(vec!["sanad_created".to_string()]);
 
-        let event = IndexingEvent::RightCreated {
-            right_id: Hash::zero(),
+        let event = IndexingEvent::SanadCreated {
+            sanad_id: Hash::zero(),
             chain: Chain::Ethereum,
             owner: "test".to_string(),
             created_at: Utc::now(),
@@ -308,8 +308,8 @@ mod tests {
 
     #[test]
     fn test_event_batch() {
-        let events = vec![IndexingEvent::RightCreated {
-            right_id: Hash::zero(),
+        let events = vec![IndexingEvent::SanadCreated {
+            sanad_id: Hash::zero(),
             chain: Chain::Ethereum,
             owner: "test".to_string(),
             created_at: Utc::now(),

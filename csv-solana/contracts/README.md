@@ -1,12 +1,12 @@
 # CSV Seal - Solana Anchor Program
 
-Cross-Chain Right Transfer implementation on Solana using the Anchor framework.
+Cross-Chain Sanad Transfer implementation on Solana using the Anchor framework.
 
 ## Overview
 
 This program implements the same CSV (Client-Side Validation) seal functionality as the Aptos, Sui, and Ethereum contracts:
 
-- **RightAccount**: PDA storing right data (right_id, commitment, owner, nullifier, state_root)
+- **SanadAccount**: PDA storing sanad data (sanad_id, commitment, owner, nullifier, state_root)
 - **LockRegistry**: Tracks lock records for refunds with 24h timeout
 - **Events**: Emitted for all cross-chain operations
 
@@ -24,32 +24,32 @@ Initialize the LockRegistry (called once during deployment).
 
 ### `create_seal`
 
-Create a new Right on Solana.
+Create a new Sanad on Solana.
 
 **Args:**
 
-- `right_id`: [u8; 32] - Unique Right identifier
+- `sanad_id`: [u8; 32] - Unique Sanad identifier
 - `commitment`: [u8; 32] - Commitment hash
 - `state_root`: [u8; 32] - Off-chain state commitment
 
 **Accounts:**
 
-- `right_account` (PDA): RightAccount to create
-- `owner` (signer): Owner of the right
+- `sanad_account` (PDA): SanadAccount to create
+- `owner` (signer): Owner of the sanad
 - `system_program`: System program
 
 ### `consume_seal`
 
-Consume a Right (single-use enforcement).
+Consume a Sanad (single-use enforcement).
 
 **Accounts:**
 
-- `right_account`: RightAccount to consume
+- `sanad_account`: SanadAccount to consume
 - `consumer` (signer): Must be the owner
 
-### `lock_right`
+### `lock_sanad`
 
-Lock a Right for cross-chain transfer.
+Lock a Sanad for cross-chain transfer.
 
 **Args:**
 
@@ -58,19 +58,19 @@ Lock a Right for cross-chain transfer.
 
 **Accounts:**
 
-- `right_account`: RightAccount to lock
+- `sanad_account`: SanadAccount to lock
 - `registry`: LockRegistry
 - `owner` (signer): Must be the owner
 - `recent_blockhashes`: For source tx hash
 - `system_program`: System program
 
-### `mint_right`
+### `mint_sanad`
 
-Mint a new Right from a cross-chain transfer proof.
+Mint a new Sanad from a cross-chain transfer proof.
 
 **Args:**
 
-- `right_id`: [u8; 32] - From source chain
+- `sanad_id`: [u8; 32] - From source chain
 - `commitment`: [u8; 32] - Preserved commitment
 - `state_root`: [u8; 32] - Off-chain state
 - `source_chain`: u8 - Source chain ID
@@ -78,13 +78,13 @@ Mint a new Right from a cross-chain transfer proof.
 
 **Accounts:**
 
-- `right_account` (PDA): New RightAccount
+- `sanad_account` (PDA): New SanadAccount
 - `owner` (signer): New owner
 - `system_program`: System program
 
-### `refund_right`
+### `refund_sanad`
 
-Refund a locked Right after timeout.
+Refund a locked Sanad after timeout.
 
 **Args:**
 
@@ -93,14 +93,14 @@ Refund a locked Right after timeout.
 **Accounts:**
 
 - `registry`: LockRegistry
-- `original_right`: Original RightAccount (locked)
-- `new_right_account` (PDA): New RightAccount to create
+- `original_sanad`: Original SanadAccount (locked)
+- `new_sanad_account` (PDA): New SanadAccount to create
 - `claimant` (signer): Original owner
 - `system_program`: System program
 
-### `transfer_right`
+### `transfer_sanad`
 
-Transfer ownership of a Right.
+Transfer ownership of a Sanad.
 
 **Args:**
 
@@ -108,12 +108,12 @@ Transfer ownership of a Right.
 
 **Accounts:**
 
-- `right_account`: RightAccount
+- `sanad_account`: SanadAccount
 - `current_owner` (signer): Current owner
 
 ### `register_nullifier`
 
-Register a nullifier for a Right.
+Register a nullifier for a Sanad.
 
 **Args:**
 
@@ -121,18 +121,18 @@ Register a nullifier for a Right.
 
 **Accounts:**
 
-- `right_account`: RightAccount
+- `sanad_account`: SanadAccount
 - `authority` (signer): Owner or authority
 
 ## Events
 
 - `RegistryInitialized`: LockRegistry created
-- `RightCreated`: New right created
-- `RightConsumed`: Right consumed
-- `CrossChainLock`: Right locked for cross-chain transfer
-- `CrossChainMint`: Right minted from cross-chain proof
-- `CrossChainRefund`: Locked right refunded
-- `RightTransferred`: Ownership transferred
+- `SanadCreated`: New sanad created
+- `SanadConsumed`: Sanad consumed
+- `CrossChainLock`: Sanad locked for cross-chain transfer
+- `CrossChainMint`: Sanad minted from cross-chain proof
+- `CrossChainRefund`: Locked sanad refunded
+- `SanadTransferred`: Ownership transferred
 - `NullifierRegistered`: Nullifier registered
 
 ## Install
@@ -196,5 +196,5 @@ csv contract deploy solana --network devnet
 - `6009`: InvalidChainId
 - `6010`: InvalidCommitment
 - `6011`: InvalidProof
-- `6012`: RightNotFound
+- `6012`: SanadNotFound
 - `6013`: InvalidStateRoot

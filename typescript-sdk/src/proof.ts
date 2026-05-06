@@ -1,4 +1,4 @@
-import { SealRef, AnchorRef } from './seal';
+import { SealPoint, CommitAnchor } from './seal';
 
 /**
  * Inclusion proof — proves a commitment was included in a block.
@@ -62,7 +62,7 @@ export interface DAGSegment {
  * - Exported as a file
  * - Shared peer-to-peer
  * - Verified offline by any counterparty
- * - Used to mint a Right on a destination chain
+ * - Used to mint a Sanad on a destination chain
  *
  * This is the core CSV competitive advantage over bridges:
  * Traditional bridges give you a receipt; CSV gives you a cryptographic proof.
@@ -73,9 +73,9 @@ export interface ProofBundle {
   /** Authorizing signatures (total max 1MB) */
   signatures: Uint8Array[];
   /** Seal reference that was consumed */
-  sealRef: SealRef;
+  sealRef: SealPoint;
   /** Anchor reference (on-chain location) */
-  anchorRef: AnchorRef;
+  anchorRef: CommitAnchor;
   /** Inclusion proof */
   inclusionProof: InclusionProof;
   /** Finality proof */

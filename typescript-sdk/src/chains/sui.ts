@@ -1,4 +1,4 @@
-import { SealRef } from '../seal';
+import { SealPoint } from '../seal';
 import { hexToBytes, bytesToHex } from '../types';
 
 /**
@@ -11,9 +11,9 @@ export namespace SuiChain {
    * Create a Sui seal from an ObjectId.
    *
    * @param objectId - Sui object ID (hex string, 64 chars)
-   * @returns SealRef
+   * @returns SealPoint
    */
-  export function createSeal(objectId: string): SealRef {
+  export function createSeal(objectId: string): SealPoint {
     return {
       sealId: hexToBytes(objectId.startsWith('0x') ? objectId.slice(2) : objectId),
       nonce: null,

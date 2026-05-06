@@ -34,7 +34,7 @@ pub fn Header(sidebar_open: bool, on_sidebar_toggle: EventHandler<()>) -> Elemen
                         }
                     }
 
-                    // Right: chain selector, network selector, wallet info
+                    // Sanad: chain selector, network selector, wallet info
                     div { class: "flex items-center gap-3",
                         // Chain selector
                         div { class: "flex items-center gap-2",

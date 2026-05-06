@@ -111,7 +111,7 @@ const CSS_TOKENS: &str = r#"
 
     /* Seal is valid and unspent */
     --seal-unconsumed: #22c55e;
-    /* Seal is spent, right transferred */
+    /* Seal is spent, sanad transferred */
     --seal-consumed: #6b7280;
     /* Protocol violation detected */
     --seal-double-spent: #ef4444;

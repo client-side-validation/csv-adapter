@@ -232,7 +232,7 @@ pub fn generate_verifier_contract_bytecode() -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use csv_core::seal::SealRef;
+    use csv_core::seal::SealPoint;
     use csv_core::hash::Hash;
 
     #[test]
@@ -265,7 +265,7 @@ mod tests {
     fn test_wrong_proof_system_fails() {
         let verifier = EthereumGroth16Verifier::new();
 
-        let seal = SealRef::new(vec![0xAB; 32], Some(42)).unwrap();
+        let seal = SealPoint::new(vec![0xAB; 32], Some(42)).unwrap();
         let public_inputs = ZkPublicInputs {
             seal_ref: seal,
             block_hash: Hash::new([1u8; 32]),

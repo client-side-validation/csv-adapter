@@ -6,7 +6,7 @@
  *
  * ## Key Features
  *
- * - **Cross-chain digital rights** — Rights that move between blockchains
+ * - **Cross-chain digital sanads** — Sanads that move between blockchains
  * - **Single-use seals** — Chain-enforced one-time consumption
  * - **Offline verification** — Verify proofs without RPC calls
  * - **No trusted bridge** — Self-verifying proof bundles
@@ -49,8 +49,8 @@ export {
 
 // Seal types
 export {
-  SealRef,
-  AnchorRef,
+  SealPoint,
+  CommitAnchor,
   sealRefFromHex,
   sealRefFromJson,
   sealRefToJson,
@@ -59,16 +59,16 @@ export {
   anchorRefToJson,
 } from './seal';
 
-// Right types
+// Sanad types
 export {
-  Right,
+  Sanad,
   OwnershipProof,
-  rightFromHex,
-  rightFromJson,
-  rightToJson,
+  sanadFromHex,
+  sanadFromJson,
+  sanadToJson,
   ownershipProofFromHex,
   ownershipProofToJson,
-} from './right';
+} from './sanad';
 
 // Proof types
 export {

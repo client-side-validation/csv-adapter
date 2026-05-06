@@ -4,12 +4,12 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum CsvError {
-    /// Attempted to consume an already consumed right
-    #[msg("Right has already been consumed")]
+    /// Attempted to consume an already consumed sanad
+    #[msg("Sanad has already been consumed")]
     AlreadyConsumed,
     
-    /// Attempted to lock an already locked right
-    #[msg("Right has already been locked")]
+    /// Attempted to lock an already locked sanad
+    #[msg("Sanad has already been locked")]
     AlreadyLocked,
     
     /// Lock record not found in registry
@@ -20,20 +20,20 @@ pub enum CsvError {
     #[msg("Refund timeout has not yet expired")]
     RefundTimeoutNotExpired,
     
-    /// Right has already been refunded
-    #[msg("Right has already been refunded")]
+    /// Sanad has already been refunded
+    #[msg("Sanad has already been refunded")]
     AlreadyRefunded,
     
     /// Caller is not authorized
     #[msg("Caller is not authorized")]
     NotAuthorized,
     
-    /// Nullifier already registered for this right
+    /// Nullifier already registered for this sanad
     #[msg("Nullifier already registered")]
     NullifierAlreadyRegistered,
     
-    /// Right has not been consumed
-    #[msg("Right has not been consumed")]
+    /// Sanad has not been consumed
+    #[msg("Sanad has not been consumed")]
     NotConsumed,
     
     /// Lock registry is full
@@ -52,15 +52,15 @@ pub enum CsvError {
     #[msg("Proof verification failed")]
     InvalidProof,
     
-    /// Right not found
-    #[msg("Right not found")]
-    RightNotFound,
+    /// Sanad not found
+    #[msg("Sanad not found")]
+    SanadNotFound,
     
     /// Invalid state root
     #[msg("Invalid state root")]
     InvalidStateRoot,
 
     /// Invalid asset/proof metadata
-    #[msg("Invalid right metadata")]
-    InvalidRightMetadata,
+    #[msg("Invalid sanad metadata")]
+    InvalidSanadMetadata,
 }

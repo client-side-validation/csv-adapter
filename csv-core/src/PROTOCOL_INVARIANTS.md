@@ -4,7 +4,7 @@ This document defines the fundamental invariants of the CSV (Client-Side Validat
 
 ## Invariant 1: Seal IDs Must Come From Real Blockchain Transactions
 
-**Rule:** A `SealRef.seal_id` must come from a real blockchain transaction.
+**Rule:** A `SealPoint.seal_id` must come from a real blockchain transaction.
 
 **Prohibited:**
 
@@ -33,7 +33,7 @@ let seal_ref = chain_adapter.create_seal(value)?;
 
 **Prohibited:**
 
-- Never build a `ProofBundle` without an `AnchorRef`
+- Never build a `ProofBundle` without an `CommitAnchor`
 - Never use simulated/mock anchors in production
 - Never skip the publication step
 
@@ -61,9 +61,9 @@ let proof_bundle = ProofBundle::new(
 
 ---
 
-## Invariant 3: Rights Must Pass ConsignmentValidator Before Entering AppState
+## Invariant 3: Sanads Must Pass ConsignmentValidator Before Entering AppState
 
-**Rule:** A `Right` must pass all 5 validation steps of `ConsignmentValidator` before being accepted into `AppState`.
+**Rule:** A `Sanad` must pass all 5 validation steps of `ConsignmentValidator` before being accepted into `AppState`.
 
 **Required Steps:**
 
@@ -75,7 +75,7 @@ let proof_bundle = ProofBundle::new(
 
 **Prohibited:**
 
-- Never accept a Right without running all 5 validation steps
+- Never accept a Sanad without running all 5 validation steps
 - Never skip validation for "trusted" sources
 - Never cache validation results across consignment updates
 
@@ -91,7 +91,7 @@ if !report.passed {
 }
 
 // Only now add to AppState
-app_state.add_right(right)?;
+app_state.add_sanad(sanad)?;
 ```
 
 **Security Impact:** Skipping validation allows fraudulent state transitions to enter the wallet state, enabling theft.
@@ -234,8 +234,8 @@ let commitment = hash(
 When reviewing code changes, verify:
 
 - [ ] No fake seal IDs are constructed
-- [ ] Proof bundles always include real AnchorRefs
-- [ ] ConsignmentValidator runs before accepting Rights
+- [ ] Proof bundles always include real CommitAnchors
+- [ ] ConsignmentValidator runs before accepting Sanads
 - [ ] Balances are u64 native units only
 - [ ] TransferState machine is not skipped
 - [ ] SealRegistry check runs before transfer acceptance

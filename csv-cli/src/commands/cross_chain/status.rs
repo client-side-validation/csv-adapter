@@ -21,7 +21,7 @@ pub fn cmd_status(transfer_id: String, state: &UnifiedStateManager) -> Result<()
         output::header("📋 Cross-Chain Transfer Report");
 
         output::kv("Transfer ID", &hex::encode(transfer.id.as_bytes()));
-        output::kv("Right ID", &hex::encode(transfer.right_id.as_bytes()));
+        output::kv("Sanad ID", &hex::encode(transfer.sanad_id.as_bytes()));
         output::kv("Status", &format!("{:?}", transfer.status));
         output::kv(
             "Created At",
@@ -75,7 +75,7 @@ pub fn cmd_status(transfer_id: String, state: &UnifiedStateManager) -> Result<()
 pub fn cmd_list(from: Option<Chain>, to: Option<Chain>, state: &UnifiedStateManager) -> Result<()> {
     output::header("Cross-Chain Transfers");
 
-    let headers = vec!["Transfer ID", "From", "To", "Right ID", "Status"];
+    let headers = vec!["Transfer ID", "From", "To", "Sanad ID", "Status"];
     let mut rows = Vec::new();
 
     for transfer in &state.storage.transfers {
@@ -100,7 +100,7 @@ pub fn cmd_list(from: Option<Chain>, to: Option<Chain>, state: &UnifiedStateMana
             hex::encode(transfer.id.as_bytes())[..10].to_string(),
             transfer.source_chain.to_string(),
             transfer.dest_chain.to_string(),
-            hex::encode(transfer.right_id.as_bytes())[..10].to_string(),
+            hex::encode(transfer.sanad_id.as_bytes())[..10].to_string(),
             status_str,
         ]);
     }

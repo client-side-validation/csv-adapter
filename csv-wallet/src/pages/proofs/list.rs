@@ -38,7 +38,7 @@ pub fn Proofs() -> Element {
                             thead {
                                 tr { class: "text-left text-gray-400 border-b border-gray-800",
                                     th { class: "px-4 py-2 font-medium", "Chain" }
-                                    th { class: "px-4 py-2 font-medium", "Right ID" }
+                                    th { class: "px-4 py-2 font-medium", "Sanad ID" }
                                     th { class: "px-4 py-2 font-medium", "Seal" }
                                     th { class: "px-4 py-2 font-medium", "Type" }
                                     th { class: "px-4 py-2 font-medium", "Status" }
@@ -47,11 +47,11 @@ pub fn Proofs() -> Element {
                             }
                             tbody { class: "divide-y divide-gray-800",
                                 for (idx, proof) in proofs_owned.iter().enumerate() {
-                                    tr { key: "{idx}-{proof.chain}-{proof.right_id}-{proof.proof_type}", class: "hover:bg-gray-800/50 transition-colors",
+                                    tr { key: "{idx}-{proof.chain}-{proof.sanad_id}-{proof.proof_type}", class: "hover:bg-gray-800/50 transition-colors",
                                         td { class: "px-4 py-3", span { class: "{chain_badge_class(&proof.chain)}", "{chain_icon_emoji(&proof.chain)} {chain_name(&proof.chain)}" } }
                                         td { class: "px-4 py-3 font-mono text-xs",
-                                            Link { to: Route::RightJourney { id: proof.right_id.clone() }, class: "text-purple-400 hover:text-purple-300",
-                                                "{truncate_address(&proof.right_id, 8)}"
+                                            Link { to: Route::SanadJourney { id: proof.sanad_id.clone() }, class: "text-purple-400 hover:text-purple-300",
+                                                "{truncate_address(&proof.sanad_id, 8)}"
                                             }
                                         }
                                         td { class: "px-4 py-3 font-mono text-xs",
@@ -113,10 +113,10 @@ pub fn Proofs() -> Element {
                                         p { class: "text-sm", span { class: "{chain_badge_class(&proof.chain)}", "{chain_icon_emoji(&proof.chain)} {chain_name(&proof.chain)}" } }
                                     }
                                     div { class: "space-y-2",
-                                        p { class: "text-sm text-gray-400", "Right ID" }
+                                        p { class: "text-sm text-gray-400", "Sanad ID" }
                                         p { class: "text-sm font-mono break-all",
-                                            Link { to: Route::RightJourney { id: proof.right_id.clone() }, class: "text-purple-400 hover:text-purple-300",
-                                                "{&proof.right_id}"
+                                            Link { to: Route::SanadJourney { id: proof.sanad_id.clone() }, class: "text-purple-400 hover:text-purple-300",
+                                                "{&proof.sanad_id}"
                                             }
                                         }
                                     }
@@ -174,7 +174,7 @@ pub fn Proofs() -> Element {
                                         "Are you sure you want to delete this proof? This action cannot be undone."
                                     }
                                     div { class: "bg-gray-800/50 rounded-lg p-3",
-                                        p { class: "text-xs text-gray-500", "Right ID: {truncate_address(&proof.right_id, 20)}" }
+                                        p { class: "text-xs text-gray-500", "Sanad ID: {truncate_address(&proof.sanad_id, 20)}" }
                                         p { class: "text-xs text-gray-500", "Seal: {truncate_address(&proof.seal_ref, 12)}" }
                                         p { class: "text-xs text-gray-500", "Chain: {chain_name(&proof.chain)}" }
                                         p { class: "text-xs text-gray-500", "Status: {proof.status}" }
@@ -187,7 +187,7 @@ pub fn Proofs() -> Element {
                                         }
                                         button {
                                             onclick: move |_| {
-                                                ctx.remove_proof(&proof.right_id, &proof.proof_type);
+                                                ctx.remove_proof(&proof.sanad_id, &proof.proof_type);
                                                 close_modal.set(None);
                                             },
                                             class: "flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-sm font-medium transition-colors",

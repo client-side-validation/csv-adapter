@@ -21,9 +21,9 @@ use csv_core::proof::{FinalityProof, ProofBundle};
 
 #[cfg(feature = "rpc")]
 type SignedTransaction = (Vec<u8>, Vec<u8>, Vec<u8>);
-use csv_core::seal::AnchorRef as CoreAnchorRef;
-use csv_core::seal::SealRef as CoreSealRef;
-use csv_core::AnchorLayer;
+use csv_core::seal::CommitAnchor as CoreCommitAnchor;
+use csv_core::seal::SealPoint as CoreSealPoint;
+use csv_core::SealProtocol;
 use csv_core::Hash;
 
 use crate::checkpoint::{CheckpointVerifier, CheckpointVerifierTrait};
@@ -34,7 +34,7 @@ use crate::proofs::{CommitmentEventBuilder, EventProofVerifier, EventProofVerifi
 use crate::rpc::SuiObject;
 use crate::rpc::SuiRpc;
 use crate::seal::SealRegistry;
-use crate::types::{SuiAnchorRef, SuiFinalityProof, SuiInclusionProof, SuiSealRef};
+use crate::types::{SuiCommitAnchor, SuiFinalityProof, SuiInclusionProof, SuiSealPoint};
 
 /// Block on an async future in a sync context.
 /// Uses a new tokio runtime to avoid interfering with existing runtimes.
@@ -335,7 +335,7 @@ impl SuiSealProtocol {
     }
 
     /// Verify that a seal object is available before consumption.
-    fn verify_seal_available(&self, seal: &SuiSealRef) -> SuiResult<()> {
+    fn verify_seal_available(&self, seal: &SuiSealPoint) -> SuiResult<()> {
         // Check registry first
         let registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
         if registry.is_seal_used(seal) {
@@ -397,7 +397,7 @@ impl SuiSealProtocol {
     #[cfg(feature = "rpc")]
     fn build_and_sign_move_call(
         &self,
-        seal: &SuiSealRef,
+        seal: &SuiSealPoint,
         commitment: [u8; 32],
     ) -> Result<SignedTransaction, Box<dyn std::error::Error + Send + Sync>> {
         use ed25519_dalek::Signer;
@@ -474,8 +474,8 @@ impl SuiSealProtocol {
     /// Verify the event in a published anchor matches the expected commitment.
     fn verify_anchor_event(
         &self,
-        anchor: &SuiAnchorRef,
-        expected_seal: &SuiSealRef,
+        anchor: &SuiCommitAnchor,
+        expected_seal: &SuiSealPoint,
         expected_commitment: Hash,
     ) -> CoreResult<()> {
         let expected_event_data = self
@@ -500,13 +500,13 @@ impl SuiSealProtocol {
     }
 }
 
-impl AnchorLayer for SuiSealProtocol {
-    type SealRef = SuiSealRef;
-    type AnchorRef = SuiAnchorRef;
+impl SealProtocol for SuiSealProtocol {
+    type SealPoint = SuiSealPoint;
+    type CommitAnchor = SuiCommitAnchor;
     type InclusionProof = SuiInclusionProof;
     type FinalityProof = SuiFinalityProof;
 
-    fn publish(&self, commitment: Hash, seal: Self::SealRef) -> CoreResult<Self::AnchorRef> {
+    fn publish(&self, commitment: Hash, seal: Self::SealPoint) -> CoreResult<Self::CommitAnchor> {
         log::debug!(
             "Publishing commitment via seal object {}",
             format_object_id(seal.object_id)
@@ -569,7 +569,7 @@ impl AnchorLayer for SuiSealProtocol {
                 .mark_seal_used(&seal, checkpoint)
                 .map_err(AdapterError::from)?;
 
-            Ok(SuiAnchorRef::new(seal.object_id, tx_digest, checkpoint))
+            Ok(SuiCommitAnchor::new(seal.object_id, tx_digest, checkpoint))
         }
 
         #[cfg(not(feature = "rpc"))]
@@ -586,11 +586,11 @@ impl AnchorLayer for SuiSealProtocol {
                 .build(*commitment.as_bytes(), seal.object_id);
 
             // Return fallback anchor
-            Ok(SuiAnchorRef::new(seal.object_id, [0u8; 32], 0))
+            Ok(SuiCommitAnchor::new(seal.object_id, [0u8; 32], 0))
         }
     }
 
-    fn verify_inclusion(&self, anchor: Self::AnchorRef) -> CoreResult<Self::InclusionProof> {
+    fn verify_inclusion(&self, anchor: Self::CommitAnchor) -> CoreResult<Self::InclusionProof> {
         log::debug!(
             "Verifying inclusion for anchor at checkpoint {}",
             anchor.checkpoint
@@ -635,7 +635,7 @@ impl AnchorLayer for SuiSealProtocol {
         ))
     }
 
-    fn verify_finality(&self, anchor: Self::AnchorRef) -> CoreResult<Self::FinalityProof> {
+    fn verify_finality(&self, anchor: Self::CommitAnchor) -> CoreResult<Self::FinalityProof> {
         log::debug!(
             "Verifying finality for anchor at checkpoint {}",
             anchor.checkpoint
@@ -653,7 +653,7 @@ impl AnchorLayer for SuiSealProtocol {
         Ok(SuiFinalityProof::new(anchor.checkpoint, is_certified))
     }
 
-    fn enforce_seal(&self, seal: Self::SealRef) -> CoreResult<()> {
+    fn enforce_seal(&self, seal: Self::SealPoint) -> CoreResult<()> {
         let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
         if registry.is_seal_used(&seal) {
             return Err(AdapterError::SealReplay(format!(
@@ -666,7 +666,7 @@ impl AnchorLayer for SuiSealProtocol {
             .map_err(AdapterError::from)
     }
 
-    fn create_seal(&self, _value: Option<u64>) -> CoreResult<Self::SealRef> {
+    fn create_seal(&self, _value: Option<u64>) -> CoreResult<Self::SealPoint> {
         use sha2::{Digest, Sha256};
         // Use timestamp-based nonce for replay resistance
         let nonce = std::time::SystemTime::now()
@@ -679,7 +679,7 @@ impl AnchorLayer for SuiSealProtocol {
         let result = hasher.finalize();
         let mut object_id = [0u8; 32];
         object_id.copy_from_slice(&result);
-        Ok(SuiSealRef::new(object_id, 1, nonce))
+        Ok(SuiSealPoint::new(object_id, 1, nonce))
     }
 
     fn hash_commitment(
@@ -687,9 +687,9 @@ impl AnchorLayer for SuiSealProtocol {
         contract_id: Hash,
         previous_commitment: Hash,
         transition_payload_hash: Hash,
-        seal_ref: &Self::SealRef,
+        seal_point: &Self::SealPoint,
     ) -> Hash {
-        let core_seal = CoreSealRef::new(seal_ref.to_vec(), Some(seal_ref.nonce))
+        let core_seal = CoreSealPoint::new(seal_ref.to_vec(), Some(seal_ref.nonce))
             .expect("valid seal reference");
         Commitment::simple(
             contract_id,
@@ -703,16 +703,16 @@ impl AnchorLayer for SuiSealProtocol {
 
     fn build_proof_bundle(
         &self,
-        anchor: Self::AnchorRef,
+        anchor: Self::CommitAnchor,
         transition_dag: DAGSegment,
     ) -> CoreResult<ProofBundle> {
         let inclusion = self.verify_inclusion(anchor.clone())?;
         let finality = self.verify_finality(anchor.clone())?;
 
-        let seal_ref = CoreSealRef::new(anchor.object_id.to_vec(), Some(anchor.checkpoint))
+        let seal_ref = CoreSealPoint::new(anchor.object_id.to_vec(), Some(anchor.checkpoint))
             .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
-        let anchor_ref = CoreAnchorRef::new(anchor.object_id.to_vec(), anchor.checkpoint, vec![])
+        let anchor_ref = CoreCommitAnchor::new(anchor.object_id.to_vec(), anchor.checkpoint, vec![])
             .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
         let inclusion_proof = csv_core::InclusionProof::new(
@@ -743,7 +743,7 @@ impl AnchorLayer for SuiSealProtocol {
         .map_err(|e| AdapterError::Generic(e.to_string()))
     }
 
-    fn rollback(&self, anchor: Self::AnchorRef) -> CoreResult<()> {
+    fn rollback(&self, anchor: Self::CommitAnchor) -> CoreResult<()> {
         log::warn!(
             "Rollback requested for anchor at checkpoint {}",
             anchor.checkpoint
@@ -765,7 +765,7 @@ impl AnchorLayer for SuiSealProtocol {
         if anchor.checkpoint < current_checkpoint {
             let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
             // Try to clear using anchor object_id as seal identifier
-            let dummy_seal = SuiSealRef::new(anchor.object_id, 0, 0);
+            let dummy_seal = SuiSealPoint::new(anchor.object_id, 0, 0);
             if let Err(e) = registry.clear_seal(&dummy_seal) {
                 // Seal may not be in registry yet, which is OK for rollback
                 log::debug!("Rollback: seal not found in registry (this is OK): {}", e);
@@ -834,7 +834,7 @@ mod tests {
     #[test]
     fn test_verify_finality() {
         let adapter = test_adapter();
-        let anchor = SuiAnchorRef::new([1u8; 32], [2u8; 32], 500);
+        let anchor = SuiCommitAnchor::new([1u8; 32], [2u8; 32], 500);
         let result = adapter.verify_finality(anchor);
         assert!(result.is_ok());
     }

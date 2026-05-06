@@ -1,8 +1,8 @@
 import { SignatureScheme } from './types';
 
 /**
- * Ownership proof for a Right.
- * Mirrors csv_adapter_core::right::OwnershipProof
+ * Ownership proof for a Sanad.
+ * Mirrors csv_adapter_core::sanad::OwnershipProof
  */
 export interface OwnershipProof {
   /** Proof bytes (chain-specific format) */
@@ -14,20 +14,20 @@ export interface OwnershipProof {
 }
 
 /**
- * A verifiable, single-use digital right.
- * Mirrors csv_adapter_core::right::Right
+ * A verifiable, single-use digital sanad.
+ * Mirrors csv_adapter_core::sanad::Sanad
  *
- * Rights exist in client state, not on any chain.
+ * Sanads exist in client state, not on any chain.
  * The chain only records commitments and enforces single-use via seals.
  */
-export interface Right {
+export interface Sanad {
   /** Unique ID: H(commitment || salt) — 32 bytes hex */
   id: string;
   /** Encodes state + rules — 32 bytes hex */
   commitment: string;
   /** Proof of ownership */
   owner: OwnershipProof;
-  /** Salt used to compute the Right ID */
+  /** Salt used to compute the Sanad ID */
   salt: Uint8Array;
   /** One-time consumption marker (L3+) — 32 bytes hex or null */
   nullifier: string | null;
@@ -68,9 +68,9 @@ export function ownershipProofToJson(op: OwnershipProof): {
 }
 
 /**
- * Create a Right from hex strings.
+ * Create a Sanad from hex strings.
  */
-export function rightFromHex(
+export function sanadFromHex(
   id: string,
   commitment: string,
   owner: OwnershipProof,
@@ -78,7 +78,7 @@ export function rightFromHex(
   nullifier?: string,
   stateRoot?: string,
   executionProof?: string,
-): Right {
+): Sanad {
   return {
     id,
     commitment,
@@ -91,9 +91,9 @@ export function rightFromHex(
 }
 
 /**
- * Serialize a Right to JSON-compatible format.
+ * Serialize a Sanad to JSON-compatible format.
  */
-export function rightToJson(right: Right): {
+export function sanadToJson(sanad: Sanad): {
   id: string;
   commitment: string;
   owner: { proof: string; owner: string; scheme: SignatureScheme | null };
@@ -103,20 +103,20 @@ export function rightToJson(right: Right): {
   executionProof: string | null;
 } {
   return {
-    id: right.id,
-    commitment: right.commitment,
-    owner: ownershipProofToJson(right.owner),
-    salt: bytesToHex(right.salt),
-    nullifier: right.nullifier,
-    stateRoot: right.stateRoot,
-    executionProof: right.executionProof ? bytesToHex(right.executionProof) : null,
+    id: sanad.id,
+    commitment: sanad.commitment,
+    owner: ownershipProofToJson(sanad.owner),
+    salt: bytesToHex(sanad.salt),
+    nullifier: sanad.nullifier,
+    stateRoot: sanad.stateRoot,
+    executionProof: sanad.executionProof ? bytesToHex(sanad.executionProof) : null,
   };
 }
 
 /**
- * Deserialize a Right from JSON.
+ * Deserialize a Sanad from JSON.
  */
-export function rightFromJson(json: {
+export function sanadFromJson(json: {
   id: string;
   commitment: string;
   owner: { proof: string; owner: string; scheme: SignatureScheme | null };
@@ -124,7 +124,7 @@ export function rightFromJson(json: {
   nullifier: string | null;
   stateRoot: string | null;
   executionProof: string | null;
-}): Right {
+}): Sanad {
   return {
     id: json.id,
     commitment: json.commitment,

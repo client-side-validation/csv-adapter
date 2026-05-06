@@ -6,7 +6,7 @@
 //! ## Security Purpose
 //!
 //! This registry is the **primary defense against double-spending** in the CSV protocol.
-//! When a Right is consumed, the seal that enforced it is recorded here.
+//! When a Sanad is consumed, the seal that enforced it is recorded here.
 //! Any subsequent attempt to consume the same seal will be detected and rejected.
 //!
 //! ## Chain-Specific Seal Types
@@ -51,7 +51,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use crate::hash::Hash;
-use crate::right::RightId;
+use crate::title::SanadId;
 use crate::seal::SealPoint;
 
 /// The chain that enforces this seal's single-use.
@@ -79,8 +79,8 @@ pub struct SealConsumption {
     pub chain: ChainId,
     /// The seal reference (chain-specific format)
     pub seal_ref: SealPoint,
-    /// The Right that was consumed
-    pub right_id: RightId,
+    /// The Sanad that was consumed
+    pub sanad_id: SanadId,
     /// Block height when this was consumed
     pub block_height: u64,
     /// Transaction/operation hash that consumed this seal
@@ -118,8 +118,8 @@ pub enum SealStatus {
 /// 2. **Deterministic Lookup**: Seal identity is derived from normalized
 ///    bytes, ensuring consistent lookup regardless of chain origin.
 ///
-/// 3. **Cross-Chain Correlation**: The `right_consumption_map` enables
-///    tracking all seals consumed by a specific Right across all chains.
+/// 3. **Cross-Chain Correlation**: The `sanad_consumption_map` enables
+///    tracking all seals consumed by a specific Sanad across all chains.
 ///
 /// # Thread Safety
 ///
@@ -137,8 +137,8 @@ pub enum SealStatus {
 pub struct SealNullifier {
     /// Map from seal identity to consumption events
     consumed_seals: BTreeMap<Vec<u8>, Vec<SealConsumption>>,
-    /// Map from Right ID to seals that consumed it
-    right_consumption_map: BTreeMap<Hash, Vec<SealConsumption>>,
+    /// Map from Sanad ID to seals that consumed it
+    sanad_consumption_map: BTreeMap<Hash, Vec<SealConsumption>>,
     /// Set of known chain identifiers
     known_chains: BTreeSet<ChainId>,
 }
@@ -159,7 +159,7 @@ impl SealNullifier {
     /// # Security Requirements (CRITICAL)
     /// - MUST check existing consumptions before recording
     /// - MUST record double-spend attempts for forensic analysis
-    /// - MUST update both `consumed_seals` and `right_consumption_map`
+    /// - MUST update both `consumed_seals` and `sanad_consumption_map`
     /// - MUST be atomic (no race conditions between check and record)
     ///
     /// # Returns
@@ -210,8 +210,8 @@ impl SealNullifier {
                 .or_default()
                 .push(consumption.clone());
 
-            self.right_consumption_map
-                .entry(consumption.right_id.0)
+            self.sanad_consumption_map
+                .entry(consumption.sanad_id.0)
                 .or_default()
                 .push(consumption.clone());
 
@@ -224,9 +224,9 @@ impl SealNullifier {
             .or_default()
             .push(consumption.clone());
 
-        // Track by Right ID
-        self.right_consumption_map
-            .entry(consumption.right_id.0)
+        // Track by Sanad ID
+        self.sanad_consumption_map
+            .entry(consumption.sanad_id.0)
             .or_default()
             .push(consumption.clone());
 
@@ -284,10 +284,10 @@ impl SealNullifier {
             .unwrap_or_default()
     }
 
-    /// Get all seals consumed by a specific Right.
-    pub fn get_seals_for_right(&self, right_id: &RightId) -> Vec<SealConsumption> {
-        self.right_consumption_map
-            .get(&right_id.0)
+    /// Get all seals consumed by a specific Sanad.
+    pub fn get_seals_for_sanad(&self, sanad_id: &SanadId) -> Vec<SealConsumption> {
+        self.sanad_consumption_map
+            .get(&sanad_id.0)
             .cloned()
             .unwrap_or_default()
     }
@@ -353,8 +353,8 @@ use serde::{Deserialize, Serialize};
 pub struct OptimizedSealNullifier {
     /// Map from seal identity to consumption events (HashMap for O(1) lookups)
     consumed_seals: std::collections::HashMap<Vec<u8>, Vec<SealConsumption>>,
-    /// Map from Right ID to seals that consumed it
-    right_consumption_map: std::collections::HashMap<Hash, Vec<SealConsumption>>,
+    /// Map from Sanad ID to seals that consumed it
+    sanad_consumption_map: std::collections::HashMap<Hash, Vec<SealConsumption>>,
     /// Set of known chain identifiers
     known_chains: BTreeSet<ChainId>,
     /// Bloom filter for fast negative lookups
@@ -384,7 +384,7 @@ impl OptimizedSealNullifier {
 
         Self {
             consumed_seals: std::collections::HashMap::with_capacity(capacity),
-            right_consumption_map: std::collections::HashMap::with_capacity(capacity),
+            sanad_consumption_map: std::collections::HashMap::with_capacity(capacity),
             known_chains: BTreeSet::new(),
             bloom_filter: crate::performance::BloomFilter::new(capacity, false_positive_rate),
             status_cache: std::collections::HashMap::with_capacity(1000),
@@ -453,8 +453,8 @@ impl OptimizedSealNullifier {
                 .or_default()
                 .push(consumption.clone());
 
-            self.right_consumption_map
-                .entry(consumption.right_id.0)
+            self.sanad_consumption_map
+                .entry(consumption.sanad_id.0)
                 .or_default()
                 .push(consumption.clone());
 
@@ -467,9 +467,9 @@ impl OptimizedSealNullifier {
             .or_default()
             .push(consumption.clone());
 
-        // Track by Right ID
-        self.right_consumption_map
-            .entry(consumption.right_id.0)
+        // Track by Sanad ID
+        self.sanad_consumption_map
+            .entry(consumption.sanad_id.0)
             .or_default()
             .push(consumption.clone());
 
@@ -602,10 +602,10 @@ impl OptimizedSealNullifier {
             .unwrap_or_default()
     }
 
-    /// Get all seals consumed by a specific Right.
-    pub fn get_seals_for_right(&self, right_id: &RightId) -> Vec<SealConsumption> {
-        self.right_consumption_map
-            .get(&right_id.0)
+    /// Get all seals consumed by a specific Sanad.
+    pub fn get_seals_for_sanad(&self, sanad_id: &SanadId) -> Vec<SealConsumption> {
+        self.sanad_consumption_map
+            .get(&sanad_id.0)
             .cloned()
             .unwrap_or_default()
     }
@@ -672,11 +672,11 @@ impl Default for OptimizedSealNullifier {
 mod tests {
     use super::*;
 
-    fn make_consumption(chain: ChainId, seal_bytes: Vec<u8>, right_id: RightId) -> SealConsumption {
+    fn make_consumption(chain: ChainId, seal_bytes: Vec<u8>, sanad_id: SanadId) -> SealConsumption {
         SealConsumption {
             chain,
             seal_ref: SealPoint::new(seal_bytes, None).unwrap(),
-            right_id,
+            sanad_id,
             block_height: 100,
             tx_hash: Hash::new([0xAB; 32]),
             recorded_at: 1_000_000,
@@ -686,8 +686,8 @@ mod tests {
     #[test]
     fn test_record_single_consumption() {
         let mut registry = SealNullifier::new();
-        let right_id = RightId(Hash::new([0xCD; 32]));
-        let consumption = make_consumption(ChainId::Bitcoin, vec![0x01], right_id);
+        let sanad_id = SanadId(Hash::new([0xCD; 32]));
+        let consumption = make_consumption(ChainId::Bitcoin, vec![0x01], sanad_id);
 
         assert!(registry.record_consumption(consumption).is_ok());
         assert_eq!(registry.total_seals(), 1);
@@ -697,15 +697,15 @@ mod tests {
     #[test]
     fn test_detect_same_chain_replay() {
         let mut registry = SealNullifier::new();
-        let right_id = RightId(Hash::new([0xCD; 32]));
+        let sanad_id = SanadId(Hash::new([0xCD; 32]));
         let seal_bytes = vec![0x01];
 
-        let consumption1 = make_consumption(ChainId::Bitcoin, seal_bytes.clone(), right_id);
+        let consumption1 = make_consumption(ChainId::Bitcoin, seal_bytes.clone(), sanad_id);
         registry.record_consumption(consumption1).unwrap();
 
         // Try to consume the same seal again on Bitcoin
-        let right_id2 = RightId(Hash::new([0xEF; 32]));
-        let consumption2 = make_consumption(ChainId::Bitcoin, seal_bytes, right_id2);
+        let sanad_id2 = SanadId(Hash::new([0xEF; 32]));
+        let consumption2 = make_consumption(ChainId::Bitcoin, seal_bytes, sanad_id2);
         let result = registry.record_consumption(consumption2);
 
         assert!(result.is_err());
@@ -716,15 +716,15 @@ mod tests {
     #[test]
     fn test_detect_cross_chain_double_spend() {
         let mut registry = SealNullifier::new();
-        let right_id = RightId(Hash::new([0xCD; 32]));
+        let sanad_id = SanadId(Hash::new([0xCD; 32]));
         let seal_bytes = vec![0x01];
 
         // Consume on Bitcoin
-        let consumption1 = make_consumption(ChainId::Bitcoin, seal_bytes.clone(), right_id.clone());
+        let consumption1 = make_consumption(ChainId::Bitcoin, seal_bytes.clone(), sanad_id.clone());
         registry.record_consumption(consumption1).unwrap();
 
         // Try to consume on Ethereum (cross-chain double-spend)
-        let consumption2 = make_consumption(ChainId::Ethereum, seal_bytes, right_id);
+        let consumption2 = make_consumption(ChainId::Ethereum, seal_bytes, sanad_id);
         let result = registry.record_consumption(consumption2);
 
         assert!(result.is_err());
@@ -747,10 +747,10 @@ mod tests {
     #[test]
     fn test_seal_status_consumed() {
         let mut registry = SealNullifier::new();
-        let right_id = RightId(Hash::new([0xCD; 32]));
+        let sanad_id = SanadId(Hash::new([0xCD; 32]));
         let seal = SealPoint::new(vec![0x01], None).unwrap();
 
-        let consumption = make_consumption(ChainId::Bitcoin, vec![0x01], right_id);
+        let consumption = make_consumption(ChainId::Bitcoin, vec![0x01], sanad_id);
         registry.record_consumption(consumption).unwrap();
 
         match registry.check_seal_status(&seal) {
@@ -764,16 +764,16 @@ mod tests {
     #[test]
     fn test_seal_status_double_spent() {
         let mut registry = SealNullifier::new();
-        let right_id = RightId(Hash::new([0xCD; 32]));
+        let sanad_id = SanadId(Hash::new([0xCD; 32]));
         let seal = SealPoint::new(vec![0x01], None).unwrap();
         let seal_bytes = vec![0x01];
 
         // Consume on Bitcoin
-        let c1 = make_consumption(ChainId::Bitcoin, seal_bytes.clone(), right_id.clone());
+        let c1 = make_consumption(ChainId::Bitcoin, seal_bytes.clone(), sanad_id.clone());
         registry.record_consumption(c1).unwrap();
 
         // Try to consume on Ethereum (will be recorded in history but flagged as double-spend)
-        let c2 = make_consumption(ChainId::Ethereum, seal_bytes, right_id.clone());
+        let c2 = make_consumption(ChainId::Ethereum, seal_bytes, sanad_id.clone());
 
         // Note: record_consumption returns error, but we can still check status
         let _ = registry.record_consumption(c2);
@@ -789,8 +789,8 @@ mod tests {
         let mut registry = SealNullifier::new();
         assert_eq!(registry.known_chains().len(), 0);
 
-        let right_id = RightId(Hash::new([0xCD; 32]));
-        let c1 = make_consumption(ChainId::Bitcoin, vec![0x01], right_id.clone());
+        let sanad_id = SanadId(Hash::new([0xCD; 32]));
+        let c1 = make_consumption(ChainId::Bitcoin, vec![0x01], sanad_id.clone());
         registry.record_consumption(c1).unwrap();
 
         assert_eq!(registry.known_chains().len(), 1);
@@ -800,8 +800,8 @@ mod tests {
     #[cfg(feature = "std")]
     fn test_optimized_registry_basic() {
         let mut registry = OptimizedSealNullifier::new();
-        let right_id = RightId(Hash::new([0xCD; 32]));
-        let consumption = make_consumption(ChainId::Bitcoin, vec![0x01], right_id);
+        let sanad_id = SanadId(Hash::new([0xCD; 32]));
+        let consumption = make_consumption(ChainId::Bitcoin, vec![0x01], sanad_id);
 
         assert!(registry.record_consumption(consumption).is_ok());
         assert_eq!(registry.total_seals(), 1);
@@ -832,20 +832,20 @@ mod tests {
     #[cfg(feature = "std")]
     fn test_optimized_registry_double_spend_detection() {
         let mut registry = OptimizedSealNullifier::new();
-        let right_id = RightId(Hash::new([0xCD; 32]));
+        let sanad_id = SanadId(Hash::new([0xCD; 32]));
         let seal_bytes = vec![0x01];
 
         // Consume on Bitcoin
-        let c1 = make_consumption(ChainId::Bitcoin, seal_bytes.clone(), right_id.clone());
+        let c1 = make_consumption(ChainId::Bitcoin, seal_bytes.clone(), sanad_id.clone());
         registry.record_consumption(c1).unwrap();
 
         // Try same-chain double spend
-        let c2 = make_consumption(ChainId::Bitcoin, seal_bytes.clone(), right_id.clone());
+        let c2 = make_consumption(ChainId::Bitcoin, seal_bytes.clone(), sanad_id.clone());
         let result = registry.record_consumption(c2);
         assert!(result.is_err());
 
         // Try cross-chain double spend
-        let c3 = make_consumption(ChainId::Ethereum, seal_bytes, right_id);
+        let c3 = make_consumption(ChainId::Ethereum, seal_bytes, sanad_id);
         let result = registry.record_consumption(c3);
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -856,14 +856,14 @@ mod tests {
     #[cfg(feature = "std")]
     fn test_optimized_registry_status_caching() {
         let mut registry = OptimizedSealNullifier::new();
-        let right_id = RightId(Hash::new([0xCD; 32]));
+        let sanad_id = SanadId(Hash::new([0xCD; 32]));
         let seal = SealPoint::new(vec![0x01], None).unwrap();
 
         // First check (cache miss)
         let _ = registry.check_seal_status(&seal);
 
         // Record consumption
-        let c1 = make_consumption(ChainId::Bitcoin, vec![0x01], right_id);
+        let c1 = make_consumption(ChainId::Bitcoin, vec![0x01], sanad_id);
         registry.record_consumption(c1).unwrap();
 
         // Second check (should hit cache now)
@@ -877,14 +877,14 @@ mod tests {
     #[cfg(feature = "std")]
     fn test_optimized_registry_is_seal_consumed() {
         let mut registry = OptimizedSealNullifier::new();
-        let right_id = RightId(Hash::new([0xCD; 32]));
+        let sanad_id = SanadId(Hash::new([0xCD; 32]));
         let seal = SealPoint::new(vec![0x01], None).unwrap();
 
         // Not consumed yet - bloom filter should give O(1) negative result
         assert!(!registry.is_seal_consumed(&seal));
 
         // Consume it
-        let c1 = make_consumption(ChainId::Bitcoin, vec![0x01], right_id);
+        let c1 = make_consumption(ChainId::Bitcoin, vec![0x01], sanad_id);
         registry.record_consumption(c1).unwrap();
 
         // Now consumed
@@ -898,8 +898,8 @@ mod tests {
 
         // Add some seals
         for i in 0..100u8 {
-            let right_id = RightId(Hash::new([i; 32]));
-            let c = make_consumption(ChainId::Bitcoin, vec![i], right_id);
+            let sanad_id = SanadId(Hash::new([i; 32]));
+            let c = make_consumption(ChainId::Bitcoin, vec![i], sanad_id);
             registry.record_consumption(c).unwrap();
         }
 

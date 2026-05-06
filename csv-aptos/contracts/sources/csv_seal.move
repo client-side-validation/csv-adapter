@@ -37,17 +37,17 @@ module csv_seal::CSVSealV2 {
     use std::bcs;
 
     const ASSET_CLASS_UNSPECIFIED: u8 = 0;
-    const ASSET_CLASS_PROOF_RIGHT: u8 = 3;
+    const ASSET_CLASS_PROOF_SANAD: u8 = 3;
     const PROOF_SYSTEM_UNSPECIFIED: u8 = 0;
 
     // =========================================================================
     // Cross-Chain Events (matching Sui version)
     // =========================================================================
 
-    /// Emitted when a new seal/Right is created.
+    /// Emitted when a new seal/Sanad is created.
     #[event]
-    struct RightCreated has drop, store {
-        right_id: vector<u8>,
+    struct SanadCreated has drop, store {
+        sanad_id: vector<u8>,
         commitment: vector<u8>,
         owner: address,
         asset_class: u8,
@@ -57,17 +57,17 @@ module csv_seal::CSVSealV2 {
         proof_root: vector<u8>,
     }
 
-    /// Emitted when a seal/Right is consumed.
+    /// Emitted when a seal/Sanad is consumed.
     #[event]
-    struct RightConsumed has drop, store {
-        right_id: vector<u8>,
+    struct SanadConsumed has drop, store {
+        sanad_id: vector<u8>,
         consumer: address,
     }
 
-    /// Emitted when a Right is locked for cross-chain transfer.
+    /// Emitted when a Sanad is locked for cross-chain transfer.
     #[event]
     struct CrossChainLock has drop, store {
-        right_id: vector<u8>,
+        sanad_id: vector<u8>,
         commitment: vector<u8>,
         owner: address,
         destination_chain: u8,
@@ -81,10 +81,10 @@ module csv_seal::CSVSealV2 {
         proof_root: vector<u8>,
     }
 
-    /// Emitted when a Right is minted from cross-chain proof.
+    /// Emitted when a Sanad is minted from cross-chain proof.
     #[event]
     struct CrossChainMint has drop, store {
-        right_id: vector<u8>,
+        sanad_id: vector<u8>,
         commitment: vector<u8>,
         owner: address,
         source_chain: u8,
@@ -96,19 +96,19 @@ module csv_seal::CSVSealV2 {
         proof_root: vector<u8>,
     }
 
-    /// Emitted when a Right is refunded after timeout.
+    /// Emitted when a Sanad is refunded after timeout.
     #[event]
     struct CrossChainRefund has drop, store {
-        right_id: vector<u8>,
+        sanad_id: vector<u8>,
         commitment: vector<u8>,
         claimant: address,
         refunded_at: u64,
     }
 
-    /// Emitted whenever token/NFT/proof metadata is attached to a Right.
+    /// Emitted whenever token/NFT/proof metadata is attached to a Sanad.
     #[event]
-    struct RightMetadataRecorded has drop, store {
-        right_id: vector<u8>,
+    struct SanadMetadataRecorded has drop, store {
+        sanad_id: vector<u8>,
         asset_class: u8,
         asset_id: vector<u8>,
         metadata_hash: vector<u8>,
@@ -168,7 +168,7 @@ module csv_seal::CSVSealV2 {
         nonce: u64,
         /// Whether this seal has been consumed.
         consumed: bool,
-        /// Asset class: 0 unspecified, 1 fungible token, 2 NFT, 3 proof right.
+        /// Asset class: 0 unspecified, 1 fungible token, 2 NFT, 3 proof sanad.
         asset_class: u8,
         /// Chain-native token/NFT/proof family id.
         asset_id: vector<u8>,
@@ -220,7 +220,7 @@ module csv_seal::CSVSealV2 {
     }
 
     /// Attach token/NFT/proof metadata to an unconsumed seal.
-    public entry fun record_right_metadata(
+    public entry fun record_sanad_metadata(
         account: &signer,
         asset_class: u8,
         asset_id: vector<u8>,
@@ -230,7 +230,7 @@ module csv_seal::CSVSealV2 {
     ) acquires Seal {
         let addr = signer::address_of(account);
         assert!(exists<Seal>(addr), ESealNotFound);
-        assert!(asset_class <= ASSET_CLASS_PROOF_RIGHT, EInvalidMetadata);
+        assert!(asset_class <= ASSET_CLASS_PROOF_SANAD, EInvalidMetadata);
         assert!(asset_class == ASSET_CLASS_UNSPECIFIED || vector::length(&asset_id) > 0, EInvalidMetadata);
         assert!(proof_system == PROOF_SYSTEM_UNSPECIFIED || vector::length(&proof_root) > 0, EInvalidMetadata);
 
@@ -243,8 +243,8 @@ module csv_seal::CSVSealV2 {
         seal.proof_system = proof_system;
         seal.proof_root = proof_root;
 
-        event::emit(RightMetadataRecorded {
-            right_id: bcs::to_bytes(&addr),
+        event::emit(SanadMetadataRecorded {
+            sanad_id: bcs::to_bytes(&addr),
             asset_class,
             asset_id: seal.asset_id,
             metadata_hash: seal.metadata_hash,
@@ -426,7 +426,7 @@ module csv_seal::CSVSealV2 {
 
     /// Lock record for tracking cross-chain transfers and refunds.
     struct LockRecord has store, drop {
-        right_id: vector<u8>,
+        sanad_id: vector<u8>,
         commitment: vector<u8>,
         owner: address,
         destination_chain: u8,
@@ -462,9 +462,9 @@ module csv_seal::CSVSealV2 {
 
     /// Lock a seal for cross-chain transfer.
     /// This consumes the seal and records the lock in the registry.
-    public entry fun lock_right(
+    public entry fun lock_sanad(
         account: &signer,
-        right_id: vector<u8>,
+        sanad_id: vector<u8>,
         destination_chain: u8,
         destination_owner: vector<u8>,
     ) acquires Seal, LockRegistry {
@@ -475,7 +475,7 @@ module csv_seal::CSVSealV2 {
         assert!(!seal.consumed, ESealAlreadyConsumed);
 
         let nonce = seal.nonce;
-        let commitment = get_commitment_bytes(right_id, nonce);
+        let commitment = get_commitment_bytes(sanad_id, nonce);
 
         // Record lock in registry
         let registry_addr = get_registry_addr();
@@ -483,9 +483,9 @@ module csv_seal::CSVSealV2 {
         let registry = borrow_global_mut<LockRegistry>(registry_addr);
         let locked_at = aptos_framework::timestamp::now_seconds();
 
-        assert!(!smart_table::contains(&registry.locks, right_id), EAnchorDataExists);
-        smart_table::add(&mut registry.locks, right_id, LockRecord {
-            right_id: copy right_id,
+        assert!(!smart_table::contains(&registry.locks, sanad_id), EAnchorDataExists);
+        smart_table::add(&mut registry.locks, sanad_id, LockRecord {
+            sanad_id: copy sanad_id,
             commitment: copy commitment,
             owner: owner_addr,
             destination_chain,
@@ -503,7 +503,7 @@ module csv_seal::CSVSealV2 {
 
         // Emit CrossChainLock event
         event::emit(CrossChainLock {
-            right_id: copy right_id,
+            sanad_id: copy sanad_id,
             commitment: copy commitment,
             owner: owner_addr,
             destination_chain,
@@ -517,9 +517,9 @@ module csv_seal::CSVSealV2 {
             proof_root: seal.proof_root,
         });
 
-        // Emit RightConsumed event
-        event::emit(RightConsumed {
-            right_id: copy right_id,
+        // Emit SanadConsumed event
+        event::emit(SanadConsumed {
+            sanad_id: copy sanad_id,
             consumer: owner_addr,
         });
 
@@ -534,9 +534,9 @@ module csv_seal::CSVSealV2 {
     }
 
     /// Mint a new seal from a cross-chain transfer proof.
-    public entry fun mint_right(
+    public entry fun mint_sanad(
         account: &signer,
-        right_id: vector<u8>,
+        sanad_id: vector<u8>,
         commitment: vector<u8>,
         source_chain: u8,
         source_seal_ref: vector<u8>,
@@ -558,7 +558,7 @@ module csv_seal::CSVSealV2 {
 
         // Emit CrossChainMint event
         event::emit(CrossChainMint {
-            right_id: copy right_id,
+            sanad_id: copy sanad_id,
             commitment: copy commitment,
             owner: owner_addr,
             source_chain,
@@ -570,9 +570,9 @@ module csv_seal::CSVSealV2 {
             proof_root: vector::empty<u8>(),
         });
 
-        // Emit RightCreated event
-        event::emit(RightCreated {
-            right_id,
+        // Emit SanadCreated event
+        event::emit(SanadCreated {
+            sanad_id,
             commitment,
             owner: owner_addr,
             asset_class: ASSET_CLASS_UNSPECIFIED,
@@ -584,9 +584,9 @@ module csv_seal::CSVSealV2 {
     }
 
     /// Refund a seal after the lock timeout has elapsed.
-    public entry fun refund_right(
+    public entry fun refund_sanad(
         account: &signer,
-        right_id: vector<u8>,
+        sanad_id: vector<u8>,
         registry_addr: address,
     ) acquires LockRegistry {
         let claimant = signer::address_of(account);
@@ -594,8 +594,8 @@ module csv_seal::CSVSealV2 {
         assert!(exists<LockRegistry>(registry_addr), ESealNotFound);
         let registry = borrow_global_mut<LockRegistry>(registry_addr);
 
-        assert!(smart_table::contains(&registry.locks, right_id), ESealNotFound);
-        let lock = smart_table::borrow_mut(&mut registry.locks, right_id);
+        assert!(smart_table::contains(&registry.locks, sanad_id), ESealNotFound);
+        let lock = smart_table::borrow_mut(&mut registry.locks, sanad_id);
 
         // Verify not already refunded
         assert!(!lock.refunded, ESealAlreadyConsumed);
@@ -609,11 +609,11 @@ module csv_seal::CSVSealV2 {
 
         // Copy values for event emission
         let commitment_copy = lock.commitment;
-        let right_id_copy = right_id;
+        let sanad_id_copy = sanad_id;
 
         // Emit CrossChainRefund event
         event::emit(CrossChainRefund {
-            right_id: right_id_copy,
+            sanad_id: sanad_id_copy,
             commitment: commitment_copy,
             claimant,
             refunded_at: now,
@@ -623,36 +623,36 @@ module csv_seal::CSVSealV2 {
     /// Get lock info for off-chain verification.
     public fun get_lock_info(
         registry_addr: address,
-        right_id: vector<u8>,
+        sanad_id: vector<u8>,
     ): (vector<u8>, address, u64, bool) acquires LockRegistry {
         assert!(exists<LockRegistry>(registry_addr), ESealNotFound);
         let registry = borrow_global<LockRegistry>(registry_addr);
-        assert!(smart_table::contains(&registry.locks, right_id), ESealNotFound);
-        let lock = smart_table::borrow(&registry.locks, right_id);
+        assert!(smart_table::contains(&registry.locks, sanad_id), ESealNotFound);
+        let lock = smart_table::borrow(&registry.locks, sanad_id);
         (lock.commitment, lock.owner, lock.locked_at, lock.refunded)
     }
 
     /// Check if refund is available for a seal.
     public fun can_refund(
         registry_addr: address,
-        right_id: vector<u8>,
+        sanad_id: vector<u8>,
         now: u64,
     ): bool acquires LockRegistry {
         if (!exists<LockRegistry>(registry_addr)) {
             return false
         };
         let registry = borrow_global<LockRegistry>(registry_addr);
-        if (!smart_table::contains(&registry.locks, right_id)) {
+        if (!smart_table::contains(&registry.locks, sanad_id)) {
             return false
         };
-        let lock = smart_table::borrow(&registry.locks, right_id);
+        let lock = smart_table::borrow(&registry.locks, sanad_id);
         !lock.refunded && now >= lock.locked_at + registry.refund_timeout
     }
 
-    /// Helper to generate commitment from right_id and nonce.
-    fun get_commitment_bytes(right_id: vector<u8>, nonce: u64): vector<u8> {
+    /// Helper to generate commitment from sanad_id and nonce.
+    fun get_commitment_bytes(sanad_id: vector<u8>, nonce: u64): vector<u8> {
         // Simple concatenation - in production use proper hash
-        let result = right_id;
+        let result = sanad_id;
         let nonce_bytes = bcs::to_bytes(&nonce);
         vector::append(&mut result, nonce_bytes);
         result

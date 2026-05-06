@@ -8,9 +8,9 @@ Bitcoin adapter for **CSV (Client-Side Validation)** with UTXO seals and SPV pro
 
 ## Overview
 
-This crate implements the [`AnchorLayer`] trait for Bitcoin, using UTXOs as single-use seals and Tapret/Opret for commitment publication. Bitcoin provides **L1 Structural** single-use enforcement through its UTXO model — when a UTXO is spent, it is consumed forever.
+This crate implements the [`SealProtocol`] trait for Bitcoin, using UTXOs as single-use seals and Tapret/Opret for commitment publication. Bitcoin provides **L1 Structural** single-use enforcement through its UTXO model — when a UTXO is spent, it is consumed forever.
 
-[`AnchorLayer`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/trait.AnchorLayer.html
+[`SealProtocol`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/trait.SealProtocol.html
 
 ### Key Features
 
@@ -47,27 +47,27 @@ csv-adapter-bitcoin = "0.1"
 ### Creating a Bitcoin Anchor Layer
 
 ```rust
-use csv_adapter_bitcoin::{BitcoinAnchorLayer, Network};
+use csv_adapter_bitcoin::{BitcoinSealProtocol, Network};
 
 // Create adapter for Signet (test network)
-let adapter = BitcoinAnchorLayer::signet()?;
+let adapter = BitcoinSealProtocol::signet()?;
 
 // Or for mainnet
-// let adapter = BitcoinAnchorLayer::mainnet()?;
+// let adapter = BitcoinSealProtocol::mainnet()?;
 ```
 
 ### Working with UTXO Seals
 
 ```rust
-use csv_adapter_bitcoin::{BitcoinAnchorLayer, WalletUtxo};
-use csv_adapter_core::{Hash, AnchorLayer};
+use csv_adapter_bitcoin::{BitcoinSealProtocol, WalletUtxo};
+use csv_adapter_core::{Hash, SealProtocol};
 
-let adapter = BitcoinAnchorLayer::signet()?;
+let adapter = BitcoinSealProtocol::signet()?;
 
 // Create a seal from a UTXO
 let seal = adapter.create_seal(Some(100_000))?;
 
-// Publish a commitment (anchors a Right to Bitcoin)
+// Publish a commitment (anchors a Sanad to Bitcoin)
 let commitment = Hash::new([0xAB; 32]);
 let anchor = adapter.publish(commitment, seal)?;
 ```
@@ -97,7 +97,7 @@ let is_valid = verifier.verify(txid)?;
 ## Architecture
 
 ```
-BitcoinAnchorLayer
+BitcoinSealProtocol
 ├── UTXO Seals         ← Native single-use (L1 Structural)
 ├── Tapret/Opret       ← Commitment publication
 ├── SPV Proofs         ← Merkle tree verification

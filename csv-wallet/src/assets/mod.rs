@@ -1,6 +1,6 @@
 //! Asset tracking.
 //!
-//! Tracks owned rights, seals, and their valuations.
+//! Tracks owned sanads, seals, and their valuations.
 
 pub mod tracker;
 pub mod valuation;

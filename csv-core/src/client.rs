@@ -8,14 +8,14 @@
 //! ```text
 //! Client receives consignment from peer:
 //!   │
-//!   ├─ Bitcoin anchor?  → Map UTXO spend → Right(id, commitment, owner, nullifier=None)
-//!   ├─ Sui anchor?      → Map object deletion → Right(id, commitment, owner, nullifier=None)
-//!   ├─ Aptos anchor?    → Map resource destruction → Right(id, commitment, owner, nullifier=None)
-//!   └─ Ethereum anchor? → Map nullifier registration → Right(id, commitment, owner, nullifier=Some(hash))
+//!   ├─ Bitcoin anchor?  → Map UTXO spend → Sanad(id, commitment, owner, nullifier=None)
+//!   ├─ Sui anchor?      → Map object deletion → Sanad(id, commitment, owner, nullifier=None)
+//!   ├─ Aptos anchor?    → Map resource destruction → Sanad(id, commitment, owner, nullifier=None)
+//!   └─ Ethereum anchor? → Map nullifier registration → Sanad(id, commitment, owner, nullifier=Some(hash))
 //!         │
 //!         ▼
 //!   Client validates uniformly:
-//!     1. Each Right.verify() passes
+//!     1. Each Sanad.verify() passes
 //!     2. Commitment chain integrity (genesis → present)
 //!     3. No seal double-consumption (cross-chain registry)
 //!     4. Accept or reject the consignment
@@ -33,7 +33,7 @@ use crate::commitment_chain::{
 use crate::consignment::Consignment;
 use crate::cross_chain::InclusionProof as CrossChainInclusionProof;
 use crate::hash::Hash;
-use crate::right::{Right, RightError, RightId};
+use crate::title::{Sanad, SanadError, SanadId};
 use crate::seal::SealPoint;
 use crate::nullifier::{ChainId, SealNullifier, SealConsumption, SealStatus};
 use crate::state_store::{
@@ -47,8 +47,8 @@ pub enum ValidationResult {
     Accepted {
         /// The validated contract history
         history: ContractHistory,
-        /// Number of Rights validated
-        rights_count: usize,
+        /// Number of Sanads validated
+        sanads_count: usize,
         /// Number of seals consumed
         seals_consumed: usize,
     },
@@ -67,8 +67,8 @@ pub enum ValidationError {
     EmptyConsignment,
     #[error("Commitment chain verification failed: {0}")]
     CommitmentChainError(#[from] ChainError),
-    #[error("Right validation failed: {0}")]
-    RightValidationError(#[from] RightError),
+    #[error("Sanad validation failed: {0}")]
+    SanadValidationError(#[from] SanadError),
     #[error("Double-spend detected")]
     DoubleSpend(String),
     #[error("Missing history: contract has incomplete state history")]
@@ -95,8 +95,8 @@ pub struct SealConsumptionEvent {
     pub chain: ChainId,
     /// The seal that was consumed
     pub seal: SealPoint,
-    /// The Right after consumption (new owner, etc.)
-    pub right: Right,
+    /// The Sanad after consumption (new owner, etc.)
+    pub sanad: Sanad,
     /// Inclusion proof (chain-specific)
     pub inclusion: CrossChainInclusionProof,
     /// Block/checkpoint height
@@ -131,7 +131,7 @@ impl ValidationClient {
     /// This is the main entry point. It:
     /// 1. Validates consignment structure
     /// 2. Extracts commitments and verifies the chain
-    /// 3. Maps anchors to Rights and verifies seal consumption
+    /// 3. Maps anchors to Sanads and verifies seal consumption
     /// 4. Updates local state if valid
     pub fn receive_consignment(
         &mut self,
@@ -170,7 +170,7 @@ impl ValidationClient {
 
         ValidationResult::Accepted {
             history: ContractHistory::from_genesis(chain_result.genesis.clone()),
-            rights_count: consignment.seal_assignments.len(),
+            sanads_count: consignment.seal_assignments.len(),
             seals_consumed,
         }
     }
@@ -183,11 +183,11 @@ impl ValidationClient {
         &mut self,
         event: SealConsumptionEvent,
     ) -> Result<(), ValidationError> {
-        // Step 1: Verify the Right itself
+        // Step 1: Verify the Sanad itself
         event
-            .right
+            .sanad
             .verify()
-            .map_err(ValidationError::RightValidationError)?;
+            .map_err(ValidationError::SanadValidationError)?;
 
         // Step 2: Check seal not already consumed (cross-chain)
         match self.seal_registry.check_seal_status(&event.seal) {
@@ -214,7 +214,7 @@ impl ValidationClient {
         let consumption = SealConsumption {
             chain: event.chain.clone(),
             seal_ref: event.seal.clone(),
-            right_id: event.right.id.clone(),
+            sanad_id: event.sanad.id.clone(),
             block_height: event.height,
             tx_hash: event.tx_hash,
             recorded_at: 0, // Would be current timestamp
@@ -335,7 +335,7 @@ impl ValidationClient {
             {
                 SealStatus::Unconsumed => {
                     // Seal is fresh — record consumption
-                    let right_id_bytes: [u8; 32] = {
+                    let sanad_id_bytes: [u8; 32] = {
                         let mut arr = [0u8; 32];
                         let seal_bytes = seal_assignment.seal_ref.to_vec();
                         let len = seal_bytes.len().min(32);
@@ -346,7 +346,7 @@ impl ValidationClient {
                     let consumption = SealConsumption {
                         chain: anchor_chain.clone(),
                         seal_ref: seal_assignment.seal_ref.clone(),
-                        right_id: RightId(Hash::new(right_id_bytes)),
+                        sanad_id: SanadId(Hash::new(sanad_id_bytes)),
                         block_height: 0,               // Would come from anchor
                         tx_hash: Hash::new([0u8; 32]), // Would come from anchor
                         recorded_at: 0,
@@ -500,7 +500,7 @@ impl ValidationClient {
             let record = StateTransitionRecord {
                 commitment,
                 seal_ref: seal,
-                rights: Vec::new(),
+                sanads: Vec::new(),
                 block_height: 0,
                 verified: true,
             };
@@ -540,7 +540,7 @@ mod tests {
     use super::*;
     use crate::consignment::Consignment;
     use crate::genesis::Genesis;
-    use crate::OwnershipProof;
+    use crate::TitleOwnershipProof;
 
     fn make_test_genesis() -> Genesis {
         Genesis::new(
@@ -573,12 +573,12 @@ mod tests {
 
         match result {
             ValidationResult::Accepted {
-                rights_count,
+                sanads_count,
                 seals_consumed,
                 ..
             } => {
                 // Empty consignment with no seal assignments is valid
-                assert_eq!(rights_count, 0);
+                assert_eq!(sanads_count, 0);
                 assert_eq!(seals_consumed, 0);
             }
             ValidationResult::Rejected { reason } => {
@@ -609,9 +609,9 @@ mod tests {
     fn test_seal_consumption_event_btc() {
         let mut client = ValidationClient::new();
 
-        let right = Right::new(
+        let sanad = Sanad::new(
             Hash::new([0xCD; 32]),
-            OwnershipProof {
+            TitleOwnershipProof {
                 proof: vec![0x01, 0x02, 0x03],
                 owner: vec![0xFF; 32],
                 scheme: None,
@@ -630,7 +630,7 @@ mod tests {
         let event = SealConsumptionEvent {
             chain: ChainId::Bitcoin,
             seal: SealPoint::new(vec![0x01], None).unwrap(),
-            right,
+            sanad,
             inclusion,
             height: 1000,
             tx_hash: Hash::new([0xAB; 32]),
@@ -647,9 +647,9 @@ mod tests {
     fn test_seal_consumption_event_double_spend() {
         let mut client = ValidationClient::new();
 
-        let right = Right::new(
+        let sanad = Sanad::new(
             Hash::new([0xCD; 32]),
-            OwnershipProof {
+            TitleOwnershipProof {
                 proof: vec![0x01],
                 owner: vec![0xFF; 32],
                 scheme: None,
@@ -670,7 +670,7 @@ mod tests {
         let event1 = SealConsumptionEvent {
             chain: ChainId::Bitcoin,
             seal: seal.clone(),
-            right: right.clone(),
+            sanad: sanad.clone(),
             inclusion: inclusion.clone(),
             height: 1000,
             tx_hash: Hash::new([0xAB; 32]),
@@ -679,9 +679,9 @@ mod tests {
         assert!(client.verify_seal_consumption_event(event1).is_ok());
 
         // Try to consume same seal again
-        let right2 = Right::new(
+        let sanad2 = Sanad::new(
             Hash::new([0xEF; 32]),
-            OwnershipProof {
+            TitleOwnershipProof {
                 proof: vec![0x02],
                 owner: vec![0xEE; 32],
                 scheme: None,
@@ -692,7 +692,7 @@ mod tests {
         let event2 = SealConsumptionEvent {
             chain: ChainId::Bitcoin,
             seal: seal.clone(),
-            right: right2,
+            sanad: sanad2,
             inclusion,
             height: 1001,
             tx_hash: Hash::new([0xBC; 32]),
@@ -710,9 +710,9 @@ mod tests {
     fn test_seal_consumption_cross_chain() {
         let mut client = ValidationClient::new();
 
-        let right = Right::new(
+        let sanad = Sanad::new(
             Hash::new([0xCD; 32]),
-            OwnershipProof {
+            TitleOwnershipProof {
                 proof: vec![0x01],
                 owner: vec![0xFF; 32],
                 scheme: None,
@@ -746,7 +746,7 @@ mod tests {
         let event_btc = SealConsumptionEvent {
             chain: ChainId::Bitcoin,
             seal: seal.clone(),
-            right: right.clone(),
+            sanad: sanad.clone(),
             inclusion: btc_inclusion,
             height: 1000,
             tx_hash: Hash::new([0xAB; 32]),
@@ -754,9 +754,9 @@ mod tests {
         assert!(client.verify_seal_consumption_event(event_btc).is_ok());
 
         // Try to consume on Ethereum (cross-chain double-spend)
-        let right2 = Right::new(
+        let sanad2 = Sanad::new(
             Hash::new([0xEF; 32]),
-            OwnershipProof {
+            TitleOwnershipProof {
                 proof: vec![0x02],
                 owner: vec![0xEE; 32],
                 scheme: None,
@@ -767,7 +767,7 @@ mod tests {
         let event_eth = SealConsumptionEvent {
             chain: ChainId::Ethereum,
             seal: seal.clone(),
-            right: right2,
+            sanad: sanad2,
             inclusion: eth_inclusion,
             height: 2000,
             tx_hash: Hash::new([0xBC; 32]),
@@ -781,9 +781,9 @@ mod tests {
     fn test_seal_consumption_invalid_inclusion() {
         let mut client = ValidationClient::new();
 
-        let right = Right::new(
+        let sanad = Sanad::new(
             Hash::new([0xCD; 32]),
-            OwnershipProof {
+            TitleOwnershipProof {
                 proof: vec![0x01],
                 owner: vec![0xFF; 32],
                 scheme: None,
@@ -803,7 +803,7 @@ mod tests {
         let event = SealConsumptionEvent {
             chain: ChainId::Bitcoin,
             seal: SealPoint::new(vec![0x01], None).unwrap(),
-            right,
+            sanad,
             inclusion,
             height: 1000,
             tx_hash: Hash::new([0xAB; 32]),

@@ -63,7 +63,7 @@ pub use config::{CheckpointConfig, SealContractConfig, SuiConfig, SuiNetwork, Tr
 pub use deploy::publish_csv_package;
 pub use error::SuiError;
 #[cfg(feature = "rpc")]
-pub use mint::mint_right;
+pub use mint::mint_sanad;
 pub use proofs::{
     CommitmentEventBuilder, EventProof, EventProofVerifier, StateProof, StateProofVerifier,
     TransactionProof,
@@ -74,7 +74,7 @@ pub use node::SuiRpcClient;
 pub use rpc::MockSuiRpc;
 pub use rpc::{SuiCheckpoint, SuiEvent, SuiLedgerInfo, SuiObject, SuiRpc, SuiTransactionBlock};
 pub use seal::{SealRecord, SealRegistry, SealStore};
-pub use types::{SuiAnchorRef, SuiFinalityProof, SuiInclusionProof, SuiSealRef};
+pub use types::{SuiCommitAnchor, SuiFinalityProof, SuiInclusionProof, SuiSealPoint};
 
 // Chain operations exports
 pub use chain_operations::SuiBackend;

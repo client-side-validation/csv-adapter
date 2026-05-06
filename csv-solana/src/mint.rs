@@ -1,4 +1,4 @@
-//! Mint operations for CSV rights on Solana
+//! Mint operations for CSV sanads on Solana
 //!
 //! This module provides SDK-based minting using solana-sdk for transaction building
 //! and JSON-RPC for submission (avoids version compatibility issues).
@@ -6,14 +6,14 @@
 use crate::error::{SolanaError, SolanaResult};
 use csv_core::hash::Hash as CsvHash;
 
-/// Mint a right on Solana using JSON-RPC
+/// Mint a sanad on Solana using JSON-RPC
 ///
 /// This uses solana-sdk for keypair/transaction construction and direct JSON-RPC for sending.
-pub fn mint_right_from_hex_key(
+pub fn mint_sanad_from_hex_key(
     rpc_url: &str,
     program_id: &str,
     private_key_hex: &str,
-    right_id: CsvHash,
+    sanad_id: CsvHash,
     commitment: CsvHash,
     state_root: CsvHash,
     source_chain: u8,
@@ -79,24 +79,24 @@ pub fn mint_right_from_hex_key(
         .parse()
         .map_err(|e| SolanaError::Rpc(format!("Invalid blockhash: {}", e)))?;
 
-    // Derive the right PDA with correct seeds: ["right", owner, right_id]
-    let (right_pda, _bump) = Pubkey::find_program_address(
-        &[b"right", payer.pubkey().as_ref(), right_id.as_bytes()],
+    // Derive the sanad PDA with correct seeds: ["sanad", owner, sanad_id]
+    let (sanad_pda, _bump) = Pubkey::find_program_address(
+        &[b"sanad", payer.pubkey().as_ref(), sanad_id.as_bytes()],
         &program_id,
     );
 
     // Build instruction data with correct Anchor discriminator
     // Anchor discriminator = first 8 bytes of sha256("global:instruction_name")
-    // For mint_right: sha256("global:mint_right")[0..8]
+    // For mint_sanad: sha256("global:mint_sanad")[0..8]
     let discriminator = {
         use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
-        hasher.update(b"global:mint_right");
+        hasher.update(b"global:mint_sanad");
         let hash = hasher.finalize();
         hash[..8].to_vec()
     };
     let mut data = discriminator;
-    data.extend_from_slice(right_id.as_bytes());
+    data.extend_from_slice(sanad_id.as_bytes());
     data.extend_from_slice(commitment.as_bytes());
     data.extend_from_slice(state_root.as_bytes());
     data.push(source_chain);
@@ -107,7 +107,7 @@ pub fn mint_right_from_hex_key(
         program_id,
         &data,
         vec![
-            AccountMeta::new(right_pda, false),
+            AccountMeta::new(sanad_pda, false),
             AccountMeta::new_readonly(payer.pubkey(), true),
             AccountMeta::new_readonly(
                 "11111111111111111111111111111111"

@@ -2,14 +2,14 @@
 //!
 //! Provides detailed information about individual assets.
 
-use csv_core::{Chain, Right, RightId};
+use csv_core::{Chain, Sanad, SanadId};
 use serde::{Serialize, Deserialize};
 
 /// Detailed asset information.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetDetails {
-    /// Right ID
-    pub right_id: String,
+    /// Sanad ID
+    pub sanad_id: String,
     /// Chain
     pub chain: Chain,
     /// Commitment
@@ -35,16 +35,16 @@ pub struct AssetDetails {
 }
 
 impl AssetDetails {
-    /// Create asset details from a Right.
-    pub fn from_right(right: &Right, chain: Chain) -> Self {
+    /// Create asset details from a Sanad.
+    pub fn from_sanad(sanad: &Sanad, chain: Chain) -> Self {
         Self {
-            right_id: format!("{:x}", right.id.0),
+            sanad_id: format!("{:x}", sanad.id.0),
             chain,
-            commitment: format!("{:x}", right.commitment.0),
-            owner_address: hex::encode(&right.owner.owner),
+            commitment: format!("{:x}", sanad.commitment.0),
+            owner_address: hex::encode(&sanad.owner.owner),
             seal_id: None,
-            state_root: right.state_root.map(|h| format!("{:x}", h.0)),
-            nullifier: right.nullifier.map(|h| format!("{:x}", h.0)),
+            state_root: sanad.state_root.map(|h| format!("{:x}", h.0)),
+            nullifier: sanad.nullifier.map(|h| format!("{:x}", h.0)),
             created_at: chrono::Utc::now(),
             last_transfer: None,
             transfer_count: 0,
@@ -53,12 +53,12 @@ impl AssetDetails {
         }
     }
 
-    /// Format the right ID for display.
-    pub fn format_right_id(&self) -> String {
-        if self.right_id.len() > 16 {
-            format!("{}...{}", &self.right_id[..8], &self.right_id[self.right_id.len() - 8..])
+    /// Format the sanad ID for display.
+    pub fn format_sanad_id(&self) -> String {
+        if self.sanad_id.len() > 16 {
+            format!("{}...{}", &self.sanad_id[..8], &self.sanad_id[self.sanad_id.len() - 8..])
         } else {
-            self.right_id.clone()
+            self.sanad_id.clone()
         }
     }
 
@@ -73,6 +73,6 @@ impl AssetDetails {
 
     /// Get explorer URL.
     pub fn explorer_url(&self, network: &crate::chains::ChainNetwork) -> String {
-        format!("{}/right/{}", network.explorer_url(), self.right_id)
+        format!("{}/sanad/{}", network.explorer_url(), self.sanad_id)
     }
 }

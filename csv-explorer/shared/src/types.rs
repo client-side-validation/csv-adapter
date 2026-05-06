@@ -1,7 +1,7 @@
 /// Core explorer types for the CSV Explorer.
 ///
 /// This module defines all the data types used across the explorer,
-/// including rights, transfers, seals, contracts, and chain information.
+/// including sanads, transfers, seals, contracts, and chain information.
 ///
 /// ## Protocol Alignment
 ///
@@ -13,7 +13,7 @@
 /// - [`csv_core::SyncStatus`] — Indexer sync status
 /// - [`csv_core::ErrorCode`] — Machine-readable error codes
 ///
-/// Explorer-specific types (RightRecord, SealRecord, etc.) wrap these
+/// Explorer-specific types (SanadRecord, SealRecord, etc.) wrap these
 /// protocol types with additional metadata for display purposes.
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -76,24 +76,24 @@ impl std::fmt::Display for ChainStatus {
     }
 }
 
-/// Status of a right record.
+/// Status of a sanad record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum RightStatus {
-    /// Right is currently active.
+pub enum SanadStatus {
+    /// Sanad is currently active.
     Active,
-    /// Right has been spent/consumed.
+    /// Sanad has been spent/consumed.
     Spent,
-    /// Right is pending confirmation.
+    /// Sanad is pending confirmation.
     Pending,
 }
 
-impl std::fmt::Display for RightStatus {
+impl std::fmt::Display for SanadStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RightStatus::Active => write!(f, "active"),
-            RightStatus::Spent => write!(f, "spent"),
-            RightStatus::Pending => write!(f, "pending"),
+            SanadStatus::Active => write!(f, "active"),
+            SanadStatus::Spent => write!(f, "spent"),
+            SanadStatus::Pending => write!(f, "pending"),
         }
     }
 }
@@ -153,8 +153,8 @@ pub enum ContractType {
     NullifierRegistry,
     /// State commitment contract.
     StateCommitment,
-    /// Right registry contract.
-    RightRegistry,
+    /// Sanad registry contract.
+    SanadRegistry,
     /// Bridge/transfer contract.
     Bridge,
     /// Generic program/module.
@@ -166,7 +166,7 @@ impl std::fmt::Display for ContractType {
         match self {
             ContractType::NullifierRegistry => write!(f, "nullifier_registry"),
             ContractType::StateCommitment => write!(f, "state_commitment"),
-            ContractType::RightRegistry => write!(f, "right_registry"),
+            ContractType::SanadRegistry => write!(f, "sanad_registry"),
             ContractType::Bridge => write!(f, "bridge"),
             ContractType::Other => write!(f, "other"),
         }
@@ -221,28 +221,28 @@ pub struct ChainInfo {
     pub sync_lag: u64,
 }
 
-/// A right record -- the core entity tracked by the CSV system.
+/// A sanad record -- the core entity tracked by the CSV system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RightRecord {
-    /// Right identifier (hex-encoded right_id).
+pub struct SanadRecord {
+    /// Sanad identifier (hex-encoded sanad_id).
     pub id: String,
-    /// Chain that enforces the seal for this right.
+    /// Chain that enforces the seal for this sanad.
     pub chain: String,
     /// Seal reference on the chain.
     pub seal_ref: String,
-    /// Commitment hash of the right.
+    /// Commitment hash of the sanad.
     pub commitment: String,
     /// Current owner address.
     pub owner: String,
-    /// When the right was created.
+    /// When the sanad was created.
     pub created_at: DateTime<Utc>,
-    /// Transaction that created this right.
+    /// Transaction that created this sanad.
     pub created_tx: String,
-    /// Current status of the right.
-    pub status: RightStatus,
-    /// Optional metadata associated with the right.
+    /// Current status of the sanad.
+    pub status: SanadStatus,
+    /// Optional metadata associated with the sanad.
     pub metadata: Option<JsonValue>,
-    /// Number of times this right has been transferred.
+    /// Number of times this sanad has been transferred.
     pub transfer_count: u64,
     /// Timestamp of the last transfer, if any.
     pub last_transfer_at: Option<DateTime<Utc>>,
@@ -253,8 +253,8 @@ pub struct RightRecord {
 pub struct TransferRecord {
     /// Transfer identifier.
     pub id: String,
-    /// Right being transferred.
-    pub right_id: String,
+    /// Sanad being transferred.
+    pub sanad_id: String,
     /// Source chain.
     pub from_chain: String,
     /// Destination chain.
@@ -279,7 +279,7 @@ pub struct TransferRecord {
     pub duration_ms: Option<u64>,
 }
 
-/// A seal record -- the mechanism that binds a right to a chain.
+/// A seal record -- the mechanism that binds a sanad to a chain.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SealRecord {
     /// Seal identifier.
@@ -290,8 +290,8 @@ pub struct SealRecord {
     pub seal_type: SealType,
     /// Chain-specific seal reference.
     pub seal_ref: String,
-    /// Linked right identifier, if known.
-    pub right_id: Option<String>,
+    /// Linked sanad identifier, if known.
+    pub sanad_id: Option<String>,
     /// Current seal status.
     pub status: SealStatus,
     /// When the seal was consumed, if applicable.
@@ -327,12 +327,12 @@ pub struct CsvContract {
 // Filter types
 // ---------------------------------------------------------------------------
 
-/// Filter for querying rights.
+/// Filter for querying sanads.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct RightFilter {
+pub struct SanadFilter {
     pub chain: Option<String>,
     pub owner: Option<String>,
-    pub status: Option<RightStatus>,
+    pub status: Option<SanadStatus>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
 }
@@ -340,7 +340,7 @@ pub struct RightFilter {
 /// Filter for querying transfers.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TransferFilter {
-    pub right_id: Option<String>,
+    pub sanad_id: Option<String>,
     pub from_chain: Option<String>,
     pub to_chain: Option<String>,
     pub status: Option<TransferStatus>,
@@ -354,7 +354,7 @@ pub struct SealFilter {
     pub chain: Option<String>,
     pub seal_type: Option<SealType>,
     pub status: Option<SealStatus>,
-    pub right_id: Option<String>,
+    pub sanad_id: Option<String>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
 }
@@ -376,11 +376,11 @@ pub struct ContractFilter {
 /// Aggregate statistics for the explorer.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ExplorerStats {
-    pub total_rights: u64,
+    pub total_sanads: u64,
     pub total_transfers: u64,
     pub total_seals: u64,
     pub total_contracts: u64,
-    pub rights_by_chain: Vec<ChainCount>,
+    pub sanads_by_chain: Vec<ChainCount>,
     pub transfers_by_chain_pair: Vec<ChainPairCount>,
     pub active_seals_by_chain: Vec<ChainCount>,
     pub transfer_success_rate: f64,
@@ -487,7 +487,7 @@ pub struct IndexingActivity {
     pub chain: String,
     /// Network (mainnet/testnet).
     pub network: Network,
-    /// What was indexed (rights, seals, transfers).
+    /// What was indexed (sanads, seals, transfers).
     pub indexed_type: String,
     /// Number of items indexed.
     pub items_count: u64,
@@ -527,14 +527,14 @@ pub struct BlockInfo {
     pub log_index: u64,
 }
 
-impl RightRecord {
-    /// Convert RightRecord to CsvEvent::RightCreated
-    pub fn to_right_created_event(&self, block_info: BlockInfo) -> CsvEvent {
+impl SanadRecord {
+    /// Convert SanadRecord to CsvEvent::SanadCreated
+    pub fn to_sanad_created_event(&self, block_info: BlockInfo) -> CsvEvent {
         use csv_core::events::event_names;
         use csv_core::hash::Hash;
-        use csv_core::right::RightId;
+        use csv_core::sanad::SanadId;
 
-        // Parse the right ID from hex string
+        // Parse the sanad ID from hex string
         let id_bytes = hex::decode(&self.id).unwrap_or_default();
         let id_hash = if id_bytes.len() == 32 {
             Hash::new(id_bytes.try_into().unwrap_or([0u8; 32]))
@@ -543,11 +543,11 @@ impl RightRecord {
         };
 
         let data = EventData::empty()
-            .with_right_id(RightId(id_hash))
+            .with_sanad_id(SanadId(id_hash))
             .with_owner(&self.owner);
 
         CsvEvent {
-            event_name: event_names::RIGHT_CREATED.to_string(),
+            event_name: event_names::SANAD_CREATED.to_string(),
             chain_id: self.chain.clone(),
             block_height: block_info.height,
             block_hash: block_info.hash,
@@ -561,11 +561,11 @@ impl RightRecord {
 }
 
 impl TransferRecord {
-    /// Convert TransferRecord to CsvEvent::RightTransferred or CrossChainLock/Mint
+    /// Convert TransferRecord to CsvEvent::SanadTransferred or CrossChainLock/Mint
     pub fn to_transfer_event(&self, block_info: BlockInfo, is_cross_chain: bool) -> CsvEvent {
         use csv_core::events::event_names;
         use csv_core::hash::Hash;
-        use csv_core::right::RightId;
+        use csv_core::sanad::SanadId;
 
         let event_name = if is_cross_chain {
             if self.from_chain == self.to_chain {
@@ -574,11 +574,11 @@ impl TransferRecord {
                 event_names::CROSS_CHAIN_MINT
             }
         } else {
-            event_names::RIGHT_TRANSFERRED
+            event_names::SANAD_TRANSFERRED
         };
 
-        // Parse the right ID from hex string
-        let id_bytes = hex::decode(&self.right_id).unwrap_or_default();
+        // Parse the sanad ID from hex string
+        let id_bytes = hex::decode(&self.sanad_id).unwrap_or_default();
         let id_hash = if id_bytes.len() == 32 {
             Hash::new(id_bytes.try_into().unwrap_or([0u8; 32]))
         } else {
@@ -586,7 +586,7 @@ impl TransferRecord {
         };
 
         let data = EventData::empty()
-            .with_right_id(RightId(id_hash))
+            .with_sanad_id(SanadId(id_hash))
             .with_previous_owner(&self.from_owner)
             .with_new_owner(&self.to_owner)
             .with_source_chain(&self.from_chain)

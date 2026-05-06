@@ -13,9 +13,9 @@ use super::chain_indexer::ChainIndexer;
 use super::chain_indexer::ChainResult;
 use super::rpc_manager::RpcManager;
 use csv_explorer_shared::{
-    ChainConfig, CommitmentScheme, ContractStatus, ContractType, CsvContract, EnhancedRightRecord,
+    ChainConfig, CommitmentScheme, ContractStatus, ContractType, CsvContract, EnhancedSanadRecord,
     EnhancedSealRecord, EnhancedTransferRecord, ExplorerError, FinalityProofType,
-    InclusionProofType, Network, PriorityLevel, RightRecord, SealRecord, SealStatus, SealType,
+    InclusionProofType, Network, PriorityLevel, SanadRecord, SealRecord, SealStatus, SealType,
     TransferRecord,
 };
 
@@ -127,26 +127,26 @@ impl ChainIndexer for SuiIndexer {
         Ok(0)
     }
 
-    async fn index_rights(&self, block: u64) -> ChainResult<Vec<RightRecord>> {
+    async fn index_sanads(&self, block: u64) -> ChainResult<Vec<SanadRecord>> {
         let checkpoint = self.fetch_checkpoint(block).await?;
-        let mut rights = Vec::new();
+        let mut sanads = Vec::new();
 
         for txn in &checkpoint.transactions {
             if let Some(events) = &txn.events {
                 for event in events {
-                    // Match AnchorEvent or RightCreated events from CSV packages
+                    // Match AnchorEvent or SanadCreated events from CSV packages
                     // Pattern: {package_id}::csv_seal::AnchorEvent or similar
                     if event.type_.contains("csv_seal") && event.type_.contains("AnchorEvent") {
-                        if let Some(right) = self.parse_right_from_event(event, &txn.digest) {
-                            rights.push(right);
+                        if let Some(sanad) = self.parse_sanad_from_event(event, &txn.digest) {
+                            sanads.push(sanad);
                         }
                     }
                 }
             }
         }
 
-        tracing::debug!(chain = "sui", block, count = rights.len(), "Indexed rights");
-        Ok(rights)
+        tracing::debug!(chain = "sui", block, count = sanads.len(), "Indexed sanads");
+        Ok(sanads)
     }
 
     async fn index_seals(&self, block: u64) -> ChainResult<Vec<SealRecord>> {
@@ -201,7 +201,7 @@ impl ChainIndexer for SuiIndexer {
         Ok(vec![CsvContract {
             id: "sui-csv-package".to_string(),
             chain: "sui".to_string(),
-            contract_type: ContractType::RightRegistry,
+            contract_type: ContractType::SanadRegistry,
             address: "0x0000000000000000000000000000000000000000000000000000000000000001"
                 .to_string(),
             deployed_tx: "genesis".to_string(),
@@ -215,27 +215,27 @@ impl ChainIndexer for SuiIndexer {
     // Advanced commitment and proof indexing methods
     // -----------------------------------------------------------------------
 
-    async fn index_enhanced_rights(&self, block: u64) -> ChainResult<Vec<EnhancedRightRecord>> {
+    async fn index_enhanced_sanads(&self, block: u64) -> ChainResult<Vec<EnhancedSanadRecord>> {
         let checkpoint = self.fetch_checkpoint(block).await?;
-        let mut rights = Vec::new();
+        let mut sanads = Vec::new();
 
         for txn in &checkpoint.transactions {
             if let Some(events) = &txn.events {
                 for event in events {
                     if event.type_.contains("csv_seal") && event.type_.contains("AnchorEvent") {
-                        if let Some(right) = self.parse_right_from_event(event, &txn.digest) {
-                            let enhanced = EnhancedRightRecord {
-                                id: right.id.clone(),
-                                chain: right.chain.clone(),
-                                seal_ref: right.seal_ref.clone(),
-                                commitment: right.commitment.clone(),
-                                owner: right.owner.clone(),
-                                created_at: right.created_at,
-                                created_tx: right.created_tx.clone(),
-                                status: right.status.to_string(),
-                                metadata: right.metadata,
-                                transfer_count: right.transfer_count,
-                                last_transfer_at: right.last_transfer_at,
+                        if let Some(sanad) = self.parse_sanad_from_event(event, &txn.digest) {
+                            let enhanced = EnhancedSanadRecord {
+                                id: sanad.id.clone(),
+                                chain: sanad.chain.clone(),
+                                seal_ref: sanad.seal_ref.clone(),
+                                commitment: sanad.commitment.clone(),
+                                owner: sanad.owner.clone(),
+                                created_at: sanad.created_at,
+                                created_tx: sanad.created_tx.clone(),
+                                status: sanad.status.to_string(),
+                                metadata: sanad.metadata,
+                                transfer_count: sanad.transfer_count,
+                                last_transfer_at: sanad.last_transfer_at,
                                 commitment_scheme: CommitmentScheme::HashBased,
                                 commitment_version: 2,
                                 protocol_id: "csv-sui".to_string(),
@@ -246,14 +246,14 @@ impl ChainIndexer for SuiIndexer {
                                 proof_size_bytes: None,
                                 confirmations: None,
                             };
-                            rights.push(enhanced);
+                            sanads.push(enhanced);
                         }
                     }
                 }
             }
         }
 
-        Ok(rights)
+        Ok(sanads)
     }
 
     async fn index_enhanced_seals(&self, block: u64) -> ChainResult<Vec<EnhancedSealRecord>> {
@@ -270,7 +270,7 @@ impl ChainIndexer for SuiIndexer {
                                 chain: seal.chain.clone(),
                                 seal_type: seal.seal_type.to_string(),
                                 seal_ref: seal.seal_ref.clone(),
-                                right_id: seal.right_id.clone(),
+                                sanad_id: seal.sanad_id.clone(),
                                 status: seal.status.to_string(),
                                 consumed_at: seal.consumed_at,
                                 consumed_tx: seal.consumed_tx.clone(),
@@ -302,7 +302,7 @@ impl ChainIndexer for SuiIndexer {
                         if let Some(transfer) = self.parse_transfer_from_event(event, &txn.digest) {
                             let enhanced = EnhancedTransferRecord {
                                 id: transfer.id.clone(),
-                                right_id: transfer.right_id.clone(),
+                                sanad_id: transfer.sanad_id.clone(),
                                 from_chain: transfer.from_chain.clone(),
                                 to_chain: transfer.to_chain.clone(),
                                 from_owner: transfer.from_owner.clone(),
@@ -344,7 +344,7 @@ impl ChainIndexer for SuiIndexer {
     // Address-based indexing methods (for priority indexing)
     // -----------------------------------------------------------------------
 
-    async fn index_rights_by_address(&self, _address: &str) -> ChainResult<Vec<RightRecord>> {
+    async fn index_sanads_by_address(&self, _address: &str) -> ChainResult<Vec<SanadRecord>> {
         Ok(Vec::new())
     }
 
@@ -364,7 +364,7 @@ impl ChainIndexer for SuiIndexer {
     ) -> ChainResult<AddressIndexingResult> {
         Ok(AddressIndexingResult {
             addresses_processed: 0,
-            rights_indexed: 0,
+            sanads_indexed: 0,
             seals_indexed: 0,
             transfers_indexed: 0,
             contracts_indexed: 0,
@@ -432,21 +432,21 @@ impl SuiIndexer {
         }
     }
 
-    fn parse_right_from_event(&self, event: &EventData, tx_digest: &str) -> Option<RightRecord> {
+    fn parse_sanad_from_event(&self, event: &EventData, tx_digest: &str) -> Option<SanadRecord> {
         let parsed = event.parsed_json.as_ref()?;
-        let right_id = parsed.get("right_id")?.as_str()?.to_string();
+        let sanad_id = parsed.get("sanad_id")?.as_str()?.to_string();
         let owner = parsed.get("owner")?.as_str()?.to_string();
         let commitment = parsed.get("commitment")?.as_str()?.to_string();
 
-        Some(RightRecord {
-            id: right_id,
+        Some(SanadRecord {
+            id: sanad_id,
             chain: "sui".to_string(),
             seal_ref: event.package_id.clone(),
             commitment,
             owner,
             created_at: chrono::Utc::now(),
             created_tx: tx_digest.to_string(),
-            status: csv_explorer_shared::RightStatus::Active,
+            status: csv_explorer_shared::SanadStatus::Active,
             metadata: None,
             transfer_count: 0,
             last_transfer_at: None,
@@ -462,7 +462,7 @@ impl SuiIndexer {
             chain: "sui".to_string(),
             seal_type: SealType::Object,
             seal_ref: event.package_id.clone(),
-            right_id: None,
+            sanad_id: None,
             status: if event.type_.contains("Consumed") {
                 SealStatus::Consumed
             } else {
@@ -480,13 +480,13 @@ impl SuiIndexer {
         tx_digest: &str,
     ) -> Option<TransferRecord> {
         let parsed = event.parsed_json.as_ref()?;
-        let right_id = parsed.get("right_id")?.as_str()?.to_string();
+        let sanad_id = parsed.get("sanad_id")?.as_str()?.to_string();
         let from_chain = parsed.get("from_chain")?.as_str()?.to_string();
         let to_chain = parsed.get("to_chain")?.as_str()?.to_string();
 
         Some(TransferRecord {
             id: format!("sui-xfer-{}", tx_digest),
-            right_id,
+            sanad_id,
             from_chain,
             to_chain,
             from_owner: event.sender.clone(),

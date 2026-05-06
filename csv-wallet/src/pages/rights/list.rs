@@ -1,4 +1,4 @@
-//! Rights list page.
+//! Sanads list page.
 
 use crate::context::{use_wallet_context, ProofStatus, SealStatus};
 use crate::pages::common::*;
@@ -7,25 +7,25 @@ use csv_core::Chain;
 use dioxus::prelude::*;
 
 #[component]
-pub fn Rights() -> Element {
+pub fn Sanads() -> Element {
     let wallet_ctx = use_wallet_context();
-    let rights = wallet_ctx.rights();
+    let sanads = wallet_ctx.sanads();
     let mut filter_chain = use_signal(|| Option::<Chain>::None);
 
     let filtered = match *filter_chain.read() {
-        Some(c) => rights
+        Some(c) => sanads
             .iter()
             .filter(|r| r.chain == c)
             .cloned()
             .collect::<Vec<_>>(),
-        None => rights,
+        None => sanads,
     };
 
     rsx! {
         div { class: "space-y-6",
             div { class: "flex items-center justify-between",
-                h1 { class: "text-2xl font-bold", "Rights" }
-                Link { to: Route::CreateRight {}, class: "{btn_primary_class()}", "+ Create Right" }
+                h1 { class: "text-2xl font-bold", "Sanads" }
+                Link { to: Route::CreateSanad {}, class: "{btn_primary_class()}", "+ Create Sanad" }
             }
 
             // Filter bar
@@ -38,7 +38,7 @@ pub fn Rights() -> Element {
                 }
                 for chain in [Chain::Bitcoin, Chain::Ethereum, Chain::Sui, Chain::Aptos, Chain::Solana] {
                     button {
-                        key: "right-filter-{chain:?}",
+                        key: "sanad-filter-{chain:?}",
                         onclick: move |_| filter_chain.set(Some(chain)),
                         class: if matches!(*filter_chain.read(), Some(c) if c == chain) { "{chain_badge_class(&chain)} cursor-pointer" } else { "{chain_badge_class(&chain)} opacity-50 cursor-pointer" },
                         "{chain_icon_emoji(&chain)} {chain_name(&chain)}"
@@ -47,18 +47,18 @@ pub fn Rights() -> Element {
             }
 
             if filtered.is_empty() {
-                {empty_state("\u{1F48E}", "No Rights found", "Create a Right to get started.")}
+                {empty_state("\u{1F48E}", "No Sanads found", "Create a Sanad to get started.")}
             } else {
                 div { class: "{table_class()}",
                     div { class: "{card_header_class()} flex items-center justify-between",
-                        h2 { class: "font-semibold text-sm", "Tracked Rights" }
+                        h2 { class: "font-semibold text-sm", "Tracked Sanads" }
                         span { class: "text-xs text-gray-400", "{filtered.len()} total" }
                     }
                     div { class: "overflow-x-auto",
                         table { class: "w-full text-sm",
                             thead {
                                 tr { class: "text-left text-gray-400 border-b border-gray-800",
-                                    th { class: "px-4 py-2 font-medium", "Right ID" }
+                                    th { class: "px-4 py-2 font-medium", "Sanad ID" }
                                     th { class: "px-4 py-2 font-medium", "Chain" }
                                     th { class: "px-4 py-2 font-medium", "Value" }
                                     th { class: "px-4 py-2 font-medium", "Status" }
@@ -67,19 +67,19 @@ pub fn Rights() -> Element {
                                 }
                             }
                             tbody { class: "divide-y divide-gray-800",
-                                for (idx, right) in filtered.iter().enumerate() {
+                                for (idx, sanad) in filtered.iter().enumerate() {
                                     {
-                                        let seal = wallet_ctx.seal_for_right(&right.id);
-                                        let proofs = wallet_ctx.proofs_for_right(&right.id);
+                                        let seal = wallet_ctx.seal_for_sanad(&sanad.id);
+                                        let proofs = wallet_ctx.proofs_for_sanad(&sanad.id);
                                         let verified_count = proofs.iter().filter(|p| p.status == ProofStatus::Verified).count();
                                         rsx! {
-                                            tr { key: "{idx}-{right.id}", class: "hover:bg-gray-800/50 transition-colors",
-                                                td { class: "px-4 py-3 font-mono text-xs text-gray-300", "{truncate_address(&right.id, 8)}" }
-                                                td { class: "px-4 py-3", span { class: "{chain_badge_class(&right.chain)}", "{chain_icon_emoji(&right.chain)} {chain_name(&right.chain)}" } }
-                                                td { class: "px-4 py-3 font-mono text-xs", "{right.value}" }
+                                            tr { key: "{idx}-{sanad.id}", class: "hover:bg-gray-800/50 transition-colors",
+                                                td { class: "px-4 py-3 font-mono text-xs text-gray-300", "{truncate_address(&sanad.id, 8)}" }
+                                                td { class: "px-4 py-3", span { class: "{chain_badge_class(&sanad.chain)}", "{chain_icon_emoji(&sanad.chain)} {chain_name(&sanad.chain)}" } }
+                                                td { class: "px-4 py-3 font-mono text-xs", "{sanad.value}" }
                                                 td { class: "px-4 py-3",
-                                                    span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {right_status_class(&right.status)}",
-                                                        "{right.status}"
+                                                    span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {sanad_status_class(&sanad.status)}",
+                                                        "{sanad.status}"
                                                     }
                                                 }
                                                 td { class: "px-4 py-3",
@@ -105,14 +105,14 @@ pub fn Rights() -> Element {
                                                     }
                                                 }
                                                 td { class: "px-4 py-3 flex gap-2",
-                                                    Link { to: Route::RightJourney { id: right.id.clone() }, class: "text-purple-400 hover:text-purple-300 text-xs font-medium", "Journey" }
-                                                    Link { to: Route::ShowRight { id: right.id.clone() }, class: "text-blue-400 hover:text-blue-300 text-xs", "View" }
+                                                    Link { to: Route::SanadJourney { id: sanad.id.clone() }, class: "text-purple-400 hover:text-purple-300 text-xs font-medium", "Journey" }
+                                                    Link { to: Route::ShowSanad { id: sanad.id.clone() }, class: "text-blue-400 hover:text-blue-300 text-xs", "View" }
                                                     button {
                                                         onclick: {
                                                             let mut wallet_ctx = wallet_ctx.clone();
-                                                            let right_id = right.id.clone();
+                                                            let sanad_id = sanad.id.clone();
                                                             move |_| {
-                                                                wallet_ctx.remove_right(&right_id);
+                                                                wallet_ctx.remove_sanad(&sanad_id);
                                                             }
                                                         },
                                                         class: "text-red-400 hover:text-red-300 text-xs",

@@ -509,7 +509,7 @@ pub trait ChainSanadOps: Send + Sync {
 /// Implementors must provide real implementations for all operations.
 /// Use `CapabilityUnavailable` error for operations not supported on a chain.
 pub trait ChainBackend:
-    ChainQuery + ChainSigner + ChainBroadcaster + ChainDeployer + ChainProofProvider + crate::chain_operations::ChainRightOps
+    ChainQuery + ChainSigner + ChainBroadcaster + ChainDeployer + ChainProofProvider + crate::chain_operations::ChainSanadOps
 {
     /// Get the chain identifier
     fn chain_id(&self) -> &'static str;
@@ -597,7 +597,7 @@ pub enum ChainCapability {
 }
 
 /// Blanket implementation to allow trait objects
-impl<T: ChainQuery + ChainSigner + ChainBroadcaster + ChainDeployer + ChainProofProvider + crate::chain_operations::ChainRightOps + Send + Sync>
+impl<T: ChainQuery + ChainSigner + ChainBroadcaster + ChainDeployer + ChainProofProvider + crate::chain_operations::ChainSanadOps + Send + Sync>
     ChainBackend for T
 {
     fn chain_id(&self) -> &'static str {

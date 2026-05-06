@@ -3,25 +3,25 @@
 //! Implements the actual request handling logic for all API endpoints.
 
 use crate::api::{
-    ApiResponse, RightsResponse, RightsSearchRequest, TransfersResponse, TransfersSearchRequest,
+    ApiResponse, SanadsResponse, SanadsSearchRequest, TransfersResponse, TransfersSearchRequest,
 };
-use crate::indexing::{IndexingManager, RightsQuery, TransferQuery};
+use crate::indexing::{IndexingManager, SanadsQuery, TransferQuery};
 use chrono::{DateTime, Utc};
 use csv_core::Hash;
 use futures::SinkExt;
 use std::sync::Arc;
 use warp::{Rejection, Reply};
 
-/// Handle getting rights by owner
-pub async fn get_rights_by_owner(
+/// Handle getting sanads by owner
+pub async fn get_sanads_by_owner(
     owner: String,
     indexing_manager: Arc<IndexingManager>,
 ) -> Result<impl Reply, Rejection> {
-    match indexing_manager.get_rights_by_owner(&owner).await {
-        Ok(rights) => {
-            let response = RightsResponse {
-                rights: rights.clone(),
-                total_count: rights.len() as u64,
+    match indexing_manager.get_sanads_by_owner(&owner).await {
+        Ok(sanads) => {
+            let response = SanadsResponse {
+                sanads: sanads.clone(),
+                total_count: sanads.len() as u64,
                 has_more: false,
             };
             Ok(warp::reply::json(&ApiResponse::success(response)))
@@ -32,13 +32,13 @@ pub async fn get_rights_by_owner(
     }
 }
 
-/// Handle searching rights
-pub async fn search_rights(
-    request: RightsSearchRequest,
+/// Handle searching sanads
+pub async fn search_sanads(
+    request: SanadsSearchRequest,
     indexing_manager: Arc<IndexingManager>,
 ) -> Result<impl Reply, Rejection> {
     // Convert API request to internal query
-    let query = RightsQuery {
+    let query = SanadsQuery {
         owner: request.owner,
         chain: request.chain,
         status: request.status.and_then(|s| s.parse().ok()),
@@ -46,11 +46,11 @@ pub async fn search_rights(
         offset: request.offset,
     };
 
-    match indexing_manager.search_rights(&query).await {
-        Ok(rights) => {
-            let response = RightsResponse {
-                rights: rights.clone(),
-                total_count: rights.len() as u64,
+    match indexing_manager.search_sanads(&query).await {
+        Ok(sanads) => {
+            let response = SanadsResponse {
+                sanads: sanads.clone(),
+                total_count: sanads.len() as u64,
                 has_more: false,
             };
             Ok(warp::reply::json(&ApiResponse::success(response)))
@@ -232,13 +232,13 @@ async fn handle_subscription(
     // Parse subscription data
     if let Some(subscription_type) = data.get("type").and_then(|v| v.as_str()) {
         match subscription_type {
-            "rights" => {
-                // Subscribe to rights updates
+            "sanads" => {
+                // Subscribe to sanads updates
                 if let Some(owner) = data.get("owner").and_then(|v| v.as_str()) {
-                    if let Ok(rights) = indexing_manager.get_rights_by_owner(owner).await {
+                    if let Ok(sanads) = indexing_manager.get_sanads_by_owner(owner).await {
                         let response = serde_json::json!({
-                            "type": "rights_update",
-                            "data": rights
+                            "type": "sanads_update",
+                            "data": sanads
                         });
 
                         if let Ok(text) = serde_json::to_string(&response) {
@@ -249,8 +249,8 @@ async fn handle_subscription(
             }
             "transfers" => {
                 // Subscribe to transfer updates
-                if let Some(right_id) = data.get("right_id").and_then(|v| v.as_str()) {
-                    if let Ok(hash) = Hash::from_hex(right_id) {
+                if let Some(sanad_id) = data.get("sanad_id").and_then(|v| v.as_str()) {
+                    if let Ok(hash) = Hash::from_hex(sanad_id) {
                         if let Ok(Some(transfer)) =
                             indexing_manager.get_transfer_by_hash(&hash).await
                         {
@@ -314,8 +314,8 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_rights_search_request_conversion() {
-        let request = RightsSearchRequest {
+    async fn test_sanads_search_request_conversion() {
+        let request = SanadsSearchRequest {
             owner: Some("test_owner".to_string()),
             chain: Some("ethereum".to_string()),
             status: Some("created".to_string()),
@@ -323,7 +323,7 @@ mod tests {
             offset: Some(0),
         };
 
-        let query = RightsQuery {
+        let query = SanadsQuery {
             owner: request.owner,
             chain: request.chain,
             status: request.status.and_then(|s| s.parse().ok()),

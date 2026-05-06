@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/// @title CSVMint -- Cross-Chain Right Mint on Ethereum
-/// @notice Verifies cross-chain transfer proofs and mints new Rights
+/// @title CSVMint -- Cross-Chain Sanad Mint on Ethereum
+/// @notice Verifies cross-chain transfer proofs and mints new Sanads
 /// @dev This contract enforces on-chain verification of cross-chain proofs.
 /// The source chain lock event must be proven via a Merkle proof that
 /// is verified against a trusted bridge/relayer commitment root.
@@ -10,7 +10,7 @@ contract CSVMint {
     uint8 public constant ASSET_CLASS_UNSPECIFIED = 0;
     uint8 public constant ASSET_CLASS_FUNGIBLE_TOKEN = 1;
     uint8 public constant ASSET_CLASS_NON_FUNGIBLE_TOKEN = 2;
-    uint8 public constant ASSET_CLASS_PROOF_RIGHT = 3;
+    uint8 public constant ASSET_CLASS_PROOF_SANAD = 3;
     uint8 public constant PROOF_SYSTEM_UNSPECIFIED = 0;
 
     /// @notice Address of the CSVLock contract on the source chain's bridge
@@ -19,13 +19,13 @@ contract CSVMint {
     /// @notice Trusted verifier address that validates proofs before minting
     address public verifier;
 
-    /// @notice Tracks minted Rights (prevents double-mint)
-    mapping(bytes32 => bool) public mintedRights;
+    /// @notice Tracks minted Sanads (prevents double-mint)
+    mapping(bytes32 => bool) public mintedSanads;
 
     /// @notice Tracks registered nullifiers (prevents double-spend on Ethereum)
     mapping(bytes32 => bool) public nullifiers;
 
-    struct RightMetadata {
+    struct SanadMetadata {
         uint8 assetClass;
         bytes32 assetId;
         bytes32 metadataHash;
@@ -33,18 +33,18 @@ contract CSVMint {
         bytes32 proofRoot;
     }
 
-    mapping(bytes32 => RightMetadata) public rightMetadata;
+    mapping(bytes32 => SanadMetadata) public sanadMetadata;
 
     /// @notice Contract owner — controls verifier address and batch minting
     address public owner;
 
-    /// @notice Emitted when a Right is minted from cross-chain transfer
-    event RightMinted(
-        bytes32 indexed rightId,
+    /// @notice Emitted when a Sanad is minted from cross-chain transfer
+    event SanadMinted(
+        bytes32 indexed sanadId,
         bytes32 indexed commitment,
         address indexed owner,
         uint8 sourceChain,
-        bytes sourceSealRef,
+        bytes sourceSealPoint,
         uint8 assetClass,
         bytes32 assetId,
         bytes32 metadataHash,
@@ -53,15 +53,15 @@ contract CSVMint {
     );
 
     /// @notice Emitted when a nullifier is registered
-    event NullifierRegistered(bytes32 indexed nullifier, bytes32 indexed rightId);
+    event NullifierRegistered(bytes32 indexed nullifier, bytes32 indexed sanadId);
 
     /// @notice Emitted when owner is changed
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     /// @notice Emitted when verifier is changed
     event VerifierUpdated(address indexed oldVerifier, address indexed newVerifier);
-    event RightMetadataRecorded(
-        bytes32 indexed rightId,
+    event SanadMetadataRecorded(
+        bytes32 indexed sanadId,
         uint8 assetClass,
         bytes32 indexed assetId,
         bytes32 metadataHash,
@@ -75,13 +75,13 @@ contract CSVMint {
     uint8 public constant CHAIN_APTOS = 2;
     uint8 public constant CHAIN_ETHEREUM = 3;
 
-    error RightAlreadyMinted();
+    error SanadAlreadyMinted();
     error InvalidProof();
     error NotAuthorized();
     error NullifierAlreadyRegistered();
     error ZeroAddress();
     error ArraysMismatch();
-    error InvalidRightMetadata();
+    error InvalidSanadMetadata();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotAuthorized();
@@ -111,41 +111,41 @@ contract CSVMint {
         owner = newOwner;
     }
 
-    /// @notice Register a nullifier for a Right (prevents double-spend)
-    /// @param nullifier The nullifier hash (keccak256 of rightId + secret + context)
-    /// @param rightId The Right identifier
-    function registerNullifier(bytes32 nullifier, bytes32 rightId) external {
+    /// @notice Register a nullifier for a Sanad (prevents double-spend)
+    /// @param nullifier The nullifier hash (keccak256 of sanadId + secret + context)
+    /// @param sanadId The Sanad identifier
+    function registerNullifier(bytes32 nullifier, bytes32 sanadId) external {
         if (nullifiers[nullifier]) revert NullifierAlreadyRegistered();
         nullifiers[nullifier] = true;
-        emit NullifierRegistered(nullifier, rightId);
+        emit NullifierRegistered(nullifier, sanadId);
     }
 
-    /// @notice Mint a new Right from a verified cross-chain transfer
-    /// @param rightId Unique Right identifier (from source chain)
-    /// @param commitment Right's commitment hash (preserved across chains)
+    /// @notice Mint a new Sanad from a verified cross-chain transfer
+    /// @param sanadId Unique Sanad identifier (from source chain)
+    /// @param commitment Sanad's commitment hash (preserved across chains)
     /// @param stateRoot Off-chain state root (preserved across chains)
     /// @param sourceChain Source chain ID
-    /// @param sourceSealRef Encoded source chain seal reference
+    /// @param sourceSealPoint Encoded source chain seal reference
     /// @param proof Merkle proof bytes verifying the source chain lock event
     /// @param proofRoot The trusted proof root (e.g., bridge commitment root)
-    function mintRight(
-        bytes32 rightId,
+    function mintSanad(
+        bytes32 sanadId,
         bytes32 commitment,
         bytes32 stateRoot,
         uint8 sourceChain,
-        bytes calldata sourceSealRef,
+        bytes calldata sourceSealPoint,
         bytes calldata proof,
         bytes32 proofRoot
     ) external returns (bool) {
-        return _mintRight(
-            rightId,
+        return _mintSanad(
+            sanadId,
             commitment,
             stateRoot,
             sourceChain,
-            sourceSealRef,
+            sourceSealPoint,
             proof,
             proofRoot,
-            RightMetadata({
+            SanadMetadata({
                 assetClass: ASSET_CLASS_UNSPECIFIED,
                 assetId: bytes32(0),
                 metadataHash: bytes32(0),
@@ -155,13 +155,13 @@ contract CSVMint {
         );
     }
 
-    /// @notice Mint a Right with token/NFT/proof metadata preserved for indexers and future apps.
-    function mintRightWithMetadata(
-        bytes32 rightId,
+    /// @notice Mint a Sanad with token/NFT/proof metadata preserved for indexers and future apps.
+    function mintSanadWithMetadata(
+        bytes32 sanadId,
         bytes32 commitment,
         bytes32 stateRoot,
         uint8 sourceChain,
-        bytes calldata sourceSealRef,
+        bytes calldata sourceSealPoint,
         bytes calldata proof,
         bytes32 proofRoot,
         uint8 assetClass,
@@ -169,7 +169,7 @@ contract CSVMint {
         bytes32 metadataHash,
         uint8 proofSystem
     ) external returns (bool) {
-        RightMetadata memory metadata = RightMetadata({
+        SanadMetadata memory metadata = SanadMetadata({
             assetClass: assetClass,
             assetId: assetId,
             metadataHash: metadataHash,
@@ -177,42 +177,42 @@ contract CSVMint {
             proofRoot: proofRoot
         });
         _validateMetadata(metadata);
-        return _mintRight(rightId, commitment, stateRoot, sourceChain, sourceSealRef, proof, proofRoot, metadata);
+        return _mintSanad(sanadId, commitment, stateRoot, sourceChain, sourceSealPoint, proof, proofRoot, metadata);
     }
 
-    function _mintRight(
-        bytes32 rightId,
+    function _mintSanad(
+        bytes32 sanadId,
         bytes32 commitment,
         bytes32 stateRoot,
         uint8 sourceChain,
-        bytes calldata sourceSealRef,
+        bytes calldata sourceSealPoint,
         bytes calldata proof,
         bytes32 proofRoot,
-        RightMetadata memory metadata
+        SanadMetadata memory metadata
     ) internal returns (bool) {
-        if (mintedRights[rightId]) revert RightAlreadyMinted();
+        if (mintedSanads[sanadId]) revert SanadAlreadyMinted();
         if (stateRoot == bytes32(0)) revert InvalidProof();
 
         // Verify the cross-chain proof on-chain
-        _verifyCrossChainProof(rightId, commitment, sourceChain, proof, proofRoot);
+        _verifyCrossChainProof(sanadId, commitment, sourceChain, proof, proofRoot);
 
-        mintedRights[rightId] = true;
-        rightMetadata[rightId] = metadata;
+        mintedSanads[sanadId] = true;
+        sanadMetadata[sanadId] = metadata;
 
-        emit RightMinted(
-            rightId,
+        emit SanadMinted(
+            sanadId,
             commitment,
             msg.sender,
             sourceChain,
-            sourceSealRef,
+            sourceSealPoint,
             metadata.assetClass,
             metadata.assetId,
             metadata.metadataHash,
             metadata.proofSystem,
             metadata.proofRoot
         );
-        emit RightMetadataRecorded(
-            rightId,
+        emit SanadMetadataRecorded(
+            sanadId,
             metadata.assetClass,
             metadata.assetId,
             metadata.metadataHash,
@@ -223,21 +223,21 @@ contract CSVMint {
         return true;
     }
 
-    function _validateMetadata(RightMetadata memory metadata) internal pure {
-        if (metadata.assetClass > ASSET_CLASS_PROOF_RIGHT) revert InvalidRightMetadata();
+    function _validateMetadata(SanadMetadata memory metadata) internal pure {
+        if (metadata.assetClass > ASSET_CLASS_PROOF_SANAD) revert InvalidSanadMetadata();
         if (metadata.assetClass != ASSET_CLASS_UNSPECIFIED && metadata.assetId == bytes32(0)) {
-            revert InvalidRightMetadata();
+            revert InvalidSanadMetadata();
         }
         if (metadata.proofSystem != PROOF_SYSTEM_UNSPECIFIED && metadata.proofRoot == bytes32(0)) {
-            revert InvalidRightMetadata();
+            revert InvalidSanadMetadata();
         }
     }
 
     /// @notice Verify a cross-chain lock proof using Merkle tree verification
-    /// @dev Computes the leaf hash as keccak256(rightId || commitment || sourceChain)
+    /// @dev Computes the leaf hash as keccak256(sanadId || commitment || sourceChain)
     /// and verifies it against the proofRoot using the provided Merkle branch.
     function _verifyCrossChainProof(
-        bytes32 rightId,
+        bytes32 sanadId,
         bytes32 commitment,
         uint8 sourceChain,
         bytes calldata proof,
@@ -246,11 +246,11 @@ contract CSVMint {
         // Validate non-empty inputs
         if (proof.length == 0) revert InvalidProof();
         if (proofRoot == bytes32(0)) revert InvalidProof();
-        if (rightId == bytes32(0)) revert InvalidProof();
+        if (sanadId == bytes32(0)) revert InvalidProof();
         if (commitment == bytes32(0)) revert InvalidProof();
 
-        // Build the leaf hash: keccak256(rightId || commitment || sourceChain)
-        bytes32 leaf = keccak256(abi.encodePacked(rightId, commitment, sourceChain));
+        // Build the leaf hash: keccak256(sanadId || commitment || sourceChain)
+        bytes32 leaf = keccak256(abi.encodePacked(sanadId, commitment, sourceChain));
 
         // Verify the Merkle proof against the trusted root
         if (!_verifyMerkleProof(proof, proofRoot, leaf)) revert InvalidProof();
@@ -269,7 +269,7 @@ contract CSVMint {
     /// as an additional parameter to ensure deterministic verification.
     ///
     /// For now, we verify by walking the branch in both orderings (leaf-left
-    /// and leaf-right) at each level — if any valid path produces the root,
+    /// and leaf-sanad) at each level — if any valid path produces the root,
     /// the proof is valid.
     function _verifyMerkleProof(
         bytes calldata proof,
@@ -291,7 +291,7 @@ contract CSVMint {
         }
         if (current == root) return true;
 
-        // If that didn't match, try leaf as right child at every level
+        // If that didn't match, try leaf as sanad child at every level
         current = leaf;
         for (uint256 i = 0; i < numLevels; i++) {
             bytes32 sibling;
@@ -309,11 +309,11 @@ contract CSVMint {
         return a < b ? keccak256(abi.encodePacked(a, b)) : keccak256(abi.encodePacked(b, a));
     }
 
-    /// @notice Check if a Right has been minted on this chain
-    /// @param rightId Right identifier
+    /// @notice Check if a Sanad has been minted on this chain
+    /// @param sanadId Sanad identifier
     /// @return True if minted
-    function isRightMinted(bytes32 rightId) external view returns (bool) {
-        return mintedRights[rightId];
+    function isSanadMinted(bytes32 sanadId) external view returns (bool) {
+        return mintedSanads[sanadId];
     }
 
     /// @notice Check if a nullifier has been registered
@@ -323,36 +323,36 @@ contract CSVMint {
         return nullifiers[nullifier];
     }
 
-    /// @notice Batch mint multiple Rights (for efficiency) — owner only
-    /// @param rightIds Array of Right identifiers
+    /// @notice Batch mint multiple Sanads (for efficiency) — owner only
+    /// @param sanadIds Array of Sanad identifiers
     /// @param commitments Array of commitment hashes
     /// @param stateRoots Array of state roots
     /// @param sourceChain Source chain ID
-    /// @param sourceSealRef Source seal reference
+    /// @param sourceSealPoint Source seal reference
     /// @param proofs Array of proof bytes for each mint
     /// @param proofRoot The trusted proof root
-    function batchMintRights(
-        bytes32[] calldata rightIds,
+    function batchMintSanads(
+        bytes32[] calldata sanadIds,
         bytes32[] calldata commitments,
         bytes32[] calldata stateRoots,
         uint8 sourceChain,
-        bytes calldata sourceSealRef,
+        bytes calldata sourceSealPoint,
         bytes[] calldata proofs,
         bytes32 proofRoot
     ) external onlyOwner {
         if (
-            rightIds.length != commitments.length ||
-            rightIds.length != stateRoots.length ||
-            rightIds.length != proofs.length
+            sanadIds.length != commitments.length ||
+            sanadIds.length != stateRoots.length ||
+            sanadIds.length != proofs.length
         ) revert ArraysMismatch();
 
-        for (uint256 i = 0; i < rightIds.length; i++) {
-            this.mintRight(
-                rightIds[i],
+        for (uint256 i = 0; i < sanadIds.length; i++) {
+            this.mintSanad(
+                sanadIds[i],
                 commitments[i],
                 stateRoots[i],
                 sourceChain,
-                sourceSealRef,
+                sourceSealPoint,
                 proofs[i],
                 proofRoot
             );

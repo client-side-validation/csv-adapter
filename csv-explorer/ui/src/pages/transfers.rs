@@ -110,7 +110,7 @@ pub fn TransfersList() -> Element {
                         tr { class: "border-b border-gray-800 text-left text-sm text-gray-400",
                             th { class: "px-6 py-3 font-medium", "Transfer ID" }
                             th { class: "px-6 py-3 font-medium", "Route" }
-                            th { class: "px-6 py-3 font-medium", "Right ID" }
+                            th { class: "px-6 py-3 font-medium", "Sanad ID" }
                             th { class: "px-6 py-3 font-medium", "Status" }
                             th { class: "px-6 py-3 font-medium", "Lock TX" }
                             th { class: "px-6 py-3 font-medium", "Created" }
@@ -136,7 +136,7 @@ pub fn TransfersList() -> Element {
                                     id: transfer.id.clone(),
                                     from_chain: transfer.from_chain.clone(),
                                     to_chain: transfer.to_chain.clone(),
-                                    right_id: transfer.right_id.clone(),
+                                    sanad_id: transfer.sanad_id.clone(),
                                     status: transfer.status.to_string(),
                                     lock_tx: transfer.lock_tx.clone(),
                                     created_at: transfer.created_at,
@@ -155,7 +155,7 @@ fn TransferRow(
     id: String,
     from_chain: String,
     to_chain: String,
-    right_id: String,
+    sanad_id: String,
     status: String,
     lock_tx: String,
     created_at: chrono::DateTime<chrono::Utc>,
@@ -176,7 +176,7 @@ fn TransferRow(
                 }
             }
             td { class: "px-6 py-4 font-mono text-sm text-gray-300",
-                "{right_id}"
+                "{sanad_id}"
             }
             td { class: "px-6 py-4",
                 crate::components::status_badge::StatusBadge { status }

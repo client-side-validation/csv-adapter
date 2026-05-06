@@ -1,11 +1,11 @@
-//! ChainAdapter implementation for BitcoinSealProtocol
+//! ChainDriver implementation for BitcoinSealProtocol
 //!
-//! This module implements the `ChainAdapter` trait from `csv-adapter-core`,
+//! This module implements the `ChainDriver` trait from `csv-adapter-core`,
 //! enabling Bitcoin to be used through the unified chain adapter interface.
 
 use async_trait::async_trait;
 use csv_core::chain_adapter::{
-    AccountModel, ChainAdapter, ChainCapabilities, ChainError, ChainResult, RpcClient, Wallet,
+    AccountModel, ChainDriver, ChainCapabilities, ChainError, ChainResult, RpcClient, Wallet,
 };
 use csv_core::chain_config::ChainConfig;
 use csv_core::Chain;
@@ -182,7 +182,7 @@ fn bitcoin_capabilities() -> ChainCapabilities {
 }
 
 #[async_trait]
-impl ChainAdapter for BitcoinSealProtocol {
+impl ChainDriver for BitcoinSealProtocol {
     fn chain_id(&self) -> &'static str {
         "bitcoin"
     }

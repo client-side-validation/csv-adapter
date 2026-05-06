@@ -305,9 +305,9 @@ mod tests {
     use crate::chain_indexer::{BlockIndexResult, ChainResult};
     use async_trait::async_trait;
     use csv_explorer_shared::{
-        CommitmentScheme, ContractStatus, ContractType, CsvContract, EnhancedRightRecord,
+        CommitmentScheme, ContractStatus, ContractType, CsvContract, EnhancedSanadRecord,
         EnhancedSealRecord, EnhancedTransferRecord, FinalityProofType, InclusionProofType, Network,
-        PriorityLevel, RightRecord, SealRecord, TransferRecord,
+        PriorityLevel, SanadRecord, SealRecord, TransferRecord,
     };
 
     struct MockIndexer;
@@ -329,7 +329,7 @@ mod tests {
         async fn get_latest_synced_block(&self) -> ChainResult<u64> {
             Ok(0)
         }
-        async fn index_rights(&self, _block: u64) -> ChainResult<Vec<RightRecord>> {
+        async fn index_sanads(&self, _block: u64) -> ChainResult<Vec<SanadRecord>> {
             Ok(vec![])
         }
         async fn index_seals(&self, _block: u64) -> ChainResult<Vec<SealRecord>> {
@@ -341,10 +341,10 @@ mod tests {
         async fn index_contracts(&self, _block: u64) -> ChainResult<Vec<CsvContract>> {
             Ok(vec![])
         }
-        async fn index_enhanced_rights(
+        async fn index_enhanced_sanads(
             &self,
             _block: u64,
-        ) -> ChainResult<Vec<EnhancedRightRecord>> {
+        ) -> ChainResult<Vec<EnhancedSanadRecord>> {
             Ok(vec![])
         }
         async fn index_enhanced_seals(&self, _block: u64) -> ChainResult<Vec<EnhancedSealRecord>> {
@@ -356,7 +356,7 @@ mod tests {
         ) -> ChainResult<Vec<EnhancedTransferRecord>> {
             Ok(vec![])
         }
-        async fn index_rights_by_address(&self, _address: &str) -> ChainResult<Vec<RightRecord>> {
+        async fn index_sanads_by_address(&self, _address: &str) -> ChainResult<Vec<SanadRecord>> {
             Ok(vec![])
         }
         async fn index_seals_by_address(&self, _address: &str) -> ChainResult<Vec<SealRecord>> {
@@ -376,7 +376,7 @@ mod tests {
         ) -> ChainResult<super::AddressIndexingResult> {
             Ok(super::AddressIndexingResult {
                 addresses_processed: 0,
-                rights_indexed: 0,
+                sanads_indexed: 0,
                 seals_indexed: 0,
                 transfers_indexed: 0,
                 contracts_indexed: 0,

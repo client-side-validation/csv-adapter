@@ -73,7 +73,7 @@ pub struct Commitment {
     /// deterministic empty root: `SHA256("csv-empty-mpc-root")`.
     pub mpc_root: Hash,
 
-    /// Unique contract/right identifier.
+    /// Unique contract/sanad identifier.
     ///
     /// For NFTs, this is the token ID. For credentials, this is the
     /// credential hash. For assets, this is the asset identifier.

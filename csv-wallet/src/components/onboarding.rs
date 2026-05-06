@@ -18,7 +18,7 @@ pub enum OnboardingStep {
     Welcome,
     WhatIsSeal,
     WalletSetup,
-    CreateFirstRight,
+    CreateFirstSanad,
     SecurityTips,
     Complete,
 }
@@ -29,7 +29,7 @@ impl OnboardingStep {
             OnboardingStep::Welcome => "Welcome to CSV Wallet",
             OnboardingStep::WhatIsSeal => "What is a Seal?",
             OnboardingStep::WalletSetup => "Set Up Your Wallet",
-            OnboardingStep::CreateFirstRight => "Create Your First Right",
+            OnboardingStep::CreateFirstSanad => "Create Your First Sanad",
             OnboardingStep::SecurityTips => "Security Tips",
             OnboardingStep::Complete => "You're Ready!",
         }
@@ -39,8 +39,8 @@ impl OnboardingStep {
         match self {
             OnboardingStep::Welcome => "CSV (Cross-Seal Validation) enables secure cross-chain asset transfers using cryptographic seals.",
             OnboardingStep::WhatIsSeal => "A seal is a unique digital fingerprint that represents ownership of an asset on a specific blockchain.",
-            OnboardingStep::WalletSetup => "Connect or create a wallet to start managing your seals and rights.",
-            OnboardingStep::CreateFirstRight => "Create your first right to experience how seals work in practice.",
+            OnboardingStep::WalletSetup => "Connect or create a wallet to start managing your seals and sanads.",
+            OnboardingStep::CreateFirstSanad => "Create your first sanad to experience how seals work in practice.",
             OnboardingStep::SecurityTips => "Follow these best practices to keep your seals and assets safe.",
             OnboardingStep::Complete => "You now understand the basics. Start exploring the CSV ecosystem!",
         }
@@ -51,7 +51,7 @@ impl OnboardingStep {
             OnboardingStep::Welcome => (0, 5),
             OnboardingStep::WhatIsSeal => (1, 5),
             OnboardingStep::WalletSetup => (2, 5),
-            OnboardingStep::CreateFirstRight => (3, 5),
+            OnboardingStep::CreateFirstSanad => (3, 5),
             OnboardingStep::SecurityTips => (4, 5),
             OnboardingStep::Complete => (5, 5),
         }
@@ -61,8 +61,8 @@ impl OnboardingStep {
         match self {
             OnboardingStep::Welcome => Some(OnboardingStep::WhatIsSeal),
             OnboardingStep::WhatIsSeal => Some(OnboardingStep::WalletSetup),
-            OnboardingStep::WalletSetup => Some(OnboardingStep::CreateFirstRight),
-            OnboardingStep::CreateFirstRight => Some(OnboardingStep::SecurityTips),
+            OnboardingStep::WalletSetup => Some(OnboardingStep::CreateFirstSanad),
+            OnboardingStep::CreateFirstSanad => Some(OnboardingStep::SecurityTips),
             OnboardingStep::SecurityTips => Some(OnboardingStep::Complete),
             OnboardingStep::Complete => None,
         }
@@ -73,8 +73,8 @@ impl OnboardingStep {
             OnboardingStep::Welcome => None,
             OnboardingStep::WhatIsSeal => Some(OnboardingStep::Welcome),
             OnboardingStep::WalletSetup => Some(OnboardingStep::WhatIsSeal),
-            OnboardingStep::CreateFirstRight => Some(OnboardingStep::WalletSetup),
-            OnboardingStep::SecurityTips => Some(OnboardingStep::CreateFirstRight),
+            OnboardingStep::CreateFirstSanad => Some(OnboardingStep::WalletSetup),
+            OnboardingStep::SecurityTips => Some(OnboardingStep::CreateFirstSanad),
             OnboardingStep::Complete => Some(OnboardingStep::SecurityTips),
         }
     }
@@ -177,8 +177,8 @@ pub fn OnboardingFlow(props: OnboardingFlowProps) -> Element {
                             on_import_wallet: props.on_import_wallet.clone(),
                         }
                     },
-                    OnboardingStep::CreateFirstRight => rsx! {
-                        CreateRightStep { on_next: go_next.clone() }
+                    OnboardingStep::CreateFirstSanad => rsx! {
+                        CreateSanadStep { on_next: go_next.clone() }
                     },
                     OnboardingStep::SecurityTips => rsx! {
                         SecurityTipsStep { on_next: go_next.clone() }
@@ -207,7 +207,7 @@ pub fn OnboardingFlow(props: OnboardingFlowProps) -> Element {
                         OnboardingStep::Welcome,
                         OnboardingStep::WhatIsSeal,
                         OnboardingStep::WalletSetup,
-                        OnboardingStep::CreateFirstRight,
+                        OnboardingStep::CreateFirstSanad,
                         OnboardingStep::SecurityTips,
                         OnboardingStep::Complete,
                     ] {
@@ -442,28 +442,28 @@ fn WalletSetupStep(props: WalletSetupStepProps) -> Element {
     }
 }
 
-/// Create first right step.
+/// Create first sanad step.
 #[derive(Props, Clone, PartialEq)]
-struct CreateRightStepProps {
+struct CreateSanadStepProps {
     on_next: EventHandler<()>,
 }
 
 #[allow(non_snake_case)]
-fn CreateRightStep(props: CreateRightStepProps) -> Element {
+fn CreateSanadStep(props: CreateSanadStepProps) -> Element {
     rsx! {
-        div { class: "onboarding-step create-right",
-            h2 { class: "step-title", "Create Your First Right" }
+        div { class: "onboarding-step create-sanad",
+            h2 { class: "step-title", "Create Your First Sanad" }
 
             p { class: "step-description",
-                "A Right represents ownership of an asset. "
-                "When you create a right, a seal is automatically generated to protect it."
+                "A Sanad represents ownership of an asset. "
+                "When you create a sanad, a seal is automatically generated to protect it."
             }
 
-            // Right creation flow
-            div { class: "right-flow",
+            // Sanad creation flow
+            div { class: "sanad-flow",
                 div { class: "flow-step",
                     div { class: "flow-icon", "📝" }
-                    span { class: "flow-label", "Define Right" }
+                    span { class: "flow-label", "Define Sanad" }
                     p { "Specify asset, amount, and conditions" }
                 }
                 div { class: "flow-arrow", "↓" }
@@ -476,15 +476,15 @@ fn CreateRightStep(props: CreateRightStepProps) -> Element {
                 div { class: "flow-step",
                     div { class: "flow-icon", "✓" }
                     span { class: "flow-label", "Anchored" }
-                    p { "Right is recorded on blockchain" }
+                    p { "Sanad is recorded on blockchain" }
                 }
             }
 
-            div { class: "right-example",
-                h4 { "Example Right" }
+            div { class: "sanad-example",
+                h4 { "Example Sanad" }
                 div { class: "example-card",
                     div { class: "example-row",
-                        span { class: "example-label", "Right: " }
+                        span { class: "example-label", "Sanad: " }
                         span { class: "example-value", "Transfer 1.5 ETH to Bob" }
                     }
                     div { class: "example-row",
@@ -593,13 +593,13 @@ fn CompleteStep(props: CompleteStepProps) -> Element {
 
             p { class: "step-description",
                 "You've learned the fundamentals of CSV. "
-                "Start by creating your first right or exploring the dashboard."
+                "Start by creating your first sanad or exploring the dashboard."
             }
 
             div { class: "next-actions",
                 div { class: "action-card",
                     span { class: "action-icon", "➕" }
-                    h4 { "Create a Right" }
+                    h4 { "Create a Sanad" }
                     p { "Define ownership for your first asset" }
                 }
                 div { class: "action-card",
@@ -610,7 +610,7 @@ fn CompleteStep(props: CompleteStepProps) -> Element {
                 div { class: "action-card",
                     span { class: "action-icon", "🔍" }
                     h4 { "Explore Dashboard" }
-                    p { "View your seals and rights" }
+                    p { "View your seals and sanads" }
                 }
             }
 
@@ -654,7 +654,7 @@ pub fn OnboardingChecklist(props: OnboardingChecklistProps) -> Element {
 
     let items = vec![
         ("wallet", "Set up your wallet", "🔐"),
-        ("right", "Create your first right", "📝"),
+        ("sanad", "Create your first sanad", "📝"),
         ("transfer", "Try a cross-chain transfer", "🔗"),
         ("seal", "View seal lifecycle", "🏷️"),
     ];

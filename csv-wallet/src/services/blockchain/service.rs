@@ -97,19 +97,19 @@ impl BlockchainService {
         }
     }
 
-    /// Lock a right on the source chain for cross-chain transfer.
+    /// Lock a sanad on the source chain for cross-chain transfer.
     ///
-    /// This method delegates to the ChainRightOps trait via the csv-adapter facade,
+    /// This method delegates to the ChainSanadOps trait via the csv-adapter facade,
     /// ensuring no duplicate chain-specific logic in the wallet.
-    pub async fn lock_right(
+    pub async fn lock_sanad(
         &self,
         chain: Chain,
-        right_id: &str,
+        sanad_id: &str,
         _owner: &str,
         _contract_address: &str,
         signer: &NativeWallet,
     ) -> Result<TransactionReceipt, BlockchainError> {
-        web_sys::console::log_1(&format!("Locking right {} on {:?} via facade", right_id, chain).into());
+        web_sys::console::log_1(&format!("Locking sanad {} on {:?} via facade", sanad_id, chain).into());
 
         // Get CSV client
         let client = self.csv_client.as_ref().ok_or_else(|| BlockchainError {
@@ -133,10 +133,10 @@ impl BlockchainService {
 
         web_sys::console::log_1(&format!("Estimated fee: {}", fee_estimate).into());
 
-        // Create right ID
-        let right_id_bytes: [u8; 32] = right_id.as_bytes()[..32].try_into()
-            .map_err(|_| BlockchainError { message: "Invalid right_id length".into(), chain: Some(chain), code: Some(400) })?;
-        let right_id_obj = csv_core::right::RightId::new(right_id_bytes);
+        // Create sanad ID
+        let sanad_id_bytes: [u8; 32] = sanad_id.as_bytes()[..32].try_into()
+            .map_err(|_| BlockchainError { message: "Invalid sanad_id length".into(), chain: Some(chain), code: Some(400) })?;
+        let sanad_id_obj = csv_core::sanad::SanadId::new(sanad_id_bytes);
 
         // Get key ID for signing
         let key_id = signer.key_id().map_err(|e| BlockchainError {
@@ -145,12 +145,12 @@ impl BlockchainService {
             code: Some(500),
         })?;
 
-        // Delegate to ChainRightOps::lock_right via facade
+        // Delegate to ChainSanadOps::lock_sanad via facade
         let result = facade
-            .lock_right(chain, &right_id_obj, "destination_chain", &key_id)
+            .lock_sanad(chain, &sanad_id_obj, "destination_chain", &key_id)
             .await
             .map_err(|e| BlockchainError {
-                message: format!("Lock right failed: {}", e),
+                message: format!("Lock sanad failed: {}", e),
                 chain: Some(chain),
                 code: Some(500),
             })?;
@@ -165,65 +165,65 @@ impl BlockchainService {
         })
     }
 
-    /// Lock a right on Sui - delegates to lock_right via facade
+    /// Lock a sanad on Sui - delegates to lock_sanad via facade
     /// 
-    /// DEPRECATED: Use lock_right() instead.
-    async fn lock_sui_right(
+    /// DEPRECATED: Use lock_sanad() instead.
+    async fn lock_sui_sanad(
         &self,
-        right_id: &str,
+        sanad_id: &str,
         owner: &str,
         contract_address: &str,
         signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
-        let receipt = self.lock_right(Chain::Sui, right_id, owner, contract_address, signer).await?;
+        let receipt = self.lock_sanad(Chain::Sui, sanad_id, owner, contract_address, signer).await?;
         Ok(receipt.tx_hash)
     }
 
-    /// Lock a right on Aptos - delegates to lock_right via facade
+    /// Lock a sanad on Aptos - delegates to lock_sanad via facade
     /// 
-    /// DEPRECATED: Use lock_right() instead.
-    async fn lock_aptos_right(
+    /// DEPRECATED: Use lock_sanad() instead.
+    async fn lock_aptos_sanad(
         &self,
-        right_id: &str,
+        sanad_id: &str,
         owner: &str,
         contract_address: &str,
         signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
-        let receipt = self.lock_right(Chain::Aptos, right_id, owner, contract_address, signer).await?;
+        let receipt = self.lock_sanad(Chain::Aptos, sanad_id, owner, contract_address, signer).await?;
         Ok(receipt.tx_hash)
     }
 
-    /// Lock a right on Solana - delegates to lock_right via facade
+    /// Lock a sanad on Solana - delegates to lock_sanad via facade
     /// 
-    /// DEPRECATED: Use lock_right() instead.
-    async fn lock_solana_right(
+    /// DEPRECATED: Use lock_sanad() instead.
+    async fn lock_solana_sanad(
         &self,
-        right_id: &str,
+        sanad_id: &str,
         owner: &str,
         program_id: &str,
         signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
-        let receipt = self.lock_right(Chain::Solana, right_id, owner, program_id, signer).await?;
+        let receipt = self.lock_sanad(Chain::Solana, sanad_id, owner, program_id, signer).await?;
         Ok(receipt.tx_hash)
     }
 
-    /// Lock a right on Bitcoin - delegates to lock_right via facade
+    /// Lock a sanad on Bitcoin - delegates to lock_sanad via facade
     /// 
-    /// DEPRECATED: Use lock_right() instead.
-    async fn lock_bitcoin_right(
+    /// DEPRECATED: Use lock_sanad() instead.
+    async fn lock_bitcoin_sanad(
         &self,
-        right_id: &str,
+        sanad_id: &str,
         owner: &str,
         signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
         // Use the facade - no more local UTXO fetching or transaction building
-        let receipt = self.lock_right(Chain::Bitcoin, right_id, owner, "", signer).await?;
+        let receipt = self.lock_sanad(Chain::Bitcoin, sanad_id, owner, "", signer).await?;
         Ok(receipt.tx_hash)
     }
 
     // Note: All Bitcoin-specific methods (fetch_bitcoin_utxos, build_op_return_transaction,
     // address_to_script_pubkey, sign_bitcoin_raw_transaction) have been removed.
-    // These operations are now handled by the csv-adapter facade via ChainRightOps trait.
+    // These operations are now handled by the csv-adapter facade via ChainSanadOps trait.
     // The facade delegates to csv-adapter-bitcoin which properly implements these using
     // the native bitcoin crate.
 
@@ -234,7 +234,7 @@ impl BlockchainService {
     async fn build_lock_transaction_data(
         &self,
         chain: Chain,
-        right_id: &str,
+        sanad_id: &str,
         owner: &str,
         contract_address: &str,
     ) -> Result<UnsignedTransaction, BlockchainError> {
@@ -253,8 +253,8 @@ impl BlockchainService {
         let facade = client.chain_facade();
 
         // Prepare arguments for the lock function
-        let right_bytes = hex::decode(right_id.trim_start_matches("0x")).unwrap_or_default();
-        let args = vec![right_bytes];
+        let sanad_bytes = hex::decode(sanad_id.trim_start_matches("0x")).unwrap_or_default();
+        let args = vec![sanad_bytes];
 
         // Build the contract call transaction data via facade
         let data = facade
@@ -378,7 +378,7 @@ impl BlockchainService {
         &self,
         source_chain: Chain,
         target_chain: Chain,
-        right_id: &str,
+        sanad_id: &str,
         lock_tx_hash: &str,
     ) -> Result<CrossChainProof, BlockchainError> {
         web_sys::console::log_1(
@@ -391,14 +391,14 @@ impl BlockchainService {
 
         // Use the new facade if available for proof generation
         if let Some(csv_client) = &self.csv_client {
-            let right_id_bytes = hex::decode(right_id.strip_prefix("0x").unwrap_or(right_id))
+            let sanad_id_bytes = hex::decode(sanad_id.strip_prefix("0x").unwrap_or(sanad_id))
                 .map_err(|e| BlockchainError {
-                    message: format!("Invalid right_id format: {}", e),
+                    message: format!("Invalid sanad_id format: {}", e),
                     chain: Some(source_chain),
                     code: Some(400),
                 })?;
 
-            match csv_client.chain_facade().generate_proof(source_chain, &csv_core::RightId::from_bytes(&right_id_bytes)).await {
+            match csv_client.chain_facade().generate_proof(source_chain, &csv_core::SanadId::from_bytes(&sanad_id_bytes)).await {
                 Ok(proof_bundle) => {
                     web_sys::console::log_1(&format!("Proof generated via facade: {:?}", proof_bundle).into());
                     
@@ -412,7 +412,7 @@ impl BlockchainService {
                         Chain::Ethereum => ProofData::Mpt {
                             account_proof: vec![], // Would extract from proof_bundle
                             storage_proof: vec![], // Would extract from proof_bundle
-                            value: right_id.to_string(),
+                            value: sanad_id.to_string(),
                         },
                         Chain::Sui => ProofData::Checkpoint {
                             checkpoint_digest: String::new(), // Would extract from proof_bundle
@@ -441,7 +441,7 @@ impl BlockchainService {
                     return Ok(CrossChainProof {
                         source_chain,
                         target_chain,
-                        right_id: right_id.to_string(),
+                        sanad_id: sanad_id.to_string(),
                         lock_tx_hash: lock_tx_hash.to_string(),
                         proof_data,
                         timestamp: js_sys::Date::now() as u64 / 1000,
@@ -487,20 +487,20 @@ impl BlockchainService {
 
         // Use the CSV adapter facade for proof verification
         if let Some(csv_client) = &self.csv_client {
-            let right_id_bytes = hex::decode(proof.right_id.strip_prefix("0x").unwrap_or(&proof.right_id))
+            let sanad_id_bytes = hex::decode(proof.sanad_id.strip_prefix("0x").unwrap_or(&proof.sanad_id))
                 .map_err(|e| BlockchainError {
-                    message: format!("Invalid right_id format: {}", e),
+                    message: format!("Invalid sanad_id format: {}", e),
                     chain: Some(target_chain),
                     code: Some(400),
                 })?;
-            let right_id = csv_core::RightId::from_bytes(&right_id_bytes);
+            let sanad_id = csv_core::SanadId::from_bytes(&sanad_id_bytes);
 
             // Build a ProofBundle from the CrossChainProof data
-            let proof_bundle = self.build_proof_bundle_from_cross_chain_proof(proof, &right_id_bytes)?;
+            let proof_bundle = self.build_proof_bundle_from_cross_chain_proof(proof, &sanad_id_bytes)?;
 
             // Use the facade to verify the proof bundle
             let facade = csv_client.chain_facade();
-            match facade.verify_proof_bundle(target_chain, &proof_bundle, &right_id).await {
+            match facade.verify_proof_bundle(target_chain, &proof_bundle, &sanad_id).await {
                 Ok(valid) => {
                     if valid {
                         web_sys::console::log_1(&"Proof verification successful".into());
@@ -540,13 +540,13 @@ impl BlockchainService {
     fn build_proof_bundle_from_cross_chain_proof(
         &self,
         proof: &CrossChainProof,
-        right_id_bytes: &[u8],
+        sanad_id_bytes: &[u8],
     ) -> Result<csv_core::ProofBundle, BlockchainError> {
         use csv_core::{
             dag::{DAGNode, DAGSegment},
             hash::Hash,
             proof::{FinalityProof, InclusionProof},
-            seal::{AnchorRef, SealRef},
+            seal::{CommitAnchor, SealPoint},
         };
 
         // Create inclusion proof from the proof data
@@ -558,7 +558,7 @@ impl BlockchainService {
                     proof_bytes.extend_from_slice(p.as_bytes());
                 }
                 proof_bytes.extend_from_slice(leaf.as_bytes());
-                InclusionProof::new(proof_bytes, Hash::new(right_id_bytes.try_into().unwrap_or([0u8; 32])), 0)
+                InclusionProof::new(proof_bytes, Hash::new(sanad_id_bytes.try_into().unwrap_or([0u8; 32])), 0)
                     .map_err(|e| BlockchainError {
                         message: format!("Failed to create inclusion proof: {}", e),
                         chain: Some(proof.source_chain),
@@ -574,7 +574,7 @@ impl BlockchainService {
                     proof_bytes.extend_from_slice(p.as_bytes());
                 }
                 proof_bytes.extend_from_slice(value.as_bytes());
-                InclusionProof::new(proof_bytes, Hash::new(right_id_bytes.try_into().unwrap_or([0u8; 32])), 0)
+                InclusionProof::new(proof_bytes, Hash::new(sanad_id_bytes.try_into().unwrap_or([0u8; 32])), 0)
                     .map_err(|e| BlockchainError {
                         message: format!("Failed to create inclusion proof: {}", e),
                         chain: Some(proof.source_chain),
@@ -586,7 +586,7 @@ impl BlockchainService {
                 proof_bytes.extend_from_slice(checkpoint_digest.as_bytes());
                 proof_bytes.extend_from_slice(&transaction_block.to_le_bytes());
                 proof_bytes.extend_from_slice(certificate.as_bytes());
-                InclusionProof::new(proof_bytes, Hash::new(right_id_bytes.try_into().unwrap_or([0u8; 32])), 0)
+                InclusionProof::new(proof_bytes, Hash::new(sanad_id_bytes.try_into().unwrap_or([0u8; 32])), 0)
                     .map_err(|e| BlockchainError {
                         message: format!("Failed to create inclusion proof: {}", e),
                         chain: Some(proof.source_chain),
@@ -598,7 +598,7 @@ impl BlockchainService {
                 proof_bytes.extend_from_slice(&ledger_version.to_le_bytes());
                 proof_bytes.extend_from_slice(&ledger_proof);
                 proof_bytes.extend_from_slice(root_hash.as_bytes());
-                InclusionProof::new(proof_bytes, Hash::new(right_id_bytes.try_into().unwrap_or([0u8; 32])), 0)
+                InclusionProof::new(proof_bytes, Hash::new(sanad_id_bytes.try_into().unwrap_or([0u8; 32])), 0)
                     .map_err(|e| BlockchainError {
                         message: format!("Failed to create inclusion proof: {}", e),
                         chain: Some(proof.source_chain),
@@ -610,7 +610,7 @@ impl BlockchainService {
                 let mut proof_data = vec![];
                 proof_data.extend_from_slice(proof_bytes.as_bytes());
                 proof_data.extend_from_slice(seal_id.as_bytes());
-                InclusionProof::new(proof_data, Hash::new(right_id_bytes.try_into().unwrap_or([0u8; 32])), 0)
+                InclusionProof::new(proof_data, Hash::new(sanad_id_bytes.try_into().unwrap_or([0u8; 32])), 0)
                     .map_err(|e| BlockchainError {
                         message: format!("Failed to create inclusion proof from ZK data: {}", e),
                         chain: Some(proof.source_chain),
@@ -628,7 +628,7 @@ impl BlockchainService {
             })?;
 
         // Create DAG segment
-        let commitment = Hash::new(right_id_bytes.try_into().unwrap_or([0u8; 32]));
+        let commitment = Hash::new(sanad_id_bytes.try_into().unwrap_or([0u8; 32]));
         let dag_node = DAGNode::new(
             commitment,
             vec![], // No inputs
@@ -639,15 +639,15 @@ impl BlockchainService {
         let dag_segment = DAGSegment::new(vec![dag_node], commitment);
 
         // Create seal and anchor refs
-        let seal_ref = SealRef::new(right_id_bytes.to_vec(), None)
+        let seal_ref = SealPoint::new(sanad_id_bytes.to_vec(), None)
             .map_err(|e| BlockchainError {
                 message: format!("Failed to create seal ref: {}", e),
                 chain: Some(proof.source_chain),
                 code: Some(500),
             })?;
 
-        let anchor_ref = AnchorRef::new(
-            right_id_bytes.to_vec(),
+        let anchor_ref = CommitAnchor::new(
+            sanad_id_bytes.to_vec(),
             proof.timestamp,
             inclusion_proof.proof_bytes.clone(),
         )
@@ -675,18 +675,18 @@ impl BlockchainService {
         Ok(proof_bundle)
     }
 
-    /// Mint a right on the target chain after proof verification.
-    pub async fn mint_right(
+    /// Mint a sanad on the target chain after proof verification.
+    pub async fn mint_sanad(
         &self,
         chain: Chain,
-        right_id: &str,
+        sanad_id: &str,
         owner: &str,
         _value: u64,
         contract_address: &str,
         signer: &NativeWallet,
     ) -> Result<TransactionReceipt, BlockchainError> {
         web_sys::console::log_1(
-            &format!("Minting right {} on {:?} for {}", right_id, chain, owner).into(),
+            &format!("Minting sanad {} on {:?} for {}", sanad_id, chain, owner).into(),
         );
 
         // Get keystore reference for signing (never pass actual private key)
@@ -700,7 +700,7 @@ impl BlockchainService {
         let tx_data = self
             .build_mint_transaction_data(
                 chain,
-                right_id,
+                sanad_id,
                 owner,
                 contract_address,
                 key_id, // Use keystore reference, not actual key
@@ -732,7 +732,7 @@ impl BlockchainService {
     async fn build_mint_transaction_data(
         &self,
         chain: Chain,
-        right_id: &str,
+        sanad_id: &str,
         owner: &str,
         contract_address: &str,
         _key_id: &str, // Keystore reference, not actual private key
@@ -752,9 +752,9 @@ impl BlockchainService {
         let facade = client.chain_facade();
 
         // Prepare arguments for the mint function
-        let right_bytes = hex::decode(right_id.trim_start_matches("0x")).unwrap_or_default();
+        let sanad_bytes = hex::decode(sanad_id.trim_start_matches("0x")).unwrap_or_default();
         let owner_bytes = hex::decode(signer_addr.trim_start_matches("0x")).unwrap_or_default();
-        let args = vec![right_bytes, owner_bytes];
+        let args = vec![sanad_bytes, owner_bytes];
 
         // Build the contract call transaction data via facade
         let data = facade
@@ -783,14 +783,14 @@ impl BlockchainService {
         &self,
         from_chain: Chain,
         to_chain: Chain,
-        right_id: &str,
+        sanad_id: &str,
         dest_owner: &str,
         contracts: &ContractDeployments,
         signer: &NativeWallet,
     ) -> Result<CrossChainTransferResult, BlockchainError> {
         web_sys::console::log_1(&"Starting cross-chain transfer...".into());
 
-        // Step 1: Lock the right on source chain
+        // Step 1: Lock the sanad on source chain
         // UTXO chains (Bitcoin) don't use contracts - they use special transaction outputs
         let needs_source_contract = !matches!(from_chain, Chain::Bitcoin);
         let source_contract_address = if needs_source_contract {
@@ -808,9 +808,9 @@ impl BlockchainService {
         };
 
         let lock_receipt = self
-            .lock_right(
+            .lock_sanad(
                 from_chain,
-                right_id,
+                sanad_id,
                 &signer.address(),
                 &source_contract_address,
                 signer,
@@ -837,7 +837,7 @@ impl BlockchainService {
 
         // Step 2: Generate proof
         let proof = self
-            .generate_proof(from_chain, to_chain, right_id, &lock_receipt.tx_hash)
+            .generate_proof(from_chain, to_chain, sanad_id, &lock_receipt.tx_hash)
             .await?;
 
         // Step 3: Verify proof on target chain
@@ -859,13 +859,13 @@ impl BlockchainService {
             });
         }
 
-        // Step 4: Mint right on target chain
+        // Step 4: Mint sanad on target chain
         let mint_receipt = self
-            .mint_right(
+            .mint_sanad(
                 to_chain,
-                right_id,
+                sanad_id,
                 dest_owner,
-                0, // Value would come from the locked right
+                0, // Value would come from the locked sanad
                 &target_contract.contract_address,
                 signer,
             )
@@ -894,16 +894,16 @@ impl BlockchainService {
         format!("0x{}", hex::encode(hasher.finalize()))
     }
 
-    /// Transfer a right locally on the same chain (no cross-chain overhead)
+    /// Transfer a sanad locally on the same chain (no cross-chain overhead)
     ///
     /// # Security
-    /// - Validates right ownership before transfer
+    /// - Validates sanad ownership before transfer
     /// - Uses CSV facade for chain-specific transfer logic
     /// - Proper error handling for all failure modes
     ///
     /// # Arguments
-    /// * `chain` - Chain where the right exists
-    /// * `right_id` - ID of the right to transfer
+    /// * `chain` - Chain where the sanad exists
+    /// * `sanad_id` - ID of the sanad to transfer
     /// * `new_owner` - Address of the new owner
     /// * `contracts` - Contract deployments for the chain
     /// * `signer` - Wallet to sign the transaction
@@ -911,26 +911,26 @@ impl BlockchainService {
     /// # Returns
     /// * `Ok(String)` - Transaction hash on success
     /// * `Err(BlockchainError)` - Error details on failure
-    pub async fn transfer_right_local(
+    pub async fn transfer_sanad_local(
         &self,
         chain: Chain,
-        right_id: &str,
+        sanad_id: &str,
         new_owner: &str,
         contracts: &ContractDeployments,
         signer: &NativeWallet,
     ) -> Result<String, BlockchainError> {
         web_sys::console::log_1(
             &format!(
-                "Initiating local transfer for right {} on {:?} to {}",
-                right_id, chain, new_owner
+                "Initiating local transfer for sanad {} on {:?} to {}",
+                sanad_id, chain, new_owner
             )
             .into(),
         );
 
         // Validate inputs
-        if right_id.is_empty() {
+        if sanad_id.is_empty() {
             return Err(BlockchainError {
-                message: "Right ID cannot be empty".to_string(),
+                message: "Sanad ID cannot be empty".to_string(),
                 chain: Some(chain),
                 code: Some(400),
             });
@@ -953,7 +953,7 @@ impl BlockchainService {
 
         let tx_hash = match chain {
             Chain::Bitcoin => {
-                // Bitcoin local transfer requires ChainRightOps trait implementation
+                // Bitcoin local transfer requires ChainSanadOps trait implementation
                 // Use the CSV adapter facade for proper UTXO handling
                 let client = self.csv_client.as_ref().ok_or_else(|| BlockchainError {
                     message: "CSV client required for Bitcoin transfers".to_string(),
@@ -963,15 +963,15 @@ impl BlockchainService {
 
                 let facade = client.chain_facade();
                 
-                // Parse right_id bytes
-                let right_id_bytes = hex::decode(right_id.trim_start_matches("0x"))
+                // Parse sanad_id bytes
+                let sanad_id_bytes = hex::decode(sanad_id.trim_start_matches("0x"))
                     .map_err(|e| BlockchainError {
-                        message: format!("Invalid right_id format: {}", e),
+                        message: format!("Invalid sanad_id format: {}", e),
                         chain: Some(Chain::Bitcoin),
                         code: Some(400),
                     })?;
 
-                let right_id_core = csv_core::RightId::from_bytes(&right_id_bytes);
+                let sanad_id_core = csv_core::SanadId::from_bytes(&sanad_id_bytes);
 
                 // Execute transfer via facade
                 let empty_proof = csv_core::proof::InclusionProof::new(vec![], csv_core::Hash::new([0u8; 32]), 0)
@@ -980,7 +980,7 @@ impl BlockchainService {
                         chain: Some(chain),
                         code: Some(500),
                     })?;
-                match facade.mint_right(chain, "source", &right_id_core, &empty_proof, new_owner).await {
+                match facade.mint_sanad(chain, "source", &sanad_id_core, &empty_proof, new_owner).await {
                     Ok(result) => {
                         web_sys::console::log_1(
                             &format!("Bitcoin transfer completed: {:?}", result.transaction_hash).into(),
@@ -1009,7 +1009,7 @@ impl BlockchainService {
 
                 // Build transfer transaction data
                 let tx_data = self
-                    .build_transfer_transaction_data(chain, right_id, new_owner, &contract.contract_address)
+                    .build_transfer_transaction_data(chain, sanad_id, new_owner, &contract.contract_address)
                     .await?;
 
                 // Sign with keystore reference (key_id identifies the key)
@@ -1042,14 +1042,14 @@ impl BlockchainService {
         Ok(tx_hash)
     }
 
-    /// Build transaction data for local right transfer.
+    /// Build transaction data for local sanad transfer.
     ///
     /// Uses ChainFacade::build_contract_call to properly delegate transaction
     /// building to the appropriate chain adapter.
     async fn build_transfer_transaction_data(
         &self,
         chain: Chain,
-        right_id: &str,
+        sanad_id: &str,
         new_owner: &str,
         contract_address: &str,
     ) -> Result<UnsignedTransaction, BlockchainError> {
@@ -1068,9 +1068,9 @@ impl BlockchainService {
         let facade = client.chain_facade();
 
         // Prepare arguments for the transfer function
-        let right_bytes = hex::decode(right_id.trim_start_matches("0x")).unwrap_or_default();
+        let sanad_bytes = hex::decode(sanad_id.trim_start_matches("0x")).unwrap_or_default();
         let owner_bytes = hex::decode(new_owner.trim_start_matches("0x")).unwrap_or_default();
-        let args = vec![right_bytes, owner_bytes];
+        let args = vec![sanad_bytes, owner_bytes];
 
         // Build the contract call transaction data via facade
         let data = facade
@@ -1236,47 +1236,47 @@ pub mod wallet_connection {
 
 /// Build Sui lock transaction bytes
 async fn build_sui_lock_transaction(
-    right_id: &str,
+    sanad_id: &str,
     owner: &str,
     contract_address: &str,
 ) -> Result<Vec<u8>, BlockchainError> {
     // Simplified BCS transaction builder
     // In production, this would use proper BCS serialization
-    let tx_data = format!("SUI:LOCK:{}:{}:{}", right_id, owner, contract_address);
+    let tx_data = format!("SUI:LOCK:{}:{}:{}", sanad_id, owner, contract_address);
     Ok(tx_data.into_bytes())
 }
 
 /// Build Aptos lock transaction bytes
 async fn build_aptos_lock_transaction(
-    right_id: &str,
+    sanad_id: &str,
     owner: &str,
     contract_address: &str,
 ) -> Result<Vec<u8>, BlockchainError> {
     // Simplified BCS transaction builder
-    let tx_data = format!("APTOS:LOCK:{}:{}:{}", right_id, owner, contract_address);
+    let tx_data = format!("APTOS:LOCK:{}:{}:{}", sanad_id, owner, contract_address);
     Ok(tx_data.into_bytes())
 }
 
 /// Build Solana lock transaction bytes
 async fn build_solana_lock_transaction(
-    right_id: &str,
+    sanad_id: &str,
     owner: &str,
     contract_address: &str,
 ) -> Result<Vec<u8>, BlockchainError> {
     // Solana instruction data format
-    let tx_data = format!("SOLANA:LOCK:{}:{}:{}", right_id, owner, contract_address);
+    let tx_data = format!("SOLANA:LOCK:{}:{}:{}", sanad_id, owner, contract_address);
     Ok(tx_data.into_bytes())
 }
 
 /// Build EVM lock transaction data
 async fn build_evm_lock_transaction(
     chain: Chain,
-    right_id: &str,
+    sanad_id: &str,
     owner: &str,
     contract_address: &str,
 ) -> Result<UnsignedTransaction, BlockchainError> {
     // EVM transaction data (simplified)
-    let data = format!("EVM:LOCK:{}:{}:{}", right_id, owner, contract_address);
+    let data = format!("EVM:LOCK:{}:{}:{}", sanad_id, owner, contract_address);
     Ok(UnsignedTransaction {
         chain,
         from: owner.to_string(),

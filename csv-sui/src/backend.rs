@@ -1,11 +1,11 @@
-//! ChainAdapter implementation for SuiSealProtocol
+//! ChainDriver implementation for SuiSealProtocol
 //!
-//! This module implements the `ChainAdapter` trait from `csv-adapter-core`,
+//! This module implements the `ChainDriver` trait from `csv-adapter-core`,
 //! enabling Sui to be used through the unified chain adapter interface.
 
 use async_trait::async_trait;
 use csv_core::chain_adapter::{
-    AccountModel, ChainAdapter, ChainCapabilities, ChainError, ChainResult, RpcClient, Wallet,
+    AccountModel, ChainDriver, ChainCapabilities, ChainError, ChainResult, RpcClient, Wallet,
 };
 use ed25519_dalek::Verifier;
 use csv_core::chain_config::ChainConfig;
@@ -359,7 +359,7 @@ fn sui_capabilities() -> ChainCapabilities {
 }
 
 #[async_trait]
-impl ChainAdapter for SuiSealProtocol {
+impl ChainDriver for SuiSealProtocol {
     fn chain_id(&self) -> &'static str {
         "sui"
     }

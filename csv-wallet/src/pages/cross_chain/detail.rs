@@ -47,7 +47,7 @@ pub fn TransferDetail(id: String) -> Element {
                     // Transfer ID
                     div { class: "flex justify-between items-start",
                         span { class: "text-sm text-gray-400", "Transfer ID" }
-                        div { class: "text-right",
+                        div { class: "text-sanad",
                             p { class: "font-mono text-sm text-gray-200 break-all", "{t.id}" }
                         }
                     }
@@ -66,10 +66,10 @@ pub fn TransferDetail(id: String) -> Element {
                         }
                     }
 
-                    // Right ID
+                    // Sanad ID
                     div { class: "flex justify-between items-start",
-                        span { class: "text-sm text-gray-400", "Right ID" }
-                        p { class: "font-mono text-sm text-gray-200 break-all max-w-md", "{t.right_id}" }
+                        span { class: "text-sm text-gray-400", "Sanad ID" }
+                        p { class: "font-mono text-sm text-gray-200 break-all max-w-md", "{t.sanad_id}" }
                     }
 
                     // Destination Owner
@@ -99,7 +99,7 @@ pub fn TransferDetail(id: String) -> Element {
                     // Transaction Hash with explorer link
                     div { class: "flex justify-between items-start",
                         span { class: "text-sm text-gray-400", "Transaction Hash" }
-                        div { class: "text-right",
+                        div { class: "text-sanad",
                             if let Some(ref hash) = t.source_tx_hash {
                                 p { class: "font-mono text-sm text-gray-200 break-all max-w-md", "{hash}" }
                                 if let Some(url) = wallet_ctx.get_explorer_url(t.from_chain, hash) {
@@ -151,7 +151,7 @@ pub fn TransferDetail(id: String) -> Element {
                     // Transaction Hash with explorer link
                     div { class: "flex justify-between items-start",
                         span { class: "text-sm text-gray-400", "Transaction Hash" }
-                        div { class: "text-right",
+                        div { class: "text-sanad",
                             if let Some(ref hash) = t.dest_tx_hash {
                                 p { class: "font-mono text-sm text-gray-200 break-all max-w-md", "{hash}" }
                                 if let Some(url) = wallet_ctx.get_explorer_url(t.to_chain, hash) {

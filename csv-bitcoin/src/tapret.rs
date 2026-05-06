@@ -7,7 +7,7 @@
 //!
 //! Per RGB specification and BIP-341:
 //! - Tapret leaf: OP_RETURN <protocol_id (32 bytes)> <nonce (1 byte)> <commitment (32 bytes)>
-//! - Nonce mining ensures the tapret leaf is placed at the rightmost depth-1 position
+//! - Nonce mining ensures the tapret leaf is placed at the sanadmost depth-1 position
 //!   in the Taproot merkle tree
 //! - Internal key is derived from the wallet's taproot key
 //!
@@ -63,7 +63,7 @@ impl TapretCommitment {
 
     /// Build the Tapret leaf with a nonce appended for mining
     ///
-    /// The nonce is used to ensure the Tapret leaf ends up at the rightmost
+    /// The nonce is used to ensure the Tapret leaf ends up at the sanadmost
     /// depth-1 position in the Taproot merkle tree per BIP-341 consensus ordering.
     pub fn leaf_script_with_nonce(&self, nonce: u8) -> ScriptBuf {
         let mut payload = [0u8; 65];

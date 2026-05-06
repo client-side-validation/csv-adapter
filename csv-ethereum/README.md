@@ -8,9 +8,9 @@ Ethereum adapter for **CSV (Client-Side Validation)** with nullifier-based seals
 
 ## Overview
 
-This crate implements the [`AnchorLayer`] trait for Ethereum, using nullifier registration as **L3 Cryptographic** single-use enforcement. Unlike Bitcoin's structural single-use, Ethereum requires explicit nullifier tracking via smart contracts.
+This crate implements the [`SealProtocol`] trait for Ethereum, using nullifier registration as **L3 Cryptographic** single-use enforcement. Unlike Bitcoin's structural single-use, Ethereum requires explicit nullifier tracking via smart contracts.
 
-[`AnchorLayer`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/trait.AnchorLayer.html
+[`SealProtocol`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/trait.SealProtocol.html
 
 ### Key Features
 
@@ -46,22 +46,22 @@ csv-adapter-ethereum = "0.1"
 ### Creating an Ethereum Anchor Layer
 
 ```rust
-use csv_adapter_ethereum::EthereumAnchorLayer;
+use csv_adapter_ethereum::EthereumSealProtocol;
 
 // Create adapter with mock RPC for testing
-let adapter = EthereumAnchorLayer::mock();
+let adapter = EthereumSealProtocol::mock();
 
 // Or with real RPC (requires `rpc` feature)
-// let adapter = EthereumAnchorLayer::from_rpc(rpc_url, chain_id)?;
+// let adapter = EthereumSealProtocol::from_rpc(rpc_url, chain_id)?;
 ```
 
 ### Working with Nullifier Seals
 
 ```rust
-use csv_adapter_ethereum::EthereumAnchorLayer;
-use csv_adapter_core::{Hash, AnchorLayer};
+use csv_adapter_ethereum::EthereumSealProtocol;
+use csv_adapter_core::{Hash, SealProtocol};
 
-let adapter = EthereumAnchorLayer::mock();
+let adapter = EthereumSealProtocol::mock();
 
 // Create a nullifier-based seal
 let nullifier = Hash::new([0x01; 32]);
@@ -89,7 +89,7 @@ let is_valid = verify_mpt_proof(
 ## Architecture
 
 ```
-EthereumAnchorLayer
+EthereumSealProtocol
 ├── Nullifier Registry  ← L3 Cryptographic single-use
 ├── MPT Proofs         ← Merkle Patricia Trie verification
 ├── LOG Events         ← Commitment publication
@@ -99,7 +99,7 @@ EthereumAnchorLayer
 
 ### Seal Lifecycle
 
-1. **Create**: Generate a nullifier hash (H(right_id || secret))
+1. **Create**: Generate a nullifier hash (H(sanad_id || secret))
 2. **Register**: Submit nullifier to smart contract (on-chain)
 3. **Anchor**: Emit LOG event with commitment hash
 4. **Verify**: MPT proof confirms inclusion in state root

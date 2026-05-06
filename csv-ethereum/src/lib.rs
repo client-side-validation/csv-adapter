@@ -50,7 +50,7 @@ pub use rpc::EthereumRpc;
 pub use rpc::MockEthereumRpc;
 pub use seal_contract::CsvSealAbi;
 pub use types::{
-    EthereumAnchorRef, EthereumFinalityProof, EthereumInclusionProof, EthereumSealRef,
+    EthereumCommitAnchor, EthereumFinalityProof, EthereumInclusionProof, EthereumSealPoint,
 };
 pub use zk_verifier::{EthereumGroth16Verifier, SolidityGroth16Proof, generate_verifier_contract_bytecode};
 

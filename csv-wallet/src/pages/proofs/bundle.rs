@@ -7,7 +7,7 @@
 //! - Finality proof (confirmations, checkpoint)
 //! - Seal reference consumed (real chain-native ID)
 //! - Commitment hash
-//! - Right ID before and after
+//! - Sanad ID before and after
 //!
 //! Competitive advantage: This proof can be exported and verified OFFLINE
 //! without trusting any server. Traditional bridges give you a receipt;
@@ -99,8 +99,8 @@ fn proof_overview_section(proof: &ProofRecord) -> Element {
                     p { class: "font-medium", "{proof.chain.to_string()}" }
                 }
                 div { class: "space-y-1",
-                    label { class: "text-xs text-gray-500 uppercase", "Right ID" }
-                    p { class: "font-mono text-sm", "{&proof.right_id}" }
+                    label { class: "text-xs text-gray-500 uppercase", "Sanad ID" }
+                    p { class: "font-mono text-sm", "{&proof.sanad_id}" }
                 }
                 div { class: "space-y-1",
                     label { class: "text-xs text-gray-500 uppercase", "Status" }

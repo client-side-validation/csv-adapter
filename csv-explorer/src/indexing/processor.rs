@@ -51,26 +51,26 @@ impl EventProcessor {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let start = Instant::now();
         let result = match event {
-            IndexingEvent::RightCreated {
-                right_id,
+            IndexingEvent::SanadCreated {
+                sanad_id,
                 chain,
                 owner,
                 created_at,
                 metadata,
             } => {
-                self.handle_right_created(*right_id, *chain, owner, *created_at, metadata)
+                self.handle_sanad_created(*sanad_id, *chain, owner, *created_at, metadata)
                     .await
             }
-            IndexingEvent::RightTransferred {
-                right_id,
+            IndexingEvent::SanadTransferred {
+                sanad_id,
                 from_chain,
                 to_chain,
                 transfer_id,
                 created_at,
                 proof_bundle,
             } => {
-                self.handle_right_transferred(
-                    *right_id,
+                self.handle_sanad_transferred(
+                    *sanad_id,
                     *from_chain,
                     *to_chain,
                     *transfer_id,
@@ -93,15 +93,15 @@ impl EventProcessor {
                 )
                 .await
             }
-            IndexingEvent::RightUpdated {
-                right_id,
+            IndexingEvent::SanadUpdated {
+                sanad_id,
                 chain,
                 old_metadata,
                 new_metadata,
                 updated_at,
             } => {
-                self.handle_right_updated(
-                    *right_id,
+                self.handle_sanad_updated(
+                    *sanad_id,
                     *chain,
                     old_metadata,
                     new_metadata,
@@ -148,17 +148,17 @@ impl EventProcessor {
         result
     }
 
-    /// Handle right created event
-    async fn handle_right_created(
+    /// Handle sanad created event
+    async fn handle_sanad_created(
         &self,
-        right_id: Hash,
+        sanad_id: Hash,
         chain: Chain,
         owner: &str,
         created_at: DateTime<Utc>,
         metadata: &serde_json::Value,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let indexed_right = crate::indexing::IndexedRight {
-            id: right_id,
+        let indexed_sanad = crate::indexing::IndexedSanad {
+            id: sanad_id,
             owner: owner.to_string(),
             chain: chain.to_string(),
             created_at,
@@ -167,14 +167,14 @@ impl EventProcessor {
             metadata: metadata.clone(),
         };
 
-        self.storage.store_right(&indexed_right).await?;
+        self.storage.store_sanad(&indexed_sanad).await?;
         Ok(())
     }
 
-    /// Handle right transferred event
-    async fn handle_right_transferred(
+    /// Handle sanad transferred event
+    async fn handle_sanad_transferred(
         &self,
-        right_id: Hash,
+        sanad_id: Hash,
         from_chain: Chain,
         to_chain: Chain,
         transfer_id: Hash,
@@ -183,7 +183,7 @@ impl EventProcessor {
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let indexed_transfer = crate::indexing::IndexedTransfer {
             id: transfer_id,
-            right_id,
+            sanad_id,
             from_chain: from_chain.to_string(),
             to_chain: to_chain.to_string(),
             status: TransferStatus::Initiated,
@@ -198,12 +198,12 @@ impl EventProcessor {
 
         self.storage.store_transfer(&indexed_transfer).await?;
 
-        // Update right status and chain
-        if let Some(mut right) = self.storage.get_right_by_id(&right_id).await? {
-            right.status = TransferStatus::Initiated;
-            right.chain = to_chain.to_string();
-            right.updated_at = Utc::now();
-            self.storage.store_right(&right).await?;
+        // Update sanad status and chain
+        if let Some(mut sanad) = self.storage.get_sanad_by_id(&sanad_id).await? {
+            sanad.status = TransferStatus::Initiated;
+            sanad.chain = to_chain.to_string();
+            sanad.updated_at = Utc::now();
+            self.storage.store_sanad(&sanad).await?;
         }
 
         Ok(())
@@ -222,12 +222,12 @@ impl EventProcessor {
             transfer.updated_at = updated_at;
             self.storage.store_transfer(&transfer).await?;
 
-            // Update right status if transfer is completed
+            // Update sanad status if transfer is completed
             if new_status.is_completed() {
-                if let Some(mut right) = self.storage.get_right_by_id(&transfer.right_id).await? {
-                    right.status = TransferStatus::Completed;
-                    right.updated_at = updated_at;
-                    self.storage.store_right(&right).await?;
+                if let Some(mut sanad) = self.storage.get_sanad_by_id(&transfer.sanad_id).await? {
+                    sanad.status = TransferStatus::Completed;
+                    sanad.updated_at = updated_at;
+                    self.storage.store_sanad(&sanad).await?;
                 }
             }
         }
@@ -235,19 +235,19 @@ impl EventProcessor {
         Ok(())
     }
 
-    /// Handle right updated event
-    async fn handle_right_updated(
+    /// Handle sanad updated event
+    async fn handle_sanad_updated(
         &self,
-        right_id: Hash,
+        sanad_id: Hash,
         _chain: Chain,
         _old_metadata: &serde_json::Value,
         new_metadata: &serde_json::Value,
         updated_at: DateTime<Utc>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        if let Some(mut right) = self.storage.get_right_by_id(&right_id).await? {
-            right.metadata = new_metadata.clone();
-            right.updated_at = updated_at;
-            self.storage.store_right(&right).await?;
+        if let Some(mut sanad) = self.storage.get_sanad_by_id(&sanad_id).await? {
+            sanad.metadata = new_metadata.clone();
+            sanad.updated_at = updated_at;
+            self.storage.store_sanad(&sanad).await?;
         }
 
         Ok(())
@@ -309,12 +309,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_right_created_event() {
+    async fn test_sanad_created_event() {
         let storage = Arc::new(IndexStorage::new().unwrap());
         let processor = EventProcessor::new(storage);
 
-        let event = IndexingEvent::RightCreated {
-            right_id: Hash::zero(),
+        let event = IndexingEvent::SanadCreated {
+            sanad_id: Hash::zero(),
             chain: Chain::Ethereum,
             owner: "test_owner".to_string(),
             created_at: Utc::now(),

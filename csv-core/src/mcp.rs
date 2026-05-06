@@ -277,14 +277,14 @@ pub mod error_codes {
     pub const CSV_CHAIN_NOT_ENABLED: &str = "CSV_018";
     /// CSV insufficient funds.
     pub const CSV_INSUFFICIENT_FUNDS: &str = "CSV_002";
-    /// CSV invalid right ID.
-    pub const CSV_INVALID_RIGHT_ID: &str = "CSV_003";
-    /// CSV right not found.
-    pub const CSV_RIGHT_NOT_FOUND: &str = "CSV_004";
+    /// CSV invalid sanad ID.
+    pub const CSV_INVALID_SANAD_ID: &str = "CSV_003";
+    /// CSV sanad not found.
+    pub const CSV_SANAD_NOT_FOUND: &str = "CSV_004";
     /// CSV transfer not found.
     pub const CSV_TRANSFER_NOT_FOUND: &str = "CSV_005";
-    /// CSV right already consumed.
-    pub const CSV_RIGHT_ALREADY_CONSUMED: &str = "CSV_006";
+    /// CSV sanad already consumed.
+    pub const CSV_SANAD_ALREADY_CONSUMED: &str = "CSV_006";
     /// CSV invalid commitment.
     pub const CSV_INVALID_COMMITMENT: &str = "CSV_007";
     /// CSV proof verification failed.
@@ -329,7 +329,7 @@ pub enum TransferStatus {
         /// ISO 8601 timestamp
         timestamp: String,
     },
-    /// Locking Right on source chain
+    /// Locking Sanad on source chain
     Locking {
         /// Source chain
         chain: Chain,
@@ -365,7 +365,7 @@ pub enum TransferStatus {
         /// Verification time in milliseconds
         verification_time_ms: Option<u64>,
     },
-    /// Minting Right on destination chain
+    /// Minting Sanad on destination chain
     Minting {
         /// Destination chain
         chain: Chain,
@@ -374,8 +374,8 @@ pub enum TransferStatus {
     },
     /// Transfer completed successfully
     Completed {
-        /// Right ID on destination chain
-        right_id: String,
+        /// Sanad ID on destination chain
+        sanad_id: String,
         /// Destination chain
         destination_chain: Chain,
         /// Destination transaction hash

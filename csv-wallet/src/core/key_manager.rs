@@ -52,7 +52,7 @@ impl HasErrorSuggestion for KeyError {
             KeyError::DerivationError(_) => {
                 "Key derivation failed. Check: \
                  1) The seed/mnemonic is valid, 2) The derivation path is correct, \
-                 3) The target chain uses the right curve (secp256k1 vs ed25519). \
+                 3) The target chain uses the sanad curve (secp256k1 vs ed25519). \
                  Common paths: m/44'/60'/0'/0/0 (Ethereum), m/86'/0'/0'/0/0 (Bitcoin Taproot).".to_string()
             }
             KeyError::SigningError(_) => {

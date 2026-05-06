@@ -24,7 +24,7 @@ impl TransfersRepository {
 
         sqlx::query(
             r#"
-            INSERT INTO transfers (id, right_id, from_chain, to_chain, from_owner, to_owner,
+            INSERT INTO transfers (id, sanad_id, from_chain, to_chain, from_owner, to_owner,
                                    lock_tx, mint_tx, proof_ref, status, created_at, completed_at,
                                    duration_ms)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
@@ -38,7 +38,7 @@ impl TransfersRepository {
             "#,
         )
         .bind(&transfer.id)
-        .bind(&transfer.right_id)
+        .bind(&transfer.sanad_id)
         .bind(&transfer.from_chain)
         .bind(&transfer.to_chain)
         .bind(&transfer.from_owner)
@@ -59,7 +59,7 @@ impl TransfersRepository {
     /// Get a single transfer by ID.
     pub async fn get(&self, id: &str) -> Result<Option<TransferRecord>> {
         let row = sqlx::query(
-            "SELECT id, right_id, from_chain, to_chain, from_owner, to_owner, \
+            "SELECT id, sanad_id, from_chain, to_chain, from_owner, to_owner, \
              lock_tx, mint_tx, proof_ref, status, created_at, completed_at, duration_ms \
              FROM transfers WHERE id = $1",
         )
@@ -76,13 +76,13 @@ impl TransfersRepository {
     /// List transfers matching the given filter.
     pub async fn list(&self, filter: TransferFilter) -> Result<Vec<TransferRecord>> {
         let mut sql = String::from(
-            "SELECT id, right_id, from_chain, to_chain, from_owner, to_owner, \
+            "SELECT id, sanad_id, from_chain, to_chain, from_owner, to_owner, \
              lock_tx, mint_tx, proof_ref, status, created_at, completed_at, duration_ms \
              FROM transfers WHERE 1=1",
         );
 
-        if filter.right_id.is_some() {
-            sql.push_str(" AND right_id = ?");
+        if filter.sanad_id.is_some() {
+            sql.push_str(" AND sanad_id = ?");
         }
         if filter.from_chain.is_some() {
             sql.push_str(" AND from_chain = ?");
@@ -104,8 +104,8 @@ impl TransfersRepository {
         }
 
         let mut query = sqlx::query(&sql);
-        if let Some(ref right_id) = filter.right_id {
-            query = query.bind(right_id);
+        if let Some(ref sanad_id) = filter.sanad_id {
+            query = query.bind(sanad_id);
         }
         if let Some(ref from_chain) = filter.from_chain {
             query = query.bind(from_chain);
@@ -135,8 +135,8 @@ impl TransfersRepository {
     pub async fn count(&self, filter: TransferFilter) -> Result<u64> {
         let mut sql = String::from("SELECT COUNT(*) FROM transfers WHERE 1=1");
 
-        if filter.right_id.is_some() {
-            sql.push_str(" AND right_id = ?");
+        if filter.sanad_id.is_some() {
+            sql.push_str(" AND sanad_id = ?");
         }
         if filter.from_chain.is_some() {
             sql.push_str(" AND from_chain = ?");
@@ -149,8 +149,8 @@ impl TransfersRepository {
         }
 
         let mut query = sqlx::query_scalar::<_, i64>(&sql);
-        if let Some(ref right_id) = filter.right_id {
-            query = query.bind(right_id);
+        if let Some(ref sanad_id) = filter.sanad_id {
+            query = query.bind(sanad_id);
         }
         if let Some(ref from_chain) = filter.from_chain {
             query = query.bind(from_chain);
@@ -166,14 +166,14 @@ impl TransfersRepository {
         Ok(count as u64)
     }
 
-    /// Get transfers for a specific right.
-    pub async fn by_right(&self, right_id: &str) -> Result<Vec<TransferRecord>> {
+    /// Get transfers for a specific sanad.
+    pub async fn by_sanad(&self, sanad_id: &str) -> Result<Vec<TransferRecord>> {
         let rows = sqlx::query(
-            "SELECT id, right_id, from_chain, to_chain, from_owner, to_owner, \
+            "SELECT id, sanad_id, from_chain, to_chain, from_owner, to_owner, \
              lock_tx, mint_tx, proof_ref, status, created_at, completed_at, duration_ms \
-             FROM transfers WHERE right_id = ? ORDER BY created_at DESC",
+             FROM transfers WHERE sanad_id = ? ORDER BY created_at DESC",
         )
-        .bind(right_id)
+        .bind(sanad_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -183,7 +183,7 @@ impl TransfersRepository {
     /// Get recent transfers.
     pub async fn recent(&self, limit: usize) -> Result<Vec<TransferRecord>> {
         let rows = sqlx::query(
-            "SELECT id, right_id, from_chain, to_chain, from_owner, to_owner, \
+            "SELECT id, sanad_id, from_chain, to_chain, from_owner, to_owner, \
              lock_tx, mint_tx, proof_ref, status, created_at, completed_at, duration_ms \
              FROM transfers ORDER BY created_at DESC LIMIT ?",
         )
@@ -212,7 +212,7 @@ fn row_to_transfer(row: &SqliteRow) -> Result<TransferRecord> {
 
     Ok(TransferRecord {
         id: row.try_get("id")?,
-        right_id: row.try_get("right_id")?,
+        sanad_id: row.try_get("sanad_id")?,
         from_chain: row.try_get("from_chain")?,
         to_chain: row.try_get("to_chain")?,
         from_owner: row.try_get("from_owner")?,

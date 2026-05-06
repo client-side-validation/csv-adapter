@@ -6,17 +6,17 @@
 //! - ChainBroadcaster: Transaction broadcasting
 //! - ChainDeployer: Program deployment
 //! - ChainProofProvider: Proof building and verification
-//! - ChainRightOps: Right management via program accounts
+//! - ChainSanadOps: Sanad management via program accounts
 
 use async_trait::async_trait;
 use csv_core::chain_operations::{
     BalanceInfo, ChainBroadcaster, ChainDeployer, ChainOpError, ChainOpResult, ChainProofProvider,
-    ChainQuery, ChainRightOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus,
-    RightOperationResult, TransactionInfo, TransactionStatus,
+    ChainQuery, ChainSanadOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus,
+    SanadOperationResult, TransactionInfo, TransactionStatus,
 };
 use csv_core::hash::Hash;
 use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
-use csv_core::right::RightId;
+use csv_core::title::SanadId;
 use csv_core::signature::SignatureScheme;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Signature;
@@ -602,94 +602,94 @@ impl ChainProofProvider for SolanaBackend {
 }
 
 #[async_trait]
-impl ChainRightOps for SolanaBackend {
-    async fn create_right(
+impl ChainSanadOps for SolanaBackend {
+    async fn create_sanad(
         &self,
         owner: &str,
         asset_class: &str,
         asset_id: &str,
         metadata: serde_json::Value,
-    ) -> ChainOpResult<RightOperationResult> {
+    ) -> ChainOpResult<SanadOperationResult> {
         let _ = owner;
         let _ = asset_class;
         let _ = asset_id;
         let _ = metadata;
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right creation requires signed transaction. \
+            "Sanad creation requires signed transaction. \
              Construct and submit a transaction to create the seal account.".to_string(),
         ))
     }
 
-    async fn consume_right(
+    async fn consume_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        let _ = right_id;
+    ) -> ChainOpResult<SanadOperationResult> {
+        let _ = sanad_id;
         let _ = owner_key_id;
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right consumption requires signed transaction. \
+            "Sanad consumption requires signed transaction. \
              Construct and submit a transaction to close the seal account.".to_string(),
         ))
     }
 
-    async fn lock_right(
+    async fn lock_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         destination_chain: &str,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        let _ = right_id;
+    ) -> ChainOpResult<SanadOperationResult> {
+        let _ = sanad_id;
         let _ = destination_chain;
         let _ = owner_key_id;
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right locking requires signed transaction. \
+            "Sanad locking requires signed transaction. \
              Construct and submit a transaction to lock the seal account.".to_string(),
         ))
     }
 
-    async fn mint_right(
+    async fn mint_sanad(
         &self,
         source_chain: &str,
-        source_right_id: &RightId,
+        source_sanad_id: &SanadId,
         lock_proof: &CoreInclusionProof,
         new_owner: &str,
-    ) -> ChainOpResult<RightOperationResult> {
+    ) -> ChainOpResult<SanadOperationResult> {
         let _ = source_chain;
-        let _ = source_right_id;
+        let _ = source_sanad_id;
         let _ = lock_proof;
         let _ = new_owner;
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right minting requires signed transaction. \
+            "Sanad minting requires signed transaction. \
              Verify lock proof, then construct and submit mint transaction.".to_string(),
         ))
     }
 
-    async fn refund_right(
+    async fn refund_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        let _ = right_id;
+    ) -> ChainOpResult<SanadOperationResult> {
+        let _ = sanad_id;
         let _ = owner_key_id;
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right refund requires signed transaction. \
+            "Sanad refund requires signed transaction. \
              Construct and submit a transaction to refund the locked seal.".to_string(),
         ))
     }
 
-    async fn record_right_metadata(
+    async fn record_sanad_metadata(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         metadata: serde_json::Value,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        let _ = right_id;
+    ) -> ChainOpResult<SanadOperationResult> {
+        let _ = sanad_id;
         let _ = metadata;
         let _ = owner_key_id;
 
@@ -699,20 +699,20 @@ impl ChainRightOps for SolanaBackend {
         ))
     }
 
-    async fn verify_right_state(
+    async fn verify_sanad_state(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         expected_state: &str,
     ) -> ChainOpResult<bool> {
-        // Derive the seal account address from the right_id
-        // The seal account is a PDA derived from the right_id hash
+        // Derive the seal account address from the sanad_id
+        // The seal account is a PDA derived from the sanad_id hash
         use solana_sdk::pubkey::Pubkey;
         use solana_system_interface::program;
 
-        // Convert right_id bytes to a Pubkey (32 bytes)
-        let right_bytes = right_id.as_bytes();
-        let seal_address = Pubkey::try_from(*right_bytes)
-            .map_err(|_| ChainOpError::InvalidInput("Invalid right_id length".to_string()))?;
+        // Convert sanad_id bytes to a Pubkey (32 bytes)
+        let sanad_bytes = sanad_id.as_bytes();
+        let seal_address = Pubkey::try_from(*sanad_bytes)
+            .map_err(|_| ChainOpError::InvalidInput("Invalid sanad_id length".to_string()))?;
 
         // Query the account state via RPC
         let account_info = self

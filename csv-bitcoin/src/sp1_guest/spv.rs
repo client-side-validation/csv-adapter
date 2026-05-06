@@ -6,7 +6,7 @@
 
 use csv_core::hash::Hash;
 use csv_core::protocol_version::Chain;
-use csv_core::seal::SealRef;
+use csv_core::seal::SealPoint;
 use csv_core::zk_proof::{ZkPublicInputs, ZkSealProof, ProofSystem, VerifierKey};
 use bitcoin::hashes::{Hash as BitcoinHash, sha256d};
 
@@ -26,7 +26,7 @@ pub struct Sp1BtcSpvInput {
     /// Block height
     pub block_height: u64,
     /// Seal reference (UTXO being spent)
-    pub seal_ref: SealRef,
+    pub seal_ref: SealPoint,
     /// Commitment hash (bound to the proof)
     pub commitment: Hash,
 }
@@ -40,7 +40,7 @@ impl Sp1BtcSpvInput {
         block_header: [u8; 80],
         expected_block_hash: [u8; 32],
         block_height: u64,
-        seal_ref: SealRef,
+        seal_ref: SealPoint,
         commitment: Hash,
     ) -> Self {
         Self {
@@ -69,13 +69,13 @@ impl Sp1BtcSpvInput {
         let mut position = self.tx_position;
 
         for branch_node in &self.merkle_branch {
-            // Determine if current is left or right child
-            let is_right = (position & 1) == 1;
+            // Determine if current is left or sanad child
+            let is_sanad = (position & 1) == 1;
             position >>= 1;
 
             // Concatenate and hash
             let mut concat = Vec::with_capacity(64);
-            if is_right {
+            if is_sanad {
                 concat.extend_from_slice(branch_node);
                 concat.extend_from_slice(&current);
             } else {
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_sp1_input_creation() {
-        let seal = SealRef::new(vec![0xAB; 32], Some(0)).unwrap();
+        let seal = SealPoint::new(vec![0xAB; 32], Some(0)).unwrap();
         let input = Sp1BtcSpvInput::new(
             vec![0x01, 0x00, 0x00, 0x00], // Simplified tx data
             vec![[0xCD; 32]], // Single merkle branch node
@@ -221,7 +221,7 @@ mod tests {
         // Set merkle root in header (bytes 36-68)
         header[36..68].copy_from_slice(&[0x12; 32]);
         
-        let seal = SealRef::new(vec![0xAB; 32], Some(0)).unwrap();
+        let seal = SealPoint::new(vec![0xAB; 32], Some(0)).unwrap();
         let input = Sp1BtcSpvInput::new(
             vec![0x01; 4],
             vec![],
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn test_txid_computation() {
         // Same data should produce same txid
-        let seal = SealRef::new(vec![0xAB; 32], Some(0)).unwrap();
+        let seal = SealPoint::new(vec![0xAB; 32], Some(0)).unwrap();
         let input1 = Sp1BtcSpvInput::new(
             vec![0x01, 0x02, 0x03],
             vec![],
@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn test_verify_bitcoin_spv_fails_with_invalid_header() {
         // This should fail because the block header hash won't match
-        let seal = SealRef::new(vec![0xAB; 32], Some(0)).unwrap();
+        let seal = SealPoint::new(vec![0xAB; 32], Some(0)).unwrap();
         let input = Sp1BtcSpvInput::new(
             vec![0x01; 4],
             vec![],

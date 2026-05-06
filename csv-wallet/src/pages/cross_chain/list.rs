@@ -18,7 +18,7 @@ pub fn CrossChain() -> Element {
             }
 
             if transfers.is_empty() {
-                {empty_state("\u{21C4}", "No transfers recorded", "Start a cross-chain transfer to move Rights between chains.")}
+                {empty_state("\u{21C4}", "No transfers recorded", "Start a cross-chain transfer to move Sanads between chains.")}
             } else {
                 div { class: "{table_class()}",
                     div { class: "{card_header_class()} flex items-center justify-between",
@@ -32,7 +32,7 @@ pub fn CrossChain() -> Element {
                                     th { class: "px-4 py-2 font-medium", "Transfer ID" }
                                     th { class: "px-4 py-2 font-medium", "From" }
                                     th { class: "px-4 py-2 font-medium", "To" }
-                                    th { class: "px-4 py-2 font-medium", "Right ID" }
+                                    th { class: "px-4 py-2 font-medium", "Sanad ID" }
                                     th { class: "px-4 py-2 font-medium", "Status" }
                                     th { class: "px-4 py-2 font-medium", "" }
                                 }
@@ -48,7 +48,7 @@ pub fn CrossChain() -> Element {
                                         }
                                         td { class: "px-4 py-3", span { class: "{chain_badge_class(&t.from_chain)}", "{chain_icon_emoji(&t.from_chain)}" } }
                                         td { class: "px-4 py-3", span { class: "{chain_badge_class(&t.to_chain)}", "{chain_icon_emoji(&t.to_chain)}" } }
-                                        td { class: "px-4 py-3 font-mono text-xs", "{truncate_address(&t.right_id, 8)}" }
+                                        td { class: "px-4 py-3 font-mono text-xs", "{truncate_address(&t.sanad_id, 8)}" }
                                         td { class: "px-4 py-3",
                                             span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {transfer_status_class(&t.status)}",
                                                 "{t.status}"

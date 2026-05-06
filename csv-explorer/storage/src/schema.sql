@@ -1,8 +1,8 @@
 -- CSV Explorer database schema
 -- Apply with: sqlite3 explorer.db < schema.sql
 
--- Rights table
-CREATE TABLE IF NOT EXISTS rights (
+-- Sanads table
+CREATE TABLE IF NOT EXISTS sanads (
     id TEXT PRIMARY KEY,
     chain TEXT NOT NULL,
     seal_ref TEXT NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS rights (
 -- Transfers table
 CREATE TABLE IF NOT EXISTS transfers (
     id TEXT PRIMARY KEY,
-    right_id TEXT NOT NULL REFERENCES rights(id),
+    sanad_id TEXT NOT NULL REFERENCES sanads(id),
     from_chain TEXT NOT NULL,
     to_chain TEXT NOT NULL,
     from_owner TEXT NOT NULL,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS seals (
     chain TEXT NOT NULL,
     seal_type TEXT NOT NULL,
     seal_ref TEXT NOT NULL,
-    right_id TEXT REFERENCES rights(id),
+    sanad_id TEXT REFERENCES sanads(id),
     status TEXT NOT NULL DEFAULT 'available',
     consumed_at TIMESTAMP,
     consumed_tx TEXT,
@@ -71,15 +71,15 @@ CREATE TABLE IF NOT EXISTS sync_progress (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_rights_chain ON rights(chain);
-CREATE INDEX IF NOT EXISTS idx_rights_owner ON rights(owner);
-CREATE INDEX IF NOT EXISTS idx_rights_status ON rights(status);
-CREATE INDEX IF NOT EXISTS idx_transfers_right_id ON transfers(right_id);
+CREATE INDEX IF NOT EXISTS idx_sanads_chain ON sanads(chain);
+CREATE INDEX IF NOT EXISTS idx_sanads_owner ON sanads(owner);
+CREATE INDEX IF NOT EXISTS idx_sanads_status ON sanads(status);
+CREATE INDEX IF NOT EXISTS idx_transfers_sanad_id ON transfers(sanad_id);
 CREATE INDEX IF NOT EXISTS idx_transfers_status ON transfers(status);
 CREATE INDEX IF NOT EXISTS idx_seals_chain ON seals(chain);
 CREATE INDEX IF NOT EXISTS idx_seals_status ON seals(status);
-CREATE INDEX IF NOT EXISTS idx_seals_right_id ON seals(right_id);
+CREATE INDEX IF NOT EXISTS idx_seals_sanad_id ON seals(sanad_id);
 CREATE INDEX IF NOT EXISTS idx_seals_seal_ref ON seals(seal_ref);
-CREATE INDEX IF NOT EXISTS idx_rights_seal_ref ON rights(seal_ref);
+CREATE INDEX IF NOT EXISTS idx_sanads_seal_ref ON sanads(seal_ref);
 CREATE INDEX IF NOT EXISTS idx_contracts_chain ON contracts(chain);
 CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status);

@@ -124,9 +124,9 @@ status() {
         echo "  ✅ API Server ($API_PORT): Running"
         local stats=$(curl -s "http://localhost:$API_PORT/api/v1/stats" 2>/dev/null)
         if [ -n "$stats" ]; then
-            local rights=$(echo "$stats" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['total_rights'])" 2>/dev/null || echo "?")
+            local sanads=$(echo "$stats" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['total_sanads'])" 2>/dev/null || echo "?")
             local transfers=$(echo "$stats" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['total_transfers'])" 2>/dev/null || echo "?")
-            echo "     Data: $rights rights, $transfers transfers"
+            echo "     Data: $sanads sanads, $transfers transfers"
         fi
     else
         echo "  ❌ API Server ($API_PORT): Not running"

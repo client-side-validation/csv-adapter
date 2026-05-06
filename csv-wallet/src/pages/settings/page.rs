@@ -91,7 +91,7 @@ pub fn Settings() -> Element {
                         h3 { class: "font-semibold", "Lock Wallet?" }
                     }
                     p { class: "text-sm text-gray-400 mb-4",
-                        "This will remove the wallet from memory. Your rights, seals, and other data will remain saved, but you'll need to re-import your wallet to access them."
+                        "This will remove the wallet from memory. Your sanads, seals, and other data will remain saved, but you'll need to re-import your wallet to access them."
                     }
                     div { class: "flex gap-3",
                         button {
@@ -121,7 +121,7 @@ pub fn Settings() -> Element {
                         h3 { class: "font-semibold text-red-300", "Clear All Data?" }
                     }
                     p { class: "text-sm text-gray-400 mb-4",
-                        "This will permanently delete all wallet data, rights, seals, transfers, and settings from localStorage. This action cannot be undone."
+                        "This will permanently delete all wallet data, sanads, seals, transfers, and settings from localStorage. This action cannot be undone."
                     }
                     div { class: "flex gap-3",
                         button {

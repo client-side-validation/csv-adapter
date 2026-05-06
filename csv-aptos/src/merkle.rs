@@ -35,11 +35,11 @@ pub struct Leaf {
 pub enum MerkleNode {
     /// Leaf node
     Leaf(Leaf),
-    /// Internal node with left and right children
+    /// Internal node with left and sanad children
     Internal {
         hash: [u8; 32],
         left: Box<MerkleNode>,
-        right: Box<MerkleNode>,
+        sanad: Box<MerkleNode>,
     },
     /// Empty node
     Empty,
@@ -63,11 +63,11 @@ impl MerkleNode {
     }
 
     /// Compute the hash of an internal node from its children
-    pub fn compute_internal_hash(left_hash: [u8; 32], right_hash: [u8; 32]) -> [u8; 32] {
-        // In Aptos, the internal hash is SHA256(left || right)
+    pub fn compute_internal_hash(left_hash: [u8; 32], sanad_hash: [u8; 32]) -> [u8; 32] {
+        // In Aptos, the internal hash is SHA256(left || sanad)
         let mut hasher = Sha256::new();
         hasher.update(left_hash);
-        hasher.update(right_hash);
+        hasher.update(sanad_hash);
         hasher.finalize().into()
     }
 }
@@ -145,7 +145,7 @@ impl MerkleAccumulator {
 
             for i in (0..current_level.len()).step_by(2) {
                 let left = current_level[i].clone();
-                let right = if i + 1 < current_level.len() {
+                let sanad = if i + 1 < current_level.len() {
                     current_level[i + 1].clone()
                 } else {
                     // If odd number, duplicate the last node
@@ -153,13 +153,13 @@ impl MerkleAccumulator {
                 };
 
                 let left_hash = left.hash();
-                let right_hash = right.hash();
-                let internal_hash = MerkleNode::compute_internal_hash(left_hash, right_hash);
+                let sanad_hash = sanad.hash();
+                let internal_hash = MerkleNode::compute_internal_hash(left_hash, sanad_hash);
 
                 next_level.push(MerkleNode::Internal {
                     hash: internal_hash,
                     left: Box::new(left),
-                    right: Box::new(right),
+                    sanad: Box::new(sanad),
                 });
             }
 
@@ -206,8 +206,8 @@ impl MerkleAccumulator {
                     // The sibling is on the left
                     current_hash = MerkleNode::compute_internal_hash(*hash, current_hash);
                 }
-                MerkleProofItem::Right { hash } => {
-                    // The sibling is on the right
+                MerkleProofItem::Sanad { hash } => {
+                    // The sibling is on the sanad
                     current_hash = MerkleNode::compute_internal_hash(current_hash, *hash);
                 }
             }
@@ -223,8 +223,8 @@ impl MerkleAccumulator {
 pub enum MerkleProofItem {
     /// Sibling hash on the left
     Left { hash: [u8; 32] },
-    /// Sibling hash on the right
-    Right { hash: [u8; 32] },
+    /// Sibling hash on the sanad
+    Sanad { hash: [u8; 32] },
 }
 
 /// State proof for Aptos resource verification
@@ -453,8 +453,8 @@ mod tests {
     #[test]
     fn test_merkle_node_compute_internal_hash() {
         let left = [1u8; 32];
-        let right = [2u8; 32];
-        let hash = MerkleNode::compute_internal_hash(left, right);
+        let sanad = [2u8; 32];
+        let hash = MerkleNode::compute_internal_hash(left, sanad);
         assert_ne!(hash, [0u8; 32]);
     }
 

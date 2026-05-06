@@ -18,18 +18,18 @@ impl SealsRepository {
 
     /// Insert a new seal record.
     pub async fn insert(&self, seal: &SealRecord) -> Result<()> {
-        let right_id = seal.right_id.as_deref();
+        let sanad_id = seal.sanad_id.as_deref();
         let consumed_at = seal.consumed_at;
         let consumed_tx = seal.consumed_tx.as_deref();
 
         sqlx::query(
             r#"
-            INSERT INTO seals (id, chain, seal_type, seal_ref, right_id, status,
+            INSERT INTO seals (id, chain, seal_type, seal_ref, sanad_id, status,
                                consumed_at, consumed_tx, block_height)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             ON CONFLICT(id) DO UPDATE SET
                 status = excluded.status,
-                right_id = excluded.right_id,
+                sanad_id = excluded.sanad_id,
                 consumed_at = excluded.consumed_at,
                 consumed_tx = excluded.consumed_tx
             "#,
@@ -38,7 +38,7 @@ impl SealsRepository {
         .bind(&seal.chain)
         .bind(seal.seal_type.to_string())
         .bind(&seal.seal_ref)
-        .bind(right_id)
+        .bind(sanad_id)
         .bind(seal.status.to_string())
         .bind(consumed_at)
         .bind(consumed_tx)
@@ -52,7 +52,7 @@ impl SealsRepository {
     /// Get a single seal by ID.
     pub async fn get(&self, id: &str) -> Result<Option<SealRecord>> {
         let row = sqlx::query(
-            "SELECT id, chain, seal_type, seal_ref, right_id, status, \
+            "SELECT id, chain, seal_type, seal_ref, sanad_id, status, \
              consumed_at, consumed_tx, block_height \
              FROM seals WHERE id = $1",
         )
@@ -69,7 +69,7 @@ impl SealsRepository {
     /// List seals matching the given filter.
     pub async fn list(&self, filter: SealFilter) -> Result<Vec<SealRecord>> {
         let mut sql = String::from(
-            "SELECT id, chain, seal_type, seal_ref, right_id, status, \
+            "SELECT id, chain, seal_type, seal_ref, sanad_id, status, \
              consumed_at, consumed_tx, block_height \
              FROM seals WHERE 1=1",
         );
@@ -83,8 +83,8 @@ impl SealsRepository {
         if filter.status.is_some() {
             sql.push_str(" AND status = ?");
         }
-        if filter.right_id.is_some() {
-            sql.push_str(" AND right_id = ?");
+        if filter.sanad_id.is_some() {
+            sql.push_str(" AND sanad_id = ?");
         }
 
         sql.push_str(" ORDER BY block_height DESC");
@@ -106,8 +106,8 @@ impl SealsRepository {
         if let Some(status) = filter.status {
             query = query.bind(status.to_string());
         }
-        if let Some(ref right_id) = filter.right_id {
-            query = query.bind(right_id);
+        if let Some(ref sanad_id) = filter.sanad_id {
+            query = query.bind(sanad_id);
         }
 
         let rows = query.fetch_all(&self.pool).await?;
@@ -137,8 +137,8 @@ impl SealsRepository {
         if filter.status.is_some() {
             sql.push_str(" AND status = ?");
         }
-        if filter.right_id.is_some() {
-            sql.push_str(" AND right_id = ?");
+        if filter.sanad_id.is_some() {
+            sql.push_str(" AND sanad_id = ?");
         }
 
         let mut query = sqlx::query_scalar::<_, i64>(&sql);
@@ -151,22 +151,22 @@ impl SealsRepository {
         if let Some(status) = filter.status {
             query = query.bind(status.to_string());
         }
-        if let Some(ref right_id) = filter.right_id {
-            query = query.bind(right_id);
+        if let Some(ref sanad_id) = filter.sanad_id {
+            query = query.bind(sanad_id);
         }
 
         let count = query.fetch_one(&self.pool).await?;
         Ok(count as u64)
     }
 
-    /// Get seals for a specific right.
-    pub async fn by_right(&self, right_id: &str) -> Result<Vec<SealRecord>> {
+    /// Get seals for a specific sanad.
+    pub async fn by_sanad(&self, sanad_id: &str) -> Result<Vec<SealRecord>> {
         let rows = sqlx::query(
-            "SELECT id, chain, seal_type, seal_ref, right_id, status, \
+            "SELECT id, chain, seal_type, seal_ref, sanad_id, status, \
              consumed_at, consumed_tx, block_height \
-             FROM seals WHERE right_id = ? ORDER BY block_height DESC",
+             FROM seals WHERE sanad_id = ? ORDER BY block_height DESC",
         )
-        .bind(right_id)
+        .bind(sanad_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -176,7 +176,7 @@ impl SealsRepository {
     /// Get seals by chain.
     pub async fn by_chain(&self, chain: &str) -> Result<Vec<SealRecord>> {
         let rows = sqlx::query(
-            "SELECT id, chain, seal_type, seal_ref, right_id, status, \
+            "SELECT id, chain, seal_type, seal_ref, sanad_id, status, \
              consumed_at, consumed_tx, block_height \
              FROM seals WHERE chain = ? ORDER BY block_height DESC",
         )
@@ -193,7 +193,7 @@ impl SealsRepository {
     /// you can find the corresponding seal record in the explorer.
     pub async fn get_by_chain_native_id(&self, chain_native_id: &str) -> Result<Option<SealRecord>> {
         let row = sqlx::query(
-            "SELECT id, chain, seal_type, seal_ref, right_id, status, \
+            "SELECT id, chain, seal_type, seal_ref, sanad_id, status, \
              consumed_at, consumed_tx, block_height \
              FROM seals WHERE seal_ref = ?",
         )
@@ -231,7 +231,7 @@ fn row_to_seal(row: &SqliteRow) -> Result<SealRecord> {
         chain: row.try_get("chain")?,
         seal_type,
         seal_ref: row.try_get("seal_ref")?,
-        right_id: row.try_get::<Option<String>, _>("right_id")?,
+        sanad_id: row.try_get::<Option<String>, _>("sanad_id")?,
         status,
         consumed_at: row.try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("consumed_at")?,
         consumed_tx: row.try_get::<Option<String>, _>("consumed_tx")?,

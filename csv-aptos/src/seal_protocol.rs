@@ -21,9 +21,9 @@ use csv_core::dag::DAGSegment;
 use csv_core::error::AdapterError;
 use csv_core::error::Result as CoreResult;
 use csv_core::proof::{FinalityProof, ProofBundle};
-use csv_core::seal::AnchorRef as CoreAnchorRef;
-use csv_core::seal::SealRef as CoreSealRef;
-use csv_core::AnchorLayer;
+use csv_core::seal::CommitAnchor as CoreCommitAnchor;
+use csv_core::seal::SealPoint as CoreSealPoint;
+use csv_core::SealProtocol;
 use csv_core::Hash;
 
 use crate::checkpoint::CheckpointVerifier;
@@ -32,7 +32,7 @@ use crate::error::{AptosError, AptosResult};
 use crate::proofs::{CommitmentEventBuilder, EventProofVerifier, StateProofVerifier};
 use crate::rpc::{AptosLedgerInfo, AptosRpc, AptosTransaction};
 use crate::seal::SealRegistry;
-use crate::types::{AptosAnchorRef, AptosFinalityProof, AptosInclusionProof, AptosSealRef};
+use crate::types::{AptosCommitAnchor, AptosFinalityProof, AptosInclusionProof, AptosSealPoint};
 
 /// Aptos implementation of the SealProtocol trait
 pub struct AptosSealProtocol {
@@ -143,7 +143,7 @@ impl AptosSealProtocol {
     }
 
     /// Verify that a seal resource is available before consumption.
-    fn verify_seal_available(&self, seal: &AptosSealRef) -> AptosResult<()> {
+    fn verify_seal_available(&self, seal: &AptosSealPoint) -> AptosResult<()> {
         // Check registry first
         let registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
         if registry.is_seal_used(seal) {
@@ -261,7 +261,7 @@ impl AptosSealProtocol {
     #[cfg(feature = "rpc")]
     fn build_and_sign_entry_function(
         &self,
-        seal: &AptosSealRef,
+        seal: &AptosSealPoint,
         commitment: [u8; 32],
     ) -> Result<(serde_json::Value, Vec<u8>), Box<dyn std::error::Error + Send + Sync>> {
         use ed25519_dalek::Signer;
@@ -360,8 +360,8 @@ impl AptosSealProtocol {
     /// Verify the event in a published anchor matches the expected commitment.
     fn verify_anchor_event(
         &self,
-        anchor: &AptosAnchorRef,
-        expected_seal: &AptosSealRef,
+        anchor: &AptosCommitAnchor,
+        expected_seal: &AptosSealPoint,
         expected_commitment: Hash,
     ) -> CoreResult<()> {
         let expected_event_data = self.event_builder.build(
@@ -410,13 +410,13 @@ fn parse_aptos_address(s: &str) -> Result<[u8; 32], String> {
     Ok(addr)
 }
 
-impl AnchorLayer for AptosSealProtocol {
-    type SealRef = AptosSealRef;
-    type AnchorRef = AptosAnchorRef;
+impl SealProtocol for AptosSealProtocol {
+    type SealPoint = AptosSealPoint;
+    type CommitAnchor = AptosCommitAnchor;
     type InclusionProof = AptosInclusionProof;
     type FinalityProof = AptosFinalityProof;
 
-    fn publish(&self, commitment: Hash, seal: Self::SealRef) -> CoreResult<Self::AnchorRef> {
+    fn publish(&self, commitment: Hash, seal: Self::SealPoint) -> CoreResult<Self::CommitAnchor> {
         log::debug!(
             "Publishing commitment via seal {}",
             format_address(seal.account_address)
@@ -479,7 +479,7 @@ impl AnchorLayer for AptosSealProtocol {
                 .mark_seal_used(&seal, version)
                 .map_err(AdapterError::from)?;
 
-            Ok(AptosAnchorRef::new(version, seal.account_address, version))
+            Ok(AptosCommitAnchor::new(version, seal.account_address, version))
         }
 
         #[cfg(not(feature = "rpc"))]
@@ -496,11 +496,11 @@ impl AnchorLayer for AptosSealProtocol {
                 .build(*commitment.as_bytes(), seal.account_address);
 
             // Return fallback anchor
-            Ok(AptosAnchorRef::new(0, seal.account_address, 0))
+            Ok(AptosCommitAnchor::new(0, seal.account_address, 0))
         }
     }
 
-    fn verify_inclusion(&self, anchor: Self::AnchorRef) -> CoreResult<Self::InclusionProof> {
+    fn verify_inclusion(&self, anchor: Self::CommitAnchor) -> CoreResult<Self::InclusionProof> {
         log::debug!(
             "Verifying inclusion for anchor at version {}",
             anchor.version
@@ -590,7 +590,7 @@ impl AnchorLayer for AptosSealProtocol {
         ))
     }
 
-    fn verify_finality(&self, anchor: Self::AnchorRef) -> CoreResult<Self::FinalityProof> {
+    fn verify_finality(&self, anchor: Self::CommitAnchor) -> CoreResult<Self::FinalityProof> {
         log::debug!(
             "Verifying finality for anchor at version {}",
             anchor.version
@@ -622,7 +622,7 @@ impl AnchorLayer for AptosSealProtocol {
         Ok(AptosFinalityProof::new(anchor.version, is_certified))
     }
 
-    fn enforce_seal(&self, seal: Self::SealRef) -> CoreResult<()> {
+    fn enforce_seal(&self, seal: Self::SealPoint) -> CoreResult<()> {
         let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
         if registry.is_seal_used(&seal) {
             return Err(AdapterError::SealReplay(format!(
@@ -635,14 +635,14 @@ impl AnchorLayer for AptosSealProtocol {
             .map_err(AdapterError::from)
     }
 
-    fn create_seal(&self, _value: Option<u64>) -> CoreResult<Self::SealRef> {
+    fn create_seal(&self, _value: Option<u64>) -> CoreResult<Self::SealPoint> {
         use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(b"aptos-seal");
         let result = hasher.finalize();
         let mut addr = [0u8; 32];
         addr.copy_from_slice(&result);
-        Ok(AptosSealRef::new(addr, "CSV::Seal".to_string(), 0))
+        Ok(AptosSealPoint::new(addr, "CSV::Seal".to_string(), 0))
     }
 
     fn hash_commitment(
@@ -650,9 +650,9 @@ impl AnchorLayer for AptosSealProtocol {
         contract_id: Hash,
         previous_commitment: Hash,
         transition_payload_hash: Hash,
-        seal_ref: &Self::SealRef,
+        seal_point: &Self::SealPoint,
     ) -> Hash {
-        let core_seal = CoreSealRef::new(seal_ref.to_vec(), Some(seal_ref.nonce))
+        let core_seal = CoreSealPoint::new(seal_ref.to_vec(), Some(seal_ref.nonce))
             .expect("valid seal reference");
         Commitment::simple(
             contract_id,
@@ -666,15 +666,15 @@ impl AnchorLayer for AptosSealProtocol {
 
     fn build_proof_bundle(
         &self,
-        anchor: Self::AnchorRef,
+        anchor: Self::CommitAnchor,
         transition_dag: DAGSegment,
     ) -> CoreResult<ProofBundle> {
         let inclusion = self.verify_inclusion(anchor.clone())?;
         let finality = self.verify_finality(anchor.clone())?;
-        let seal_ref = CoreSealRef::new(anchor.event_handle.to_vec(), Some(anchor.version))
+        let seal_ref = CoreSealPoint::new(anchor.event_handle.to_vec(), Some(anchor.version))
             .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
-        let anchor_ref = CoreAnchorRef::new(anchor.event_handle.to_vec(), anchor.version, vec![])
+        let anchor_ref = CoreCommitAnchor::new(anchor.event_handle.to_vec(), anchor.version, vec![])
             .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
         let inclusion_proof = csv_core::InclusionProof::new(
@@ -705,7 +705,7 @@ impl AnchorLayer for AptosSealProtocol {
         .map_err(|e| AdapterError::Generic(e.to_string()))
     }
 
-    fn rollback(&self, anchor: Self::AnchorRef) -> CoreResult<()> {
+    fn rollback(&self, anchor: Self::CommitAnchor) -> CoreResult<()> {
         log::warn!(
             "Rollback requested for anchor at version {}",
             anchor.version
@@ -735,7 +735,7 @@ impl AnchorLayer for AptosSealProtocol {
         if anchor.version < current_version {
             let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
             // Try to clear using anchor event_handle as seal identifier
-            let dummy_seal = AptosSealRef::new(anchor.event_handle, "CSV::Seal".to_string(), 0);
+            let dummy_seal = AptosSealPoint::new(anchor.event_handle, "CSV::Seal".to_string(), 0);
             if let Err(e) = registry.clear_seal(&dummy_seal) {
                 // Seal may not be in registry yet, which is OK for rollback
                 log::debug!("Rollback: seal not found in registry (this is OK): {}", e);
@@ -809,7 +809,7 @@ mod tests {
     #[test]
     fn test_verify_finality() {
         let adapter = test_adapter();
-        let anchor = AptosAnchorRef::new(1500, [1u8; 32], 0);
+        let anchor = AptosCommitAnchor::new(1500, [1u8; 32], 0);
         let result = adapter.verify_finality(anchor);
         assert!(result.is_ok());
     }
@@ -840,7 +840,7 @@ mod tests {
             .with_signing_key(signing_key);
 
         // Create a seal
-        let seal = AptosSealRef::new([1u8; 32], resource_type.clone(), 0);
+        let seal = AptosSealPoint::new([1u8; 32], resource_type.clone(), 0);
         let commitment = Hash::new([1u8; 32]);
         let result = adapter.publish(commitment, seal);
         assert!(result.is_ok());
@@ -871,7 +871,7 @@ mod tests {
             .unwrap()
             .with_signing_key(signing_key);
 
-        let seal = AptosSealRef::new([1u8; 32], resource_type.clone(), 0);
+        let seal = AptosSealPoint::new([1u8; 32], resource_type.clone(), 0);
         let commitment = Hash::new([1u8; 32]);
         adapter.publish(commitment, seal.clone()).unwrap();
 

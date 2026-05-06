@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Sui seal reference (owned object with one_time attribute)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct SuiSealRef {
+pub struct SuiSealPoint {
     /// Object ID (32 bytes)
     pub object_id: [u8; 32],
     /// Object version
@@ -13,7 +13,7 @@ pub struct SuiSealRef {
     pub nonce: u64,
 }
 
-impl SuiSealRef {
+impl SuiSealPoint {
     /// Create a new Sui seal reference
     pub fn new(object_id: [u8; 32], version: u64, nonce: u64) -> Self {
         Self {
@@ -35,7 +35,7 @@ impl SuiSealRef {
 
 /// Sui anchor reference (dynamic object field containing commitment)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct SuiAnchorRef {
+pub struct SuiCommitAnchor {
     /// Object ID containing the commitment
     pub object_id: [u8; 32],
     /// Transaction digest that created the anchor
@@ -44,7 +44,7 @@ pub struct SuiAnchorRef {
     pub checkpoint: u64,
 }
 
-impl SuiAnchorRef {
+impl SuiCommitAnchor {
     /// Create a new Sui anchor reference
     pub fn new(object_id: [u8; 32], tx_digest: [u8; 32], checkpoint: u64) -> Self {
         Self {
@@ -102,13 +102,13 @@ mod tests {
 
     #[test]
     fn test_seal_ref_creation() {
-        let seal = SuiSealRef::new([1u8; 32], 1, 42);
+        let seal = SuiSealPoint::new([1u8; 32], 1, 42);
         assert_eq!(seal.version, 1);
     }
 
     #[test]
     fn test_anchor_ref_creation() {
-        let anchor = SuiAnchorRef::new([2u8; 32], [3u8; 32], 100);
+        let anchor = SuiCommitAnchor::new([2u8; 32], [3u8; 32], 100);
         assert_eq!(anchor.checkpoint, 100);
     }
 }

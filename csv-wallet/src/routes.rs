@@ -13,19 +13,19 @@ pub enum Route {
     #[route("/")]
     Dashboard {},
 
-    // Rights
-    #[route("/rights")]
-    Rights {},
-    #[route("/rights/create")]
-    CreateRight {},
-    #[route("/rights/:id")]
-    ShowRight { id: String },
-    #[route("/rights/:id/journey")]
-    RightJourney { id: String },
-    #[route("/rights/transfer")]
-    TransferRight {},
-    #[route("/rights/consume")]
-    ConsumeRight {},
+    // Sanads
+    #[route("/sanads")]
+    Sanads {},
+    #[route("/sanads/create")]
+    CreateSanad {},
+    #[route("/sanads/:id")]
+    ShowSanad { id: String },
+    #[route("/sanads/:id/journey")]
+    SanadJourney { id: String },
+    #[route("/sanads/transfer")]
+    TransferSanad {},
+    #[route("/sanads/consume")]
+    ConsumeSanad {},
 
     // Proofs
     #[route("/proofs")]

@@ -2,7 +2,7 @@
 //!
 //! Core seal management operations.
 
-use csv_core::{Chain, RightId, SealRef};
+use csv_core::{Chain, SanadId, SealPoint};
 use serde::{Serialize, Deserialize};
 
 /// Seal status.
@@ -19,8 +19,8 @@ pub enum SealStatus {
         tx_hash: String,
         /// Block height
         block_height: u64,
-        /// Right ID that was transferred
-        right_id: String,
+        /// Sanad ID that was transferred
+        sanad_id: String,
     },
     /// Seal was double-spent (security issue)
     DoubleSpent,
@@ -39,13 +39,13 @@ pub struct SealRecord {
     pub created_at: chrono::DateTime<chrono::Utc>,
     /// Last updated timestamp
     pub updated_at: chrono::DateTime<chrono::Utc>,
-    /// Associated Right ID
-    pub right_id: Option<RightId>,
+    /// Associated Sanad ID
+    pub sanad_id: Option<SanadId>,
     /// Value (if applicable)
     pub value: Option<u64>,
     /// Real chain-native seal reference (from chain adapter)
     /// This is the actual on-chain seal identifier, NOT a timestamp-based fake ID
-    pub seal_ref: Option<SealRef>,
+    pub seal_ref: Option<SealPoint>,
 }
 
 /// Seal manager for creating and managing seals.
@@ -81,10 +81,10 @@ impl SealManager {
         &self,
         chain: Chain,
         value: Option<u64>,
-        seal_ref: Option<SealRef>,
+        seal_ref: Option<SealPoint>,
     ) -> Result<SealRecord, String> {
         let seal_ref = seal_ref.ok_or_else(|| {
-            "Protocol violation: Cannot create seal without a real chain-native SealRef. \
+            "Protocol violation: Cannot create seal without a real chain-native SealPoint. \
              Use the chain adapter's create_seal() method to obtain a real seal reference.".to_string()
         })?;
 
@@ -96,7 +96,7 @@ impl SealManager {
             status: SealStatus::Unconsumed,
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
-            right_id: None,
+            sanad_id: None,
             value,
             seal_ref: Some(seal_ref),
         };
@@ -134,9 +134,9 @@ impl SealManager {
         Ok(!matches!(seal.status, SealStatus::Unconsumed))
     }
 
-    /// Get seals for a specific right.
-    pub fn get_seals_for_right(&self, right_id: &RightId) -> Result<Vec<SealRecord>, String> {
-        self.store.get_seals_for_right(right_id).map_err(|e| format!("{}", e))
+    /// Get seals for a specific sanad.
+    pub fn get_seals_for_sanad(&self, sanad_id: &SanadId) -> Result<Vec<SealRecord>, String> {
+        self.store.get_seals_for_sanad(sanad_id).map_err(|e| format!("{}", e))
     }
 
     /// Get seal history.

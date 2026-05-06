@@ -26,7 +26,7 @@ pub struct SealRecord {
     pub status: SealStatus,
     pub value: u64,
     pub created_at: DateTime<Utc>,
-    pub right_id: String,
+    pub sanad_id: String,
 }
 
 impl SealRecord {
@@ -213,7 +213,7 @@ mod tests {
             status: SealStatus::Unconsumed,
             value: 1000,
             created_at: Utc::now(),
-            right_id: "right-abc".to_string(),
+            sanad_id: "sanad-abc".to_string(),
         };
 
         let json = serde_json::to_string(&record).unwrap();

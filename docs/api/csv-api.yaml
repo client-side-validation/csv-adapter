@@ -2,18 +2,18 @@ openapi: 3.1.0
 info:
   title: CSV Adapter API
   description: |
-    Client-side validation system for cross-chain rights.
+    Client-side validation system for cross-chain sanads.
     
     This API enables AI agents and applications to:
-    - Create and manage Rights anchored to blockchain seals
+    - Create and manage Sanads anchored to blockchain seals
     - Execute cross-chain transfers with cryptographic proofs
     - Verify proofs locally without trusting intermediaries
     - Monitor wallet balances and chain status
     
     **Key Concepts:**
-    - **Right**: A transferrable claim anchored to a chain's single-use seal
+    - **Sanad**: A transferrable claim anchored to a chain's single-use seal
     - **Seal**: Chain-specific mechanism enforcing single-use (UTXO, Object, Resource, Nullifier)
-    - **Cross-chain transfer**: Right moves by consuming seal on source, proving on destination
+    - **Cross-chain transfer**: Sanad moves by consuming seal on source, proving on destination
   version: 0.3.0
   contact:
     name: CSV Adapter Team
@@ -29,8 +29,8 @@ servers:
     description: Production API
 
 tags:
-  - name: rights
-    description: Create, query, and manage Rights
+  - name: sanads
+    description: Create, query, and manage Sanads
   - name: transfers
     description: Cross-chain transfer operations
   - name: proofs
@@ -39,26 +39,26 @@ tags:
     description: Wallet and chain management
 
 paths:
-  /rights:
+  /sanads:
     post:
-      operationId: createRight
-      summary: Create a new Right
-      description: Create a new Right anchored to a specific blockchain's single-use seal
+      operationId: createSanad
+      summary: Create a new Sanad
+      description: Create a new Sanad anchored to a specific blockchain's single-use seal
       tags:
-        - rights
+        - sanads
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateRightRequest'
+              $ref: '#/components/schemas/CreateSanadRequest'
       responses:
         '201':
-          description: Right created successfully
+          description: Sanad created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CreateRightResponse'
+                $ref: '#/components/schemas/CreateSanadResponse'
         '400':
           description: Invalid request
           content:
@@ -73,11 +73,11 @@ paths:
                 $ref: '#/components/schemas/Error'
     
     get:
-      operationId: listRights
-      summary: List all Rights
-      description: List all Rights in the wallet, optionally filtered by chain and status
+      operationId: listSanads
+      summary: List all Sanads
+      description: List all Sanads in the wallet, optionally filtered by chain and status
       tags:
-        - rights
+        - sanads
       parameters:
         - name: chain
           in: query
@@ -93,43 +93,43 @@ paths:
             default: active
         - name: limit
           in: query
-          description: Maximum number of Rights to return
+          description: Maximum number of Sanads to return
           schema:
             type: integer
             default: 20
             maximum: 100
       responses:
         '200':
-          description: List of Rights
+          description: List of Sanads
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ListRightsResponse'
+                $ref: '#/components/schemas/ListSanadsResponse'
 
-  /rights/{rightId}:
+  /sanads/{sanadId}:
     get:
-      operationId: getRight
-      summary: Get Right details
-      description: Get details of a specific Right by its ID
+      operationId: getSanad
+      summary: Get Sanad details
+      description: Get details of a specific Sanad by its ID
       tags:
-        - rights
+        - sanads
       parameters:
-        - name: rightId
+        - name: sanadId
           in: path
           required: true
-          description: The 32-byte Right ID (hex format)
+          description: The 32-byte Sanad ID (hex format)
           schema:
             type: string
             pattern: '^0x[a-fA-F0-9]{64}$'
       responses:
         '200':
-          description: Right details
+          description: Sanad details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GetRightResponse'
+                $ref: '#/components/schemas/GetSanadResponse'
         '404':
-          description: Right not found
+          description: Sanad not found
           content:
             application/json:
               schema:
@@ -140,13 +140,13 @@ paths:
       operationId: createTransfer
       summary: Create cross-chain transfer
       description: |
-        Transfer a Right from one blockchain to another.
+        Transfer a Sanad from one blockchain to another.
         
         **Process:**
-        1. Lock Right on source chain (consume seal)
+        1. Lock Sanad on source chain (consume seal)
         2. Generate cryptographic proof
         3. Submit proof to destination chain
-        4. Mint Right on destination chain
+        4. Mint Sanad on destination chain
       tags:
         - transfers
       requestBody:
@@ -244,7 +244,7 @@ paths:
       description: |
         Verify a cross-chain proof locally.
         
-        This checks that a Right was properly locked on the source chain and the proof is valid.
+        This checks that a Sanad was properly locked on the source chain and the proof is valid.
       tags:
         - proofs
       requestBody:
@@ -309,7 +309,7 @@ components:
         - aptos
       description: Supported blockchain networks
 
-    CreateRightRequest:
+    CreateSanadRequest:
       type: object
       required:
         - chain
@@ -323,19 +323,19 @@ components:
           additionalProperties: true
         owner_address:
           type: string
-          description: Address that owns the Right (default: wallet address)
+          description: Address that owns the Sanad (default: wallet address)
         metadata:
           type: object
-          description: Optional metadata for the Right
+          description: Optional metadata for the Sanad
           additionalProperties: true
 
-    CreateRightResponse:
+    CreateSanadResponse:
       type: object
       properties:
         success:
           type: boolean
           example: true
-        right_id:
+        sanad_id:
           type: string
           pattern: '^0x[a-fA-F0-9]{64}$'
           example: '0xabc123...'
@@ -354,30 +354,30 @@ components:
           type: string
           format: date-time
 
-    GetRightResponse:
+    GetSanadResponse:
       type: object
       properties:
         success:
           type: boolean
-        right:
-          $ref: '#/components/schemas/Right'
+        sanad:
+          $ref: '#/components/schemas/Sanad'
 
-    ListRightsResponse:
+    ListSanadsResponse:
       type: object
       properties:
         success:
           type: boolean
         count:
           type: integer
-        rights:
+        sanads:
           type: array
           items:
-            $ref: '#/components/schemas/Right'
+            $ref: '#/components/schemas/Sanad'
 
-    Right:
+    Sanad:
       type: object
       properties:
-        right_id:
+        sanad_id:
           type: string
           pattern: '^0x[a-fA-F0-9]{64}$'
         chain:
@@ -395,9 +395,9 @@ components:
         history:
           type: array
           items:
-            $ref: '#/components/schemas/RightEvent'
+            $ref: '#/components/schemas/SanadEvent'
 
-    RightEvent:
+    SanadEvent:
       type: object
       properties:
         action:
@@ -414,15 +414,15 @@ components:
     CreateTransferRequest:
       type: object
       required:
-        - right_id
+        - sanad_id
         - from_chain
         - to_chain
         - destination_owner
       properties:
-        right_id:
+        sanad_id:
           type: string
           pattern: '^0x[a-fA-F0-9]{64}$'
-          description: The Right ID to transfer
+          description: The Sanad ID to transfer
         from_chain:
           $ref: '#/components/schemas/Chain'
         to_chain:
@@ -447,7 +447,7 @@ components:
           type: boolean
         transfer_id:
           type: string
-        right_id:
+        sanad_id:
           type: string
         from_chain:
           $ref: '#/components/schemas/Chain'
@@ -485,7 +485,7 @@ components:
       properties:
         transfer_id:
           type: string
-        right_id:
+        sanad_id:
           type: string
         from_chain:
           $ref: '#/components/schemas/Chain'
@@ -524,9 +524,9 @@ components:
           type: object
           description: The proof bundle to verify
           additionalProperties: true
-        expected_right_id:
+        expected_sanad_id:
           type: string
-          description: Expected Right ID after verification
+          description: Expected Sanad ID after verification
 
     VerifyProofResponse:
       type: object
@@ -544,7 +544,7 @@ components:
           $ref: '#/components/schemas/Chain'
         verification_time_ms:
           type: integer
-        right_id:
+        sanad_id:
           type: string
         details:
           type: object

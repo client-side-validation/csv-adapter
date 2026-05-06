@@ -13,31 +13,31 @@ BUILDING csv-seal-v2
 [0m[1m[38;5;11mwarning[0m[1m: invalid documentation comment[0m
    [0m[34m┌─[0m contracts/sources/csv_seal.move:43:5
    [0m[34m│[0m
-[0m[34m43[0m [0m[34m│[0m     [0m[33m/// Emitted when a new seal/Right is created.[0m
+[0m[34m43[0m [0m[34m│[0m     [0m[33m/// Emitted when a new seal/Sanad is created.[0m
    [0m[34m│[0m     [0m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m [0m[33mDocumentation comment cannot be matched to a language item[0m
 
 [0m[1m[38;5;11mwarning[0m[1m: invalid documentation comment[0m
    [0m[34m┌─[0m contracts/sources/csv_seal.move:51:5
    [0m[34m│[0m
-[0m[34m51[0m [0m[34m│[0m     [0m[33m/// Emitted when a seal/Right is consumed.[0m
+[0m[34m51[0m [0m[34m│[0m     [0m[33m/// Emitted when a seal/Sanad is consumed.[0m
    [0m[34m│[0m     [0m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m [0m[33mDocumentation comment cannot be matched to a language item[0m
 
 [0m[1m[38;5;11mwarning[0m[1m: invalid documentation comment[0m
    [0m[34m┌─[0m contracts/sources/csv_seal.move:58:5
    [0m[34m│[0m
-[0m[34m58[0m [0m[34m│[0m     [0m[33m/// Emitted when a Right is locked for cross-chain transfer.[0m
+[0m[34m58[0m [0m[34m│[0m     [0m[33m/// Emitted when a Sanad is locked for cross-chain transfer.[0m
    [0m[34m│[0m     [0m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m [0m[33mDocumentation comment cannot be matched to a language item[0m
 
 [0m[1m[38;5;11mwarning[0m[1m: invalid documentation comment[0m
    [0m[34m┌─[0m contracts/sources/csv_seal.move:70:5
    [0m[34m│[0m
-[0m[34m70[0m [0m[34m│[0m     [0m[33m/// Emitted when a Right is minted from cross-chain proof.[0m
+[0m[34m70[0m [0m[34m│[0m     [0m[33m/// Emitted when a Sanad is minted from cross-chain proof.[0m
    [0m[34m│[0m     [0m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m [0m[33mDocumentation comment cannot be matched to a language item[0m
 
 [0m[1m[38;5;11mwarning[0m[1m: invalid documentation comment[0m
    [0m[34m┌─[0m contracts/sources/csv_seal.move:80:5
    [0m[34m│[0m
-[0m[34m80[0m [0m[34m│[0m     [0m[33m/// Emitted when a Right is refunded after timeout.[0m
+[0m[34m80[0m [0m[34m│[0m     [0m[33m/// Emitted when a Sanad is refunded after timeout.[0m
    [0m[34m│[0m     [0m[33m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m [0m[33mDocumentation comment cannot be matched to a language item[0m
 
 [0m[1m[38;5;11mwarning[0m[1m: invalid documentation comment[0m

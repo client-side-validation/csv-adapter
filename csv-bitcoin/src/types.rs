@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Bitcoin seal reference (UTXO OutPoint)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct BitcoinSealRef {
+pub struct BitcoinSealPoint {
     /// Transaction ID (32 bytes)
     pub txid: [u8; 32],
     /// Output index
@@ -13,7 +13,7 @@ pub struct BitcoinSealRef {
     pub nonce: Option<u64>,
 }
 
-impl BitcoinSealRef {
+impl BitcoinSealPoint {
     /// Create a new Bitcoin seal reference
     pub fn new(txid: [u8; 32], vout: u32, nonce: Option<u64>) -> Self {
         Self { txid, vout, nonce }
@@ -40,7 +40,7 @@ impl BitcoinSealRef {
 
 /// Bitcoin anchor reference (Transaction containing commitment)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct BitcoinAnchorRef {
+pub struct BitcoinCommitAnchor {
     /// Transaction ID
     pub txid: [u8; 32],
     /// Output index (for OP_RETURN or Taproot leaf)
@@ -49,7 +49,7 @@ pub struct BitcoinAnchorRef {
     pub block_height: u64,
 }
 
-impl BitcoinAnchorRef {
+impl BitcoinCommitAnchor {
     /// Create a new Bitcoin anchor reference
     pub fn new(txid: [u8; 32], output_index: u32, block_height: u64) -> Self {
         Self {
@@ -123,14 +123,14 @@ mod tests {
 
     #[test]
     fn test_seal_ref_creation() {
-        let seal = BitcoinSealRef::new([1u8; 32], 0, Some(42));
+        let seal = BitcoinSealPoint::new([1u8; 32], 0, Some(42));
         assert_eq!(seal.vout, 0);
         assert_eq!(seal.nonce, Some(42));
     }
 
     #[test]
     fn test_anchor_ref_creation() {
-        let anchor = BitcoinAnchorRef::new([2u8; 32], 1, 100);
+        let anchor = BitcoinCommitAnchor::new([2u8; 32], 1, 100);
         assert_eq!(anchor.output_index, 1);
         assert_eq!(anchor.block_height, 100);
     }

@@ -1,25 +1,25 @@
-//! CSV Adapter — Unified Meta-Crate
+//! CSV SDK — Unified Meta-Crate
 //!
 //! This crate provides a single entry point for all CSV (Client-Side Validation)
-//! operations, unifying the individual chain adapter crates behind a coherent,
+//! operations, unifying the individual chain backend crates behind a coherent,
 //! ergonomic API.
 //!
 //! # Architecture
 //!
 //! ```text
-//! csv-adapter (this crate)
-//! ├── csv-adapter-core       (always included)
-//! ├── csv-adapter-bitcoin    (optional, feature: "bitcoin")
-//! ├── csv-adapter-ethereum   (optional, feature: "ethereum")
-//! ├── csv-adapter-sui        (optional, feature: "sui")
-//! ├── csv-adapter-aptos      (optional, feature: "aptos")
-//! └── csv-adapter-store      (optional, feature: "sqlite")
+//! csv-sdk (this crate)
+//! ├── csv-core       (always included)
+//! ├── csv-bitcoin    (optional, feature: "bitcoin")
+//! ├── csv-ethereum   (optional, feature: "ethereum")
+//! ├── csv-sui        (optional, feature: "sui")
+//! ├── csv-aptos      (optional, feature: "aptos")
+//! └── csv-store      (optional, feature: "sqlite")
 //! ```
 //!
 //! # Quick Start
 //!
 //! ```no_run
-//! use csv_adapter::prelude::*;
+//! use csv_sdk::prelude::*;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
@@ -30,7 +30,7 @@
 //!         .build()?;
 //!
 //!     // Access managers
-//!     let rights = client.rights();
+//!     let titles = client.titles();
 //!     let transfers = client.transfers();
 //!     let proofs = client.proofs();
 //!
@@ -42,11 +42,11 @@
 //!
 //! | Feature | Description |
 //! |---------|-------------|
-//! | `bitcoin` | Enable Bitcoin adapter |
-//! | `ethereum` | Enable Ethereum adapter |
-//! | `sui` | Enable Sui adapter |
-//! | `aptos` | Enable Aptos adapter |
-//! | `all-chains` | Enable all chain adapters |
+//! | `bitcoin` | Enable Bitcoin backend |
+//! | `ethereum` | Enable Ethereum backend |
+//! | `sui` | Enable Sui backend |
+//! | `aptos` | Enable Aptos backend |
+//! | `all-chains` | Enable all chain backends |
 //! | `tokio` | Enable tokio async runtime (default) |
 //! | `async-std` | Enable async-std runtime |
 //! | `sqlite` | Enable SQLite persistence |
@@ -55,9 +55,9 @@
 //!
 //! # Key Concepts
 //!
-//! - **Right**: A verifiable, single-use digital right that can be transferred
+//! - **Sanad**: A verifiable, single-use digital title (deed) that can be transferred
 //!   cross-chain. Exists in client state, not on any chain.
-//! - **Seal**: The on-chain mechanism that enforces a Right's single-use.
+//! - **Seal**: The on-chain mechanism that enforces a Sanad's single-use.
 //!   Chain-specific and exists on one chain only.
 //! - **Client-Side Validation (CSV)**: The client does the verification, not
 //!   the blockchain. The chain only records commitments and enforces single-use.
@@ -75,26 +75,22 @@ pub mod events;
 pub mod facade;
 pub mod prelude;
 pub mod proofs;
-pub mod rights;
-pub mod scalable_builder;
+pub mod titles;
 pub mod transfers;
 pub mod wallet;
 
-// Re-export core types from csv-adapter-core (🔒 STABLE API only by default)
+// Re-export core types from csv-core (🔒 STABLE API only by default)
 pub use csv_core::{
-    AnchorLayer, CommitAnchor, Commitment, Consignment, CrossChainLockEvent, DAGNode, DAGSegment,
-    FinalityProof, Genesis, Hash, InclusionProof, OwnedState, OwnershipProof, ProofBundle, Right,
-    RightId, Sanad, SanadId, Schema, SealPoint, StateRef, Transition, CONSIGNMENT_VERSION,
-    SCHEMA_VERSION,
+    CommitAnchor, Commitment, Consignment, CrossChainLockEvent, DAGNode, DAGSegment,
+    FinalityProof, Genesis, Hash, InclusionProof, OwnedState, OwnershipProof, ProofBundle,
+    Sanad, SanadId, Schema, SealPoint, SealProtocol, StateRef, Transition, CONSIGNMENT_VERSION,
+    SCHEMA_VERSION, AdapterError, Result as CoreResult, StoreError,
 };
 
 // Re-export canonical protocol types (🔒 STABLE + 🟡 BETA)
 pub use csv_core::protocol_version::{
     Capabilities, Chain, ErrorCode, ProtocolVersion, SyncStatus, TransferStatus, PROTOCOL_VERSION,
 };
-
-// Re-export error types (🔒 STABLE)
-pub use csv_core::{AdapterError, Result as CoreResult, StoreError};
 
 // ===========================================================================
 // Experimental re-exports (feature-gated)

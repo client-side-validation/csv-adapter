@@ -1,4 +1,4 @@
-import { SealRef } from '../seal';
+import { SealPoint } from '../seal';
 import { hexToBytes } from '../types';
 
 /**
@@ -11,9 +11,9 @@ export namespace AptosChain {
    * Create an Aptos seal from a resource address.
    *
    * @param address - Aptos resource address (hex string with 0x prefix)
-   * @returns SealRef
+   * @returns SealPoint
    */
-  export function createSeal(address: string): SealRef {
+  export function createSeal(address: string): SealPoint {
     const addr = address.startsWith('0x') ? address.slice(2) : address;
     return {
       sealId: hexToBytes(addr),

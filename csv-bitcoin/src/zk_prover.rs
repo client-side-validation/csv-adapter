@@ -20,7 +20,7 @@
 
 use csv_core::hash::Hash;
 use csv_core::protocol_version::Chain;
-use csv_core::seal::SealRef;
+use csv_core::seal::SealPoint;
 use csv_core::zk_proof::{ChainWitness, ProofSystem, VerifierKey, ZkError, ZkProver, ZkPublicInputs, ZkSealProof};
 use bitcoin::hashes::Hash as BitcoinHash;
 use sha2::{Digest, Sha256};
@@ -68,7 +68,7 @@ impl BitcoinSpvProver {
     /// This is for development/testing only. Real proofs require SP1.
     fn generate_mock_proof(
         &self,
-        seal: &SealRef,
+        seal: &SealPoint,
         witness: &ChainWitness,
     ) -> Result<ZkSealProof, ZkError> {
         // Create a deterministic mock proof based on witness hash
@@ -108,7 +108,7 @@ impl BitcoinSpvProver {
 impl ZkProver for BitcoinSpvProver {
     fn prove_seal_consumption(
         &self,
-        seal: &SealRef,
+        seal: &SealPoint,
         witness: &ChainWitness,
     ) -> Result<ZkSealProof, ZkError> {
         // Validate witness is for Bitcoin
@@ -219,12 +219,12 @@ impl Sp1BtcSpvInput {
 
         // Apply each branch node
         for (i, branch_node) in self.merkle_branch.iter().enumerate() {
-            // Determine if current is left or right based on position bit
-            let is_right = ((self.tx_position >> i) & 1) == 1;
+            // Determine if current is left or sanad based on position bit
+            let is_sanad = ((self.tx_position >> i) & 1) == 1;
 
             // Concatenate and hash
             let mut concat = Vec::with_capacity(64);
-            if is_right {
+            if is_sanad {
                 concat.extend_from_slice(branch_node);
                 concat.extend_from_slice(&current);
             } else {
@@ -257,7 +257,7 @@ mod tests {
     fn test_mock_proof_generation() {
         let prover = BitcoinSpvProver::new();
 
-        let seal = SealRef::new(vec![0xAB; 32], Some(42)).unwrap();
+        let seal = SealPoint::new(vec![0xAB; 32], Some(42)).unwrap();
         let witness = ChainWitness {
             chain: Chain::Bitcoin,
             block_hash: Hash::new([1u8; 32]),
@@ -281,7 +281,7 @@ mod tests {
     fn test_wrong_chain_fails() {
         let prover = BitcoinSpvProver::new();
 
-        let seal = SealRef::new(vec![0xAB; 32], Some(42)).unwrap();
+        let seal = SealPoint::new(vec![0xAB; 32], Some(42)).unwrap();
         let witness = ChainWitness {
             chain: Chain::Ethereum, // Wrong chain
             block_hash: Hash::new([1u8; 32]),
@@ -300,7 +300,7 @@ mod tests {
     fn test_missing_inclusion_proof_fails() {
         let prover = BitcoinSpvProver::new();
 
-        let seal = SealRef::new(vec![0xAB; 32], Some(42)).unwrap();
+        let seal = SealPoint::new(vec![0xAB; 32], Some(42)).unwrap();
         let witness = ChainWitness {
             chain: Chain::Bitcoin,
             block_hash: Hash::new([1u8; 32]),

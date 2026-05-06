@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Aptos seal reference (resource with key + delete)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct AptosSealRef {
+pub struct AptosSealPoint {
     /// Account address (32 bytes)
     pub account_address: [u8; 32],
     /// Resource type tag
@@ -13,7 +13,7 @@ pub struct AptosSealRef {
     pub nonce: u64,
 }
 
-impl AptosSealRef {
+impl AptosSealPoint {
     pub fn new(account_address: [u8; 32], resource_type: String, nonce: u64) -> Self {
         Self {
             account_address,
@@ -34,7 +34,7 @@ impl AptosSealRef {
 
 /// Aptos anchor reference (EventHandle containing commitment)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct AptosAnchorRef {
+pub struct AptosCommitAnchor {
     /// Transaction version
     pub version: u64,
     /// Event handle address
@@ -43,7 +43,7 @@ pub struct AptosAnchorRef {
     pub sequence_number: u64,
 }
 
-impl AptosAnchorRef {
+impl AptosCommitAnchor {
     pub fn new(version: u64, event_handle: [u8; 32], sequence_number: u64) -> Self {
         Self {
             version,
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn test_seal_ref_creation() {
-        let seal = AptosSealRef::new([1u8; 32], "CSV::Seal".to_string(), 42);
+        let seal = AptosSealPoint::new([1u8; 32], "CSV::Seal".to_string(), 42);
         assert_eq!(seal.nonce, 42);
     }
 }

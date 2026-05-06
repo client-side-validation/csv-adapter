@@ -29,7 +29,7 @@ use serde::{Deserialize, Serialize};
 
 /// A 32-byte hash value.
 ///
-/// This is the fundamental building block for commitments, right IDs,
+/// This is the fundamental building block for commitments, sanad IDs,
 /// seal references, and all cryptographic operations in CSV.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Hash([u8; 32]);

@@ -1,7 +1,7 @@
 //! WebSocket subscription service for real-time wallet updates.
 //!
 //! Allows wallets to subscribe to address-specific events
-//! and receive real-time notifications when new rights, seals,
+//! and receive real-time notifications when new sanads, seals,
 //! or transfers are indexed.
 
 use std::collections::HashMap;
@@ -19,11 +19,11 @@ use warp::Filter;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SubscriptionEvent {
-    /// New right indexed for an address.
-    NewRight {
+    /// New sanad indexed for an address.
+    NewSanad {
         address: String,
         chain: String,
-        right_id: String,
+        sanad_id: String,
         data: serde_json::Value,
     },
     /// New seal indexed for an address.
@@ -44,7 +44,7 @@ pub enum SubscriptionEvent {
     IndexingComplete {
         address: String,
         chain: String,
-        rights_count: u64,
+        sanads_count: u64,
         seals_count: u64,
         transfers_count: u64,
     },
@@ -154,18 +154,18 @@ impl SubscriptionManager {
         }
     }
 
-    /// Broadcast a new right event.
-    pub async fn broadcast_new_right(
+    /// Broadcast a new sanad event.
+    pub async fn broadcast_new_sanad(
         &self,
         address: &str,
         chain: &str,
-        right_id: &str,
+        sanad_id: &str,
         data: serde_json::Value,
     ) {
-        let event = SubscriptionEvent::NewRight {
+        let event = SubscriptionEvent::NewSanad {
             address: address.to_string(),
             chain: chain.to_string(),
-            right_id: right_id.to_string(),
+            sanad_id: sanad_id.to_string(),
             data,
         };
         self.broadcast(address, event).await;
@@ -215,7 +215,7 @@ impl SubscriptionManager {
 /// Get the event type as a string.
 fn get_event_type(event: &SubscriptionEvent) -> &'static str {
     match event {
-        SubscriptionEvent::NewRight { .. } => "new_right",
+        SubscriptionEvent::NewSanad { .. } => "new_sanad",
         SubscriptionEvent::NewSeal { .. } => "new_seal",
         SubscriptionEvent::NewTransfer { .. } => "new_transfer",
         SubscriptionEvent::IndexingComplete { .. } => "indexing_complete",

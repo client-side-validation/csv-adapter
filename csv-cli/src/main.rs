@@ -1,4 +1,4 @@
-//! CSV Adapter CLI — Cross-Chain Rights, Proofs, Wallets, and End-to-End Testing
+//! CSV Adapter CLI — Cross-Chain Sanads, Proofs, Wallets, and End-to-End Testing
 //!
 //! ```bash
 //! # Chain management
@@ -12,18 +12,18 @@
 //! csv wallet fund --chain bitcoin --network signet
 //! csv wallet export --chain bitcoin --format xpub
 //!
-//! # Right operations
-//! csv right create --chain bitcoin --value 100000
-//! csv right transfer --chain bitcoin --right-id 0x... --to bcrt1...
-//! csv right consume --chain bitcoin --right-id 0x...
-//! csv right list --chain bitcoin
+//! # Sanad operations
+//! csv sanad create --chain bitcoin --value 100000
+//! csv sanad transfer --chain bitcoin --sanad-id 0x... --to bcrt1...
+//! csv sanad consume --chain bitcoin --sanad-id 0x...
+//! csv sanad list --chain bitcoin
 //!
 //! # Proof operations
-//! csv proof generate --chain bitcoin --right-id 0x...
+//! csv proof generate --chain bitcoin --sanad-id 0x...
 //! csv proof verify --chain sui --proof-file proof.json
 //!
 //! # Cross-chain transfers
-//! csv cross-chain transfer --from bitcoin --to sui --right-id 0x...
+//! csv cross-chain transfer --from bitcoin --to sui --sanad-id 0x...
 //! csv cross-chain status --transfer-id 0x...
 //!
 //! # Contract deployment
@@ -53,7 +53,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Parser)]
 #[command(
     name = "csv",
-    about = "CSV Adapter CLI — Cross-Chain Rights, Proofs, and Transfers",
+    about = "CSV Adapter CLI — Cross-Chain Sanads, Proofs, and Transfers",
     version = VERSION,
     long_about = None
 )]
@@ -86,11 +86,11 @@ enum Commands {
         action: WalletAction,
     },
 
-    // ─── Right Operations ───
-    /// Right lifecycle (create, transfer, consume, list, show)
-    Right {
+    // ─── Sanad Operations ───
+    /// Sanad lifecycle (create, transfer, consume, list, show)
+    Sanad {
         #[command(subcommand)]
-        action: RightAction,
+        action: SanadAction,
     },
 
     // ─── Proof Operations ───
@@ -101,7 +101,7 @@ enum Commands {
     },
 
     // ─── Cross-Chain Transfers ───
-    /// Cross-chain Right transfers
+    /// Cross-chain Sanad transfers
     #[command(name = "cross-chain")]
     CrossChain {
         #[command(subcommand)]
@@ -141,7 +141,7 @@ use commands::chain::ChainAction;
 use commands::contracts::ContractAction;
 use commands::cross_chain::CrossChainAction;
 use commands::proofs::ProofAction;
-use commands::rights::RightAction;
+use commands::sanads::SanadAction;
 use commands::seals::SealAction;
 use commands::tests::TestAction;
 use commands::validate::ValidateAction;
@@ -164,7 +164,7 @@ async fn main() -> anyhow::Result<()> {
     let result = match cli.command {
         Commands::Chain { action } => chain::execute(action, &config),
         Commands::Wallet { action } => wallet::execute(action, &config, &mut state).await,
-        Commands::Right { action } => rights::execute(action, &config, &mut state),
+        Commands::Sanad { action } => sanads::execute(action, &config, &mut state),
         Commands::Proof { action } => proofs::execute(action, &config, &state),
         Commands::CrossChain { action } => cross_chain::execute(action, &config, &mut state),
         Commands::Contract { action } => contracts::execute(action, &config, &mut state),

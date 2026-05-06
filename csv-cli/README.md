@@ -1,10 +1,10 @@
 # CSV Adapter CLI
 
-**Command-line tool for cross-chain Rights, proofs, wallets, and end-to-end testing.**
+**Command-line tool for cross-chain Sanads, proofs, wallets, and end-to-end testing.**
 
 ```
 csv — CSV Adapter CLI v0.1.0
-Cross-Chain Rights, Proofs, and Transfers
+Cross-Chain Sanads, Proofs, and Transfers
 ```
 
 ---
@@ -60,11 +60,11 @@ csv wallet balance solana
 csv contract deploy --chain sui
 csv contract deploy --chain ethereum
 
-# 5. Create a Right on Bitcoin
-csv right create --chain bitcoin --value 100000
+# 5. Create a Sanad on Bitcoin
+csv sanad create --chain bitcoin --value 100000
 
 # 6. Transfer it cross-chain to Sui
-csv cross-chain transfer --from bitcoin --to sui --right-id 0x...
+csv cross-chain transfer --from bitcoin --to sui --sanad-id 0x...
 
 # 7. Verify the proof
 csv proof verify-cross-chain --source bitcoin --dest sui --proof proof.json
@@ -208,41 +208,41 @@ csv wallet list
 
 ---
 
-### Right Operations
+### Sanad Operations
 
-**Create a new Right:**
+**Create a new Sanad:**
 
 ```bash
-# Bitcoin Right with 100k sats value
-csv right create --chain bitcoin --value 100000
+# Bitcoin Sanad with 100k sats value
+csv sanad create --chain bitcoin --value 100000
 
-# Ethereum Right (nullifier-based)
-csv right create --chain ethereum
+# Ethereum Sanad (nullifier-based)
+csv sanad create --chain ethereum
 
-# Sui Right (object-based)
-csv right create --chain sui
+# Sui Sanad (object-based)
+csv sanad create --chain sui
 
-# Aptos Right (resource-based)
-csv right create --chain aptos
+# Aptos Sanad (resource-based)
+csv sanad create --chain aptos
 ```
 
-**Show Right details:**
+**Show Sanad details:**
 
 ```bash
-csv right show 0xabababababababababababababababababababababababababababababababab
+csv sanad show 0xabababababababababababababababababababababababababababababababab
 ```
 
-**List tracked Rights:**
+**List tracked Sanads:**
 
 ```bash
-csv right list
-csv right list --chain bitcoin    # Filter by chain
+csv sanad list
+csv sanad list --chain bitcoin    # Filter by chain
 ```
 
-**Consume a Right:**
+**Consume a Sanad:**
 
 ```bash
-csv right consume 0xabab...
+csv sanad consume 0xabab...
 ```
 
 ---
@@ -253,16 +253,16 @@ csv right consume 0xabab...
 
 ```bash
 # Bitcoin Merkle proof
-csv proof generate --chain bitcoin --right-id 0x... --output btc_proof.json
+csv proof generate --chain bitcoin --sanad-id 0x... --output btc_proof.json
 
 # Ethereum MPT proof
-csv proof generate --chain ethereum --right-id 0x... --output eth_proof.json
+csv proof generate --chain ethereum --sanad-id 0x... --output eth_proof.json
 
 # Sui checkpoint proof
-csv proof generate --chain sui --right-id 0x... --output sui_proof.json
+csv proof generate --chain sui --sanad-id 0x... --output sui_proof.json
 
 # Aptos ledger proof
-csv proof generate --chain aptos --right-id 0x... --output apt_proof.json
+csv proof generate --chain aptos --sanad-id 0x... --output apt_proof.json
 ```
 
 **Verify proof on a chain:**
@@ -289,16 +289,16 @@ csv proof verify-cross-chain --source ethereum --dest aptos eth_proof.json
 
 ```bash
 # Bitcoin → Sui
-csv cross-chain transfer --from bitcoin --to sui --right-id 0x...
+csv cross-chain transfer --from bitcoin --to sui --sanad-id 0x...
 
 # Sui → Ethereum
-csv cross-chain transfer --from sui --to ethereum --right-id 0x...
+csv cross-chain transfer --from sui --to ethereum --sanad-id 0x...
 
 # Bitcoin → Ethereum
-csv cross-chain transfer --from bitcoin --to ethereum --right-id 0x...
+csv cross-chain transfer --from bitcoin --to ethereum --sanad-id 0x...
 
 # Ethereum → Sui
-csv cross-chain transfer --from ethereum --to sui --right-id 0x...
+csv cross-chain transfer --from ethereum --to sui --sanad-id 0x...
 ```
 
 **Check transfer status:**
@@ -500,7 +500,7 @@ The CLI persists state to `~/.csv/data/state.json`:
 
 ```json
 {
-  "rights": [],
+  "sanads": [],
   "transfers": [],
   "contracts": {},
   "addresses": {
@@ -529,7 +529,7 @@ The CLI persists state to `~/.csv/data/state.json`:
 
 ## Cross-Chain Transfer Flow
 
-Here's the complete flow for transferring a Right from Bitcoin to Ethereum:
+Here's the complete flow for transferring a Sanad from Bitcoin to Ethereum:
 
 ```bash
 # Step 1: Generate wallets
@@ -543,21 +543,21 @@ csv wallet fund ethereum
 # Step 3: Deploy Ethereum contracts
 csv contract deploy --chain ethereum
 
-# Step 4: Create Right on Bitcoin
-csv right create --chain bitcoin --value 100000
+# Step 4: Create Sanad on Bitcoin
+csv sanad create --chain bitcoin --value 100000
 
 # Step 5: Check balance to confirm funding
 csv wallet balance bitcoin
 
 # Step 6: Execute cross-chain transfer
-csv cross-chain transfer --from bitcoin --to ethereum --right-id 0x...
+csv cross-chain transfer --from bitcoin --to ethereum --sanad-id 0x...
 
 # Step 7: Verify the transfer
 csv cross-chain list
 csv cross-chain status <transfer-id>
 
 # Step 8: Validate the proof
-csv proof generate --chain bitcoin --right-id 0x... --output proof.json
+csv proof generate --chain bitcoin --sanad-id 0x... --output proof.json
 csv proof verify-cross-chain --source bitcoin --dest ethereum proof.json
 ```
 
@@ -578,10 +578,10 @@ csv chain status bitcoin
 csv chain set-rpc bitcoin <new-url>
 ```
 
-**"Right not found"** — List tracked Rights:
+**"Sanad not found"** — List tracked Sanads:
 
 ```bash
-csv right list
+csv sanad list
 ```
 
 **"Transfer not found"** — List all transfers:

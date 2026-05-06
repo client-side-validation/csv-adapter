@@ -45,7 +45,7 @@ pub use tapret::{
     mine_tapret_nonce, OpretCommitment, TapretCommitment, TapretError, TAPRET_SCRIPT_SIZE,
 };
 pub use tx_builder::{CommitmentData, CommitmentTxBuilder, TxBuilderError};
-pub use types::{BitcoinAnchorRef, BitcoinFinalityProof, BitcoinInclusionProof, BitcoinSealRef};
+pub use types::{BitcoinCommitAnchor, BitcoinFinalityProof, BitcoinInclusionProof, BitcoinSealPoint};
 pub use wallet::{Bip86Path, DerivedTaprootKey, SealWallet, WalletError, WalletUtxo};
 pub use zk_prover::{BitcoinSpvProver, Sp1BtcSpvInput};
 pub use sp1_guest::{Sp1BtcSpvInput as Sp1GuestInput, Sp1BtcSpvOutput as Sp1GuestOutput, verify_bitcoin_spv};
@@ -58,7 +58,7 @@ pub use mpc_batch::{
 // Chain operations exports
 pub use chain_operations::{
     BitcoinBackend, BitcoinChainBroadcaster, BitcoinChainDeployer, BitcoinChainProofProvider, BitcoinChainQuery,
-    BitcoinChainRightOps, BitcoinChainSigner,
+    BitcoinChainSanadOps, BitcoinChainSigner,
 };
 
 #[cfg(feature = "rpc")]

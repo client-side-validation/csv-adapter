@@ -3,7 +3,7 @@ use dioxus::prelude::*;
 use dioxus_router::*;
 
 use crate::pages::{
-    Chains, ContractsList, Home, RightDetail, RightsList, SealDetail, SealsList, Stats,
+    Chains, ContractsList, Home, SanadDetail, SanadsList, SealDetail, SealsList, Stats,
     TransferDetail, TransfersList, Wallet,
 };
 
@@ -12,10 +12,10 @@ use crate::pages::{
 pub enum Route {
     #[route("/")]
     Home {},
-    #[route("/rights")]
-    RightsList {},
-    #[route("/rights/:id")]
-    RightDetail { id: String },
+    #[route("/sanads")]
+    SanadsList {},
+    #[route("/sanads/:id")]
+    SanadDetail { id: String },
     #[route("/transfers")]
     TransfersList {},
     #[route("/transfers/:id")]

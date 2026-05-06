@@ -1,7 +1,7 @@
 //! Bitcoin seal management
 
 use crate::error::{BitcoinError, BitcoinResult};
-use crate::types::BitcoinSealRef;
+use crate::types::BitcoinSealPoint;
 use csv_core::hardening::{BoundedQueue, MAX_SEAL_NULLIFIER_SIZE};
 
 /// Registry for tracking used seals (prevents replay)
@@ -30,7 +30,7 @@ impl SealRegistry {
     }
 
     /// Check if a seal has been used
-    pub fn is_seal_used(&self, seal: &BitcoinSealRef) -> bool {
+    pub fn is_seal_used(&self, seal: &BitcoinSealPoint) -> bool {
         self.used_seals.contains(&seal.to_vec())
     }
 
@@ -48,7 +48,7 @@ impl SealRegistry {
     }
 
     /// Mark a seal as used
-    pub fn mark_seal_used(&mut self, seal: &BitcoinSealRef) -> BitcoinResult<()> {
+    pub fn mark_seal_used(&mut self, seal: &BitcoinSealPoint) -> BitcoinResult<()> {
         // Check if already used
         if self.is_seal_used(seal) {
             return Err(BitcoinError::UTXOSpent(format!(
@@ -72,7 +72,7 @@ impl SealRegistry {
     }
 
     /// Clear a seal from the registry (for reorg rollback)
-    pub fn clear_seal(&mut self, seal: &BitcoinSealRef) {
+    pub fn clear_seal(&mut self, seal: &BitcoinSealPoint) {
         let seal_bytes = seal.to_vec();
         self.used_seals.remove(&seal_bytes);
     }
@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn test_seal_registry() {
         let mut registry = SealRegistry::new();
-        let seal = BitcoinSealRef::new([1u8; 32], 0, Some(42));
+        let seal = BitcoinSealPoint::new([1u8; 32], 0, Some(42));
 
         assert!(!registry.is_seal_used(&seal));
         registry.mark_seal_used(&seal).unwrap();
@@ -126,10 +126,10 @@ mod tests {
         let mut registry = SealRegistry::with_max_size(3);
         assert_eq!(registry.max_size(), 3);
 
-        let seal1 = BitcoinSealRef::new([1u8; 32], 0, Some(1));
-        let seal2 = BitcoinSealRef::new([2u8; 32], 0, Some(2));
-        let seal3 = BitcoinSealRef::new([3u8; 32], 0, Some(3));
-        let seal4 = BitcoinSealRef::new([4u8; 32], 0, Some(4));
+        let seal1 = BitcoinSealPoint::new([1u8; 32], 0, Some(1));
+        let seal2 = BitcoinSealPoint::new([2u8; 32], 0, Some(2));
+        let seal3 = BitcoinSealPoint::new([3u8; 32], 0, Some(3));
+        let seal4 = BitcoinSealPoint::new([4u8; 32], 0, Some(4));
 
         registry.mark_seal_used(&seal1).unwrap();
         registry.mark_seal_used(&seal2).unwrap();
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn test_registry_clear() {
         let mut registry = SealRegistry::new();
-        let seal = BitcoinSealRef::new([1u8; 32], 0, Some(42));
+        let seal = BitcoinSealPoint::new([1u8; 32], 0, Some(42));
 
         registry.mark_seal_used(&seal).unwrap();
         assert!(registry.is_seal_used(&seal));

@@ -117,21 +117,21 @@ fn run_test_pair(
     check_chain_connectivity(from, config)?;
     check_chain_connectivity(to, config)?;
 
-    // Test 2: Create Right on source
-    output::progress(2, 5, &format!("Creating Right on {}...", from));
+    // Test 2: Create Sanad on source
+    output::progress(2, 5, &format!("Creating Sanad on {}...", from));
     // In production: call adapter.create_seal()
 
-    // Test 3: Lock Right on source
-    output::progress(3, 5, &format!("Locking Right on {}...", from));
+    // Test 3: Lock Sanad on source
+    output::progress(3, 5, &format!("Locking Sanad on {}...", from));
     // In production: consume seal, get inclusion proof
 
     // Test 4: Verify proof on destination
     output::progress(4, 5, &format!("Verifying proof on {}...", to));
     // In production: verify inclusion proof
 
-    // Test 5: Mint Right on destination
-    output::progress(5, 5, &format!("Minting Right on {}...", to));
-    // In production: call mint_right()
+    // Test 5: Mint Sanad on destination
+    output::progress(5, 5, &format!("Minting Sanad on {}...", to));
+    // In production: call mint_sanad()
 
     output::success(&format!("Transfer {} → {}: PASS", from, to));
     Ok(())
@@ -226,7 +226,7 @@ fn cmd_scenario(name: String, _config: &Config, _state: &UnifiedStateManager) ->
     match name.as_str() {
         "double_spend" => {
             output::info("Testing double-spend detection...");
-            output::progress(1, 3, "Creating Right...");
+            output::progress(1, 3, "Creating Sanad...");
             output::progress(2, 3, "Consuming seal (first time)...");
             output::progress(3, 3, "Attempting to consume same seal...");
             output::success("Double-spend correctly rejected");
@@ -240,7 +240,7 @@ fn cmd_scenario(name: String, _config: &Config, _state: &UnifiedStateManager) ->
         }
         "ownership_transfer" => {
             output::info("Testing ownership transfer...");
-            output::progress(1, 3, "Creating Right with owner A...");
+            output::progress(1, 3, "Creating Sanad with owner A...");
             output::progress(2, 3, "Transferring to owner B...");
             output::progress(3, 3, "Verifying new ownership...");
             output::success("Ownership transfer verified");

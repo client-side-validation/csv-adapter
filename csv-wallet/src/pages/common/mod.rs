@@ -1,6 +1,6 @@
 //! Common UI helpers and styling functions for pages.
 
-use crate::context::types::{RightStatus, SealStatus, TestStatus, TransferStatus};
+use crate::context::types::{SanadStatus, SealStatus, TestStatus, TransferStatus};
 use csv_core::Chain;
 use dioxus::prelude::*;
 
@@ -64,11 +64,11 @@ pub fn format_timestamp(timestamp: u64) -> String {
     }
 }
 
-pub fn right_status_class(status: &RightStatus) -> &'static str {
+pub fn sanad_status_class(status: &SanadStatus) -> &'static str {
     match status {
-        RightStatus::Active => "text-green-400 bg-green-500/20",
-        RightStatus::Transferred => "text-blue-400 bg-blue-500/20",
-        RightStatus::Consumed => "text-gray-400 bg-gray-500/20",
+        SanadStatus::Active => "text-green-400 bg-green-500/20",
+        SanadStatus::Transferred => "text-blue-400 bg-blue-500/20",
+        SanadStatus::Consumed => "text-gray-400 bg-gray-500/20",
     }
 }
 

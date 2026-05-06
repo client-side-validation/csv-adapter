@@ -72,8 +72,8 @@ pub fn CrossChainStatus() -> Element {
                                     span { class: "{chain_badge_class(&t.to_chain)}", "{chain_icon_emoji(&t.to_chain)} {chain_name(&t.to_chain)}" }
                                 }
                                 div { class: "flex justify-between",
-                                    span { class: "text-sm text-gray-400", "Right ID" }
-                                    span { class: "text-sm font-mono text-gray-300", "{truncate_address(&t.right_id, 12)}" }
+                                    span { class: "text-sm text-gray-400", "Sanad ID" }
+                                    span { class: "text-sm font-mono text-gray-300", "{truncate_address(&t.sanad_id, 12)}" }
                                 }
                                 div { class: "flex justify-between",
                                     span { class: "text-sm text-gray-400", "Destination Owner" }

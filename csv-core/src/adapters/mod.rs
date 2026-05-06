@@ -9,7 +9,7 @@
 //! - `csv-adapter-ethereum` - Ethereum implementation
 
 pub use super::chain_adapter::{
-    ChainAdapter, ChainAdapterExt, ChainError, ChainResult, RpcClient, Wallet,
+    ChainDriver, ChainDriverExt, ChainError, ChainResult, RpcClient, Wallet,
 };
 pub use super::chain_config::{AccountModel, ChainCapabilities, ChainConfig};
 

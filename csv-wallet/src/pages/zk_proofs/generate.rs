@@ -16,7 +16,7 @@ use dioxus::prelude::*;
 pub fn ZkGenerateProof() -> Element {
     let mut wallet_ctx = use_wallet_context();
     let mut selected_chain = use_signal(|| Chain::Bitcoin);
-    let mut right_id = use_signal(String::new);
+    let mut sanad_id = use_signal(String::new);
     let mut result = use_signal(|| None::<ZkResult>);
     let mut is_generating = use_signal(|| false);
 
@@ -64,32 +64,32 @@ pub fn ZkGenerateProof() -> Element {
                     }
                 }
 
-                // Right ID input
+                // Sanad ID input
                 div { class: "space-y-2",
-                    label { class: "text-sm text-gray-400", "Right ID" }
+                    label { class: "text-sm text-gray-400", "Sanad ID" }
                     input {
                         class: "{input_mono_class()}",
-                        value: "{right_id.read()}",
-                        oninput: move |e| right_id.set(e.value()),
-                        placeholder: "Enter the Right ID to prove seal consumption for",
+                        value: "{sanad_id.read()}",
+                        oninput: move |e| sanad_id.set(e.value()),
+                        placeholder: "Enter the Sanad ID to prove seal consumption for",
                     }
                 }
 
                 // Generate button
                 button {
                     class: "{btn_full_primary_class()}",
-                    disabled: right_id.read().is_empty() || is_generating(),
+                    disabled: sanad_id.read().is_empty() || is_generating(),
                     onclick: move |_| {
                         is_generating.set(true);
 
-                        // Get the seal for this right
-                        let right_id_str = right_id.read().clone();
-                        let seal_opt = wallet_ctx.seal_for_right(&right_id_str);
+                        // Get the seal for this sanad
+                        let sanad_id_str = sanad_id.read().clone();
+                        let seal_opt = wallet_ctx.seal_for_sanad(&sanad_id_str);
 
                         if seal_opt.is_none() {
                             result.set(Some(ZkResult {
                                 success: false,
-                                message: "No seal found for this right. Create a seal first.".to_string(),
+                                message: "No seal found for this sanad. Create a seal first.".to_string(),
                                 proof: None,
                             }));
                             is_generating.set(false);
@@ -101,8 +101,8 @@ pub fn ZkGenerateProof() -> Element {
 
                         // Generate ZK proof based on chain
                         let proof_result = match chain {
-                            Chain::Bitcoin => generate_bitcoin_zk_proof(&seal.seal_ref, &right_id_str),
-                            Chain::Ethereum => generate_ethereum_zk_proof(&seal.seal_ref, &right_id_str),
+                            Chain::Bitcoin => generate_bitcoin_zk_proof(&seal.seal_ref, &sanad_id_str),
+                            Chain::Ethereum => generate_ethereum_zk_proof(&seal.seal_ref, &sanad_id_str),
                             _ => Err("ZK proofs not yet available for this chain".to_string()),
                         };
 
@@ -111,7 +111,7 @@ pub fn ZkGenerateProof() -> Element {
                                 // Save proof to wallet
                                 let proof_record = ProofRecord {
                                     chain,
-                                    right_id: right_id_str.clone(),
+                                    sanad_id: sanad_id_str.clone(),
                                     seal_ref: seal.seal_ref.clone(),
                                     proof_type: "zk".to_string(),
                                     status: ProofStatus::Generated,
@@ -245,10 +245,10 @@ struct ZkResult {
 
 /// Generate a Bitcoin SPV ZK proof using SP1
 #[cfg(feature = "csv-adapter-bitcoin")]
-fn generate_bitcoin_zk_proof(seal_ref: &str, right_id: &str) -> Result<ZkSealProof, String> {
+fn generate_bitcoin_zk_proof(seal_ref: &str, sanad_id: &str) -> Result<ZkSealProof, String> {
     use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
     use csv_core::hash::Hash;
-    use csv_core::seal::SealRef;
+    use csv_core::seal::SealPoint;
     use csv_core::zk_proof::{ChainWitness, ZkProver};
 
     let prover = BitcoinSpvProver::new();
@@ -257,7 +257,7 @@ fn generate_bitcoin_zk_proof(seal_ref: &str, right_id: &str) -> Result<ZkSealPro
     let seal_bytes = hex::decode(seal_ref.trim_start_matches("0x"))
         .map_err(|e| format!("Invalid seal reference: {}", e))?;
 
-    let seal = SealRef::new(seal_bytes, None)
+    let seal = SealPoint::new(seal_bytes, None)
         .map_err(|e| format!("Invalid seal: {}", e))?;
 
     // Create mock witness data
@@ -266,7 +266,7 @@ fn generate_bitcoin_zk_proof(seal_ref: &str, right_id: &str) -> Result<ZkSealPro
         chain: Chain::Bitcoin,
         block_hash: Hash::new([0x01; 32]), // Would be actual block hash
         block_height: 800_000,
-        tx_data: format!("spend_right_{}", right_id).into_bytes(),
+        tx_data: format!("spend_sanad_{}", sanad_id).into_bytes(),
         inclusion_proof: vec![0xAB; 32], // Would be actual Merkle branch
         finality_proof: vec![0xCD; 16],
         timestamp: js_sys::Date::now() as u64 / 1000,
@@ -278,21 +278,21 @@ fn generate_bitcoin_zk_proof(seal_ref: &str, right_id: &str) -> Result<ZkSealPro
 
 /// Generate a Bitcoin SPV ZK proof using SP1 (stub for non-bitcoin builds)
 #[cfg(not(feature = "csv-adapter-bitcoin"))]
-fn generate_bitcoin_zk_proof(_seal_ref: &str, _right_id: &str) -> Result<ZkSealProof, String> {
+fn generate_bitcoin_zk_proof(_seal_ref: &str, _sanad_id: &str) -> Result<ZkSealProof, String> {
     Err("Bitcoin ZK proof generation not available in this build".to_string())
 }
 
 /// Generate an Ethereum Groth16 ZK proof
-fn generate_ethereum_zk_proof(_seal_ref: &str, _right_id: &str) -> Result<ZkSealProof, String> {
+fn generate_ethereum_zk_proof(_seal_ref: &str, _sanad_id: &str) -> Result<ZkSealProof, String> {
     // Ethereum Groth16 proof generation would use a similar pattern
     // but with the Ethereum adapter's zk_verifier module
 
     // For now, return a mock proof
     use csv_core::hash::Hash;
-    use csv_core::seal::SealRef;
+    use csv_core::seal::SealPoint;
     use csv_core::zk_proof::{VerifierKey, ZkPublicInputs, ProofSystem};
 
-    let seal = SealRef::new(vec![0xAB; 32], None)
+    let seal = SealPoint::new(vec![0xAB; 32], None)
         .map_err(|e| format!("Invalid seal: {}", e))?;
 
     let verifier_key = VerifierKey::new(

@@ -2,21 +2,21 @@
 
 use anchor_lang::prelude::*;
 
-/// RightAccount stores the state of a Right on Solana
+/// SanadAccount stores the state of a Sanad on Solana
 /// This is a PDA (Program Derived Address) account
 #[account]
-pub struct RightAccount {
-    /// Owner of the right
+pub struct SanadAccount {
+    /// Owner of the sanad
     pub owner: Pubkey,
-    /// Unique Right identifier (preserved across chains)
-    pub right_id: [u8; 32],
+    /// Unique Sanad identifier (preserved across chains)
+    pub sanad_id: [u8; 32],
     /// Commitment hash (preserved across chains)
     pub commitment: [u8; 32],
     /// State root (off-chain state commitment)
     pub state_root: [u8; 32],
-    /// Nullifier for this right (for L3 chains that use nullifiers)
+    /// Nullifier for this sanad (for L3 chains that use nullifiers)
     pub nullifier: [u8; 32],
-    /// Asset class: 0 unspecified, 1 fungible token, 2 NFT, 3 proof right
+    /// Asset class: 0 unspecified, 1 fungible token, 2 NFT, 3 proof sanad
     pub asset_class: u8,
     /// Chain-native token mint, NFT collection/item id, or proof family id
     pub asset_id: [u8; 32],
@@ -26,9 +26,9 @@ pub struct RightAccount {
     pub proof_system: u8,
     /// Root/verification key commitment for advanced proof systems
     pub proof_root: [u8; 32],
-    /// Whether this right has been consumed
+    /// Whether this sanad has been consumed
     pub consumed: bool,
-    /// Whether this right is locked for cross-chain transfer
+    /// Whether this sanad is locked for cross-chain transfer
     pub locked: bool,
     /// Creation timestamp (Unix epoch seconds)
     pub created_at: i64,
@@ -36,18 +36,18 @@ pub struct RightAccount {
     pub bump: u8,
 }
 
-impl RightAccount {
+impl SanadAccount {
     /// Account size for space calculation
-    /// 8 (discriminator) + 32 (owner) + 32 (right_id) + 32 (commitment) + 
+    /// 8 (discriminator) + 32 (owner) + 32 (sanad_id) + 32 (commitment) + 
     /// 32 (state_root) + 32 (nullifier) + metadata/proof fields + flags + timestamp + bump
     pub const SIZE: usize = 32 + 32 + 32 + 32 + 32 + 1 + 32 + 32 + 1 + 32 + 1 + 1 + 8 + 1;
 }
 
-/// LockRecord stores information about a locked right for refund purposes
+/// LockRecord stores information about a locked sanad for refund purposes
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct LockRecord {
-    /// Right identifier
-    pub right_id: [u8; 32],
+    /// Sanad identifier
+    pub sanad_id: [u8; 32],
     /// Commitment hash
     pub commitment: [u8; 32],
     /// Original owner
@@ -56,7 +56,7 @@ pub struct LockRecord {
     pub destination_chain: u8,
     /// Destination owner (hashed)
     pub destination_owner: [u8; 32],
-    /// Asset class for the locked right
+    /// Asset class for the locked sanad
     pub asset_class: u8,
     /// Chain-native asset id
     pub asset_id: [u8; 32],

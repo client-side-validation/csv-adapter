@@ -88,7 +88,7 @@ pub trait SealStore: Send + Sync {
 pub struct InMemorySealStore {
     seals: Vec<SealRecord>,
     anchors: Vec<AnchorRecord>,
-    rights: Vec<RightRecord>,
+    sanads: Vec<SanadRecord>,
 }
 
 impl InMemorySealStore {
@@ -97,7 +97,7 @@ impl InMemorySealStore {
         Self {
             seals: Vec::new(),
             anchors: Vec::new(),
-            rights: Vec::new(),
+            sanads: Vec::new(),
         }
     }
 }
@@ -199,59 +199,59 @@ impl SealStore for InMemorySealStore {
     }
 }
 
-impl RightStore for InMemorySealStore {
-    fn save_right(&mut self, record: &RightRecord) -> Result<(), StoreError> {
+impl SanadStore for InMemorySealStore {
+    fn save_sanad(&mut self, record: &SanadRecord) -> Result<(), StoreError> {
         // Check for duplicate
-        if self.has_right(&record.right_id)? {
+        if self.has_sanad(&record.sanad_id)? {
             return Err(StoreError::DuplicateRecord(format!(
-                "Right with ID {:?} already exists",
-                record.right_id
+                "Sanad with ID {:?} already exists",
+                record.sanad_id
             )));
         }
-        self.rights.push(record.clone());
+        self.sanads.push(record.clone());
         Ok(())
     }
 
-    fn get_right(&self, right_id: &crate::right::RightId) -> Result<Option<RightRecord>, StoreError> {
+    fn get_sanad(&self, sanad_id: &crate::title::SanadId) -> Result<Option<SanadRecord>, StoreError> {
         Ok(self
-            .rights
+            .sanads
             .iter()
-            .find(|r| r.right_id.0.as_bytes() == right_id.0.as_bytes())
+            .find(|r| r.sanad_id.0.as_bytes() == sanad_id.0.as_bytes())
             .cloned())
     }
 
-    fn list_rights_by_chain(&self, chain: &str) -> Result<Vec<RightRecord>, StoreError> {
+    fn list_sanads_by_chain(&self, chain: &str) -> Result<Vec<SanadRecord>, StoreError> {
         Ok(self
-            .rights
+            .sanads
             .iter()
             .filter(|r| r.chain == chain)
             .cloned()
             .collect())
     }
 
-    fn list_rights_by_owner(&self, owner: &[u8]) -> Result<Vec<RightRecord>, StoreError> {
+    fn list_sanads_by_owner(&self, owner: &[u8]) -> Result<Vec<SanadRecord>, StoreError> {
         Ok(self
-            .rights
+            .sanads
             .iter()
             .filter(|r| r.owner == owner)
             .cloned()
             .collect())
     }
 
-    fn consume_right(
+    fn consume_sanad(
         &mut self,
-        right_id: &crate::right::RightId,
+        sanad_id: &crate::title::SanadId,
         consumed_at: u64,
     ) -> Result<(), StoreError> {
         if let Some(r) = self
-            .rights
+            .sanads
             .iter_mut()
-            .find(|r| r.right_id.0.as_bytes() == right_id.0.as_bytes())
+            .find(|r| r.sanad_id.0.as_bytes() == sanad_id.0.as_bytes())
         {
             if r.consumed {
                 return Err(StoreError::DuplicateRecord(format!(
-                    "Right {:?} already consumed",
-                    right_id
+                    "Sanad {:?} already consumed",
+                    sanad_id
                 )));
             }
             r.consumed = true;
@@ -259,63 +259,63 @@ impl RightStore for InMemorySealStore {
             Ok(())
         } else {
             Err(StoreError::NotFound(format!(
-                "Right {:?} not found",
-                right_id
+                "Sanad {:?} not found",
+                sanad_id
             )))
         }
     }
 
-    fn list_consumed_rights(&self) -> Result<Vec<RightRecord>, StoreError> {
+    fn list_consumed_sanads(&self) -> Result<Vec<SanadRecord>, StoreError> {
         Ok(self
-            .rights
+            .sanads
             .iter()
             .filter(|r| r.consumed)
             .cloned()
             .collect())
     }
 
-    fn list_active_rights(&self) -> Result<Vec<RightRecord>, StoreError> {
+    fn list_active_sanads(&self) -> Result<Vec<SanadRecord>, StoreError> {
         Ok(self
-            .rights
+            .sanads
             .iter()
             .filter(|r| !r.consumed)
             .cloned()
             .collect())
     }
 
-    fn has_right(&self, right_id: &crate::right::RightId) -> Result<bool, StoreError> {
+    fn has_sanad(&self, sanad_id: &crate::title::SanadId) -> Result<bool, StoreError> {
         Ok(self
-            .rights
+            .sanads
             .iter()
-            .any(|r| r.right_id.0.as_bytes() == right_id.0.as_bytes()))
+            .any(|r| r.sanad_id.0.as_bytes() == sanad_id.0.as_bytes()))
     }
 
-    fn delete_right(&mut self, right_id: &crate::right::RightId) -> Result<(), StoreError> {
-        let before = self.rights.len();
-        self.rights
-            .retain(|r| r.right_id.0.as_bytes() != right_id.0.as_bytes());
-        if self.rights.len() == before {
+    fn delete_sanad(&mut self, sanad_id: &crate::title::SanadId) -> Result<(), StoreError> {
+        let before = self.sanads.len();
+        self.sanads
+            .retain(|r| r.sanad_id.0.as_bytes() != sanad_id.0.as_bytes());
+        if self.sanads.len() == before {
             return Err(StoreError::NotFound(format!(
-                "Right {:?} not found",
-                right_id
+                "Sanad {:?} not found",
+                sanad_id
             )));
         }
         Ok(())
     }
 }
 
-/// A persisted Right record
+/// A persisted Sanad record
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RightRecord {
-    /// Right ID (unique identifier)
-    pub right_id: crate::right::RightId,
-    /// The chain where this Right is anchored
+pub struct SanadRecord {
+    /// Sanad ID (unique identifier)
+    pub sanad_id: crate::title::SanadId,
+    /// The chain where this Sanad is anchored
     pub chain: String,
     /// Owner identifier (address or pubkey)
     pub owner: Vec<u8>,
-    /// The serialized Right data
-    pub right_data: Vec<u8>,
-    /// Whether the Right has been consumed
+    /// The serialized Sanad data
+    pub sanad_data: Vec<u8>,
+    /// Whether the Sanad has been consumed
     pub consumed: bool,
     /// Timestamp (Unix epoch seconds) when recorded
     pub recorded_at: u64,
@@ -323,41 +323,41 @@ pub struct RightRecord {
     pub consumed_at: Option<u64>,
 }
 
-/// Trait for persistent Right storage
+/// Trait for persistent Sanad storage
 ///
-/// This trait extends the seal storage with Right-specific operations
-/// required by the RightsManager facade.
-pub trait RightStore: Send + Sync {
-    /// Save a Right to the store
-    fn save_right(&mut self, record: &RightRecord) -> Result<(), StoreError>;
+/// This trait extends the seal storage with Sanad-specific operations
+/// required by the SanadsManager facade.
+pub trait SanadStore: Send + Sync {
+    /// Save a Sanad to the store
+    fn save_sanad(&mut self, record: &SanadRecord) -> Result<(), StoreError>;
 
-    /// Get a Right by its ID
-    fn get_right(&self, right_id: &crate::right::RightId) -> Result<Option<RightRecord>, StoreError>;
+    /// Get a Sanad by its ID
+    fn get_sanad(&self, sanad_id: &crate::title::SanadId) -> Result<Option<SanadRecord>, StoreError>;
 
-    /// List all Rights for a specific chain
-    fn list_rights_by_chain(&self, chain: &str) -> Result<Vec<RightRecord>, StoreError>;
+    /// List all Sanads for a specific chain
+    fn list_sanads_by_chain(&self, chain: &str) -> Result<Vec<SanadRecord>, StoreError>;
 
-    /// List all Rights for a specific owner
-    fn list_rights_by_owner(&self, owner: &[u8]) -> Result<Vec<RightRecord>, StoreError>;
+    /// List all Sanads for a specific owner
+    fn list_sanads_by_owner(&self, owner: &[u8]) -> Result<Vec<SanadRecord>, StoreError>;
 
-    /// Mark a Right as consumed
-    fn consume_right(
+    /// Mark a Sanad as consumed
+    fn consume_sanad(
         &mut self,
-        right_id: &crate::right::RightId,
+        sanad_id: &crate::title::SanadId,
         consumed_at: u64,
     ) -> Result<(), StoreError>;
 
-    /// List consumed Rights
-    fn list_consumed_rights(&self) -> Result<Vec<RightRecord>, StoreError>;
+    /// List consumed Sanads
+    fn list_consumed_sanads(&self) -> Result<Vec<SanadRecord>, StoreError>;
 
-    /// List unconsumed (active) Rights
-    fn list_active_rights(&self) -> Result<Vec<RightRecord>, StoreError>;
+    /// List unconsumed (active) Sanads
+    fn list_active_sanads(&self) -> Result<Vec<SanadRecord>, StoreError>;
 
-    /// Check if a Right exists
-    fn has_right(&self, right_id: &crate::right::RightId) -> Result<bool, StoreError>;
+    /// Check if a Sanad exists
+    fn has_sanad(&self, sanad_id: &crate::title::SanadId) -> Result<bool, StoreError>;
 
-    /// Delete a Right (for administrative purposes)
-    fn delete_right(&mut self, right_id: &crate::right::RightId) -> Result<(), StoreError>;
+    /// Delete a Sanad (for administrative purposes)
+    fn delete_sanad(&mut self, sanad_id: &crate::title::SanadId) -> Result<(), StoreError>;
 }
 
 /// Store error types

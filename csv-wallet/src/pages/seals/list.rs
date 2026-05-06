@@ -68,7 +68,7 @@ pub fn Seals() -> Element {
                                     th { class: "px-4 py-2 font-medium", "#" }
                                     th { class: "px-4 py-2 font-medium", "Seal Ref" }
                                     th { class: "px-4 py-2 font-medium", "Chain" }
-                                    th { class: "px-4 py-2 font-medium", "Protects Right" }
+                                    th { class: "px-4 py-2 font-medium", "Protects Sanad" }
                                     th { class: "px-4 py-2 font-medium", "Value" }
                                     th { class: "px-4 py-2 font-medium", "Status" }
                                     th { class: "px-4 py-2 font-medium", "Actions" }
@@ -81,8 +81,8 @@ pub fn Seals() -> Element {
                                         td { class: "px-4 py-3 font-mono text-xs", "{truncate_address(&seal.seal_ref, 12)}" }
                                         td { class: "px-4 py-3", span { class: "{chain_badge_class(&seal.chain)}", "{chain_icon_emoji(&seal.chain)} {chain_name(&seal.chain)}" } }
                                         td { class: "px-4 py-3 font-mono text-xs",
-                                            Link { to: Route::RightJourney { id: seal.right_id.clone() }, class: "text-purple-400 hover:text-purple-300",
-                                                "{truncate_address(&seal.right_id, 8)}"
+                                            Link { to: Route::SanadJourney { id: seal.sanad_id.clone() }, class: "text-purple-400 hover:text-purple-300",
+                                                "{truncate_address(&seal.sanad_id, 8)}"
                                             }
                                         }
                                         td { class: "px-4 py-3 font-mono text-xs", "{seal.value}" }
@@ -169,10 +169,10 @@ pub fn Seals() -> Element {
                                         }
                                     }
                                     div { class: "space-y-2",
-                                        p { class: "text-sm text-gray-400", "Protects Right" }
+                                        p { class: "text-sm text-gray-400", "Protects Sanad" }
                                         p { class: "text-sm font-mono break-all",
-                                            Link { to: Route::RightJourney { id: seal.right_id.clone() }, class: "text-purple-400 hover:text-purple-300",
-                                                "{&seal.right_id}"
+                                            Link { to: Route::SanadJourney { id: seal.sanad_id.clone() }, class: "text-purple-400 hover:text-purple-300",
+                                                "{&seal.sanad_id}"
                                             }
                                         }
                                     }
@@ -211,7 +211,7 @@ pub fn Seals() -> Element {
                                         p { class: "text-xs text-gray-500", "Seal Ref: {truncate_address(&seal.seal_ref, 20)}" }
                                         p { class: "text-xs text-gray-500", "Chain: {chain_name(&seal.chain)}" }
                                         p { class: "text-xs text-gray-500", "Status: {seal.status}" }
-                                        p { class: "text-xs text-gray-500", "Right: {truncate_address(&seal.right_id, 12)}" }
+                                        p { class: "text-xs text-gray-500", "Sanad: {truncate_address(&seal.sanad_id, 12)}" }
                                     }
                                     div { class: "flex gap-3",
                                         button {

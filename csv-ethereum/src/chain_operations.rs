@@ -6,16 +6,16 @@
 //! - ChainBroadcaster: Transaction broadcasting
 //! - ChainDeployer: Contract deployment via CREATE/CREATE2
 //! - ChainProofProvider: MPT inclusion and finality proofs
-//! - ChainRightOps: Right management via CSV seal contract
+//! - ChainSanadOps: Sanad management via CSV seal contract
 
 use async_trait::async_trait;
 use csv_core::chain_operations::{
     BalanceInfo, ChainBroadcaster, ChainDeployer, ChainOpError, ChainOpResult, ChainProofProvider,
-    ChainQuery, ChainRightOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus, RightOperationResult, TransactionInfo, TransactionStatus,
+    ChainQuery, ChainSanadOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus, SanadOperationResult, TransactionInfo, TransactionStatus,
 };
 use csv_core::hash::Hash;
 use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
-use csv_core::right::RightId;
+use csv_core::title::SanadId;
 use csv_core::signature::SignatureScheme;
 
 use crate::seal_protocol::EthereumSealProtocol;
@@ -35,7 +35,7 @@ pub struct EthereumBackend {
     domain_separator: [u8; 32],
     /// Finality checker
     finality_checker: FinalityChecker,
-    /// Seal contract ABI for right operations
+    /// Seal contract ABI for sanad operations
     seal_contract: CsvSealAbi,
     /// Event proof verifier
     proof_verifier: EventProofVerifier,
@@ -800,120 +800,120 @@ impl ChainProofProvider for EthereumBackend {
 }
 
 #[async_trait]
-impl ChainRightOps for EthereumBackend {
-    async fn create_right(
+impl ChainSanadOps for EthereumBackend {
+    async fn create_sanad(
         &self,
         owner: &str,
         asset_class: &str,
         asset_id: &str,
         metadata: serde_json::Value,
-    ) -> ChainOpResult<RightOperationResult> {
+    ) -> ChainOpResult<SanadOperationResult> {
         let _ = owner;
         let _ = asset_class;
         let _ = asset_id;
         let _ = metadata;
 
-        // In Ethereum, creating a right involves calling the CSV seal contract
+        // In Ethereum, creating a sanad involves calling the CSV seal contract
         // The contract would:
         // 1. Create a new seal entry with metadata
         // 2. Store the commitment
-        // 3. Emit a RightCreated event
+        // 3. Emit a SanadCreated event
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right creation requires a signed transaction to the CSV seal contract. \
-             Construct and submit a transaction calling the createRight function.".to_string(),
+            "Sanad creation requires a signed transaction to the CSV seal contract. \
+             Construct and submit a transaction calling the createSanad function.".to_string(),
         ))
     }
 
-    async fn consume_right(
+    async fn consume_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        let _ = right_id;
+    ) -> ChainOpResult<SanadOperationResult> {
+        let _ = sanad_id;
         let _ = owner_key_id;
 
-        // Consuming a right:
+        // Consuming a sanad:
         // 1. Call consumeSeal on the CSV seal contract
         // 2. Provide the commitment and nullifier
         // 3. Contract verifies and marks as consumed
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right consumption requires a signed transaction to the CSV seal contract. \
+            "Sanad consumption requires a signed transaction to the CSV seal contract. \
              Construct and submit a transaction calling the consumeSeal function.".to_string(),
         ))
     }
 
-    async fn lock_right(
+    async fn lock_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         destination_chain: &str,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        let _ = right_id;
+    ) -> ChainOpResult<SanadOperationResult> {
+        let _ = sanad_id;
         let _ = destination_chain;
         let _ = owner_key_id;
 
-        // Locking a right:
+        // Locking a sanad:
         // 1. Call lockSeal on the CSV seal contract
         // 2. Contract marks the seal as locked with destination chain
         // 3. Emits CrossChainLock event
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right locking requires a signed transaction to the CSV seal contract. \
+            "Sanad locking requires a signed transaction to the CSV seal contract. \
              Construct and submit a transaction calling the lockSeal function.".to_string(),
         ))
     }
 
-    async fn mint_right(
+    async fn mint_sanad(
         &self,
         source_chain: &str,
-        source_right_id: &RightId,
+        source_sanad_id: &SanadId,
         lock_proof: &CoreInclusionProof,
         new_owner: &str,
-    ) -> ChainOpResult<RightOperationResult> {
+    ) -> ChainOpResult<SanadOperationResult> {
         let _ = source_chain;
-        let _ = source_right_id;
+        let _ = source_sanad_id;
         let _ = lock_proof;
         let _ = new_owner;
 
-        // Minting a right on destination:
+        // Minting a sanad on destination:
         // 1. Verify the lock proof from source chain
         // 2. Call mintSeal on the CSV seal contract
-        // 3. Contract creates new seal for the right
+        // 3. Contract creates new seal for the sanad
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right minting requires a signed transaction to the CSV seal contract. \
+            "Sanad minting requires a signed transaction to the CSV seal contract. \
              Verify the lock proof, then construct and submit a transaction \
              calling the mintSeal function.".to_string(),
         ))
     }
 
-    async fn refund_right(
+    async fn refund_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        let _ = right_id;
+    ) -> ChainOpResult<SanadOperationResult> {
+        let _ = sanad_id;
         let _ = owner_key_id;
 
-        // Refunding a locked right:
+        // Refunding a locked sanad:
         // 1. Call refundSeal on the CSV seal contract
         // 2. Contract verifies timeout and returns seal to owner
 
         Err(ChainOpError::CapabilityUnavailable(
-            "Right refund requires a signed transaction to the CSV seal contract. \
+            "Sanad refund requires a signed transaction to the CSV seal contract. \
              Construct and submit a transaction calling the refundSeal function.".to_string(),
         ))
     }
 
-    async fn record_right_metadata(
+    async fn record_sanad_metadata(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         metadata: serde_json::Value,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult> {
-        let _ = right_id;
+    ) -> ChainOpResult<SanadOperationResult> {
+        let _ = sanad_id;
         let _ = metadata;
         let _ = owner_key_id;
 
@@ -927,14 +927,14 @@ impl ChainRightOps for EthereumBackend {
         ))
     }
 
-    async fn verify_right_state(
+    async fn verify_sanad_state(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         expected_state: &str,
     ) -> ChainOpResult<bool> {
         // Query the CSV seal contract for the seal state
-        // The right_id contains the commitment hash
-        let commitment = right_id.0.as_bytes();
+        // The sanad_id contains the commitment hash
+        let commitment = sanad_id.0.as_bytes();
 
         // In a full implementation, we would:
         // 1. Call the CSV seal contract's getSealState(bytes32 commitment) function

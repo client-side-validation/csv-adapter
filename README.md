@@ -3,9 +3,9 @@
 **Status:** Production-Ready (May 2026)  
 **Evaluation:** [Production Guarantee Plan](docs/PRODUCTION_GUARANTEE_PLAN.md)
 
-Client-side validation for cross-chain rights built around a universal seal model.
+Client-side validation for cross-chain sanads built around a universal seal model.
 
-CSV Adapter treats a blockchain as the place where single-use is enforced, not where full application state lives. A `Right` stays in client state, while a chain-specific `Seal` is consumed on Bitcoin, Sui, Aptos, or Ethereum and later proven to another client with inclusion and finality evidence.
+CSV Adapter treats a blockchain as the place where single-use is enforced, not where full application state lives. A `Sanad` stays in client state, while a chain-specific `Seal` is consumed on Bitcoin, Sui, Aptos, or Ethereum and later proven to another client with inclusion and finality evidence.
 
 ## What the codebase contains
 
@@ -15,8 +15,8 @@ This repository is organized as a **monorepo** with a Rust workspace:
 
 | Crate | Purpose |
 |-------|---------|
-| `csv-adapter-core` | Protocol types, proofs, validation logic, state machine, `AnchorLayer` trait |
-| `csv-adapter-store` | State storage for seals, rights, and wallet metadata |
+| `csv-adapter-core` | Protocol types, proofs, validation logic, state machine, `SealProtocol` trait |
+| `csv-adapter-store` | State storage for seals, sanads, and wallet metadata |
 | `csv-adapter-keystore` | **BIP-39/BIP-44** key derivation, **AES-256-GCM** encrypted storage |
 | `csv-adapter-bitcoin` | Bitcoin chain adapter with UTXO seal model |
 | `csv-adapter-ethereum` | Ethereum chain adapter with nullifier registration |
@@ -29,7 +29,7 @@ This repository is organized as a **monorepo** with a Rust workspace:
 
 | Application | Purpose |
 |-------------|---------|
-| `csv-cli` | Command-line tool for wallets, rights, proofs, cross-chain flows |
+| `csv-cli` | Command-line tool for wallets, sanads, proofs, cross-chain flows |
 | `csv-wallet` | **Web wallet UI** with seal visualizer, proof inspector, onboarding |
 | `csv-explorer` | Block explorer, API, indexer |
 
@@ -45,11 +45,11 @@ This repository is organized as a **monorepo** with a Rust workspace:
 
 CSV is not a bridge. It is a verification model.
 
-1. A right is anchored to a chain-specific seal.
+1. A sanad is anchored to a chain-specific seal.
 2. The seal is consumed on the source chain.
 3. The sender produces a proof bundle from source-chain data.
 4. The receiver verifies the proof locally or through a destination-chain verifier.
-5. The right is accepted because the proof is valid, not because a bridge attested to it.
+5. The sanad is accepted because the proof is valid, not because a bridge attested to it.
 
 This lets the system preserve each chain's native single-use guarantee:
 
@@ -87,17 +87,17 @@ cargo build -p csv-cli --release
 ./target/release/csv wallet balance --chain aptos
 ```
 
-### Create Your First Right
+### Create Your First Sanad
 
 ```bash
-# Create a Right on Bitcoin
-./target/release/csv right create --chain bitcoin --value 100000 --metadata '{"type":"subscription","service":"premium"}'
+# Create a Sanad on Bitcoin
+./target/release/csv sanad create --chain bitcoin --value 100000 --metadata '{"type":"subscription","service":"premium"}'
 
-# List your Rights
-./target/release/csv right list --chain bitcoin
+# List your Sanads
+./target/release/csv sanad list --chain bitcoin
 
-# Transfer Right to Ethereum
-./target/release/csv right transfer --right-id 0x... --from bitcoin --to ethereum
+# Transfer Sanad to Ethereum
+./target/release/csv sanad transfer --sanad-id 0x... --from bitcoin --to ethereum
 ```
 
 ### Cross-Chain Subscriptions Example
@@ -127,7 +127,7 @@ let client = CsvClient::builder()
     .with_store_backend(StoreBackend::InMemory)
     .build()?;
 
-let rights = client.rights();
+let sanads = client.sanads();
 let transfers = client.transfers();
 let proofs = client.proofs();
 ```
@@ -139,8 +139,8 @@ let proofs = client.proofs();
 CSV Adapter is designed for rapid development:
 
 1. **Initialize**: `csv wallet init --fund` generates wallets for all chains
-2. **Create Rights**: `csv right create --chain bitcoin --value 100000`
-3. **Cross-Chain**: `csv right transfer --from bitcoin --to ethereum`
+2. **Create Sanads**: `csv sanad create --chain bitcoin --value 100000`
+3. **Cross-Chain**: `csv sanad transfer --from bitcoin --to ethereum`
 4. **Verify**: `csv proof verify --chain ethereum --proof-file proof.json`
 
 ### Cost Savings
@@ -212,7 +212,7 @@ The MCP server provides self-describing errors with actionable suggestions:
 
 From `repomix-output.xml` and the live source tree, the repo is strongest where it has a clear center:
 
-- `csv-adapter-core` is the architectural anchor. Its exported modules and the `AnchorLayer` trait provide a coherent protocol boundary for every chain adapter.
+- `csv-adapter-core` is the architectural anchor. Its exported modules and the `SealProtocol` trait provide a coherent protocol boundary for every chain adapter.
 - The Rust packages are relatively well factored: protocol in `core`, per-chain enforcement in adapters, and user operations in `csv-cli` and `csv-adapter`.
 - The broader repo has grown into a product ecosystem, not just a Rust library. The explorer, wallet, TypeScript SDK, MCP server, and local-dev tooling matter and should be reflected in top-level docs.
 

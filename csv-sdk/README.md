@@ -1,6 +1,6 @@
 # CSV Adapter — Unified Meta-Crate
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)]()
+[![Build](https://img.shields.io/badge/build-passing-bsanadgreen)]()
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)]()
 
 A single entry point for all CSV (Client-Side Validation) operations, unifying the individual chain adapter crates behind a coherent, ergonomic API.
@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
         .build()?;
 
     // Access managers
-    let rights = client.rights();
+    let sanads = client.sanads();
     let transfers = client.transfers();
     let proofs = client.proofs();
 
@@ -69,7 +69,7 @@ let client = CsvClient::builder()
     .build()?;
 
 // Access all managers
-let rights = client.rights();
+let sanads = client.sanads();
 let transfers = client.transfers();
 let proofs = client.proofs();
 let wallet_mgr = client.wallet()?;
@@ -123,7 +123,7 @@ let client = CsvClient::builder()
 
 ```
 csv-adapter (this crate)
-├── csv-adapter-core       (always included — Right, Hash, Commitment, traits)
+├── csv-adapter-core       (always included — Sanad, Hash, Commitment, traits)
 ├── csv-adapter-bitcoin    (optional — UTXO seals, Tapret anchoring)
 ├── csv-adapter-ethereum   (optional — nullifier seals, MPT proofs)
 ├── csv-adapter-sui        (optional — object seals, checkpoint finality)
@@ -139,7 +139,7 @@ csv-adapter (this crate)
 | `builder` | `ClientBuilder` — fluent construction |
 | `config` | `Config` — serializable configuration |
 | `wallet` | `Wallet` / `WalletManager` — multi-chain HD wallet |
-| `rights` | `RightsManager` — create, query, manage Rights |
+| `sanads` | `SanadsManager` — create, query, manage Sanads |
 | `transfers` | `TransferManager` — cross-chain transfers |
 | `proofs` | `ProofManager` — generate and verify proofs |
 | `events` | `EventStream` — real-time event streaming |
@@ -180,13 +180,13 @@ fn handle_error(err: CsvError) {
 
 ## Key Concepts
 
-### Right
+### Sanad
 
-A **Right** is a verifiable, single-use digital claim. It exists in client state (not on any chain) and is anchored to a single-use seal on a specific chain.
+A **Sanad** is a verifiable, single-use digital claim. It exists in client state (not on any chain) and is anchored to a single-use seal on a specific chain.
 
 ### Seal
 
-A **Seal** is the on-chain mechanism that enforces a Right's single-use. Chain-specific and exists on one chain only:
+A **Seal** is the on-chain mechanism that enforces a Sanad's single-use. Chain-specific and exists on one chain only:
 
 - **Bitcoin**: UTXO spend (L1 Structural)
 - **Sui**: Object deletion (L1 Structural)
@@ -195,7 +195,7 @@ A **Seal** is the on-chain mechanism that enforces a Right's single-use. Chain-s
 
 ### Cross-Chain Transfer
 
-A Right doesn't "move" between chains. The source chain's seal is consumed, a proof is generated, and the destination chain verifies the proof locally. No bridges, no wrapped tokens, no cross-chain messaging.
+A Sanad doesn't "move" between chains. The source chain's seal is consumed, a proof is generated, and the destination chain verifies the proof locally. No bridges, no wrapped tokens, no cross-chain messaging.
 
 ---
 

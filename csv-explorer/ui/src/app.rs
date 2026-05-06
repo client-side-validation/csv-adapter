@@ -3,7 +3,7 @@ use dioxus::prelude::*;
 use dioxus_router::components::{Link, Outlet};
 
 use crate::app::routes::Route;
-use crate::pages::{Home, RightsList, SealsList, Stats, TransfersList, Wallet};
+use crate::pages::{Home, SanadsList, SealsList, Stats, TransfersList, Wallet};
 
 /// Version from workspace Cargo.toml (via csv-adapter-core)
 const VERSION: &str = csv_core::PROTOCOL_VERSION_DISPLAY;
@@ -30,7 +30,7 @@ pub fn App() -> Element {
                                 }
                             }
                             nav { class: "hidden md:flex gap-6",
-                                NavLink { to: Route::RightsList {}, class: "nav-link".to_string(), "Rights" }
+                                NavLink { to: Route::SanadsList {}, class: "nav-link".to_string(), "Sanads" }
                                 NavLink { to: Route::TransfersList {}, class: "nav-link".to_string(), "Transfers" }
                                 NavLink { to: Route::SealsList {}, class: "nav-link".to_string(), "Seals" }
                                 NavLink { to: Route::ContractsList {}, class: "nav-link".to_string(), "Contracts" }
@@ -38,7 +38,7 @@ pub fn App() -> Element {
                                 NavLink { to: Route::Chains {}, class: "nav-link".to_string(), "Chains" }
                             }
                         }
-                        // Right side: search and wallet
+                        // Sanad side: search and wallet
                         div { class: "flex items-center gap-4",
                             crate::components::search::GlobalSearch {}
                             Link { to: Route::Wallet {},

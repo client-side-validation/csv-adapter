@@ -1,29 +1,29 @@
-//! Right Journey page - shows the complete lifecycle of a Right.
+//! Sanad Journey page - shows the complete lifecycle of a Sanad.
 //!
-//! This page visualizes the flow: Right → Seal → Proof → Destination Right
+//! This page visualizes the flow: Sanad → Seal → Proof → Destination Sanad
 //! helping users understand the relationship between these concepts.
 
 use crate::context::{
-    use_wallet_context, ProofRecord, ProofStatus, RightStatus, SealRecord, SealStatus, TrackedRight,
+    use_wallet_context, ProofRecord, ProofStatus, SanadStatus, SealRecord, SealStatus, TrackedSanad,
 };
 use crate::pages::common::*;
 use crate::routes::Route;
 use dioxus::prelude::*;
 
-/// Right Journey page - visualizes the complete right lifecycle
+/// Sanad Journey page - visualizes the complete sanad lifecycle
 #[component]
-pub fn RightJourney(id: String) -> Element {
+pub fn SanadJourney(id: String) -> Element {
     let wallet_ctx = use_wallet_context();
-    let right = wallet_ctx.get_right(&id);
-    let seal = wallet_ctx.seal_for_right(&id);
-    let proofs = wallet_ctx.proofs_for_right(&id);
+    let sanad = wallet_ctx.get_sanad(&id);
+    let seal = wallet_ctx.seal_for_sanad(&id);
+    let proofs = wallet_ctx.proofs_for_sanad(&id);
 
-    // Find destination right if this was transferred
-    let dest_right = if let Some(ref r) = right {
-        if r.status == RightStatus::Transferred {
-            // Look for a right that might be the destination
-            wallet_ctx.rights().into_iter().find(|other| {
-                other.id != r.id && other.value == r.value && other.status == RightStatus::Active
+    // Find destination sanad if this was transferred
+    let dest_sanad = if let Some(ref r) = sanad {
+        if r.status == SanadStatus::Transferred {
+            // Look for a sanad that might be the destination
+            wallet_ctx.sanads().into_iter().find(|other| {
+                other.id != r.id && other.value == r.value && other.status == SanadStatus::Active
             })
         } else {
             None
@@ -36,26 +36,26 @@ pub fn RightJourney(id: String) -> Element {
         div { class: "max-w-4xl mx-auto space-y-6",
             // Header
             div { class: "flex items-center gap-3",
-                Link { to: Route::Rights {}, class: "{btn_secondary_class()}", "\u{2190} Back" }
-                h1 { class: "text-xl font-bold", "Right Journey" }
+                Link { to: Route::Sanads {}, class: "{btn_secondary_class()}", "\u{2190} Back" }
+                h1 { class: "text-xl font-bold", "Sanad Journey" }
             }
 
-            if right.is_none() {
+            if sanad.is_none() {
                 div { class: "{card_class()} p-6",
-                    p { class: "text-gray-400", "Right not found." }
+                    p { class: "text-gray-400", "Sanad not found." }
                 }
             } else {
                 // Flow visualization
-                {flow_visualization(&right, &seal, &proofs, &dest_right)}
+                {flow_visualization(&sanad, &seal, &proofs, &dest_sanad)}
 
                 // Commitment chain visualization (Phase 1.3)
-                if let Some(ref r) = right {
+                if let Some(ref r) = sanad {
                     {commitment_chain_section(r, &proofs)}
                 }
 
                 // Detailed sections
-                if let Some(ref r) = right {
-                    {right_details_section(r)}
+                if let Some(ref r) = sanad {
+                    {sanad_details_section(r)}
                 }
                 if let Some(ref s) = seal {
                     {seal_details_section(s)}
@@ -63,7 +63,7 @@ pub fn RightJourney(id: String) -> Element {
                 if !proofs.is_empty() {
                     {proofs_section(&proofs)}
                 }
-                if let Some(ref d) = dest_right {
+                if let Some(ref d) = dest_sanad {
                     {destination_section(d)}
                 }
             }
@@ -73,18 +73,18 @@ pub fn RightJourney(id: String) -> Element {
 
 /// Visual flow diagram showing the lifecycle
 fn flow_visualization(
-    right: &Option<TrackedRight>,
+    sanad: &Option<TrackedSanad>,
     seal: &Option<SealRecord>,
     proofs: &[ProofRecord],
-    dest_right: &Option<TrackedRight>,
+    dest_sanad: &Option<TrackedSanad>,
 ) -> Element {
-    let right_active = right.is_some();
+    let sanad_active = sanad.is_some();
     let seal_active = seal.is_some();
     let proof_active = !proofs.is_empty();
-    let dest_active = dest_right.is_some();
+    let dest_active = dest_sanad.is_some();
 
     // Determine status colors
-    let right_color = if right_active {
+    let sanad_color = if sanad_active {
         "bg-blue-500"
     } else {
         "bg-gray-600"
@@ -119,13 +119,13 @@ fn flow_visualization(
             h2 { class: "text-lg font-semibold mb-6", "Lifecycle Flow" }
 
             div { class: "flex flex-col md:flex-row items-center justify-between gap-4",
-                // Step 1: Right
+                // Step 1: Sanad
                 div { class: "flex flex-col items-center gap-2",
-                    div { class: "w-16 h-16 rounded-full {right_color} flex items-center justify-center text-2xl",
+                    div { class: "w-16 h-16 rounded-full {sanad_color} flex items-center justify-center text-2xl",
                         "\u{1F48E}"
                     }
-                    span { class: "text-sm font-medium", "Right" }
-                    if let Some(ref r) = right {
+                    span { class: "text-sm font-medium", "Sanad" }
+                    if let Some(ref r) = sanad {
                         span { class: "text-xs text-gray-400", "{truncate_address(&r.id, 6)}" }
                     }
                 }
@@ -185,7 +185,7 @@ fn flow_visualization(
                     }
                 }
 
-                // Step 4: Destination Right
+                // Step 4: Destination Sanad
                 div { class: "flex flex-col items-center gap-2",
                     div { class: "w-16 h-16 rounded-full {dest_color} flex items-center justify-center text-2xl",
                         "\u{1F48E}"
@@ -202,7 +202,7 @@ fn flow_visualization(
             // Status summary
             div { class: "mt-6 p-4 bg-gray-800/50 rounded-lg",
                 p { class: "text-sm text-gray-300",
-                    {flow_status_text(right, seal, proofs, dest_right)}
+                    {flow_status_text(sanad, seal, proofs, dest_sanad)}
                 }
             }
         }
@@ -210,66 +210,66 @@ fn flow_visualization(
 }
 
 fn flow_status_text(
-    right: &Option<TrackedRight>,
+    sanad: &Option<TrackedSanad>,
     seal: &Option<SealRecord>,
     proofs: &[ProofRecord],
-    dest_right: &Option<TrackedRight>,
+    dest_sanad: &Option<TrackedSanad>,
 ) -> String {
-    if let Some(ref r) = right {
+    if let Some(ref r) = sanad {
         match r.status {
-            RightStatus::Active => {
+            SanadStatus::Active => {
                 if seal.is_none() {
-                    "This Right is active and can be locked for cross-chain transfer.".to_string()
+                    "This Sanad is active and can be locked for cross-chain transfer.".to_string()
                 } else if proofs.is_empty() {
-                    "Right is locked. Generate a proof to verify it on another chain.".to_string()
-                } else if dest_right.is_none() {
+                    "Sanad is locked. Generate a proof to verify it on another chain.".to_string()
+                } else if dest_sanad.is_none() {
                     "Proof generated. Ready to mint on destination chain.".to_string()
                 } else {
                     "Cross-chain transfer complete!".to_string()
                 }
             }
-            RightStatus::Transferred => {
-                "This Right has been transferred to another chain.".to_string()
+            SanadStatus::Transferred => {
+                "This Sanad has been transferred to another chain.".to_string()
             }
-            RightStatus::Consumed => "This Right has been consumed.".to_string(),
+            SanadStatus::Consumed => "This Sanad has been consumed.".to_string(),
         }
     } else {
-        "Right not found.".to_string()
+        "Sanad not found.".to_string()
     }
 }
 
-/// Right details section
-fn right_details_section(right: &TrackedRight) -> Element {
+/// Sanad details section
+fn sanad_details_section(sanad: &TrackedSanad) -> Element {
     rsx! {
         div { class: "{card_class()}",
             div { class: "{card_header_class()}",
-                h2 { class: "font-semibold", "\u{1F48E} Right Details" }
+                h2 { class: "font-semibold", "\u{1F48E} Sanad Details" }
             }
             div { class: "p-4 space-y-4",
                 div { class: "grid grid-cols-2 gap-4",
                     div {
-                        p { class: "text-xs text-gray-500", "Right ID" }
-                        p { class: "text-sm font-mono break-all", "{&right.id}" }
+                        p { class: "text-xs text-gray-500", "Sanad ID" }
+                        p { class: "text-sm font-mono break-all", "{&sanad.id}" }
                     }
                     div {
                         p { class: "text-xs text-gray-500", "Chain" }
-                        p { class: "text-sm", span { class: "{chain_badge_class(&right.chain)}", "{chain_icon_emoji(&right.chain)} {chain_name(&right.chain)}" } }
+                        p { class: "text-sm", span { class: "{chain_badge_class(&sanad.chain)}", "{chain_icon_emoji(&sanad.chain)} {chain_name(&sanad.chain)}" } }
                     }
                     div {
                         p { class: "text-xs text-gray-500", "Value" }
-                        p { class: "text-sm font-mono", "{right.value}" }
+                        p { class: "text-sm font-mono", "{sanad.value}" }
                     }
                     div {
                         p { class: "text-xs text-gray-500", "Status" }
                         p { class: "text-sm",
-                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {right_status_class(&right.status)}",
-                                "{right.status}"
+                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {sanad_status_class(&sanad.status)}",
+                                "{sanad.status}"
                             }
                         }
                     }
                     div {
                         p { class: "text-xs text-gray-500", "Owner" }
-                        p { class: "text-sm font-mono", "{truncate_address(&right.owner, 12)}" }
+                        p { class: "text-sm font-mono", "{truncate_address(&sanad.owner, 12)}" }
                     }
                 }
             }
@@ -306,8 +306,8 @@ fn seal_details_section(seal: &SealRecord) -> Element {
                         }
                     }
                     div {
-                        p { class: "text-xs text-gray-500", "Protects Right" }
-                        p { class: "text-sm font-mono", "{truncate_address(&seal.right_id, 12)}" }
+                        p { class: "text-xs text-gray-500", "Protects Sanad" }
+                        p { class: "text-sm font-mono", "{truncate_address(&seal.sanad_id, 12)}" }
                     }
                     div {
                         p { class: "text-xs text-gray-500", "Value Locked" }
@@ -501,35 +501,35 @@ fn proof_data_display(data: &crate::context::ProofData) -> Element {
     }
 }
 
-/// Destination right section
-fn destination_section(right: &TrackedRight) -> Element {
+/// Destination sanad section
+fn destination_section(sanad: &TrackedSanad) -> Element {
     rsx! {
         div { class: "{card_class()} border-green-500/30",
             div { class: "{card_header_class()} bg-green-900/20",
-                h2 { class: "font-semibold text-green-400", "\u{2705} Destination Right" }
+                h2 { class: "font-semibold text-green-400", "\u{2705} Destination Sanad" }
             }
             div { class: "p-4 space-y-4",
                 p { class: "text-sm text-gray-300",
-                    "The Right has been successfully minted on the destination chain."
+                    "The Sanad has been successfully minted on the destination chain."
                 }
                 div { class: "grid grid-cols-2 gap-4",
                     div {
-                        p { class: "text-xs text-gray-500", "Right ID" }
-                        p { class: "text-sm font-mono break-all", "{&right.id}" }
+                        p { class: "text-xs text-gray-500", "Sanad ID" }
+                        p { class: "text-sm font-mono break-all", "{&sanad.id}" }
                     }
                     div {
                         p { class: "text-xs text-gray-500", "Chain" }
-                        p { class: "text-sm", span { class: "{chain_badge_class(&right.chain)}", "{chain_icon_emoji(&right.chain)} {chain_name(&right.chain)}" } }
+                        p { class: "text-sm", span { class: "{chain_badge_class(&sanad.chain)}", "{chain_icon_emoji(&sanad.chain)} {chain_name(&sanad.chain)}" } }
                     }
                     div {
                         p { class: "text-xs text-gray-500", "Value" }
-                        p { class: "text-sm font-mono", "{right.value}" }
+                        p { class: "text-sm font-mono", "{sanad.value}" }
                     }
                     div {
                         p { class: "text-xs text-gray-500", "Status" }
                         p { class: "text-sm",
-                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {right_status_class(&right.status)}",
-                                "{right.status}"
+                            span { class: "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {sanad_status_class(&sanad.status)}",
+                                "{sanad.status}"
                             }
                         }
                     }
@@ -542,9 +542,9 @@ fn destination_section(right: &TrackedRight) -> Element {
 /// Commitment chain section - Phase 1.3: Make Commitment Chain Walkable in UI
 ///
 /// This section visualizes the cryptographic commitment chain that proves
-/// the provenance of the Right. This is the primary UI proof that CSV works
+/// the provenance of the Sanad. This is the primary UI proof that CSV works
 /// differently from bridges - the user can SEE their entire provenance chain.
-fn commitment_chain_section(_right: &TrackedRight, proofs: &[ProofRecord]) -> Element {
+fn commitment_chain_section(_sanad: &TrackedSanad, proofs: &[ProofRecord]) -> Element {
     // Build commitment chain from available data
     // In a full implementation, this would come from the consignment
     let chain = build_commitment_chain_from_proofs(proofs);
@@ -589,7 +589,7 @@ fn commitment_chain_section(_right: &TrackedRight, proofs: &[ProofRecord]) -> El
                         div { class: "mt-4 p-3 bg-blue-900/20 border border-blue-700/30 rounded-lg",
                             p { class: "text-xs text-blue-300 font-medium", "\u{1F3E0} Genesis Commitment" }
                             p { class: "text-xs text-blue-400/70 mt-1",
-                                "The root of trust for this Right. All subsequent commitments chain back to this hash."
+                                "The root of trust for this Sanad. All subsequent commitments chain back to this hash."
                             }
                             p { class: "text-xs font-mono text-blue-400/50 mt-2 break-all",
                                 "{truncate_address(&genesis.hash, 16)}"

@@ -1,12 +1,12 @@
-/// Right detail page showing full information about a CSV right.
+/// Sanad detail page showing full information about a CSV sanad.
 use dioxus::prelude::*;
 use dioxus_router::components::Link;
 
 use crate::app::routes::Route;
 
 #[component]
-pub fn RightDetail(id: String) -> Element {
-    let mut right: Signal<Option<csv_explorer_shared::RightRecord>> = use_signal(|| None);
+pub fn SanadDetail(id: String) -> Element {
+    let mut sanad: Signal<Option<csv_explorer_shared::SanadRecord>> = use_signal(|| None);
     let mut transfers: Signal<Option<Vec<csv_explorer_shared::TransferRecord>>> =
         use_signal(|| None);
     let mut seals: Signal<Option<Vec<csv_explorer_shared::SealRecord>>> = use_signal(|| None);
@@ -17,7 +17,7 @@ pub fn RightDetail(id: String) -> Element {
             spawn(async move {
                 // Data fetching from API to be implemented
                 // Currently displays empty state
-                right.set(None);
+                sanad.set(None);
                 transfers.set(None);
                 seals.set(None);
             });
@@ -28,24 +28,24 @@ pub fn RightDetail(id: String) -> Element {
         div { class: "space-y-8",
             // Breadcrumb
             div { class: "flex items-center gap-2 text-sm text-gray-500",
-                Link { to: Route::RightsList {}, class: "hover:text-gray-300", "Rights" }
+                Link { to: Route::SanadsList {}, class: "hover:text-gray-300", "Sanads" }
                 span { "→" }
                 span { class: "text-gray-300 font-mono", "{id}" }
             }
 
             // Header
             div { class: "flex items-center justify-between",
-                h1 { class: "text-2xl font-bold", "Right Detail" }
-                if let Some(ref r) = *right.read() {
+                h1 { class: "text-2xl font-bold", "Sanad Detail" }
+                if let Some(ref r) = *sanad.read() {
                     StatusBadge { status: r.status.to_string() }
                 }
             }
 
-            if let Some(ref r) = *right.read() {
+            if let Some(ref r) = *sanad.read() {
                 // Main info card
                 div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
                     div { class: "grid grid-cols-1 md:grid-cols-2 gap-6",
-                        DetailRow { label: "Right ID", value: r.id.clone() }
+                        DetailRow { label: "Sanad ID", value: r.id.clone() }
                         DetailRow { label: "Chain", value: r.chain.clone() }
                         DetailRow { label: "Owner", value: r.owner.clone() }
                         DetailRow { label: "Seal Reference", value: r.seal_ref.clone() }
@@ -72,7 +72,7 @@ pub fn RightDetail(id: String) -> Element {
                     if let Some(ref txs) = *transfers.read() {
                         if txs.is_empty() {
                             div { class: "bg-gray-900 rounded-xl border border-gray-800 p-8 text-center text-gray-500",
-                                "No transfers for this right yet"
+                                "No transfers for this sanad yet"
                             }
                         } else {
                             div { class: "bg-gray-900 rounded-xl border border-gray-800 overflow-hidden",
@@ -126,7 +126,7 @@ pub fn RightDetail(id: String) -> Element {
                     if let Some(ref seals_list) = *seals.read() {
                         if seals_list.is_empty() {
                             div { class: "bg-gray-900 rounded-xl border border-gray-800 p-8 text-center text-gray-500",
-                                "No seals associated with this right"
+                                "No seals associated with this sanad"
                             }
                         } else {
                             div { class: "grid grid-cols-1 md:grid-cols-2 gap-4",

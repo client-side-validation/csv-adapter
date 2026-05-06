@@ -1,11 +1,11 @@
 /// Repository for advanced commitment and proof metadata.
 ///
 /// Handles storage and querying of commitment schemes, proof types,
-/// and enhanced right/seal records with metadata.
+/// and enhanced sanad/seal records with metadata.
 use csv_explorer_shared::{
-    CommitmentScheme, EnhancedInclusionProof, EnhancedRightRecord, EnhancedSealRecord,
+    CommitmentScheme, EnhancedInclusionProof, EnhancedSanadRecord, EnhancedSealRecord,
     EnhancedTransferRecord, FinalityProofCount, FinalityProofType, InclusionProofCount,
-    InclusionProofType, ProofStatistics, ProofVerificationStatus, RightProofFilter, SchemeCount,
+    InclusionProofType, ProofStatistics, ProofVerificationStatus, SanadProofFilter, SchemeCount,
     SealProofCount, SealProofFilter,
 };
 use sqlx::{Row, SqlitePool};
@@ -25,10 +25,10 @@ impl AdvancedProofRepository {
 
     /// Initialize the advanced proof tables.
     pub async fn init(&self) -> Result<(), sqlx::Error> {
-        // Enhanced rights table
+        // Enhanced sanads table
         sqlx::query(
             r#"
-            CREATE TABLE IF NOT EXISTS enhanced_rights (
+            CREATE TABLE IF NOT EXISTS enhanced_sanads (
                 id TEXT PRIMARY KEY,
                 chain TEXT NOT NULL,
                 seal_ref TEXT NOT NULL,
@@ -68,7 +68,7 @@ impl AdvancedProofRepository {
                 chain TEXT NOT NULL,
                 seal_type TEXT NOT NULL,
                 seal_ref TEXT NOT NULL,
-                right_id TEXT,
+                sanad_id TEXT,
                 status TEXT NOT NULL,
                 consumed_at DATETIME,
                 consumed_tx TEXT,
@@ -90,7 +90,7 @@ impl AdvancedProofRepository {
             r#"
             CREATE TABLE IF NOT EXISTS enhanced_inclusion_proofs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                right_id TEXT NOT NULL,
+                sanad_id TEXT NOT NULL,
                 chain TEXT NOT NULL,
                 anchor_ref TEXT NOT NULL,
                 proof_type TEXT NOT NULL,
@@ -110,7 +110,7 @@ impl AdvancedProofRepository {
             r#"
             CREATE TABLE IF NOT EXISTS enhanced_transfers (
                 id TEXT PRIMARY KEY,
-                right_id TEXT NOT NULL,
+                sanad_id TEXT NOT NULL,
                 from_chain TEXT NOT NULL,
                 to_chain TEXT NOT NULL,
                 from_owner TEXT NOT NULL,
@@ -154,8 +154,8 @@ impl AdvancedProofRepository {
         // Create indexes for performance
         sqlx::query(
             r#"
-            CREATE INDEX IF NOT EXISTS idx_enhanced_rights_scheme 
-            ON enhanced_rights(commitment_scheme)
+            CREATE INDEX IF NOT EXISTS idx_enhanced_sanads_scheme 
+            ON enhanced_sanads(commitment_scheme)
             "#,
         )
         .execute(&self.pool)
@@ -163,8 +163,8 @@ impl AdvancedProofRepository {
 
         sqlx::query(
             r#"
-            CREATE INDEX IF NOT EXISTS idx_enhanced_rights_owner 
-            ON enhanced_rights(owner)
+            CREATE INDEX IF NOT EXISTS idx_enhanced_sanads_owner 
+            ON enhanced_sanads(owner)
             "#,
         )
         .execute(&self.pool)
@@ -181,8 +181,8 @@ impl AdvancedProofRepository {
 
         sqlx::query(
             r#"
-            CREATE INDEX IF NOT EXISTS idx_inclusion_proofs_right 
-            ON enhanced_inclusion_proofs(right_id)
+            CREATE INDEX IF NOT EXISTS idx_inclusion_proofs_sanad 
+            ON enhanced_inclusion_proofs(sanad_id)
             "#,
         )
         .execute(&self.pool)
@@ -191,16 +191,16 @@ impl AdvancedProofRepository {
         Ok(())
     }
 
-    /// Insert or update an enhanced right record.
-    pub async fn insert_enhanced_right(
+    /// Insert or update an enhanced sanad record.
+    pub async fn insert_enhanced_sanad(
         &self,
-        record: &EnhancedRightRecord,
+        record: &EnhancedSanadRecord,
     ) -> Result<(), sqlx::Error> {
         let metadata_json = record.metadata.as_ref().map(|v| v.to_string());
 
         sqlx::query(
             r#"
-            INSERT INTO enhanced_rights (
+            INSERT INTO enhanced_sanads (
                 id, chain, seal_ref, commitment, owner, created_at, created_tx,
                 status, metadata, transfer_count, last_transfer_at,
                 commitment_scheme, commitment_version, protocol_id, mpc_root, domain_separator,
@@ -246,7 +246,7 @@ impl AdvancedProofRepository {
         sqlx::query(
             r#"
             INSERT INTO enhanced_seals (
-                id, chain, seal_type, seal_ref, right_id, status, consumed_at,
+                id, chain, seal_type, seal_ref, sanad_id, status, consumed_at,
                 consumed_tx, block_height, seal_proof_type, seal_proof_verified
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
             ON CONFLICT(id) DO UPDATE SET
@@ -258,7 +258,7 @@ impl AdvancedProofRepository {
         .bind(&record.chain)
         .bind(&record.seal_type)
         .bind(&record.seal_ref)
-        .bind(record.right_id.as_deref())
+        .bind(record.sanad_id.as_deref())
         .bind(&record.status)
         .bind(record.consumed_at)
         .bind(record.consumed_tx.as_deref())
@@ -279,12 +279,12 @@ impl AdvancedProofRepository {
         sqlx::query(
             r#"
             INSERT INTO enhanced_inclusion_proofs (
-                right_id, chain, anchor_ref, proof_type, proof_data,
+                sanad_id, chain, anchor_ref, proof_type, proof_data,
                 proof_size_bytes, verified, created_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
             "#,
         )
-        .bind(&record.right_id)
+        .bind(&record.sanad_id)
         .bind(&record.chain)
         .bind(&record.anchor_ref)
         .bind(&record.proof_type)
@@ -306,7 +306,7 @@ impl AdvancedProofRepository {
         sqlx::query(
             r#"
             INSERT INTO enhanced_transfers (
-                id, right_id, from_chain, to_chain, from_owner, to_owner,
+                id, sanad_id, from_chain, to_chain, from_owner, to_owner,
                 lock_tx, mint_tx, proof_ref, status, created_at, completed_at,
                 duration_ms, cross_chain_proof_type, bridge_contract, bridge_proof_verified
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
@@ -319,7 +319,7 @@ impl AdvancedProofRepository {
             "#,
         )
         .bind(&record.id)
-        .bind(&record.right_id)
+        .bind(&record.sanad_id)
         .bind(&record.from_chain)
         .bind(&record.to_chain)
         .bind(&record.from_owner)
@@ -340,15 +340,15 @@ impl AdvancedProofRepository {
         Ok(())
     }
 
-    /// Query enhanced rights with filter.
-    pub async fn query_enhanced_rights(
+    /// Query enhanced sanads with filter.
+    pub async fn query_enhanced_sanads(
         &self,
-        filter: RightProofFilter,
-    ) -> Result<Vec<EnhancedRightRecord>, sqlx::Error> {
+        filter: SanadProofFilter,
+    ) -> Result<Vec<EnhancedSanadRecord>, sqlx::Error> {
         let limit = filter.limit.unwrap_or(20);
         let offset = filter.offset.unwrap_or(0);
 
-        let mut query = String::from("SELECT * FROM enhanced_rights WHERE 1=1");
+        let mut query = String::from("SELECT * FROM enhanced_sanads WHERE 1=1");
 
         if let Some(ref chain) = filter.chain {
             query.push_str(&format!(" AND chain = '{}'", chain));
@@ -372,7 +372,7 @@ impl AdvancedProofRepository {
 
         let mut records = Vec::new();
         for row in rows {
-            records.push(EnhancedRightRecord {
+            records.push(EnhancedSanadRecord {
                 id: row.get("id"),
                 chain: row.get("chain"),
                 seal_ref: row.get("seal_ref"),
@@ -454,7 +454,7 @@ impl AdvancedProofRepository {
                 chain: row.get("chain"),
                 seal_type: row.get("seal_type"),
                 seal_ref: row.get("seal_ref"),
-                right_id: row.get("right_id"),
+                sanad_id: row.get("sanad_id"),
                 status: row.get("status"),
                 consumed_at: row.get("consumed_at"),
                 consumed_tx: row.get("consumed_tx"),
@@ -469,11 +469,11 @@ impl AdvancedProofRepository {
 
     /// Get proof statistics.
     pub async fn get_proof_statistics(&self) -> Result<ProofStatistics, sqlx::Error> {
-        // Total rights
-        let total_row = sqlx::query("SELECT COUNT(*) as count FROM enhanced_rights")
+        // Total sanads
+        let total_row = sqlx::query("SELECT COUNT(*) as count FROM enhanced_sanads")
             .fetch_one(&self.pool)
             .await?;
-        let total_rights: i64 = total_row.get("count");
+        let total_sanads: i64 = total_row.get("count");
 
         // Total seals
         let total_seals_row = sqlx::query("SELECT COUNT(*) as count FROM enhanced_seals")
@@ -481,18 +481,18 @@ impl AdvancedProofRepository {
             .await?;
         let total_seals: i64 = total_seals_row.get("count");
 
-        // Rights by commitment scheme
+        // Sanads by commitment scheme
         let scheme_rows = sqlx::query(
             r#"
             SELECT commitment_scheme, COUNT(*) as count
-            FROM enhanced_rights
+            FROM enhanced_sanads
             GROUP BY commitment_scheme
             "#,
         )
         .fetch_all(&self.pool)
         .await?;
 
-        let rights_by_scheme: Vec<SchemeCount> = scheme_rows
+        let sanads_by_scheme: Vec<SchemeCount> = scheme_rows
             .into_iter()
             .map(|row| {
                 let scheme_str: String = row.get("commitment_scheme");
@@ -505,18 +505,18 @@ impl AdvancedProofRepository {
             })
             .collect();
 
-        // Rights by inclusion proof type
+        // Sanads by inclusion proof type
         let incl_rows = sqlx::query(
             r#"
             SELECT inclusion_proof_type, COUNT(*) as count
-            FROM enhanced_rights
+            FROM enhanced_sanads
             GROUP BY inclusion_proof_type
             "#,
         )
         .fetch_all(&self.pool)
         .await?;
 
-        let rights_by_inclusion: Vec<InclusionProofCount> = incl_rows
+        let sanads_by_inclusion: Vec<InclusionProofCount> = incl_rows
             .into_iter()
             .map(|row| {
                 let proof_str: String = row.get("inclusion_proof_type");
@@ -529,18 +529,18 @@ impl AdvancedProofRepository {
             })
             .collect();
 
-        // Rights by finality proof type
+        // Sanads by finality proof type
         let final_rows = sqlx::query(
             r#"
             SELECT finality_proof_type, COUNT(*) as count
-            FROM enhanced_rights
+            FROM enhanced_sanads
             GROUP BY finality_proof_type
             "#,
         )
         .fetch_all(&self.pool)
         .await?;
 
-        let rights_by_finality: Vec<FinalityProofCount> = final_rows
+        let sanads_by_finality: Vec<FinalityProofCount> = final_rows
             .into_iter()
             .map(|row| {
                 let proof_str: String = row.get("finality_proof_type");
@@ -577,19 +577,19 @@ impl AdvancedProofRepository {
             .collect();
 
         Ok(ProofStatistics {
-            total_rights: total_rights as u64,
+            total_sanads: total_sanads as u64,
             total_seals: total_seals as u64,
-            rights_by_commitment_scheme: rights_by_scheme,
-            rights_by_inclusion_proof: rights_by_inclusion,
-            rights_by_finality_proof: rights_by_finality,
+            sanads_by_commitment_scheme: sanads_by_scheme,
+            sanads_by_inclusion_proof: sanads_by_inclusion,
+            sanads_by_finality_proof: sanads_by_finality,
             seals_by_proof_type: seals_by_type,
         })
     }
 
-    /// Update proof verification status for a right.
-    pub async fn update_right_verification_status(
+    /// Update proof verification status for a sanad.
+    pub async fn update_sanad_verification_status(
         &self,
-        right_id: &str,
+        sanad_id: &str,
         status: ProofVerificationStatus,
     ) -> Result<(), sqlx::Error> {
         let verified = match status {
@@ -600,13 +600,13 @@ impl AdvancedProofRepository {
 
         sqlx::query(
             r#"
-            UPDATE enhanced_rights
+            UPDATE enhanced_sanads
             SET zk_proof_verified = ?1
             WHERE id = ?2
             "#,
         )
         .bind(verified)
-        .bind(right_id)
+        .bind(sanad_id)
         .execute(&self.pool)
         .await?;
 

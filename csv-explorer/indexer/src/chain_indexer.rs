@@ -5,9 +5,9 @@
 use async_trait::async_trait;
 
 use csv_explorer_shared::{
-    BlockInfo, CommitmentScheme, CsvContract, CsvEvent, EnhancedRightRecord, EnhancedSealRecord,
+    BlockInfo, CommitmentScheme, CsvContract, CsvEvent, EnhancedSanadRecord, EnhancedSealRecord,
     EnhancedTransferRecord, ExplorerError, FinalityProofType,
-    InclusionProofType, Network, PriorityLevel, RightRecord, SealRecord, TransferRecord,
+    InclusionProofType, Network, PriorityLevel, SanadRecord, SealRecord, TransferRecord,
 };
 
 /// Result type alias for chain indexer operations.
@@ -33,8 +33,8 @@ pub trait ChainIndexer: Send + Sync {
     /// Get the latest block number that has been fully synced.
     async fn get_latest_synced_block(&self) -> ChainResult<u64>;
 
-    /// Index rights found in a specific block.
-    async fn index_rights(&self, block: u64) -> ChainResult<Vec<RightRecord>>;
+    /// Index sanads found in a specific block.
+    async fn index_sanads(&self, block: u64) -> ChainResult<Vec<SanadRecord>>;
 
     /// Index seals found in a specific block.
     async fn index_seals(&self, block: u64) -> ChainResult<Vec<SealRecord>>;
@@ -59,15 +59,15 @@ pub trait ChainIndexer: Send + Sync {
     ///
     /// # Returns
     /// Vector of CsvEvent structs following the standard schema:
-    /// - RightCreated, RightConsumed
+    /// - SanadCreated, SanadConsumed
     /// - CrossChainLock, CrossChainMint, CrossChainRefund
-    /// - RightTransferred, NullifierRegistered
-    /// - RightMetadataRecorded
+    /// - SanadTransferred, NullifierRegistered
+    /// - SanadMetadataRecorded
     async fn index_csv_events(&self, block: u64) -> ChainResult<Vec<CsvEvent>> {
         // Default implementation: convert from legacy records
         let mut events = Vec::new();
 
-        let rights = self.index_rights(block).await?;
+        let sanads = self.index_sanads(block).await?;
         let transfers = self.index_transfers(block).await?;
 
         // Create dummy block info - real implementations should override this
@@ -80,8 +80,8 @@ pub trait ChainIndexer: Send + Sync {
             log_index: 0,
         };
 
-        for right in rights {
-            events.push(right.to_right_created_event(block_info.clone()));
+        for sanad in sanads {
+            events.push(sanad.to_sanad_created_event(block_info.clone()));
         }
 
         for transfer in transfers {
@@ -94,14 +94,14 @@ pub trait ChainIndexer: Send + Sync {
     /// Parse a single block and return the latest block height processed.
     /// This is a convenience method that calls all index_* methods.
     async fn process_block(&self, block: u64) -> ChainResult<BlockIndexResult> {
-        let rights = self.index_rights(block).await?;
+        let sanads = self.index_sanads(block).await?;
         let seals = self.index_seals(block).await?;
         let transfers = self.index_transfers(block).await?;
         let contracts = self.index_contracts(block).await?;
 
         Ok(BlockIndexResult {
             block,
-            rights_count: rights.len() as u64,
+            sanads_count: sanads.len() as u64,
             seals_count: seals.len() as u64,
             transfers_count: transfers.len() as u64,
             contracts_count: contracts.len() as u64,
@@ -112,8 +112,8 @@ pub trait ChainIndexer: Send + Sync {
     // Advanced commitment and proof indexing methods
     // -----------------------------------------------------------------------
 
-    /// Index rights with enhanced commitment metadata.
-    async fn index_enhanced_rights(&self, block: u64) -> ChainResult<Vec<EnhancedRightRecord>>;
+    /// Index sanads with enhanced commitment metadata.
+    async fn index_enhanced_sanads(&self, block: u64) -> ChainResult<Vec<EnhancedSanadRecord>>;
 
     /// Index seals with enhanced proof metadata.
     async fn index_enhanced_seals(&self, block: u64) -> ChainResult<Vec<EnhancedSealRecord>>;
@@ -128,8 +128,8 @@ pub trait ChainIndexer: Send + Sync {
     // Priority address-based indexing methods
     // -----------------------------------------------------------------------
 
-    /// Index all rights related to a specific address.
-    async fn index_rights_by_address(&self, address: &str) -> ChainResult<Vec<RightRecord>>;
+    /// Index all sanads related to a specific address.
+    async fn index_sanads_by_address(&self, address: &str) -> ChainResult<Vec<SanadRecord>>;
 
     /// Index all seals related to a specific address.
     async fn index_seals_by_address(&self, address: &str) -> ChainResult<Vec<SealRecord>>;
@@ -137,7 +137,7 @@ pub trait ChainIndexer: Send + Sync {
     /// Index all transfers related to a specific address.
     async fn index_transfers_by_address(&self, address: &str) -> ChainResult<Vec<TransferRecord>>;
 
-    /// Index all data (rights, seals, transfers) for a list of addresses with priority.
+    /// Index all data (sanads, seals, transfers) for a list of addresses with priority.
     /// Returns the count of items indexed for each type.
     async fn index_addresses_with_priority(
         &self,
@@ -161,7 +161,7 @@ pub trait ChainIndexer: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct BlockIndexResult {
     pub block: u64,
-    pub rights_count: u64,
+    pub sanads_count: u64,
     pub seals_count: u64,
     pub transfers_count: u64,
     pub contracts_count: u64,
@@ -171,7 +171,7 @@ pub struct BlockIndexResult {
 #[derive(Debug, Clone)]
 pub struct AddressIndexingResult {
     pub addresses_processed: u64,
-    pub rights_indexed: u64,
+    pub sanads_indexed: u64,
     pub seals_indexed: u64,
     pub transfers_indexed: u64,
     pub contracts_indexed: u64,

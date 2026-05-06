@@ -1,4 +1,4 @@
-import { SealRef } from '../seal';
+import { SealPoint } from '../seal';
 import { hexToBytes } from '../types';
 
 /**
@@ -11,9 +11,9 @@ export namespace SolanaChain {
    * Create a Solana seal from a Pubkey.
    *
    * @param pubkey - Solana public key (base58 or hex string)
-   * @returns SealRef
+   * @returns SealPoint
    */
-  export function createSeal(pubkey: string): SealRef {
+  export function createSeal(pubkey: string): SealPoint {
     // Try to detect if it's base58 or hex
     const isBase58 = /^[1-9A-HJ-NP-Za-km-z]+$/.test(pubkey);
     return {

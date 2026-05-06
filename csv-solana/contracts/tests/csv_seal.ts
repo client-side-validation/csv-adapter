@@ -15,7 +15,7 @@ describe("csv_seal", () => {
   const owner = anchor.web3.Keypair.generate();
 
   // Test data
-  const rightId = Buffer.from(Array(32).fill(1));
+  const sanadId = Buffer.from(Array(32).fill(1));
   const commitment = Buffer.from(Array(32).fill(2));
   const stateRoot = Buffer.from(Array(32).fill(3));
   const destinationOwner = Buffer.from(Array(32).fill(4));
@@ -23,8 +23,8 @@ describe("csv_seal", () => {
 
   // PDAs
   let registryPda: anchor.web3.PublicKey;
-  let rightPda: anchor.web3.PublicKey;
-  let rightBump: number;
+  let sanadPda: anchor.web3.PublicKey;
+  let sanadBump: number;
 
   before(async () => {
     // Airdrop to owner
@@ -39,8 +39,8 @@ describe("csv_seal", () => {
       program.programId
     );
 
-    [rightPda, rightBump] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("right"), owner.publicKey.toBuffer(), rightId],
+    [sanadPda, sanadBump] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("sanad"), owner.publicKey.toBuffer(), sanadId],
       program.programId
     );
   });
@@ -66,41 +66,41 @@ describe("csv_seal", () => {
     }
   });
 
-  it("Creates a new right (seal)", async () => {
+  it("Creates a new sanad (seal)", async () => {
     await program.methods
       .createSeal(
-        Array.from(rightId),
+        Array.from(sanadId),
         Array.from(commitment),
         Array.from(stateRoot)
       )
       .accounts({
-        rightAccount: rightPda,
+        sanadAccount: sanadPda,
         owner: owner.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .signers([owner])
       .rpc();
 
-    const right = await program.account.rightAccount.fetch(rightPda);
-    expect(right.owner.toString()).to.equal(owner.publicKey.toString());
-    expect(Buffer.from(right.rightId).toString("hex")).to.equal(rightId.toString("hex"));
-    expect(Buffer.from(right.commitment).toString("hex")).to.equal(commitment.toString("hex"));
-    expect(right.consumed).to.be.false;
-    expect(right.locked).to.be.false;
+    const sanad = await program.account.sanadAccount.fetch(sanadPda);
+    expect(sanad.owner.toString()).to.equal(owner.publicKey.toString());
+    expect(Buffer.from(sanad.sanadId).toString("hex")).to.equal(sanadId.toString("hex"));
+    expect(Buffer.from(sanad.commitment).toString("hex")).to.equal(commitment.toString("hex"));
+    expect(sanad.consumed).to.be.false;
+    expect(sanad.locked).to.be.false;
   });
 
   it("Consumes a seal", async () => {
     await program.methods
       .consumeSeal()
       .accounts({
-        rightAccount: rightPda,
+        sanadAccount: sanadPda,
         consumer: owner.publicKey,
       })
       .signers([owner])
       .rpc();
 
-    const right = await program.account.rightAccount.fetch(rightPda);
-    expect(right.consumed).to.be.true;
+    const sanad = await program.account.sanadAccount.fetch(sanadPda);
+    expect(sanad.consumed).to.be.true;
   });
 
   it("Fails to consume already consumed seal", async () => {
@@ -108,7 +108,7 @@ describe("csv_seal", () => {
       await program.methods
         .consumeSeal()
         .accounts({
-          rightAccount: rightPda,
+          sanadAccount: sanadPda,
           consumer: owner.publicKey,
         })
         .signers([owner])
@@ -119,6 +119,6 @@ describe("csv_seal", () => {
     }
   });
 
-  // Additional tests for lock_right, mint_right, refund_right would go here
+  // Additional tests for lock_sanad, mint_sanad, refund_sanad would go here
   // They require more complex setup with multiple accounts and PDAs
 });

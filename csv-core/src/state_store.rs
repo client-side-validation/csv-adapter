@@ -15,7 +15,7 @@ use alloc::vec::Vec;
 
 use crate::commitment::Commitment;
 use crate::hash::Hash;
-use crate::right::Right;
+use crate::title::Sanad;
 use crate::seal::SealPoint;
 
 /// A recorded state transition in the contract history.
@@ -25,8 +25,8 @@ pub struct StateTransitionRecord {
     pub commitment: Commitment,
     /// The seal that was consumed or assigned
     pub seal_ref: SealPoint,
-    /// The Rights involved in this transition
-    pub rights: Vec<Right>,
+    /// The Sanads involved in this transition
+    pub sanads: Vec<Sanad>,
     /// Block height when this was anchored on-chain
     pub block_height: u64,
     /// Whether this transition has been verified by the client
@@ -40,8 +40,8 @@ pub struct ContractHistory {
     pub contract_id: Hash,
     /// All state transitions in chronological order
     pub transitions: Vec<StateTransitionRecord>,
-    /// Current active Rights (not yet consumed)
-    pub active_rights: BTreeMap<Hash, Right>,
+    /// Current active Sanads (not yet consumed)
+    pub active_sanads: BTreeMap<Hash, Sanad>,
     /// All consumed seals indexed by seal ID
     pub consumed_seals: BTreeMap<Vec<u8>, SealPoint>,
     /// The latest commitment hash in the chain
@@ -57,7 +57,7 @@ impl ContractHistory {
         Self {
             contract_id,
             transitions: Vec::new(),
-            active_rights: BTreeMap::new(),
+            active_sanads: BTreeMap::new(),
             consumed_seals: BTreeMap::new(),
             latest_commitment_hash: latest_hash,
         }
@@ -83,14 +83,14 @@ impl ContractHistory {
         Ok(())
     }
 
-    /// Register a new Right as active.
-    pub fn add_right(&mut self, right: Right) {
-        self.active_rights.insert(right.id.0, right);
+    /// Register a new Sanad as active.
+    pub fn add_sanad(&mut self, sanad: Sanad) {
+        self.active_sanads.insert(sanad.id.0, sanad);
     }
 
-    /// Mark a Right as consumed.
-    pub fn consume_right(&mut self, right_id: &Hash) -> Option<Right> {
-        self.active_rights.remove(right_id)
+    /// Mark a Sanad as consumed.
+    pub fn consume_sanad(&mut self, sanad_id: &Hash) -> Option<Sanad> {
+        self.active_sanads.remove(sanad_id)
     }
 
     /// Check if a seal has been consumed.
@@ -108,9 +108,9 @@ impl ContractHistory {
         self.transitions.len()
     }
 
-    /// Get all active Rights.
-    pub fn get_active_rights(&self) -> Vec<&Right> {
-        self.active_rights.values().collect()
+    /// Get all active Sanads.
+    pub fn get_active_sanads(&self) -> Vec<&Sanad> {
+        self.active_sanads.values().collect()
     }
 }
 
@@ -228,7 +228,7 @@ mod tests {
         let transition = StateTransitionRecord {
             commitment: make_test_commitment(genesis.hash(), 0x02),
             seal_ref: SealPoint::new(vec![0x02], None).unwrap(),
-            rights: Vec::new(),
+            sanads: Vec::new(),
             block_height: 100,
             verified: true,
         };
@@ -238,13 +238,13 @@ mod tests {
     }
 
     #[test]
-    fn test_right_lifecycle() {
+    fn test_sanad_lifecycle() {
         let genesis = make_test_commitment(Hash::new([0u8; 32]), 0x01);
         let mut history = ContractHistory::from_genesis(genesis);
 
-        let right = Right::new(
+        let sanad = Sanad::new(
             Hash::new([0xCD; 32]),
-            crate::right::OwnershipProof {
+            crate::sanad::TitleOwnershipProof {
                 proof: vec![0x01],
                 owner: vec![0xFF; 32],
                 scheme: None,
@@ -252,12 +252,12 @@ mod tests {
             &[0x42],
         );
 
-        history.add_right(right.clone());
-        assert_eq!(history.get_active_rights().len(), 1);
+        history.add_sanad(sanad.clone());
+        assert_eq!(history.get_active_sanads().len(), 1);
 
-        let consumed = history.consume_right(&right.id.0);
+        let consumed = history.consume_sanad(&sanad.id.0);
         assert!(consumed.is_some());
-        assert_eq!(history.get_active_rights().len(), 0);
+        assert_eq!(history.get_active_sanads().len(), 0);
     }
 
     #[test]

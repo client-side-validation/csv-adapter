@@ -1,7 +1,7 @@
 //! Solana seal implementation for CSV
 
 use crate::error::{SolanaError, SolanaResult};
-use crate::types::{SolanaSealRef, SolanaFinalityProof};
+use crate::types::{SolanaSealPoint, SolanaFinalityProof};
 use bincode::{serialize, deserialize};
 use serde::{Serialize, Deserialize};
 
@@ -9,14 +9,14 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SolanaSeal {
     /// Seal reference
-    pub seal_ref: SolanaSealRef,
+    pub seal_ref: SolanaSealPoint,
     /// Finality proof
     pub finality_proof: Option<SolanaFinalityProof>,
 }
 
 impl SolanaSeal {
     /// Create new Solana seal
-    pub fn new(seal_ref: SolanaSealRef) -> Self {
+    pub fn new(seal_ref: SolanaSealPoint) -> Self {
         Self {
             seal_ref,
             finality_proof: None,
@@ -24,7 +24,7 @@ impl SolanaSeal {
     }
 
     /// Get seal reference
-    pub fn seal_ref(&self) -> &SolanaSealRef {
+    pub fn seal_ref(&self) -> &SolanaSealPoint {
         &self.seal_ref
     }
 
@@ -79,7 +79,7 @@ impl SolanaSeal {
     /// Serialize seal to bytes using bincode
     ///
     /// The serialized format includes:
-    /// - seal_ref: SolanaSealRef (account, owner, lamports, seed)
+    /// - seal_ref: SolanaSealPoint (account, owner, lamports, seed)
     /// - finality_proof: Optional SolanaFinalityProof
     pub fn serialize(&self) -> SolanaResult<Vec<u8>> {
         let data = serialize(self)

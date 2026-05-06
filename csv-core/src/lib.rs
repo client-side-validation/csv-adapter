@@ -1,4 +1,4 @@
-//! CSV Core — Client-Side Validation for Cross-Chain Rights
+//! CSV Core — Client-Side Validation for Cross-Chain Sanads
 //!
 //! This crate provides the foundational types and traits for the CSV protocol:
 //!
@@ -11,7 +11,7 @@
 //!   and published anchors
 //! - **[`InclusionProof`]** / **[`FinalityProof`]** / **[`ProofBundle`]** —
 //!   Cryptographic proofs that a sanad was locked on the source chain
-//! - **[`SealProtocol`]** — The core trait each blockchain adapter implements
+//! - **[`SealProtocol`]** — The core seal protocol trait each chain backend implements
 //! - **[`SignatureScheme`]** — Supported signing algorithms (secp256k1, ed25519)
 //!
 //! ## Stability Tiers
@@ -53,10 +53,9 @@ extern crate alloc;
 // Core types
 pub mod commitment;
 pub mod hash;
-pub mod right;      // Legacy: being replaced by title
 pub mod seal;
 pub mod tagged_hash;
-pub mod title;      // New: Sanad/Title types (replaces right)
+pub mod title;      // Sanad/Title types
 
 // Advanced commitment types
 pub mod commitments_ext;
@@ -148,9 +147,8 @@ pub use protocol_version::{
 
 pub use commitment::Commitment;
 pub use hash::Hash;
-pub use right::{OwnershipProof, Right, RightError, RightId};
-pub use seal::{AnchorRef, CommitAnchor, SealPoint, SealRef};
-pub use title::{Sanad, SanadError, SanadId, OwnershipProof as TitleOwnershipProof};
+pub use seal::{CommitAnchor, SealPoint};
+pub use title::{Sanad, SanadError, SanadId, OwnershipProof};
 pub use signature::{parse_signatures_from_bytes, verify_signatures, Signature, SignatureScheme};
 
 // DAG and proofs
@@ -160,13 +158,13 @@ pub use verifier::verify_proof;
 
 // Errors and traits
 pub use error::{AdapterError, Result};
-pub use seal_protocol::AnchorLayer;
+pub use seal_protocol::SealProtocol;
 
 // Chain operations (Production Guarantee Plan Phase 2)
 pub use chain_operations::{
-    BalanceInfo, ChainBroadcaster, ChainCapability, ChainDeployer, ChainOpError, ChainOpResult,
-    ChainProofProvider, ChainQuery, ChainRightOps, ChainSigner, ContractStatus, DeploymentStatus,
-    FinalityStatus, FullChainAdapter, RightOperation, RightOperationResult, TokenBalance,
+    BalanceInfo, ChainBackend, ChainBroadcaster, ChainCapability, ChainDeployer, ChainOpError,
+    ChainOpResult, ChainProofProvider, ChainQuery, ChainSanadOps, ChainSigner, ContractStatus,
+    DeploymentStatus, FinalityStatus, SanadOperation, SanadOperationResult, TokenBalance,
     TransactionInfo, TransactionStatus,
 };
 
@@ -234,12 +232,12 @@ pub use performance::{
     BloomFilter, CacheStats, FilterStats, PerformanceMetrics, PerformanceStats, ProofCache,
     SealRegistryFilter, SequentialVerifier, VerificationResult,
 };
-pub use store::{AnchorRecord, InMemorySealStore, RightRecord, RightStore, SealRecord, SealStore, StoreError};
+pub use store::{AnchorRecord, InMemorySealStore, SanadRecord, SanadStore, SealRecord, SealStore, StoreError};
 
 // Chain adapter system (Beta API)
 pub use adapter_factory::{create_adapter, is_chain_supported, AdapterFactory};
 pub use chain_adapter::{
-    ChainAdapter, ChainAdapterExt, ChainError, ChainRegistry, ChainResult, RpcClient, Wallet,
+    ChainDriver, ChainDriverExt, ChainError, ChainRegistry, ChainResult, RpcClient, Wallet,
 };
 pub use chain_config::{AccountModel, ChainCapabilities, ChainConfig, ChainConfigLoader};
 pub use chain_discovery::{ChainDiscovery, ChainInfo};

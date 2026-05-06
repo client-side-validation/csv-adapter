@@ -147,7 +147,7 @@ fn row_to_contract(row: &SqliteRow) -> Result<CsvContract> {
     let contract_type = match contract_type_str.as_str() {
         "nullifier_registry" => ContractType::NullifierRegistry,
         "state_commitment" => ContractType::StateCommitment,
-        "right_registry" => ContractType::RightRegistry,
+        "sanad_registry" => ContractType::SanadRegistry,
         "bridge" => ContractType::Bridge,
         _ => ContractType::Other,
     };

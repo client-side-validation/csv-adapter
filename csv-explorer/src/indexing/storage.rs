@@ -1,8 +1,8 @@
 //! Storage layer for indexing pipeline
 //!
-//! Provides persistent storage for indexed rights, transfers, and events.
+//! Provides persistent storage for indexed sanads, transfers, and events.
 
-use crate::indexing::{IndexedRight, IndexedTransfer, RightsQuery, TransferQuery};
+use crate::indexing::{IndexedSanad, IndexedTransfer, SanadsQuery, TransferQuery};
 use chrono::{DateTime, Utc};
 #[cfg(test)]
 use csv_core::TransferStatus;
@@ -14,7 +14,7 @@ use std::sync::Arc;
 pub struct IndexStorage {
     // In-memory storage for demo purposes
     // In production, this would be a database connection
-    rights: Arc<tokio::sync::RwLock<HashMap<Hash, IndexedRight>>>,
+    sanads: Arc<tokio::sync::RwLock<HashMap<Hash, IndexedSanad>>>,
     transfers: Arc<tokio::sync::RwLock<HashMap<Hash, IndexedTransfer>>>,
     chain_sync_status: Arc<tokio::sync::RwLock<HashMap<String, ChainSyncInfo>>>,
     error_logs: Arc<tokio::sync::RwLock<Vec<ErrorLog>>>,
@@ -43,20 +43,20 @@ impl IndexStorage {
     /// Create a new index storage
     pub fn new() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         Ok(Self {
-            rights: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            sanads: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             transfers: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             chain_sync_status: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             error_logs: Arc::new(tokio::sync::RwLock::new(Vec::new())),
         })
     }
 
-    /// Store a right
-    pub async fn store_right(
+    /// Store a sanad
+    pub async fn store_sanad(
         &self,
-        right: &IndexedRight,
+        sanad: &IndexedSanad,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let mut rights = self.rights.write().await;
-        rights.insert(right.id, right.clone());
+        let mut sanads = self.sanads.write().await;
+        sanads.insert(sanad.id, sanad.clone());
         Ok(())
     }
 
@@ -70,13 +70,13 @@ impl IndexStorage {
         Ok(())
     }
 
-    /// Get right by ID
-    pub async fn get_right_by_id(
+    /// Get sanad by ID
+    pub async fn get_sanad_by_id(
         &self,
-        right_id: &Hash,
-    ) -> Result<Option<IndexedRight>, Box<dyn std::error::Error + Send + Sync>> {
-        let rights = self.rights.read().await;
-        Ok(rights.get(right_id).cloned())
+        sanad_id: &Hash,
+    ) -> Result<Option<IndexedSanad>, Box<dyn std::error::Error + Send + Sync>> {
+        let sanads = self.sanads.read().await;
+        Ok(sanads.get(sanad_id).cloned())
     }
 
     /// Get transfer by hash
@@ -88,37 +88,37 @@ impl IndexStorage {
         Ok(transfers.get(transfer_id).cloned())
     }
 
-    /// Search rights by query
-    pub async fn search_rights(
+    /// Search sanads by query
+    pub async fn search_sanads(
         &self,
-        query: &RightsQuery,
-    ) -> Result<Vec<IndexedRight>, Box<dyn std::error::Error + Send + Sync>> {
-        let rights = self.rights.read().await;
+        query: &SanadsQuery,
+    ) -> Result<Vec<IndexedSanad>, Box<dyn std::error::Error + Send + Sync>> {
+        let sanads = self.sanads.read().await;
         let mut results = Vec::new();
 
-        for right in rights.values() {
+        for sanad in sanads.values() {
             // Filter by owner
             if let Some(ref owner) = query.owner {
-                if right.owner != *owner {
+                if sanad.owner != *owner {
                     continue;
                 }
             }
 
             // Filter by chain
             if let Some(ref chain) = query.chain {
-                if right.chain != *chain {
+                if sanad.chain != *chain {
                     continue;
                 }
             }
 
             // Filter by status
             if let Some(ref status) = query.status {
-                if right.status != *status {
+                if sanad.status != *status {
                     continue;
                 }
             }
 
-            results.push(right.clone());
+            results.push(sanad.clone());
         }
 
         // Apply pagination
@@ -267,10 +267,10 @@ impl IndexStorage {
         Ok(error_logs[start..].to_vec())
     }
 
-    /// Get rights count
-    pub async fn get_rights_count(&self) -> u64 {
-        let rights = self.rights.read().await;
-        rights.len() as u64
+    /// Get sanads count
+    pub async fn get_sanads_count(&self) -> u64 {
+        let sanads = self.sanads.read().await;
+        sanads.len() as u64
     }
 
     /// Get transfers count
@@ -283,13 +283,13 @@ impl IndexStorage {
     pub async fn get_storage_stats(
         &self,
     ) -> Result<StorageStats, Box<dyn std::error::Error + Send + Sync>> {
-        let rights = self.rights.read().await;
+        let sanads = self.sanads.read().await;
         let transfers = self.transfers.read().await;
         let sync_status = self.chain_sync_status.read().await;
         let error_logs = self.error_logs.read().await;
 
         Ok(StorageStats {
-            total_rights: rights.len(),
+            total_sanads: sanads.len(),
             total_transfers: transfers.len(),
             active_chains: sync_status.len(),
             error_count: error_logs.len(),
@@ -299,7 +299,7 @@ impl IndexStorage {
 
     /// Clear all data (for testing)
     pub async fn clear_all(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        self.rights.write().await.clear();
+        self.sanads.write().await.clear();
         self.transfers.write().await.clear();
         self.chain_sync_status.write().await.clear();
         self.error_logs.write().await.clear();
@@ -310,7 +310,7 @@ impl IndexStorage {
 /// Storage statistics
 #[derive(Debug, Clone)]
 pub struct StorageStats {
-    pub total_rights: usize,
+    pub total_sanads: usize,
     pub total_transfers: usize,
     pub active_chains: usize,
     pub error_count: usize,
@@ -328,10 +328,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_right_storage() {
+    async fn test_sanad_storage() {
         let storage = IndexStorage::new().unwrap();
 
-        let right = IndexedRight {
+        let sanad = IndexedSanad {
             id: Hash::zero(),
             owner: "test".to_string(),
             chain: "ethereum".to_string(),
@@ -341,16 +341,16 @@ mod tests {
             metadata: serde_json::json!({}),
         };
 
-        // Store right
-        storage.store_right(&right).await.unwrap();
+        // Store sanad
+        storage.store_sanad(&sanad).await.unwrap();
 
-        // Get right
-        let retrieved = storage.get_right_by_id(&right.id).await.unwrap();
+        // Get sanad
+        let retrieved = storage.get_sanad_by_id(&sanad.id).await.unwrap();
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().owner, "test");
 
-        // Search rights
-        let query = RightsQuery {
+        // Search sanads
+        let query = SanadsQuery {
             owner: Some("test".to_string()),
             chain: None,
             status: None,
@@ -358,7 +358,7 @@ mod tests {
             offset: Some(0),
         };
 
-        let results = storage.search_rights(&query).await.unwrap();
+        let results = storage.search_sanads(&query).await.unwrap();
         assert_eq!(results.len(), 1);
     }
 
@@ -368,7 +368,7 @@ mod tests {
 
         let transfer = IndexedTransfer {
             id: Hash::zero(),
-            right_id: Hash::zero(),
+            sanad_id: Hash::zero(),
             from_chain: "ethereum".to_string(),
             to_chain: "sui".to_string(),
             status: TransferStatus::Initiated,

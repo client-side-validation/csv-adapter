@@ -16,7 +16,7 @@ pub mod transfer;
 
 #[derive(Subcommand)]
 pub enum CrossChainAction {
-    /// Execute a cross-chain Right transfer (via facade)
+    /// Execute a cross-chain Sanad transfer (via facade)
     Transfer {
         /// Source chain
         #[arg(long)]
@@ -24,9 +24,9 @@ pub enum CrossChainAction {
         /// Destination chain
         #[arg(long)]
         to: ConfigChain,
-        /// Right ID to transfer (hex)
+        /// Sanad ID to transfer (hex)
         #[arg(long)]
-        right_id: String,
+        sanad_id: String,
         /// Destination owner address (hex)
         #[arg(long)]
         dest_owner: Option<String>,
@@ -61,9 +61,9 @@ pub fn execute(
         CrossChainAction::Transfer {
             from,
             to,
-            right_id,
+            sanad_id,
             dest_owner,
-        } => transfer::cmd_transfer(from, to, right_id, dest_owner, config, state),
+        } => transfer::cmd_transfer(from, to, sanad_id, dest_owner, config, state),
         CrossChainAction::Status { transfer_id } => status::cmd_status(transfer_id, state),
         CrossChainAction::List { from, to } => status::cmd_list(from, to, state),
         CrossChainAction::Retry { transfer_id } => status::cmd_retry(transfer_id, config, state),

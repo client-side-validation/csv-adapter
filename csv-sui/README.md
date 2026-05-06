@@ -8,9 +8,9 @@ Sui adapter for **CSV (Client-Side Validation)** with object-based seals.
 
 ## Overview
 
-This crate implements the [`AnchorLayer`] trait for Sui, using owned objects with one-time attributes as seals. Sui provides **L1 Structural** single-use enforcement through its object model — when an object is consumed (transferred/deleted), it cannot be reused.
+This crate implements the [`SealProtocol`] trait for Sui, using owned objects with one-time attributes as seals. Sui provides **L1 Structural** single-use enforcement through its object model — when an object is consumed (transferred/deleted), it cannot be reused.
 
-[`AnchorLayer`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/trait.AnchorLayer.html
+[`SealProtocol`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/trait.SealProtocol.html
 
 ### Key Features
 
@@ -45,24 +45,24 @@ csv-adapter-sui = "0.1"
 ### Creating a Sui Anchor Layer
 
 ```rust
-use csv_adapter_sui::{SuiAnchorLayer, SuiConfig, SuiNetwork};
+use csv_adapter_sui::{SuiSealProtocol, SuiConfig, SuiNetwork};
 
 // Create adapter with mock RPC for testing
-let adapter = SuiAnchorLayer::with_mock().unwrap();
+let adapter = SuiSealProtocol::with_mock().unwrap();
 
 // Or with configuration (requires `rpc` feature)
 // let config = SuiConfig::new(SuiNetwork::Testnet);
 // let rpc = ...;
-// let adapter = SuiAnchorLayer::from_config(config, rpc).unwrap();
+// let adapter = SuiSealProtocol::from_config(config, rpc).unwrap();
 ```
 
 ### Working with Object Seals
 
 ```rust
-use csv_adapter_sui::SuiAnchorLayer;
-use csv_adapter_core::{Hash, AnchorLayer};
+use csv_adapter_sui::SuiSealProtocol;
+use csv_adapter_core::{Hash, SealProtocol};
 
-let adapter = SuiAnchorLayer::with_mock()?;
+let adapter = SuiSealProtocol::with_mock()?;
 
 // Create a seal from a Sui object
 let seal = adapter.create_seal(Some(object_id))?;
@@ -85,7 +85,7 @@ let is_final = verifier.verify_finality(&transaction)?;
 ## Architecture
 
 ```
-SuiAnchorLayer
+SuiSealProtocol
 ├── Object Seals       ← L1 Structural single-use
 ├── Dynamic Fields     ← Commitment publication
 ├── Checkpoint Proofs  ← Narwhal consensus finality

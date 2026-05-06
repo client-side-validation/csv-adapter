@@ -203,7 +203,7 @@ impl std::str::FromStr for Chain {
 pub enum TransferStatus {
     /// Transfer initiated, waiting for source chain lock
     Initiated,
-    /// Right locked on source chain, waiting for confirmations
+    /// Sanad locked on source chain, waiting for confirmations
     Locking {
         /// Current confirmation count
         current_confirmations: u32,
@@ -219,7 +219,7 @@ pub enum TransferStatus {
     SubmittingProof,
     /// Proof verification in progress on destination chain
     Verifying,
-    /// Right minting in progress on destination chain
+    /// Sanad minting in progress on destination chain
     Minting,
     /// Transfer completed successfully
     Completed,
@@ -348,10 +348,10 @@ pub enum ErrorCode {
     // Protocol errors (0xx)
     /// Protocol version mismatch
     ProtocolVersionMismatch,
-    /// Invalid right ID
-    InvalidRightId,
-    /// Right already spent
-    RightAlreadySpent,
+    /// Invalid sanad ID
+    InvalidSanadId,
+    /// Sanad already spent
+    SanadAlreadySpent,
     /// Invalid seal reference
     InvalidSealPoint,
     /// Invalid commitment
@@ -395,8 +395,8 @@ impl ErrorCode {
     pub fn code(&self) -> &'static str {
         match self {
             Self::ProtocolVersionMismatch => "CSV_001",
-            Self::InvalidRightId => "CSV_002",
-            Self::RightAlreadySpent => "CSV_003",
+            Self::InvalidSanadId => "CSV_002",
+            Self::SanadAlreadySpent => "CSV_003",
             Self::InvalidSealPoint => "CSV_004",
             Self::InvalidCommitment => "CSV_005",
             Self::ChainNotSupported => "CSV_101",
@@ -418,8 +418,8 @@ impl ErrorCode {
     pub fn category(&self) -> &'static str {
         match self {
             Self::ProtocolVersionMismatch
-            | Self::InvalidRightId
-            | Self::RightAlreadySpent
+            | Self::InvalidSanadId
+            | Self::SanadAlreadySpent
             | Self::InvalidSealPoint
             | Self::InvalidCommitment => "protocol",
             Self::ChainNotSupported | Self::AdapterNotInitialized | Self::UnsupportedOperation => {
@@ -505,10 +505,10 @@ impl Default for Capabilities {
 ///
 /// | Concept       | Canonical Name  | Description                                    |
 /// |---------------|-----------------|------------------------------------------------|
-/// | Ownership     | `right`         | A verifiable, single-use digital right         |
+/// | Ownership     | `sanad`         | A verifiable, single-use digital sanad         |
 /// | Binding       | `seal`          | Chain-specific binding mechanism               |
 /// | Publication   | `anchor`        | Published commitment on-chain                  |
-/// | Movement      | `transfer`      | Cross-chain right movement                     |
+/// | Movement      | `transfer`      | Cross-chain sanad movement                     |
 /// | Verification  | `proof`         | Cryptographic proof of lock/mint               |
 /// | Progress      | `sync_status`   | Indexer/sync freshness indicator               |
 ///

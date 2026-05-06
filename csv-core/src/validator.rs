@@ -289,8 +289,8 @@ impl ConsignmentValidator {
                 .check_seal_status(&seal_assignment.seal_ref)
             {
                 SealStatus::Unconsumed => {
-                    // Create a synthetic Right ID for tracking
-                    let right_id = crate::right::RightId(Hash::new(
+                    // Create a synthetic Sanad ID for tracking
+                    let sanad_id = crate::sanad::SanadId(Hash::new(
                         seal_assignment
                             .seal_ref
                             .id
@@ -302,7 +302,7 @@ impl ConsignmentValidator {
                     let consumption = SealConsumption {
                         chain: anchor_chain.clone(),
                         seal_ref: seal_assignment.seal_ref.clone(),
-                        right_id,
+                        sanad_id,
                         block_height: 0,
                         tx_hash: Hash::new([0u8; 32]),
                         recorded_at: 0,

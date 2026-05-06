@@ -1,7 +1,7 @@
 {
   "name": "@csv-adapter/sdk",
   "version": "0.4.0",
-  "description": "TypeScript SDK for Client-Side Validation (CSV) Protocol — cross-chain digital rights with single-use seals",
+  "description": "TypeScript SDK for Client-Side Validation (CSV) Protocol — cross-chain digital sanads with single-use seals",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -26,7 +26,7 @@
     "client-side-validation",
     "blockchain",
     "cross-chain",
-    "digital-rights",
+    "digital-sanads",
     "nft",
     "seal",
     "proof",

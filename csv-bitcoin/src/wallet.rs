@@ -16,7 +16,7 @@ use std::sync::Mutex;
 use bitcoin::secp256k1::rand::{rngs::OsRng, RngCore};
 
 #[allow(unused_imports)]
-use crate::types::BitcoinSealRef;
+use crate::types::BitcoinSealPoint;
 
 /// Hardened derivation constant
 const HARDENED: u32 = 0x8000_0000;
@@ -320,7 +320,7 @@ impl SealWallet {
         Ok(self.secp.sign_ecdsa(&msg, &sk))
     }
 
-    pub fn mark_seal_used(&self, seal: &BitcoinSealRef) -> Result<(), WalletError> {
+    pub fn mark_seal_used(&self, seal: &BitcoinSealPoint) -> Result<(), WalletError> {
         let mut used = self.used_seals.lock().unwrap_or_else(|e| e.into_inner());
         let key = seal.to_vec();
         if used.contains(&key) {
@@ -329,7 +329,7 @@ impl SealWallet {
         used.insert(key);
         Ok(())
     }
-    pub fn is_seal_used(&self, seal: &BitcoinSealRef) -> bool {
+    pub fn is_seal_used(&self, seal: &BitcoinSealPoint) -> bool {
         self.used_seals
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -556,7 +556,7 @@ mod tests {
     #[test]
     fn test_seal_lifecycle() {
         let w = SealWallet::generate_random(Network::Signet);
-        let seal = BitcoinSealRef::new([1u8; 32], 0, Some(42));
+        let seal = BitcoinSealPoint::new([1u8; 32], 0, Some(42));
         assert!(!w.is_seal_used(&seal));
         w.mark_seal_used(&seal).unwrap();
         assert!(w.is_seal_used(&seal));

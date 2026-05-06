@@ -15,9 +15,9 @@ use std::sync::Arc;
 use super::chain_indexer::{AddressIndexingResult, ChainIndexer, ChainResult};
 use super::rpc_manager::RpcManager;
 use csv_explorer_shared::{
-    ChainConfig, CommitmentScheme, CsvContract, EnhancedRightRecord, EnhancedSealRecord,
+    ChainConfig, CommitmentScheme, CsvContract, EnhancedSanadRecord, EnhancedSealRecord,
     EnhancedTransferRecord, FinalityProofType, InclusionProofType, Network, PriorityLevel,
-    RightRecord, SealRecord, SealStatus, SealType, TransferRecord,
+    SanadRecord, SealRecord, SealStatus, SealType, TransferRecord,
 };
 
 /// Bitcoin-specific indexer.
@@ -93,15 +93,15 @@ impl ChainIndexer for BitcoinIndexer {
         Ok(0)
     }
 
-    async fn index_rights(&self, block: u64) -> ChainResult<Vec<RightRecord>> {
+    async fn index_sanads(&self, block: u64) -> ChainResult<Vec<SanadRecord>> {
         let block_data = self.fetch_block(block).await?;
-        let mut rights = Vec::new();
+        let mut sanads = Vec::new();
 
         for tx in &block_data.tx {
             for vout in &tx.vout {
                 if vout.scriptpubkey_type.as_deref() == Some("op_return") {
-                    if let Some(right) = self.parse_right_from_op_return(tx, vout, block).await {
-                        rights.push(right);
+                    if let Some(sanad) = self.parse_sanad_from_op_return(tx, vout, block).await {
+                        sanads.push(sanad);
                     }
                 }
             }
@@ -110,10 +110,10 @@ impl ChainIndexer for BitcoinIndexer {
         tracing::debug!(
             chain = "bitcoin",
             block,
-            count = rights.len(),
-            "Indexed rights"
+            count = sanads.len(),
+            "Indexed sanads"
         );
-        Ok(rights)
+        Ok(sanads)
     }
 
     async fn index_seals(&self, block: u64) -> ChainResult<Vec<SealRecord>> {
@@ -171,7 +171,7 @@ impl ChainIndexer for BitcoinIndexer {
                             chain: "bitcoin".to_string(),
                             seal_type: SealType::Utxo,
                             seal_ref: format!("{}:{}", prev_txid, prev_vout),
-                            right_id: None,
+                            sanad_id: None,
                             status: SealStatus::Consumed,
                             consumed_at: Some(chrono::Utc::now()),
                             consumed_tx: Some(tx.txid.clone()),
@@ -199,29 +199,29 @@ impl ChainIndexer for BitcoinIndexer {
         Ok(Vec::new())
     }
 
-    async fn index_enhanced_rights(&self, block: u64) -> ChainResult<Vec<EnhancedRightRecord>> {
+    async fn index_enhanced_sanads(&self, block: u64) -> ChainResult<Vec<EnhancedSanadRecord>> {
         let block_data = self.fetch_block(block).await?;
-        let mut rights = Vec::new();
+        let mut sanads = Vec::new();
 
         for tx in &block_data.tx {
             for vout in &tx.vout {
                 if vout.scriptpubkey_type.as_deref() == Some("op_return") {
-                    if let Some(right) = self.parse_right_from_op_return(tx, vout, block).await {
+                    if let Some(sanad) = self.parse_sanad_from_op_return(tx, vout, block).await {
                         let scheme = self
                             .detect_commitment_scheme(&[])
                             .unwrap_or(CommitmentScheme::HashBased);
-                        rights.push(EnhancedRightRecord {
-                            id: right.id.clone(),
-                            chain: right.chain.clone(),
-                            seal_ref: right.seal_ref.clone(),
-                            commitment: right.commitment.clone(),
-                            owner: right.owner.clone(),
-                            created_at: right.created_at,
-                            created_tx: right.created_tx.clone(),
-                            status: right.status.to_string(),
-                            metadata: right.metadata,
-                            transfer_count: right.transfer_count,
-                            last_transfer_at: right.last_transfer_at,
+                        sanads.push(EnhancedSanadRecord {
+                            id: sanad.id.clone(),
+                            chain: sanad.chain.clone(),
+                            seal_ref: sanad.seal_ref.clone(),
+                            commitment: sanad.commitment.clone(),
+                            owner: sanad.owner.clone(),
+                            created_at: sanad.created_at,
+                            created_tx: sanad.created_tx.clone(),
+                            status: sanad.status.to_string(),
+                            metadata: sanad.metadata,
+                            transfer_count: sanad.transfer_count,
+                            last_transfer_at: sanad.last_transfer_at,
                             commitment_scheme: scheme,
                             commitment_version: 2,
                             protocol_id: "csv-btc".to_string(),
@@ -237,7 +237,7 @@ impl ChainIndexer for BitcoinIndexer {
             }
         }
 
-        Ok(rights)
+        Ok(sanads)
     }
 
     async fn index_enhanced_seals(&self, block: u64) -> ChainResult<Vec<EnhancedSealRecord>> {
@@ -249,7 +249,7 @@ impl ChainIndexer for BitcoinIndexer {
                 chain: s.chain.clone(),
                 seal_type: s.seal_type.to_string(),
                 seal_ref: s.seal_ref.clone(),
-                right_id: s.right_id.clone(),
+                sanad_id: s.sanad_id.clone(),
                 status: s.status.to_string(),
                 consumed_at: s.consumed_at,
                 consumed_tx: s.consumed_tx.clone(),
@@ -279,7 +279,7 @@ impl ChainIndexer for BitcoinIndexer {
         FinalityProofType::ConfirmationDepth
     }
 
-    async fn index_rights_by_address(&self, _address: &str) -> ChainResult<Vec<RightRecord>> {
+    async fn index_sanads_by_address(&self, _address: &str) -> ChainResult<Vec<SanadRecord>> {
         Ok(Vec::new())
     }
 
@@ -300,15 +300,15 @@ impl ChainIndexer for BitcoinIndexer {
         let (_priority, _network) = (priority, network);
         let mut result = AddressIndexingResult {
             addresses_processed: 0,
-            rights_indexed: 0,
+            sanads_indexed: 0,
             seals_indexed: 0,
             transfers_indexed: 0,
             contracts_indexed: 0,
             errors: Vec::new(),
         };
         for address in addresses {
-            if let Ok(rights) = self.index_rights_by_address(address).await {
-                result.rights_indexed += rights.len() as u64;
+            if let Ok(sanads) = self.index_sanads_by_address(address).await {
+                result.sanads_indexed += sanads.len() as u64;
                 result.addresses_processed += 1;
             }
         }
@@ -442,12 +442,12 @@ impl BitcoinIndexer {
         })
     }
 
-    async fn parse_right_from_op_return(
+    async fn parse_sanad_from_op_return(
         &self,
         tx: &MempoolTx,
         vout: &VoutInfo,
         block: u64,
-    ) -> Option<RightRecord> {
+    ) -> Option<SanadRecord> {
         let script_hex = vout.scriptpubkey.as_ref()?;
 
         // Strip OP_RETURN opcode prefix (6a + length byte)
@@ -502,7 +502,7 @@ impl BitcoinIndexer {
             .to_string();
         let commitment_hex = hex::encode(commitment_hash);
 
-        Some(RightRecord {
+        Some(SanadRecord {
             id: format!("btc-{}-{}", tx.txid, &commitment_hex[..16]),
             chain: "bitcoin".to_string(),
             seal_ref: format!("{}:0", tx.txid),
@@ -510,7 +510,7 @@ impl BitcoinIndexer {
             owner,
             created_at: chrono::Utc::now(),
             created_tx: tx.txid.clone(),
-            status: csv_explorer_shared::RightStatus::Active,
+            status: csv_explorer_shared::SanadStatus::Active,
             metadata: Some(serde_json::json!({
                 "protocol_id": protocol_str,
                 "commitment_scheme": "hash_based",

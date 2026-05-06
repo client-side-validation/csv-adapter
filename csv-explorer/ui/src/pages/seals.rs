@@ -107,7 +107,7 @@ pub fn SealsList() -> Element {
                             th { class: "px-6 py-3 font-medium", "Chain" }
                             th { class: "px-6 py-3 font-medium", "Type" }
                             th { class: "px-6 py-3 font-medium", "Status" }
-                            th { class: "px-6 py-3 font-medium", "Right ID" }
+                            th { class: "px-6 py-3 font-medium", "Sanad ID" }
                             th { class: "px-6 py-3 font-medium", "Block" }
                         }
                     }
@@ -132,7 +132,7 @@ pub fn SealsList() -> Element {
                                     chain: seal.chain.clone(),
                                     seal_type: seal.seal_type.to_string(),
                                     status: seal.status.to_string(),
-                                    right_id: seal.right_id.clone(),
+                                    sanad_id: seal.sanad_id.clone(),
                                     block_height: seal.block_height,
                                 }
                             }
@@ -150,7 +150,7 @@ fn SealRow(
     chain: String,
     seal_type: String,
     status: String,
-    right_id: Option<String>,
+    sanad_id: Option<String>,
     block_height: u64,
 ) -> Element {
     rsx! {
@@ -173,8 +173,8 @@ fn SealRow(
                 crate::components::status_badge::StatusBadge { status }
             }
             td { class: "px-6 py-4 font-mono text-sm text-gray-300",
-                if let Some(rid) = right_id {
-                    Link { to: Route::RightDetail { id: rid.clone() },
+                if let Some(rid) = sanad_id {
+                    Link { to: Route::SanadDetail { id: rid.clone() },
                         class: "text-blue-400 hover:text-blue-300",
                         "{rid}"
                     }

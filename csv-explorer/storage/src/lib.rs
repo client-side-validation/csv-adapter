@@ -1,7 +1,7 @@
 /// Storage layer for the CSV Explorer.
 ///
 /// Provides a typed repository pattern over SQLite for all indexed data,
-/// including rights, transfers, seals, contracts, sync progress, and statistics.
+/// including sanads, transfers, seals, contracts, sync progress, and statistics.
 pub mod db;
 pub mod repositories;
 

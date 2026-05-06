@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AptosError, AptosResult};
-use crate::types::AptosSealRef;
+use crate::types::AptosSealPoint;
 use csv_core::hardening::{BoundedQueue, MAX_SEAL_NULLIFIER_SIZE};
 
 /// A persisted seal record that can be serialized.
@@ -28,7 +28,7 @@ pub struct SealRecord {
 
 impl SealRecord {
     /// Create a new seal record from a seal reference and consumption details.
-    pub fn new(seal: &AptosSealRef, consumed_at_version: u64) -> Self {
+    pub fn new(seal: &AptosSealPoint, consumed_at_version: u64) -> Self {
         Self {
             account_address: seal.account_address,
             resource_type: seal.resource_type.clone(),
@@ -82,7 +82,7 @@ impl SealRegistry {
     }
 
     /// Check if a seal has already been used.
-    pub fn is_seal_used(&self, seal: &AptosSealRef) -> bool {
+    pub fn is_seal_used(&self, seal: &AptosSealPoint) -> bool {
         let key = format!(
             "{}-{}-{}",
             hex::encode(seal.account_address),
@@ -102,7 +102,7 @@ impl SealRegistry {
     /// `Ok(())` if the seal was successfully marked, or `Err` if already used.
     pub fn mark_seal_used(
         &mut self,
-        seal: &AptosSealRef,
+        seal: &AptosSealPoint,
         consumed_at_version: u64,
     ) -> AptosResult<()> {
         if self.is_seal_used(seal) {
@@ -131,7 +131,7 @@ impl SealRegistry {
     ///
     /// # Returns
     /// `Ok(())` if the seal was found and cleared, or `Err` if not found.
-    pub fn clear_seal(&mut self, seal: &AptosSealRef) -> AptosResult<()> {
+    pub fn clear_seal(&mut self, seal: &AptosSealPoint) -> AptosResult<()> {
         let key = format!(
             "{}-{}-{}",
             hex::encode(seal.account_address),
@@ -185,7 +185,7 @@ impl SealRegistry {
     /// `Ok(())` if the seal was successfully marked, or `Err` if already used or registry is full.
     pub fn mark_seal_used_with_limit(
         &mut self,
-        seal: &AptosSealRef,
+        seal: &AptosSealPoint,
         consumed_at_version: u64,
     ) -> AptosResult<()> {
         if self.is_seal_used(seal) {
@@ -262,8 +262,8 @@ pub trait SealStore: Send + Sync {
 mod tests {
     use super::*;
 
-    fn test_seal() -> AptosSealRef {
-        AptosSealRef::new([1u8; 32], "CSV::Seal".to_string(), 0)
+    fn test_seal() -> AptosSealPoint {
+        AptosSealPoint::new([1u8; 32], "CSV::Seal".to_string(), 0)
     }
 
     #[test]
@@ -298,8 +298,8 @@ mod tests {
     #[test]
     fn test_different_seals() {
         let mut registry = SealRegistry::new();
-        let seal1 = AptosSealRef::new([1u8; 32], "CSV::Seal".to_string(), 0);
-        let seal2 = AptosSealRef::new([2u8; 32], "CSV::Seal".to_string(), 0);
+        let seal1 = AptosSealPoint::new([1u8; 32], "CSV::Seal".to_string(), 0);
+        let seal2 = AptosSealPoint::new([2u8; 32], "CSV::Seal".to_string(), 0);
 
         registry.mark_seal_used(&seal1, 100).unwrap();
         registry.mark_seal_used(&seal2, 200).unwrap();
@@ -312,8 +312,8 @@ mod tests {
     #[test]
     fn test_same_seal_different_nonce() {
         let mut registry = SealRegistry::new();
-        let seal1 = AptosSealRef::new([1u8; 32], "CSV::Seal".to_string(), 0);
-        let seal2 = AptosSealRef::new([1u8; 32], "CSV::Seal".to_string(), 1);
+        let seal1 = AptosSealPoint::new([1u8; 32], "CSV::Seal".to_string(), 0);
+        let seal2 = AptosSealPoint::new([1u8; 32], "CSV::Seal".to_string(), 1);
 
         registry.mark_seal_used(&seal1, 100).unwrap();
         registry.mark_seal_used(&seal2, 200).unwrap();

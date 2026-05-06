@@ -9,7 +9,7 @@
 
 ## Purpose
 
-CSV Adapter is a developer platform for portable, proof-verified rights across chains. It combines client-side validation, single-use seals, chain-native anchoring, and cross-chain proof workflows so applications can move rights, assets, credentials, and state commitments without turning every chain into the source of truth for everything.
+CSV Adapter is a developer platform for portable, proof-verified sanads across chains. It combines client-side validation, single-use seals, chain-native anchoring, and cross-chain proof workflows so applications can move sanads, assets, credentials, and state commitments without turning every chain into the source of truth for everything.
 
 This blueprint is the single planning document for the project. It replaces the older split between `PLAN.md` and `BLUEPRINT.md`.
 
@@ -27,7 +27,7 @@ It is intentionally opinionated:
 
 The repository already has substantial foundations:
 
-- `csv-adapter-core` contains protocol primitives for rights, seals, commitments, proofs, transitions, registries, and cross-chain abstractions.
+- `csv-adapter-core` contains protocol primitives for sanads, seals, commitments, proofs, transitions, registries, and cross-chain abstractions.
 - Chain adapter crates exist for Bitcoin, Ethereum, Sui, Aptos, and Solana.
 - `csv-adapter` provides a unified Rust facade, though not every consumer uses it consistently yet.
 - `csv-cli`, `csv-wallet`, and `csv-explorer` exist as working surfaces.
@@ -39,7 +39,7 @@ The repository has reached production-candidate status. Per the [Production Eval
 **Completed:**
 
 - ✅ Strong protocol center in `csv-adapter-core` with canonical types
-- ✅ Clean adapter boundaries via `AnchorLayer` and `FullChainAdapter` traits
+- ✅ Clean adapter boundaries via `SealProtocol` and `ChainBackend` traits
 - ✅ Native SDK compliance across all chains (Bitcoin, Ethereum, Sui, Aptos, Solana)
 - ✅ Unified facade (`ChainFacade`) for CLI, wallet, and explorer
 - ✅ Event schema standardization with shared `CsvEvent` types
@@ -59,12 +59,12 @@ The production bar is defined in [Production Guarantee Plan](PRODUCTION_GUARANTE
 
 ## Product Direction
 
-CSV Adapter should become the default stack for applications that need portable rights across chains.
+CSV Adapter should become the default stack for applications that need portable sanads across chains.
 
 The platform should support:
 
-- cross-chain token and NFT rights
-- rights-backed DeFi applications
+- cross-chain token and NFT sanads
+- sanads-backed DeFi applications
 - proof-carrying credentials
 - event tickets and memberships
 - gaming assets
@@ -75,7 +75,7 @@ The platform should support:
 
 The core promise:
 
-> A Right can be created, transferred, consumed, proven, indexed, and displayed across chains using one shared protocol model and one shared implementation surface.
+> A Sanad can be created, transferred, consumed, proven, indexed, and displayed across chains using one shared protocol model and one shared implementation surface.
 
 ---
 
@@ -85,7 +85,7 @@ The core promise:
 
 `csv-adapter-core` is the conceptual source of truth. It should define:
 
-- canonical rights and seal semantics
+- canonical sanads and seal semantics
 - chain trait contracts
 - proof bundle formats
 - event schemas
@@ -209,18 +209,18 @@ It should not require rewriting CLI, wallet, or SDK business logic.
 
 The project should standardize around these lifecycle events:
 
-- `RightCreated`
-- `RightConsumed`
+- `SanadCreated`
+- `SanadConsumed`
 - `CrossChainLock`
 - `CrossChainMint`
 - `CrossChainRefund`
-- `RightTransferred`
+- `SanadTransferred`
 - `NullifierRegistered`
-- `RightMetadataRecorded`
+- `SanadMetadataRecorded`
 
 Every chain should expose as much of this shared metadata as the native platform supports:
 
-- `right_id`
+- `sanad_id`
 - `commitment`
 - `owner`
 - `chain_id`
@@ -247,7 +247,7 @@ Primary developer personas:
 
 | Persona | Goal | What CSV must provide |
 |---|---|---|
-| TypeScript/Web developer | Add cross-chain rights to an app | clear SDK, browser wallet flow, examples, explorer links |
+| TypeScript/Web developer | Add cross-chain sanads to an app | clear SDK, browser wallet flow, examples, explorer links |
 | Rust backend developer | Build reliable services | typed APIs, async clients, test fixtures, performance hooks |
 | Protocol engineer | extend proofs/chains | precise traits, invariants, docs, fuzz/integration tests |
 | AI agent | operate workflows from instructions | structured commands, machine-readable errors, deterministic status |
@@ -267,8 +267,8 @@ Useful future commands:
 csv doctor
 csv chain list
 csv wallet init --network testnet
-csv right create --chain bitcoin
-csv cross-chain transfer --from bitcoin --to sui --right-id <id>
+csv sanad create --chain bitcoin
+csv cross-chain transfer --from bitcoin --to sui --sanad-id <id>
 csv proof verify --proof-file proof.json
 ```
 
@@ -377,10 +377,10 @@ Focus:
 - shared event schema
 - efficient per-chain indexing
 - finality-aware status
-- rights/seals/proofs/transfers views
+- sanads/seals/proofs/transfers views
 - wallet-compatible API contracts
 
-Explorer should help users and agents audit rights history.
+Explorer should help users and agents audit sanads history.
 
 ### Workstream E: SDK and Application Platform
 
@@ -421,17 +421,17 @@ The strongest application ideas from earlier planning are still valuable, but th
 
 ### Cross-Chain NFTs
 
-Portable NFT rights across chains, with metadata roots preserved through `RightMetadataRecorded`.
+Portable NFT sanads across chains, with metadata roots preserved through `SanadMetadataRecorded`.
 
 Why it fits:
 
-- rights are naturally single-use
+- sanads are naturally single-use
 - transfers benefit from proof-carrying ownership
 - wallet/explorer visibility matters
 
 ### Cross-Chain Subscriptions
 
-Recurring access rights that can be consumed or transferred across chains.
+Recurring access sanads that can be consumed or transferred across chains.
 
 Why it fits:
 
@@ -441,7 +441,7 @@ Why it fits:
 
 ### Gaming Assets
 
-Rights for game items that move across chains without central custody.
+Sanads for game items that move across chains without central custody.
 
 Why it fits:
 
@@ -451,7 +451,7 @@ Why it fits:
 
 ### Event Ticketing and Memberships
 
-Single-use or revocable rights for access.
+Single-use or revocable sanads for access.
 
 Why it fits:
 
@@ -461,7 +461,7 @@ Why it fits:
 
 ### Supply Chain Provenance
 
-Rights and commitments for custody changes and attestations.
+Sanads and commitments for custody changes and attestations.
 
 Why it fits:
 
@@ -471,7 +471,7 @@ Why it fits:
 
 ### Credentials and Identity
 
-Proof-carrying rights for claims, credentials, and identity attestations.
+Proof-carrying sanads for claims, credentials, and identity attestations.
 
 Why it fits:
 
@@ -481,7 +481,7 @@ Why it fits:
 
 ### DeFi
 
-Rights-backed cross-chain lending, DEX flows, yield aggregation, and insurance.
+Sanads-backed cross-chain lending, DEX flows, yield aggregation, and insurance.
 
 Why it fits later:
 
@@ -551,7 +551,7 @@ Reusable UI should come after API convergence.
 
 Potential components:
 
-- right card
+- sanad card
 - proof verifier
 - transfer timeline
 - chain status badge

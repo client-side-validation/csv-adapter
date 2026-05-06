@@ -78,7 +78,7 @@ pub fn cmd_init(
         output::info("Check balances with: csv wallet balance --chain <chain>");
     }
 
-    output::success("Start building: csv right create --chain bitcoin --value 100000");
+    output::success("Start building: csv sanad create --chain bitcoin --value 100000");
 
     Ok(())
 }

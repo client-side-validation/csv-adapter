@@ -18,7 +18,7 @@ use super::to_core_chain;
 pub fn cmd_transfer(
     from: ConfigChain,
     to: ConfigChain,
-    right_id: String,
+    sanad_id: String,
     dest_owner: Option<String>,
     _config: &Config,
     state: &mut UnifiedStateManager,
@@ -28,27 +28,27 @@ pub fn cmd_transfer(
 
     output::header(&format!("Cross-Chain Transfer: {:?} → {:?}", from_chain, to_chain));
 
-    // Parse right ID
-    let bytes = hex::decode(right_id.trim_start_matches("0x"))
-        .map_err(|e| anyhow::anyhow!("Invalid Right ID: {}", e))?;
+    // Parse sanad ID
+    let bytes = hex::decode(sanad_id.trim_start_matches("0x"))
+        .map_err(|e| anyhow::anyhow!("Invalid Sanad ID: {}", e))?;
     if bytes.len() < 32 {
         return Err(anyhow::anyhow!(
-            "Invalid Right ID: expected at least 32 bytes, got {} bytes",
+            "Invalid Sanad ID: expected at least 32 bytes, got {} bytes",
             bytes.len()
         ));
     }
-    let mut right_bytes = [0u8; 32];
-    right_bytes.copy_from_slice(&bytes[..32]);
-    let right_id_hash = Hash::new(right_bytes);
+    let mut sanad_bytes = [0u8; 32];
+    sanad_bytes.copy_from_slice(&bytes[..32]);
+    let sanad_id_hash = Hash::new(sanad_bytes);
 
     // Generate transfer ID
-    let transfer_id = generate_transfer_id(&right_id_hash, &from_chain, &to_chain);
+    let transfer_id = generate_transfer_id(&sanad_id_hash, &from_chain, &to_chain);
 
-    // Check if we have the right
-    if state.get_right(&right_id_hash.to_string()).is_none() {
+    // Check if we have the sanad
+    if state.get_sanad(&sanad_id_hash.to_string()).is_none() {
         return Err(anyhow::anyhow!(
-            "Right {} not found in local state",
-            right_id_hash
+            "Sanad {} not found in local state",
+            sanad_id_hash
         ));
     }
 
@@ -91,7 +91,7 @@ pub fn cmd_transfer(
         id: transfer_id.clone(),
         source_chain: from_chain_clone,
         dest_chain: to,
-        right_id: right_id_hash.to_string(),
+        sanad_id: sanad_id_hash.to_string(),
         sender_address: sender,
         destination_address: Some(dest_addr),
         source_tx_hash: None,
@@ -116,11 +116,11 @@ pub fn cmd_transfer(
 }
 
 /// Generate deterministic transfer ID
-fn generate_transfer_id(right_id: &Hash, from: &Chain, to: &Chain) -> String {
+fn generate_transfer_id(sanad_id: &Hash, from: &Chain, to: &Chain) -> String {
     use sha2::{Digest, Sha256};
 
     let mut hasher = Sha256::new();
-    hasher.update(right_id.as_bytes());
+    hasher.update(sanad_id.as_bytes());
     hasher.update(from.to_string().as_bytes());
     hasher.update(to.to_string().as_bytes());
     hasher.update(chrono::Utc::now().timestamp().to_le_bytes());

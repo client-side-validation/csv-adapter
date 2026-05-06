@@ -102,7 +102,7 @@ pub fn AccountTransactions(id: String) -> Element {
                                             }
                                         }
                                     }
-                                    div { class: "text-right",
+                                    div { class: "text-sanad",
                                         p { class: "text-sm text-gray-300",
                                             {tx.amount.map_or("-".to_string(), |a| format!("{} {}", a, chain_name))}
                                         }

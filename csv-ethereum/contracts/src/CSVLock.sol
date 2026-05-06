@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/// @title CSVLock — Cross-Chain Right Lock on Ethereum
+/// @title CSVLock — Cross-Chain Sanad Lock on Ethereum
 /// @notice Registers nullifiers, emits lock events, and supports time-locked refunds
 contract CSVLock {
     uint8 public constant ASSET_CLASS_UNSPECIFIED = 0;
     uint8 public constant ASSET_CLASS_FUNGIBLE_TOKEN = 1;
     uint8 public constant ASSET_CLASS_NON_FUNGIBLE_TOKEN = 2;
-    uint8 public constant ASSET_CLASS_PROOF_RIGHT = 3;
+    uint8 public constant ASSET_CLASS_PROOF_SANAD = 3;
     uint8 public constant PROOF_SYSTEM_UNSPECIFIED = 0;
 
     /// @notice Tracks consumed nullifiers (seal single-use)
     mapping(bytes32 => bool) public usedSeals;
 
     /// @notice Cross-chain metadata shared by all CSV contracts.
-    struct RightMetadata {
+    struct SanadMetadata {
         uint8 assetClass;
         bytes32 assetId;
         bytes32 metadataHash;
@@ -28,7 +28,7 @@ contract CSVLock {
         uint256 timestamp;
         uint8 destinationChain;
         bytes32 destinationOwnerRoot; // Hash of destination owner for verification
-        RightMetadata metadata;
+        SanadMetadata metadata;
         bool refunded;
     }
 
@@ -41,9 +41,9 @@ contract CSVLock {
     /// @notice Address of the CSVMint contract (to verify no mint happened)
     address public mintContract;
 
-    /// @notice Emitted when a Right is locked for cross-chain transfer
+    /// @notice Emitted when a Sanad is locked for cross-chain transfer
     event CrossChainLock(
-        bytes32 indexed rightId,
+        bytes32 indexed sanadId,
         bytes32 indexed commitment,
         address indexed owner,
         uint8 destinationChain,
@@ -56,12 +56,12 @@ contract CSVLock {
         bytes32 proofRoot
     );
 
-    /// @notice Emitted when a Right is consumed (nullifier registered)
+    /// @notice Emitted when a Sanad is consumed (nullifier registered)
     event SealUsed(bytes32 indexed sealId, bytes32 commitment);
 
-    /// @notice Emitted when a locked Right is refunded
-    event RightRefunded(
-        bytes32 indexed rightId,
+    /// @notice Emitted when a locked Sanad is refunded
+    event SanadRefunded(
+        bytes32 indexed sanadId,
         bytes32 indexed commitment,
         address indexed claimant,
         uint256 refundTimestamp
@@ -69,8 +69,8 @@ contract CSVLock {
 
     /// @notice Emitted when mint contract address is set
     event MintContractSet(address indexed mintContract);
-    event RightMetadataRecorded(
-        bytes32 indexed rightId,
+    event SanadMetadataRecorded(
+        bytes32 indexed sanadId,
         uint8 assetClass,
         bytes32 indexed assetId,
         bytes32 metadataHash,
@@ -78,13 +78,13 @@ contract CSVLock {
         bytes32 indexed proofRoot
     );
 
-    error RightAlreadyConsumed();
-    error RightAlreadyLocked();
+    error SanadAlreadyConsumed();
+    error SanadAlreadyLocked();
     error TimeoutNotExpired();
-    error RightAlreadyMinted();
+    error SanadAlreadyMinted();
     error RefundAlreadyClaimed();
     error InvalidMintContract();
-    error InvalidRightMetadata();
+    error InvalidSanadMetadata();
 
     /// @notice Set the mint contract address (for refund verification)
     /// @param _mintContract Address of the CSVMint contract
@@ -94,23 +94,23 @@ contract CSVLock {
         emit MintContractSet(_mintContract);
     }
 
-    /// @notice Lock a Right for cross-chain transfer
-    /// @param rightId Unique Right identifier
-    /// @param commitment Right's commitment hash
+    /// @notice Lock a Sanad for cross-chain transfer
+    /// @param sanadId Unique Sanad identifier
+    /// @param commitment Sanad's commitment hash
     /// @param destinationChain Target chain ID
     /// @param destinationOwner Encoded destination owner address
-    function lockRight(
-        bytes32 rightId,
+    function lockSanad(
+        bytes32 sanadId,
         bytes32 commitment,
         uint8 destinationChain,
         bytes calldata destinationOwner
     ) external {
-        _lockRight(
-            rightId,
+        _lockSanad(
+            sanadId,
             commitment,
             destinationChain,
             destinationOwner,
-            RightMetadata({
+            SanadMetadata({
                 assetClass: ASSET_CLASS_UNSPECIFIED,
                 assetId: bytes32(0),
                 metadataHash: bytes32(0),
@@ -120,9 +120,9 @@ contract CSVLock {
         );
     }
 
-    /// @notice Lock a Right with asset/proof metadata for token, NFT, or advanced proof flows.
-    function lockRightWithMetadata(
-        bytes32 rightId,
+    /// @notice Lock a Sanad with asset/proof metadata for token, NFT, or advanced proof flows.
+    function lockSanadWithMetadata(
+        bytes32 sanadId,
         bytes32 commitment,
         uint8 destinationChain,
         bytes calldata destinationOwner,
@@ -132,7 +132,7 @@ contract CSVLock {
         uint8 proofSystem,
         bytes32 proofRoot
     ) external {
-        RightMetadata memory metadata = RightMetadata({
+        SanadMetadata memory metadata = SanadMetadata({
             assetClass: assetClass,
             assetId: assetId,
             metadataHash: metadataHash,
@@ -140,27 +140,27 @@ contract CSVLock {
             proofRoot: proofRoot
         });
         _validateMetadata(metadata);
-        _lockRight(rightId, commitment, destinationChain, destinationOwner, metadata);
+        _lockSanad(sanadId, commitment, destinationChain, destinationOwner, metadata);
     }
 
-    function _lockRight(
-        bytes32 rightId,
+    function _lockSanad(
+        bytes32 sanadId,
         bytes32 commitment,
         uint8 destinationChain,
         bytes calldata destinationOwner,
-        RightMetadata memory metadata
+        SanadMetadata memory metadata
     ) internal {
-        if (usedSeals[rightId]) {
-            revert RightAlreadyConsumed();
+        if (usedSeals[sanadId]) {
+            revert SanadAlreadyConsumed();
         }
-        if (locks[rightId].timestamp != 0 && !locks[rightId].refunded) {
-            revert RightAlreadyLocked();
+        if (locks[sanadId].timestamp != 0 && !locks[sanadId].refunded) {
+            revert SanadAlreadyLocked();
         }
 
-        usedSeals[rightId] = true;
+        usedSeals[sanadId] = true;
 
         // Record lock for refund support
-        locks[rightId] = LockRecord({
+        locks[sanadId] = LockRecord({
             commitment: commitment,
             timestamp: block.timestamp,
             destinationChain: destinationChain,
@@ -170,7 +170,7 @@ contract CSVLock {
         });
 
         emit CrossChainLock(
-            rightId,
+            sanadId,
             commitment,
             msg.sender,
             destinationChain,
@@ -183,24 +183,24 @@ contract CSVLock {
             metadata.proofRoot
         );
 
-        emit RightMetadataRecorded(
-            rightId,
+        emit SanadMetadataRecorded(
+            sanadId,
             metadata.assetClass,
             metadata.assetId,
             metadata.metadataHash,
             metadata.proofSystem,
             metadata.proofRoot
         );
-        emit SealUsed(rightId, commitment);
+        emit SealUsed(sanadId, commitment);
     }
 
-    function _validateMetadata(RightMetadata memory metadata) internal pure {
-        if (metadata.assetClass > ASSET_CLASS_PROOF_RIGHT) revert InvalidRightMetadata();
+    function _validateMetadata(SanadMetadata memory metadata) internal pure {
+        if (metadata.assetClass > ASSET_CLASS_PROOF_SANAD) revert InvalidSanadMetadata();
         if (metadata.assetClass != ASSET_CLASS_UNSPECIFIED && metadata.assetId == bytes32(0)) {
-            revert InvalidRightMetadata();
+            revert InvalidSanadMetadata();
         }
         if (metadata.proofSystem != PROOF_SYSTEM_UNSPECIFIED && metadata.proofRoot == bytes32(0)) {
-            revert InvalidRightMetadata();
+            revert InvalidSanadMetadata();
         }
     }
 
@@ -209,26 +209,26 @@ contract CSVLock {
     /// @param commitment Commitment hash
     function markSealUsed(bytes32 sealId, bytes32 commitment) external {
         if (usedSeals[sealId]) {
-            revert RightAlreadyConsumed();
+            revert SanadAlreadyConsumed();
         }
         usedSeals[sealId] = true;
         emit SealUsed(sealId, commitment);
     }
 
-    /// @notice Claim a refund for a locked Right that was never minted on destination.
-    /// @dev This function allows a user to recover a Right if:
+    /// @notice Claim a refund for a locked Sanad that was never minted on destination.
+    /// @dev This function allows a user to recover a Sanad if:
     ///   1. The lock was recorded in this contract
     ///   2. The REFUND_TIMEOUT has elapsed since the lock
-    ///   3. The Right was NOT minted on any destination chain
+    ///   3. The Sanad was NOT minted on any destination chain
     ///   4. The refund has not already been claimed
-    /// @param rightId The Right identifier to refund
+    /// @param sanadId The Sanad identifier to refund
     /// @param destinationOwnerHash Hash of the destination owner (for verification)
-    function refundRight(bytes32 rightId, bytes32 destinationOwnerHash) external {
-        LockRecord storage lock = locks[rightId];
+    function refundSanad(bytes32 sanadId, bytes32 destinationOwnerHash) external {
+        LockRecord storage lock = locks[sanadId];
 
         // Verify lock exists
         if (lock.timestamp == 0) {
-            revert RightAlreadyConsumed();
+            revert SanadAlreadyConsumed();
         }
 
         // Verify timeout has elapsed
@@ -241,16 +241,16 @@ contract CSVLock {
             revert RefundAlreadyClaimed();
         }
 
-        // Verify the Right was NOT minted on destination chain
-        // This requires the mint contract to expose isRightMinted
+        // Verify the Sanad was NOT minted on destination chain
+        // This requires the mint contract to expose isSanadMinted
         if (mintContract != address(0)) {
             (bool success, bytes memory data) = mintContract.staticcall(
-                abi.encodeWithSignature("isRightMinted(bytes32)", rightId)
+                abi.encodeWithSignature("isSanadMinted(bytes32)", sanadId)
             );
             if (success && data.length >= 32) {
                 bool isMinted = abi.decode(data, (bool));
                 if (isMinted) {
-                    revert RightAlreadyMinted();
+                    revert SanadAlreadyMinted();
                 }
             }
             // If call fails or mintContract not set, we proceed (trust the user)
@@ -260,44 +260,44 @@ contract CSVLock {
         // Mark as refunded to prevent re-entrancy and double-claim
         lock.refunded = true;
 
-        // Re-allow the seal for future use (re-create the Right)
-        usedSeals[rightId] = false;
+        // Re-allow the seal for future use (re-create the Sanad)
+        usedSeals[sanadId] = false;
 
-        emit RightRefunded(rightId, lock.commitment, msg.sender, block.timestamp);
+        emit SanadRefunded(sanadId, lock.commitment, msg.sender, block.timestamp);
     }
 
-    /// @notice Check if a seal/Right has been consumed
-    /// @param sealId Seal or Right identifier
+    /// @notice Check if a seal/Sanad has been consumed
+    /// @param sealId Seal or Sanad identifier
     /// @return True if consumed
     function isSealUsed(bytes32 sealId) external view returns (bool) {
         return usedSeals[sealId];
     }
 
-    /// @notice Get lock details for a Right
-    /// @param rightId The Right identifier
+    /// @notice Get lock details for a Sanad
+    /// @param sanadId The Sanad identifier
     /// @return commitment The commitment hash
     /// @return timestamp When the lock was created
     /// @return destinationChain The target chain ID
     /// @return refunded Whether the lock has been refunded
-    function getLockInfo(bytes32 rightId) external view returns (
+    function getLockInfo(bytes32 sanadId) external view returns (
         bytes32 commitment,
         uint256 timestamp,
         uint8 destinationChain,
         bool refunded
     ) {
-        LockRecord storage lock = locks[rightId];
+        LockRecord storage lock = locks[sanadId];
         return (lock.commitment, lock.timestamp, lock.destinationChain, lock.refunded);
     }
 
-    /// @notice Get metadata attached to a locked Right.
-    function getRightMetadata(bytes32 rightId) external view returns (
+    /// @notice Get metadata attached to a locked Sanad.
+    function getSanadMetadata(bytes32 sanadId) external view returns (
         uint8 assetClass,
         bytes32 assetId,
         bytes32 metadataHash,
         uint8 proofSystem,
         bytes32 proofRoot
     ) {
-        RightMetadata storage metadata = locks[rightId].metadata;
+        SanadMetadata storage metadata = locks[sanadId].metadata;
         return (
             metadata.assetClass,
             metadata.assetId,
@@ -307,11 +307,11 @@ contract CSVLock {
         );
     }
 
-    /// @notice Check if a refund can be claimed for a Right
-    /// @param rightId The Right identifier
+    /// @notice Check if a refund can be claimed for a Sanad
+    /// @param sanadId The Sanad identifier
     /// @return True if refund is claimable
-    function canRefund(bytes32 rightId) external view returns (bool) {
-        LockRecord storage lock = locks[rightId];
+    function canRefund(bytes32 sanadId) external view returns (bool) {
+        LockRecord storage lock = locks[sanadId];
 
         // Must exist
         if (lock.timestamp == 0) return false;

@@ -51,7 +51,7 @@ pub fn ContractsList() -> Element {
                         option { value: "", "All Types" }
                         option { value: "nullifier_registry", "Nullifier Registry" }
                         option { value: "state_commitment", "State Commitment" }
-                        option { value: "right_registry", "Right Registry" }
+                        option { value: "sanad_registry", "Sanad Registry" }
                         option { value: "bridge", "Bridge/Transfer" }
                         option { value: "other", "Other" }
                     }

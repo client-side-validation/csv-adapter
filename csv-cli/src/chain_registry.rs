@@ -1,12 +1,12 @@
 //! Chain registry integration for CLI
 //!
 //! This module provides integration between the CLI's Chain enum
-//! and the scalable ChainAdapter registry from csv-adapter-core.
+//! and the scalable ChainDriver registry from csv-adapter-core.
 
 #![allow(dead_code)]
 
 use crate::config::Chain;
-use csv_core::{AdapterFactory, ChainAdapter, ChainCapabilities};
+use csv_core::{AdapterFactory, ChainDriver, ChainCapabilities};
 
 /// Get the chain ID string for a Chain enum variant
 pub fn chain_id(chain: &Chain) -> &'static str {
@@ -20,7 +20,7 @@ pub fn chain_id(chain: &Chain) -> &'static str {
 }
 
 /// Get chain adapter for a Chain enum variant
-pub fn get_adapter(chain: &Chain) -> Option<Box<dyn ChainAdapter>> {
+pub fn get_adapter(chain: &Chain) -> Option<Box<dyn ChainDriver>> {
     let factory = AdapterFactory::new();
     factory.create_adapter(chain_id(chain))
 }

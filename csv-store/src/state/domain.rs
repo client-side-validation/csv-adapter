@@ -1,38 +1,38 @@
-//! Domain types: Rights, transfers, contracts, seals, proofs, transactions.
+//! Domain types: Sanads, transfers, contracts, seals, proofs, transactions.
 //!
 //! These types represent the core CSV (Client-Side Validation) domain model.
 
 use super::core::Chain;
 use serde::{Deserialize, Serialize};
 
-/// Status of a Right.
+/// Status of a Sanad.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum RightStatus {
-    /// Right is active and can be used.
+pub enum SanadStatus {
+    /// Sanad is active and can be used.
     Active,
-    /// Right has been transferred to another owner.
+    /// Sanad has been transferred to another owner.
     Transferred,
-    /// Right has been consumed (seal used).
+    /// Sanad has been consumed (seal used).
     Consumed,
 }
 
-impl std::fmt::Display for RightStatus {
+impl std::fmt::Display for SanadStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RightStatus::Active => write!(f, "active"),
-            RightStatus::Transferred => write!(f, "transferred"),
-            RightStatus::Consumed => write!(f, "consumed"),
+            SanadStatus::Active => write!(f, "active"),
+            SanadStatus::Transferred => write!(f, "transferred"),
+            SanadStatus::Consumed => write!(f, "consumed"),
         }
     }
 }
 
-/// A tracked Right (represents ownership of an asset/claim).
+/// A tracked Sanad (represents ownership of an asset/claim).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RightRecord {
-    /// Right ID (hash).
+pub struct SanadRecord {
+    /// Sanad ID (hash).
     pub id: String,
-    /// Chain where this Right is anchored.
+    /// Chain where this Sanad is anchored.
     pub chain: Chain,
     /// Seal reference (chain-specific bytes, base64 encoded for JSON).
     pub seal_ref: String,
@@ -46,7 +46,7 @@ pub struct RightRecord {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nullifier: Option<String>,
     /// Current status.
-    pub status: RightStatus,
+    pub status: SanadStatus,
     /// Creation timestamp (Unix seconds).
     pub created_at: u64,
 }
@@ -91,8 +91,8 @@ pub struct TransferRecord {
     pub source_chain: Chain,
     /// Destination chain.
     pub dest_chain: Chain,
-    /// Right ID being transferred.
-    pub right_id: String,
+    /// Sanad ID being transferred.
+    pub sanad_id: String,
     /// Sender address on source chain.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sender_address: Option<String>,
@@ -162,8 +162,8 @@ pub struct SealRecord {
 pub struct ProofRecord {
     /// Chain where proof is valid.
     pub chain: Chain,
-    /// Right ID this proof is for.
-    pub right_id: String,
+    /// Sanad ID this proof is for.
+    pub sanad_id: String,
     /// Proof type (e.g., "inclusion", "exclusion", "transition", "zk_seal").
     pub proof_type: String,
     /// Proof system used (e.g., "sp1", "groth16", "plonk" for ZK proofs).
@@ -189,7 +189,7 @@ impl ProofRecord {
     /// Create a new ZK proof record.
     pub fn new_zk_proof(
         chain: Chain,
-        right_id: String,
+        sanad_id: String,
         proof_system: &str,
         proof_data: Vec<u8>,
         block_height: u64,
@@ -198,7 +198,7 @@ impl ProofRecord {
 
         Self {
             chain,
-            right_id,
+            sanad_id,
             proof_type: "zk_seal".to_string(),
             proof_system: Some(proof_system.to_string()),
             verified: false,
@@ -240,10 +240,10 @@ pub enum TransactionType {
     ContractDeployment,
     /// Contract function call.
     ContractCall,
-    /// Right creation.
-    RightCreation,
-    /// Right transfer.
-    RightTransfer,
+    /// Sanad creation.
+    SanadCreation,
+    /// Sanad transfer.
+    SanadTransfer,
     /// Seal creation.
     SealCreation,
     /// Seal consumption.

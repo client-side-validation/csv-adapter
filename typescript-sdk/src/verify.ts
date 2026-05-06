@@ -1,6 +1,6 @@
 import { ProofBundle } from './proof';
 import { Consignment } from './consignment';
-import { Right } from './right';
+import { Sanad } from './sanad';
 import { ErrorCode } from './types';
 
 /**
@@ -32,7 +32,7 @@ export interface VerificationStep {
  *
  * This is the CSV competitive advantage over bridges:
  * "Your counterparty doesn't need to trust any server.
- *  They can verify your right with this file alone."
+ *  They can verify your sanad with this file alone."
  *
  * Verification steps:
  * 1. Parse ProofBundle JSON
@@ -146,7 +146,7 @@ export function verifyProofBundle(bundle: ProofBundle): VerificationResult {
 /**
  * Verify a Consignment offline.
  *
- * A consignment contains the full provenance of a Right, including
+ * A consignment contains the full provenance of a Sanad, including
  * genesis, transitions, seal assignments, and anchor proofs.
  *
  * @param consignment - The Consignment to verify

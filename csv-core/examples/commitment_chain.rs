@@ -5,7 +5,7 @@
 //! 2. Linking subsequent commitments to previous ones
 //! 3. Verifying the integrity of the commitment chain
 
-use csv_core::{Commitment, Hash, SealRef};
+use csv_core::{Commitment, Hash, SealPoint};
 
 fn main() {
     println!("=== CSV Adapter Core: Commitment Chain Example ===\n");
@@ -13,7 +13,7 @@ fn main() {
     // Step 1: Create a genesis commitment (no previous commitment)
     let contract_id = Hash::new([0x01; 32]);
     let payload_hash = Hash::new([0xAA; 32]);
-    let seal_ref = SealRef::new(vec![0x00; 32], None).expect("valid seal ref");
+    let seal_ref = SealPoint::new(vec![0x00; 32], None).expect("valid seal ref");
     let domain_separator = [0u8; 32];
 
     let genesis = Commitment::simple(
@@ -31,7 +31,7 @@ fn main() {
 
     // Step 2: Create a second commitment linked to the genesis
     let payload_hash_2 = Hash::new([0xBB; 32]);
-    let seal_ref_2 = SealRef::new(vec![0x01; 32], None).expect("valid seal ref");
+    let seal_ref_2 = SealPoint::new(vec![0x01; 32], None).expect("valid seal ref");
 
     let commitment_2 = Commitment::simple(
         contract_id,
@@ -48,7 +48,7 @@ fn main() {
 
     // Step 3: Create a third commitment
     let payload_hash_3 = Hash::new([0xCC; 32]);
-    let seal_ref_3 = SealRef::new(vec![0x02; 32], None).expect("valid seal ref");
+    let seal_ref_3 = SealPoint::new(vec![0x02; 32], None).expect("valid seal ref");
 
     let commitment_3 = Commitment::simple(
         contract_id,

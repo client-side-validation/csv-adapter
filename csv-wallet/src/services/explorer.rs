@@ -86,15 +86,15 @@ impl ExplorerService {
         }
     }
 
-    /// Get right details by ID.
-    pub async fn get_right(&self, right_id: &str) -> Result<RightInfo, String> {
-        let url = format!("{}/api/rights/{}", self.config.base_url, right_id);
+    /// Get sanad details by ID.
+    pub async fn get_sanad(&self, sanad_id: &str) -> Result<SanadInfo, String> {
+        let url = format!("{}/api/sanads/{}", self.config.base_url, sanad_id);
 
         self.client
             .get(&url)
             .send()
             .await
-            .map_err(|e| format!("Failed to fetch right: {}", e))?
+            .map_err(|e| format!("Failed to fetch sanad: {}", e))?
             .json()
             .await
             .map_err(|e| format!("Failed to parse response: {}", e))
@@ -213,7 +213,7 @@ impl ExplorerService {
         Ok(response.data)
     }
 
-    /// Get complete data for an address (rights, seals, transfers).
+    /// Get complete data for an address (sanads, seals, transfers).
     pub async fn get_address_data(&self, address: &str) -> Result<AddressDataResponse, String> {
         let url = format!(
             "{}/api/v1/wallet/address/{}/data",
@@ -230,19 +230,19 @@ impl ExplorerService {
             .map_err(|e| format!("Failed to parse response: {}", e))
     }
 
-    /// Get rights for a specific address.
-    pub async fn get_address_rights(&self, address: &str) -> Result<Vec<RightInfo>, String> {
+    /// Get sanads for a specific address.
+    pub async fn get_address_sanads(&self, address: &str) -> Result<Vec<SanadInfo>, String> {
         let url = format!(
-            "{}/api/v1/wallet/address/{}/rights",
+            "{}/api/v1/wallet/address/{}/sanads",
             self.config.base_url, address
         );
 
-        let response: AddressRightsResponse = self
+        let response: AddressSanadsResponse = self
             .client
             .get(&url)
             .send()
             .await
-            .map_err(|e| format!("Failed to fetch address rights: {}", e))?
+            .map_err(|e| format!("Failed to fetch address sanads: {}", e))?
             .json()
             .await
             .map_err(|e| format!("Failed to parse response: {}", e))?;
@@ -358,10 +358,10 @@ pub struct AddressDataResponse {
     pub success: bool,
 }
 
-/// Response wrapper for address rights.
+/// Response wrapper for address sanads.
 #[derive(Debug, Deserialize)]
-pub struct AddressRightsResponse {
-    pub data: Vec<RightInfo>,
+pub struct AddressSanadsResponse {
+    pub data: Vec<SanadInfo>,
     pub success: bool,
 }
 
@@ -408,9 +408,9 @@ pub struct PriorityStatusResponse {
     pub success: bool,
 }
 
-/// Right information from explorer.
+/// Sanad information from explorer.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct RightInfo {
+pub struct SanadInfo {
     pub id: String,
     pub chain: String,
     pub commitment: String,
@@ -425,7 +425,7 @@ pub struct SealInfo {
     pub id: String,
     pub chain: String,
     pub status: String,
-    pub right_id: Option<String>,
+    pub sanad_id: Option<String>,
     pub created_at: String,
 }
 
@@ -433,7 +433,7 @@ pub struct SealInfo {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TransferInfo {
     pub id: String,
-    pub right_id: String,
+    pub sanad_id: String,
     pub from_chain: String,
     pub to_chain: String,
     pub from_address: String,

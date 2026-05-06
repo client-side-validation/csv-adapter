@@ -15,9 +15,9 @@ type AppState = (
 /// Build the REST API router.
 pub fn rest_routes() -> Router<AppState> {
     Router::new()
-        // Rights
-        .route("/rights", get(handlers::list_rights))
-        .route("/rights/{id}", get(handlers::get_right))
+        // Sanads
+        .route("/sanads", get(handlers::list_sanads))
+        .route("/sanads/{id}", get(handlers::get_sanad))
         // Transfers
         .route("/transfers", get(handlers::list_transfers))
         .route("/transfers/{id}", get(handlers::get_transfer))
@@ -43,8 +43,8 @@ pub fn rest_routes() -> Router<AppState> {
             get(handlers::get_address_data),
         )
         .route(
-            "/wallet/address/{address}/rights",
-            get(handlers::get_address_rights),
+            "/wallet/address/{address}/sanads",
+            get(handlers::get_address_sanads),
         )
         .route(
             "/wallet/address/{address}/seals",
@@ -58,9 +58,9 @@ pub fn rest_routes() -> Router<AppState> {
             "/wallet/priority/status",
             get(handlers::get_priority_indexing_status),
         )
-        // Enhanced rights with commitment metadata
-        .route("/rights/enhanced", get(handlers::list_enhanced_rights))
-        .route("/rights/enhanced/{id}", get(handlers::get_enhanced_right))
+        // Enhanced sanads with commitment metadata
+        .route("/sanads/enhanced", get(handlers::list_enhanced_sanads))
+        .route("/sanads/enhanced/{id}", get(handlers::get_enhanced_sanad))
         // Enhanced seals with proof metadata
         .route("/seals/enhanced", get(handlers::list_enhanced_seals))
         .route("/seals/enhanced/{id}", get(handlers::get_enhanced_seal))
@@ -68,13 +68,13 @@ pub fn rest_routes() -> Router<AppState> {
         .route("/proofs/statistics", get(handlers::get_proof_statistics))
         // Filter by commitment scheme
         .route(
-            "/rights/by-scheme/{scheme}",
-            get(handlers::get_rights_by_scheme),
+            "/sanads/by-scheme/{scheme}",
+            get(handlers::get_sanads_by_scheme),
         )
         // Filter by proof type
         .route(
-            "/rights/by-proof/{proof_type}",
-            get(handlers::get_rights_by_proof_type),
+            "/sanads/by-proof/{proof_type}",
+            get(handlers::get_sanads_by_proof_type),
         )
 }
 

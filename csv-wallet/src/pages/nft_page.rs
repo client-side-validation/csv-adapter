@@ -157,7 +157,7 @@ fn NftCard(nft: NftRecord) -> Element {
                 }
 
                 // Chain badge
-                div { class: "absolute top-2 right-2",
+                div { class: "absolute top-2 sanad-2",
                     span { class: "px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
                         "{nft.chain}"
                     }
@@ -225,7 +225,7 @@ fn CollectionCard(collection: NftCollection) -> Element {
                 }
 
                 // Chain badge
-                div { class: "absolute top-2 right-2",
+                div { class: "absolute top-2 sanad-2",
                     span { class: "px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
                         "{collection.chain}"
                     }

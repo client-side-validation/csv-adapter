@@ -19,12 +19,12 @@
 //!
 //! while let Some(event) = events.next().await {
 //!     match event {
-//!         Event::RightCreated { right_id, chain } => {
-//!             println!("Right created: {:?} on {}", right_id, chain);
+//!         Event::SanadCreated { sanad_id, chain } => {
+//!             println!("Sanad created: {:?} on {}", sanad_id, chain);
 //!         }
-//!         Event::TransferCompleted { transfer_id, right_id, to_chain } => {
-//!             println!("Transfer {} completed: right {:?} -> {}",
-//!                      transfer_id, right_id, to_chain);
+//!         Event::TransferCompleted { transfer_id, sanad_id, to_chain } => {
+//!             println!("Transfer {} completed: sanad {:?} -> {}",
+//!                      transfer_id, sanad_id, to_chain);
 //!         }
 //!         Event::Error { message, .. } => {
 //!             eprintln!("Error: {}", message);
@@ -36,7 +36,7 @@
 //! # }
 //! ```
 
-use csv_core::{Chain, RightId};
+use csv_core::{Chain, SanadId};
 #[cfg(feature = "tokio")]
 use tokio::sync::broadcast;
 
@@ -44,11 +44,11 @@ use tokio::sync::broadcast;
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum Event {
-    /// A new Right was created.
-    RightCreated {
-        /// The unique identifier of the Right.
-        right_id: RightId,
-        /// The chain where the Right's seal is anchored.
+    /// A new Sanad was created.
+    SanadCreated {
+        /// The unique identifier of the Sanad.
+        sanad_id: SanadId,
+        /// The chain where the Sanad's seal is anchored.
         chain: Chain,
     },
 
@@ -68,8 +68,8 @@ pub enum Event {
     TransferCompleted {
         /// The unique transfer identifier.
         transfer_id: String,
-        /// The Right ID on the destination chain.
-        right_id: RightId,
+        /// The Sanad ID on the destination chain.
+        sanad_id: SanadId,
         /// The destination chain.
         to_chain: Chain,
     },

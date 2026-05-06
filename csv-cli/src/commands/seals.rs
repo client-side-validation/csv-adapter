@@ -65,28 +65,28 @@ fn cmd_create(
 
     let core_chain = to_core_chain(chain.clone());
 
-    // Phase 5: Use facade client to create seal via RightsManager
+    // Phase 5: Use facade client to create seal via SanadsManager
     let client = CsvClient::builder()
         .with_chain(core_chain)
         .build()
         .map_err(|e| anyhow::anyhow!("Failed to create CSV client: {}", e))?;
 
-    // Create a seal by creating a basic Right (which creates a seal)
-    let rights = client.rights();
+    // Create a seal by creating a basic Sanad (which creates a seal)
+    let sanads = client.sanads();
 
     // Generate a commitment for seal creation
     let commitment = csv_core::Hash::new(generate_commitment());
 
-    // Create the right (which internally creates a seal via the facade)
-    match rights.create(commitment, core_chain) {
-        Ok(right) => {
-            let seal_id = hex::encode(right.id.as_bytes());
+    // Create the sanad (which internally creates a seal via the facade)
+    match sanads.create(commitment, core_chain) {
+        Ok(sanad) => {
+            let seal_id = hex::encode(sanad.id.as_bytes());
             let value_sat = value.unwrap_or(100_000);
 
             output::kv("Chain", &chain.to_string());
             output::kv("Seal ID", &seal_id[..16.min(seal_id.len())]);
             output::kv("Value", &format!("{} satoshis", value_sat));
-            output::kv("Right ID", &hex::encode(right.id.as_bytes())[..16]);
+            output::kv("Sanad ID", &hex::encode(sanad.id.as_bytes())[..16]);
             output::success("Seal created successfully via facade");
 
             // Record in state
@@ -138,21 +138,21 @@ fn cmd_consume(
         .build()
         .map_err(|e| anyhow::anyhow!("Failed to create CSV client: {}", e))?;
 
-    // Find the right associated with this seal and burn it (consuming the seal)
-    let rights = client.rights();
+    // Find the sanad associated with this seal and burn it (consuming the seal)
+    let sanads = client.sanads();
 
-    // Create a RightId from the seal reference
-    let right_id_bytes: [u8; 32] = seal_bytes[..32.min(seal_bytes.len())]
+    // Create a SanadId from the seal reference
+    let sanad_id_bytes: [u8; 32] = seal_bytes[..32.min(seal_bytes.len())]
         .try_into()
         .unwrap_or_else(|_| {
             let mut padded = [0u8; 32];
             padded[..seal_bytes.len().min(32)].copy_from_slice(&seal_bytes[..seal_bytes.len().min(32)]);
             padded
         });
-    let right_id = csv_core::RightId::new(right_id_bytes);
+    let sanad_id = csv_core::SanadId::new(sanad_id_bytes);
 
-    // Burn the right, which consumes the seal
-    match rights.burn(&right_id) {
+    // Burn the sanad, which consumes the seal
+    match sanads.burn(&sanad_id) {
         Ok(()) => {
             state.record_seal_consumption(seal_hex.clone());
 
@@ -186,37 +186,37 @@ fn cmd_verify(
         .build()
         .map_err(|e| anyhow::anyhow!("Failed to create CSV client: {}", e))?;
 
-    // Query the right status via the rights manager
-    let rights = client.rights();
+    // Query the sanad status via the sanads manager
+    let sanads = client.sanads();
 
-    // Create a RightId from the seal reference
-    let right_id_bytes: [u8; 32] = seal_bytes[..32.min(seal_bytes.len())]
+    // Create a SanadId from the seal reference
+    let sanad_id_bytes: [u8; 32] = seal_bytes[..32.min(seal_bytes.len())]
         .try_into()
         .unwrap_or_else(|_| {
             let mut padded = [0u8; 32];
             padded[..seal_bytes.len().min(32)].copy_from_slice(&seal_bytes[..seal_bytes.len().min(32)]);
             padded
         });
-    let right_id = csv_core::RightId::new(right_id_bytes);
+    let sanad_id = csv_core::SanadId::new(sanad_id_bytes);
 
-    // Check if the right exists and get its status
+    // Check if the sanad exists and get its status
     let local_consumed = state.is_seal_consumed(&hex::encode(&seal_bytes));
 
-    match rights.get(&right_id) {
-        Ok(Some(right)) => {
-            // Right exists in the system
-            let status = if local_consumed || right.nullifier.is_some() { "Consumed" } else { "Unconsumed" };
+    match sanads.get(&sanad_id) {
+        Ok(Some(sanad)) => {
+            // Sanad exists in the system
+            let status = if local_consumed || sanad.nullifier.is_some() { "Consumed" } else { "Unconsumed" };
             output::kv("Chain", &chain.to_string());
             output::kv_hash("Seal", &seal_bytes);
             output::kv("Status", status);
-            output::kv("Right ID", &hex::encode(right.id.as_bytes())[..16]);
+            output::kv("Sanad ID", &hex::encode(sanad.id.as_bytes())[..16]);
 
-            if !local_consumed && right.nullifier.is_none() {
+            if !local_consumed && sanad.nullifier.is_none() {
                 output::info("Seal is available for use");
             }
         }
         Ok(None) => {
-            // Right not found in the system
+            // Sanad not found in the system
             output::kv("Chain", &chain.to_string());
             output::kv_hash("Seal", &seal_bytes);
             output::kv("Status", if local_consumed { "Consumed" } else { "Unknown" });

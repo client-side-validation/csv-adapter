@@ -1,6 +1,6 @@
 //! Real-time indexing pipeline for CSV Explorer
 //!
-//! Provides real-time indexing of rights, transfers, and proofs across all supported chains.
+//! Provides real-time indexing of sanads, transfers, and proofs across all supported chains.
 //! Supports event-driven updates and maintains a consistent view of cross-chain state.
 
 pub mod events;
@@ -33,7 +33,7 @@ pub struct IndexingManager {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IndexingMetrics {
     pub events_processed: u64,
-    pub rights_indexed: u64,
+    pub sanads_indexed: u64,
     pub transfers_indexed: u64,
     pub average_processing_time: Duration,
     pub last_sync_time: DateTime<Utc>,
@@ -64,7 +64,7 @@ impl IndexingManager {
             event_buffer,
             metrics: IndexingMetrics {
                 events_processed: 0,
-                rights_indexed: 0,
+                sanads_indexed: 0,
                 transfers_indexed: 0,
                 average_processing_time: Duration::from_millis(0),
                 last_sync_time: Utc::now(),
@@ -106,21 +106,21 @@ impl IndexingManager {
     /// Get current indexing metrics
     pub async fn get_metrics(&self) -> IndexingMetrics {
         // Update metrics from storage
-        let rights_count = self.storage.get_rights_count().await;
+        let sanads_count = self.storage.get_sanads_count().await;
         let transfers_count = self.storage.get_transfers_count().await;
         let mut metrics = self.metrics.clone();
-        metrics.rights_indexed = rights_count;
+        metrics.sanads_indexed = sanads_count;
         metrics.transfers_indexed = transfers_count;
         metrics.last_sync_time = Utc::now();
         metrics
     }
 
-    /// Search rights by criteria
-    pub async fn search_rights(
+    /// Search sanads by criteria
+    pub async fn search_sanads(
         &self,
-        query: &RightsQuery,
-    ) -> Result<Vec<IndexedRight>, Box<dyn std::error::Error + Send + Sync>> {
-        self.storage.search_rights(query).await
+        query: &SanadsQuery,
+    ) -> Result<Vec<IndexedSanad>, Box<dyn std::error::Error + Send + Sync>> {
+        self.storage.search_sanads(query).await
     }
 
     /// Search transfers by criteria
@@ -131,19 +131,19 @@ impl IndexingManager {
         self.storage.search_transfers(query).await
     }
 
-    /// Get rights by owner
-    pub async fn get_rights_by_owner(
+    /// Get sanads by owner
+    pub async fn get_sanads_by_owner(
         &self,
         owner: &str,
-    ) -> Result<Vec<IndexedRight>, Box<dyn std::error::Error + Send + Sync>> {
-        let query = RightsQuery {
+    ) -> Result<Vec<IndexedSanad>, Box<dyn std::error::Error + Send + Sync>> {
+        let query = SanadsQuery {
             owner: Some(owner.to_string()),
             chain: None,
             status: None,
             limit: Some(100),
             offset: Some(0),
         };
-        self.search_rights(&query).await
+        self.search_sanads(&query).await
     }
 
     /// Get transfers by hash
@@ -192,9 +192,9 @@ impl IndexingManager {
     }
 }
 
-/// Query parameters for rights search
+/// Query parameters for sanads search
 #[derive(Debug, Clone)]
-pub struct RightsQuery {
+pub struct SanadsQuery {
     pub owner: Option<String>,
     pub chain: Option<String>,
     pub status: Option<TransferStatus>,
@@ -214,9 +214,9 @@ pub struct TransferQuery {
     pub offset: Option<usize>,
 }
 
-/// Indexed right with metadata
+/// Indexed sanad with metadata
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct IndexedRight {
+pub struct IndexedSanad {
     pub id: Hash,
     pub owner: String,
     pub chain: String,
@@ -230,7 +230,7 @@ pub struct IndexedRight {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IndexedTransfer {
     pub id: Hash,
-    pub right_id: Hash,
+    pub sanad_id: Hash,
     pub from_chain: String,
     pub to_chain: String,
     pub status: TransferStatus,
@@ -251,9 +251,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_rights_search() {
+    async fn test_sanads_search() {
         let manager = IndexingManager::new().unwrap();
-        let query = RightsQuery {
+        let query = SanadsQuery {
             owner: None,
             chain: Some("ethereum".to_string()),
             status: None,
@@ -261,7 +261,7 @@ mod tests {
             offset: Some(0),
         };
 
-        let results = manager.search_rights(&query).await;
+        let results = manager.search_sanads(&query).await;
         assert!(results.is_ok());
     }
 }

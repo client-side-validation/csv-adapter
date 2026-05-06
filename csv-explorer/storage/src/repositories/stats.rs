@@ -17,7 +17,7 @@ impl StatsRepository {
 
     /// Get full aggregate statistics.
     pub async fn get_stats(&self) -> Result<ExplorerStats> {
-        let total_rights: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM rights")
+        let total_sanads: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sanads")
             .fetch_one(&self.pool)
             .await?;
 
@@ -33,13 +33,13 @@ impl StatsRepository {
             .fetch_one(&self.pool)
             .await?;
 
-        // Rights by chain
-        let rights_by_chain_rows = sqlx::query_as::<_, ChainCountRow>(
-            "SELECT chain, COUNT(*) as count FROM rights GROUP BY chain ORDER BY count DESC",
+        // Sanads by chain
+        let sanads_by_chain_rows = sqlx::query_as::<_, ChainCountRow>(
+            "SELECT chain, COUNT(*) as count FROM sanads GROUP BY chain ORDER BY count DESC",
         )
         .fetch_all(&self.pool)
         .await?;
-        let rights_by_chain = rights_by_chain_rows
+        let sanads_by_chain = sanads_by_chain_rows
             .into_iter()
             .map(|r| ChainCount {
                 chain: r.chain,
@@ -104,11 +104,11 @@ impl StatsRepository {
         .await?;
 
         Ok(ExplorerStats {
-            total_rights: total_rights as u64,
+            total_sanads: total_sanads as u64,
             total_transfers: total_transfers as u64,
             total_seals: total_seals as u64,
             total_contracts: total_contracts as u64,
-            rights_by_chain,
+            sanads_by_chain,
             transfers_by_chain_pair,
             active_seals_by_chain,
             transfer_success_rate,
@@ -116,9 +116,9 @@ impl StatsRepository {
         })
     }
 
-    /// Get total rights count.
-    pub async fn total_rights(&self) -> Result<u64> {
-        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM rights")
+    /// Get total sanads count.
+    pub async fn total_sanads(&self) -> Result<u64> {
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sanads")
             .fetch_one(&self.pool)
             .await?;
         Ok(count as u64)

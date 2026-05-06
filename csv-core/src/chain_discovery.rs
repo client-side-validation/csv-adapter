@@ -29,7 +29,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::adapter_factory::AdapterFactory;
-use super::chain_adapter::ChainAdapter;
+use super::chain_adapter::ChainDriver;
 use super::chain_config::{ChainConfig, ChainConfigLoader};
 use super::chain_plugin::{ChainPlugin, ChainPluginRegistry};
 
@@ -174,7 +174,7 @@ impl ChainDiscovery {
     pub fn create_adapter(
         &self,
         chain_id: &str,
-    ) -> Option<Box<dyn ChainAdapter>> {
+    ) -> Option<Box<dyn ChainDriver>> {
         let config = self.get_chain_config(chain_id).cloned();
         self.plugins.create_adapter(chain_id, config)
     }

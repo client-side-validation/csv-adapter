@@ -1,4 +1,4 @@
-//! Shared Event Schemas for Cross-Chain Rights
+//! Shared Event Schemas for Cross-Chain Transfers
 //!
 //! This module defines standardized event types for the CSV protocol.
 //! These events are used by:
@@ -12,32 +12,32 @@
 use serde::{Deserialize, Serialize};
 
 use crate::hash::Hash;
-use crate::right::RightId;
+use crate::title::SanadId;
 
 /// Standard event names in the CSV protocol
 pub mod event_names {
-    /// Right created on chain
-    pub const RIGHT_CREATED: &str = "RightCreated";
-    /// Right consumed (spent)
-    pub const RIGHT_CONSUMED: &str = "RightConsumed";
-    /// Right locked for cross-chain transfer
+    /// Sanad created on chain
+    pub const SANAD_CREATED: &str = "SanadCreated";
+    /// Sanad consumed (spent)
+    pub const SANAD_CONSUMED: &str = "SanadConsumed";
+    /// Sanad locked for cross-chain transfer
     pub const CROSS_CHAIN_LOCK: &str = "CrossChainLock";
-    /// Right minted on destination chain
+    /// Sanad minted on destination chain
     pub const CROSS_CHAIN_MINT: &str = "CrossChainMint";
-    /// Right refunded after timeout
+    /// Sanad refunded after timeout
     pub const CROSS_CHAIN_REFUND: &str = "CrossChainRefund";
-    /// Right transferred to new owner
-    pub const RIGHT_TRANSFERRED: &str = "RightTransferred";
-    /// Nullifier registered for spent right
+    /// Sanad transferred to new owner
+    pub const SANAD_TRANSFERRED: &str = "SanadTransferred";
+    /// Nullifier registered for spent sanad
     pub const NULLIFIER_REGISTERED: &str = "NullifierRegistered";
-    /// Right metadata recorded
-    pub const RIGHT_METADATA_RECORDED: &str = "RightMetadataRecorded";
+    /// Sanad metadata recorded
+    pub const SANAD_METADATA_RECORDED: &str = "SanadMetadataRecorded";
 }
 
 /// Standard metadata field names
 pub mod metadata_fields {
-    /// Unique right identifier
-    pub const RIGHT_ID: &str = "right_id";
+    /// Unique sanad identifier
+    pub const SANAD_ID: &str = "sanad_id";
     /// Cryptographic commitment
     pub const COMMITMENT: &str = "commitment";
     /// Owner address
@@ -48,297 +48,362 @@ pub mod metadata_fields {
     pub const ASSET_CLASS: &str = "asset_class";
     /// Specific asset identifier
     pub const ASSET_ID: &str = "asset_id";
-    /// Hash of metadata
-    pub const METADATA_HASH: &str = "metadata_hash";
-    /// Proof system used (e.g., "Merkle", "STARK", "SNARK")
-    pub const PROOF_SYSTEM: &str = "proof_system";
-    /// Root of the proof
-    pub const PROOF_ROOT: &str = "proof_root";
-    /// Source chain for cross-chain
-    pub const SOURCE_CHAIN: &str = "source_chain";
-    /// Destination chain for cross-chain
+    /// Metadata value
+    pub const METADATA: &str = "metadata";
+    /// Destination chain for cross-chain transfers
     pub const DESTINATION_CHAIN: &str = "destination_chain";
+    /// Source chain for cross-chain transfers
+    pub const SOURCE_CHAIN: &str = "source_chain";
+    /// Block height where event occurred
+    pub const BLOCK_HEIGHT: &str = "block_height";
     /// Transaction hash
     pub const TX_HASH: &str = "tx_hash";
-    /// Block height
-    pub const BLOCK_HEIGHT: &str = "block_height";
-    /// Finality status
-    pub const FINALITY_STATUS: &str = "finality_status";
 }
 
-/// Event finality status
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum EventFinalityStatus {
-    /// Event is pending/in mempool
-    Pending,
-    /// Event is confirmed but not finalized
-    Confirmed,
-    /// Event is finalized (safe from reorg)
-    Finalized,
-    /// Event was orphaned due to reorg
-    Orphaned,
-}
-
-/// Core event envelope - all chain events use this structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Base event data structure
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CsvEvent {
-    /// Event name (use constants from event_names module)
-    pub event_name: String,
+    /// Event type identifier
+    pub event_type: String,
     /// Chain where event occurred
-    pub chain_id: String,
-    /// Block height
+    pub chain: String,
+    /// Block height where event occurred
     pub block_height: u64,
-    /// Block hash
-    pub block_hash: String,
     /// Transaction hash
     pub tx_hash: String,
-    /// Log/index position in block
-    pub log_index: u64,
-    /// Timestamp (unix seconds)
+    /// Event timestamp (unix timestamp in seconds)
     pub timestamp: u64,
     /// Event-specific data
     pub data: EventData,
-    /// Finality status
-    pub finality_status: EventFinalityStatus,
+    /// Optional metadata
+    pub metadata: Option<serde_json::Value>,
 }
 
-/// Event data payload - contains event-specific fields
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventData {
-    /// Right ID (if applicable)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub right_id: Option<RightId>,
-    /// Commitment hash (if applicable)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub commitment: Option<Hash>,
-    /// Owner address
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<String>,
-    /// Asset class
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub asset_class: Option<String>,
-    /// Asset identifier
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub asset_id: Option<String>,
-    /// Metadata hash
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata_hash: Option<Hash>,
-    /// Proof system
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof_system: Option<String>,
-    /// Proof root
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof_root: Option<Hash>,
-    /// Source chain (for cross-chain)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub source_chain: Option<String>,
-    /// Destination chain (for cross-chain)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub destination_chain: Option<String>,
-    /// Previous owner (for transfers)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub previous_owner: Option<String>,
-    /// New owner (for transfers)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub new_owner: Option<String>,
-    /// Nullifier (for consumed rights)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub nullifier: Option<Hash>,
-    /// Lock ID (for cross-chain locks)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub lock_id: Option<String>,
-    /// Expiration time (for locks)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub expiration: Option<u64>,
-    /// Additional chain-specific data
-    #[serde(flatten)]
-    pub extra: serde_json::Value,
+/// Event data variants
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum EventData {
+    /// Sanad created event
+    SanadCreated {
+        sanad_id: SanadId,
+        owner: String,
+        commitment: Hash,
+        asset_class: String,
+        asset_id: String,
+        metadata: Option<serde_json::Value>,
+    },
+    /// Sanad consumed event
+    SanadConsumed {
+        sanad_id: SanadId,
+        nullifier: Hash,
+        consumed_by: String,
+    },
+    /// Sanad transferred event
+    SanadTransferred {
+        sanad_id: SanadId,
+        from: String,
+        to: String,
+        metadata: Option<serde_json::Value>,
+    },
+    /// Sanad-chain lock event
+    CrossChainLock {
+        sanad_id: SanadId,
+        source_chain: String,
+        destination_chain: String,
+        destination_owner: String,
+        proof_hash: Hash,
+    },
+    /// Cross-chain mint event
+    CrossChainMint {
+        sanad_id: SanadId,
+        source_chain: String,
+        source_sanad_id: SanadId,
+        owner: String,
+        proof_hash: Hash,
+    },
+    /// Cross-chain refund event
+    CrossChainRefund {
+        sanad_id: SanadId,
+        source_chain: String,
+        destination_chain: String,
+        refunded_to: String,
+    },
+    /// Nullifier registered event
+    NullifierRegistered {
+        sanad_id: SanadId,
+        nullifier: Hash,
+        chain: String,
+    },
+    /// Sanad metadata recorded event
+    SanadMetadataRecorded {
+        sanad_id: SanadId,
+        metadata: serde_json::Value,
+    },
 }
 
-impl EventData {
-    /// Create empty event data
-    pub fn empty() -> Self {
+impl CsvEvent {
+    /// Create a new SanadCreated event
+    pub fn sanad_created(
+        chain: &str,
+        block_height: u64,
+        tx_hash: &str,
+        timestamp: u64,
+        sanad_id: SanadId,
+        owner: &str,
+        commitment: Hash,
+        asset_class: &str,
+        asset_id: &str,
+        metadata: Option<serde_json::Value>,
+    ) -> Self {
         Self {
-            right_id: None,
-            commitment: None,
-            owner: None,
-            asset_class: None,
-            asset_id: None,
-            metadata_hash: None,
-            proof_system: None,
-            proof_root: None,
-            source_chain: None,
-            destination_chain: None,
-            previous_owner: None,
-            new_owner: None,
-            nullifier: None,
-            lock_id: None,
-            expiration: None,
-            extra: serde_json::Value::Null,
+            event_type: event_names::SANAD_CREATED.to_string(),
+            chain: chain.to_string(),
+            block_height,
+            tx_hash: tx_hash.to_string(),
+            timestamp,
+            data: EventData::SanadCreated {
+                sanad_id,
+                owner: owner.to_string(),
+                commitment,
+                asset_class: asset_class.to_string(),
+                asset_id: asset_id.to_string(),
+                metadata,
+            },
+            metadata: None,
         }
     }
 
-    /// Builder-style setter for right_id
-    pub fn with_right_id(mut self, right_id: RightId) -> Self {
-        self.right_id = Some(right_id);
-        self
-    }
-
-    /// Builder-style setter for commitment
-    pub fn with_commitment(mut self, commitment: Hash) -> Self {
-        self.commitment = Some(commitment);
-        self
-    }
-
-    /// Builder-style setter for owner
-    pub fn with_owner(mut self, owner: impl Into<String>) -> Self {
-        self.owner = Some(owner.into());
-        self
-    }
-
-    /// Builder-style setter for asset class
-    pub fn with_asset_class(mut self, asset_class: impl Into<String>) -> Self {
-        self.asset_class = Some(asset_class.into());
-        self
-    }
-
-    /// Builder-style setter for asset_id
-    pub fn with_asset_id(mut self, asset_id: impl Into<String>) -> Self {
-        self.asset_id = Some(asset_id.into());
-        self
-    }
-
-    /// Builder-style setter for metadata_hash
-    pub fn with_metadata_hash(mut self, metadata_hash: Hash) -> Self {
-        self.metadata_hash = Some(metadata_hash);
-        self
-    }
-
-    /// Builder-style setter for proof_system
-    pub fn with_proof_system(mut self, proof_system: impl Into<String>) -> Self {
-        self.proof_system = Some(proof_system.into());
-        self
-    }
-
-    /// Builder-style setter for proof_root
-    pub fn with_proof_root(mut self, proof_root: Hash) -> Self {
-        self.proof_root = Some(proof_root);
-        self
-    }
-
-    /// Builder-style setter for source_chain
-    pub fn with_source_chain(mut self, source_chain: impl Into<String>) -> Self {
-        self.source_chain = Some(source_chain.into());
-        self
-    }
-
-    /// Builder-style setter for destination_chain
-    pub fn with_destination_chain(mut self, destination_chain: impl Into<String>) -> Self {
-        self.destination_chain = Some(destination_chain.into());
-        self
-    }
-
-    /// Builder-style setter for previous_owner
-    pub fn with_previous_owner(mut self, previous_owner: impl Into<String>) -> Self {
-        self.previous_owner = Some(previous_owner.into());
-        self
-    }
-
-    /// Builder-style setter for new_owner
-    pub fn with_new_owner(mut self, new_owner: impl Into<String>) -> Self {
-        self.new_owner = Some(new_owner.into());
-        self
-    }
-
-    /// Builder-style setter for nullifier
-    pub fn with_nullifier(mut self, nullifier: Hash) -> Self {
-        self.nullifier = Some(nullifier);
-        self
-    }
-
-    /// Builder-style setter for lock_id
-    pub fn with_lock_id(mut self, lock_id: impl Into<String>) -> Self {
-        self.lock_id = Some(lock_id.into());
-        self
-    }
-
-    /// Builder-style setter for expiration
-    pub fn with_expiration(mut self, expiration: u64) -> Self {
-        self.expiration = Some(expiration);
-        self
-    }
-}
-
-/// Event filter for querying indexed events
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct EventFilter {
-    /// Filter by event name
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub event_name: Option<String>,
-    /// Filter by chain ID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub chain_id: Option<String>,
-    /// Filter by right ID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub right_id: Option<RightId>,
-    /// Filter by owner
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<String>,
-    /// Filter by asset class
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub asset_class: Option<String>,
-    /// Filter by asset ID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub asset_id: Option<String>,
-    /// Start block height
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub from_block: Option<u64>,
-    /// End block height
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub to_block: Option<u64>,
-    /// Filter by source chain (for cross-chain)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub source_chain: Option<String>,
-    /// Filter by destination chain (for cross-chain)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub destination_chain: Option<String>,
-    /// Minimum finality status required
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub min_finality: Option<EventFinalityStatus>,
-}
-
-/// Trait for event indexing plugins
-///
-/// Each chain adapter implements this trait to index chain-specific events
-/// into the shared event format.
-pub trait EventIndexer {
-    /// Get the chain ID this indexer handles
-    fn chain_id(&self) -> &'static str;
-
-    /// Parse a chain-specific log/event into CsvEvent
-    fn parse_event(
-        &self,
-        raw_log: &[u8],
+    /// Create a new SanadConsumed event
+    pub fn sanad_consumed(
+        chain: &str,
         block_height: u64,
-        block_hash: &str,
         tx_hash: &str,
-        log_index: u64,
-    ) -> Option<CsvEvent>;
+        timestamp: u64,
+        sanad_id: SanadId,
+        nullifier: Hash,
+        consumed_by: &str,
+    ) -> Self {
+        Self {
+            event_type: event_names::SANAD_CONSUMED.to_string(),
+            chain: chain.to_string(),
+            block_height,
+            tx_hash: tx_hash.to_string(),
+            timestamp,
+            data: EventData::SanadConsumed {
+                sanad_id,
+                nullifier,
+                consumed_by: consumed_by.to_string(),
+            },
+            metadata: None,
+        }
+    }
 
-    /// Get filter for events this indexer cares about
-    fn subscription_filter(&self) -> EventFilter;
+    /// Create a new SanadTransferred event
+    pub fn sanad_transferred(
+        chain: &str,
+        block_height: u64,
+        tx_hash: &str,
+        timestamp: u64,
+        sanad_id: SanadId,
+        from: &str,
+        to: &str,
+        metadata: Option<serde_json::Value>,
+    ) -> Self {
+        Self {
+            event_type: event_names::SANAD_TRANSFERRED.to_string(),
+            chain: chain.to_string(),
+            block_height,
+            tx_hash: tx_hash.to_string(),
+            timestamp,
+            data: EventData::SanadTransferred {
+                sanad_id,
+                from: from.to_string(),
+                to: to.to_string(),
+                metadata,
+            },
+            metadata: None,
+        }
+    }
 
-    /// Check if an event is valid and final
-    fn validate_event(&self, event: &CsvEvent) -> bool;
+    /// Create a new CrossChainLock event
+    pub fn cross_chain_lock(
+        chain: &str,
+        block_height: u64,
+        tx_hash: &str,
+        timestamp: u64,
+        sanad_id: SanadId,
+        source_chain: &str,
+        destination_chain: &str,
+        destination_owner: &str,
+        proof_hash: Hash,
+    ) -> Self {
+        Self {
+            event_type: event_names::CROSS_CHAIN_LOCK.to_string(),
+            chain: chain.to_string(),
+            block_height,
+            tx_hash: tx_hash.to_string(),
+            timestamp,
+            data: EventData::CrossChainLock {
+                sanad_id,
+                source_chain: source_chain.to_string(),
+                destination_chain: destination_chain.to_string(),
+                destination_owner: destination_owner.to_string(),
+                proof_hash,
+            },
+            metadata: None,
+        }
+    }
+
+    /// Create a new CrossChainMint event
+    pub fn cross_chain_mint(
+        chain: &str,
+        block_height: u64,
+        tx_hash: &str,
+        timestamp: u64,
+        sanad_id: SanadId,
+        source_chain: &str,
+        source_sanad_id: SanadId,
+        owner: &str,
+        proof_hash: Hash,
+    ) -> Self {
+        Self {
+            event_type: event_names::CROSS_CHAIN_MINT.to_string(),
+            chain: chain.to_string(),
+            block_height,
+            tx_hash: tx_hash.to_string(),
+            timestamp,
+            data: EventData::CrossChainMint {
+                sanad_id,
+                source_chain: source_chain.to_string(),
+                source_sanad_id,
+                owner: owner.to_string(),
+                proof_hash,
+            },
+            metadata: None,
+        }
+    }
+
+    /// Create a new CrossChainRefund event
+    pub fn cross_chain_refund(
+        chain: &str,
+        block_height: u64,
+        tx_hash: &str,
+        timestamp: u64,
+        sanad_id: SanadId,
+        source_chain: &str,
+        destination_chain: &str,
+        refunded_to: &str,
+    ) -> Self {
+        Self {
+            event_type: event_names::CROSS_CHAIN_REFUND.to_string(),
+            chain: chain.to_string(),
+            block_height,
+            tx_hash: tx_hash.to_string(),
+            timestamp,
+            data: EventData::CrossChainRefund {
+                sanad_id,
+                source_chain: source_chain.to_string(),
+                destination_chain: destination_chain.to_string(),
+                refunded_to: refunded_to.to_string(),
+            },
+            metadata: None,
+        }
+    }
+
+    /// Create a new NullifierRegistered event
+    pub fn nullifier_registered(
+        chain: &str,
+        block_height: u64,
+        tx_hash: &str,
+        timestamp: u64,
+        sanad_id: SanadId,
+        nullifier: Hash,
+    ) -> Self {
+        Self {
+            event_type: event_names::NULLIFIER_REGISTERED.to_string(),
+            chain: chain.to_string(),
+            block_height,
+            tx_hash: tx_hash.to_string(),
+            timestamp,
+            data: EventData::NullifierRegistered {
+                sanad_id,
+                nullifier,
+                chain: chain.to_string(),
+            },
+            metadata: None,
+        }
+    }
+
+    /// Create a new SanadMetadataRecorded event
+    pub fn sanad_metadata_recorded(
+        chain: &str,
+        block_height: u64,
+        tx_hash: &str,
+        timestamp: u64,
+        sanad_id: SanadId,
+        metadata: serde_json::Value,
+    ) -> Self {
+        Self {
+            event_type: event_names::SANAD_METADATA_RECORDED.to_string(),
+            chain: chain.to_string(),
+            block_height,
+            tx_hash: tx_hash.to_string(),
+            timestamp,
+            data: EventData::SanadMetadataRecorded {
+                sanad_id,
+                metadata,
+            },
+            metadata: None,
+        }
+    }
 }
 
-/// Registry for event indexers
+/// Event filter for querying events
+#[derive(Debug, Clone, Default)]
+pub struct EventFilter {
+    /// Filter by event type
+    pub event_type: Option<String>,
+    /// Filter by chain
+    pub chain: Option<String>,
+    /// Filter by sanad ID
+    pub sanad_id: Option<SanadId>,
+    /// Filter by owner address
+    pub owner: Option<String>,
+    /// Filter by date range (start)
+    pub from_timestamp: Option<u64>,
+    /// Filter by date range (end)
+    pub to_timestamp: Option<u64>,
+    /// Maximum number of results
+    pub limit: Option<usize>,
+}
+
+/// Event indexer interface
+#[async_trait::async_trait]
+pub trait EventIndexer: Send + Sync {
+    /// Emit an event
+    async fn emit(&self, event: CsvEvent) -> Result<(), Box<dyn std::error::Error>>;
+
+    /// Query events with filter
+    async fn query(
+        &self,
+        filter: &EventFilter,
+    ) -> Result<Vec<CsvEvent>, Box<dyn std::error::Error>>;
+
+    /// Get event by sanad ID
+    async fn get_by_sanad_id(
+        &self,
+        sanad_id: &SanadId,
+    ) -> Result<Vec<CsvEvent>, Box<dyn std::error::Error>>;
+}
+
+/// Event indexer registry
+#[derive(Debug, Default)]
 pub struct EventIndexerRegistry {
     indexers: Vec<Box<dyn EventIndexer>>,
 }
 
 impl EventIndexerRegistry {
-    /// Create a new registry
+    /// Create new registry
     pub fn new() -> Self {
         Self {
             indexers: Vec::new(),
@@ -350,43 +415,40 @@ impl EventIndexerRegistry {
         self.indexers.push(indexer);
     }
 
-    /// Get indexer for a chain
-    pub fn get_indexer(&self, chain_id: &str) -> Option<&dyn EventIndexer> {
-        self.indexers
-            .iter()
-            .find(|i| i.chain_id() == chain_id)
-            .map(|i| i.as_ref())
+    /// Emit event to all registered indexers
+    pub async fn emit(&self, event: CsvEvent) -> Result<(), Box<dyn std::error::Error>> {
+        for indexer in &self.indexers {
+            indexer.emit(event.clone()).await?;
+        }
+        Ok(())
     }
 
-    /// Get all registered chain IDs
-    pub fn supported_chains(&self) -> Vec<&'static str> {
-        self.indexers.iter().map(|i| i.chain_id()).collect()
-    }
-
-    /// Parse an event using the appropriate indexer
-    pub fn parse_event(
+    /// Query events from all registered indexers
+    pub async fn query(
         &self,
-        chain_id: &str,
-        raw_log: &[u8],
-        block_height: u64,
-        block_hash: &str,
-        tx_hash: &str,
-        log_index: u64,
-    ) -> Option<CsvEvent> {
-        self.get_indexer(chain_id)?.parse_event(
-            raw_log,
-            block_height,
-            block_hash,
-            tx_hash,
-            log_index,
-        )
+        filter: &EventFilter,
+    ) -> Result<Vec<CsvEvent>, Box<dyn std::error::Error>> {
+        let mut events = Vec::new();
+        for indexer in &self.indexers {
+            let indexer_events = indexer.query(filter).await?;
+            events.extend(indexer_events);
+        }
+        Ok(events)
     }
 }
 
-impl Default for EventIndexerRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
+/// Event finality status
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum EventFinalityStatus {
+    /// Event is pending confirmation
+    Pending,
+    /// Event has been confirmed
+    Confirmed {
+        /// Number of confirmations
+        confirmations: u64,
+    },
+    /// Event has reached finality
+    Finalized,
 }
 
 #[cfg(test)]
@@ -394,40 +456,71 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_event_data_builder() {
-        let data = EventData::empty()
-            .with_owner("0x1234")
-            .with_asset_class("RGB")
-            .with_asset_id("asset-1");
+    fn test_event_serialization() {
+        let event = CsvEvent::sanad_created(
+            "bitcoin",
+            100,
+            "tx123",
+            1700000000,
+            SanadId::new([0xAB; 32]),
+            "owner1",
+            Hash::new([0xCD; 32]),
+            "RGB",
+            "asset1",
+            None,
+        );
 
-        assert_eq!(data.owner, Some("0x1234".to_string()));
-        assert_eq!(data.asset_class, Some("RGB".to_string()));
-        assert_eq!(data.asset_id, Some("asset-1".to_string()));
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains("SanadCreated"));
+        assert!(json.contains("bitcoin"));
+
+        let deserialized: CsvEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.event_type, event.event_type);
+        assert_eq!(deserialized.chain, event.chain);
+    }
+
+    #[test]
+    fn test_event_filter() {
+        let filter = EventFilter {
+            event_type: Some("SanadCreated".to_string()),
+            chain: Some("bitcoin".to_string()),
+            ..Default::default()
+        };
+
+        assert_eq!(filter.event_type, Some("SanadCreated".to_string()));
+        assert_eq!(filter.chain, Some("bitcoin".to_string()));
     }
 
     #[test]
     fn test_event_names() {
-        assert_eq!(event_names::RIGHT_CREATED, "RightCreated");
+        assert_eq!(event_names::SANAD_CREATED, "SanadCreated");
+        assert_eq!(event_names::SANAD_CONSUMED, "SanadConsumed");
         assert_eq!(event_names::CROSS_CHAIN_LOCK, "CrossChainLock");
+        assert_eq!(event_names::CROSS_CHAIN_MINT, "CrossChainMint");
+        assert_eq!(event_names::CROSS_CHAIN_REFUND, "CrossChainRefund");
+        assert_eq!(event_names::SANAD_TRANSFERRED, "SanadTransferred");
+        assert_eq!(event_names::NULLIFIER_REGISTERED, "NullifierRegistered");
+        assert_eq!(
+            event_names::SANAD_METADATA_RECORDED,
+            "SanadMetadataRecorded"
+        );
     }
 
     #[test]
     fn test_metadata_fields() {
-        assert_eq!(metadata_fields::RIGHT_ID, "right_id");
+        assert_eq!(metadata_fields::SANAD_ID, "sanad_id");
+        assert_eq!(metadata_fields::COMMITMENT, "commitment");
+        assert_eq!(metadata_fields::OWNER, "owner");
         assert_eq!(metadata_fields::CHAIN_ID, "chain_id");
-    }
-
-    #[test]
-    fn test_event_filter_default() {
-        let filter = EventFilter::default();
-        assert!(filter.event_name.is_none());
-        assert!(filter.chain_id.is_none());
-    }
-
-    #[test]
-    fn test_event_finality_status_serialization() {
-        let status = EventFinalityStatus::Finalized;
-        let json = serde_json::to_string(&status).unwrap();
-        assert!(json.contains("Finalized"));
+        assert_eq!(metadata_fields::ASSET_CLASS, "asset_class");
+        assert_eq!(metadata_fields::ASSET_ID, "asset_id");
+        assert_eq!(metadata_fields::METADATA, "metadata");
+        assert_eq!(
+            metadata_fields::DESTINATION_CHAIN,
+            "destination_chain"
+        );
+        assert_eq!(metadata_fields::SOURCE_CHAIN, "source_chain");
+        assert_eq!(metadata_fields::BLOCK_HEIGHT, "block_height");
+        assert_eq!(metadata_fields::TX_HASH, "tx_hash");
     }
 }

@@ -7,11 +7,11 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use csv_explorer_storage::repositories::{
-    RightsRepository, SealsRepository, StatsRepository, TransfersRepository,
+    SanadsRepository, SealsRepository, StatsRepository, TransfersRepository,
 };
 use sqlx::SqlitePool;
 
-use csv_explorer_shared::{ExplorerError, RightFilter, SealFilter, TransferFilter};
+use csv_explorer_shared::{ExplorerError, SanadFilter, SealFilter, TransferFilter};
 
 // ---------------------------------------------------------------------------
 // Application state
@@ -61,12 +61,12 @@ impl<T: Serialize> From<T> for ApiResponse<T> {
 }
 
 // ---------------------------------------------------------------------------
-// Rights handlers
+// Sanads handlers
 // ---------------------------------------------------------------------------
 
-/// Query parameters for listing rights.
+/// Query parameters for listing sanads.
 #[derive(Deserialize)]
-pub struct ListRightsQuery {
+pub struct ListSanadsQuery {
     pub chain: Option<String>,
     pub owner: Option<String>,
     pub status: Option<String>,
@@ -74,27 +74,27 @@ pub struct ListRightsQuery {
     pub offset: Option<usize>,
 }
 
-/// GET /api/v1/rights
-pub async fn list_rights(
-    Query(query): Query<ListRightsQuery>,
+/// GET /api/v1/sanads
+pub async fn list_sanads(
+    Query(query): Query<ListSanadsQuery>,
     State((_, pool)): State<AppState>,
 ) -> Result<
-    Json<ApiResponse<PaginatedResponse<csv_explorer_shared::RightRecord>>>,
+    Json<ApiResponse<PaginatedResponse<csv_explorer_shared::SanadRecord>>>,
     (StatusCode, Json<ErrorResponse>),
 > {
-    let repo = RightsRepository::new(pool);
+    let repo = SanadsRepository::new(pool);
 
     let limit = query.limit.unwrap_or(20);
     let offset = query.offset.unwrap_or(0);
 
-    let filter = RightFilter {
+    let filter = SanadFilter {
         chain: query.chain,
         owner: query.owner,
         status: query.status.as_deref().map(|s| match s {
-            "active" => csv_explorer_shared::RightStatus::Active,
-            "spent" => csv_explorer_shared::RightStatus::Spent,
-            "pending" => csv_explorer_shared::RightStatus::Pending,
-            _ => csv_explorer_shared::RightStatus::Active,
+            "active" => csv_explorer_shared::SanadStatus::Active,
+            "spent" => csv_explorer_shared::SanadStatus::Spent,
+            "pending" => csv_explorer_shared::SanadStatus::Pending,
+            _ => csv_explorer_shared::SanadStatus::Active,
         }),
         limit: Some(limit),
         offset: Some(offset),
@@ -112,19 +112,19 @@ pub async fn list_rights(
     })))
 }
 
-/// GET /api/v1/rights/:id
-pub async fn get_right(
+/// GET /api/v1/sanads/:id
+pub async fn get_sanad(
     Path(id): Path<String>,
     State((_, pool)): State<AppState>,
-) -> Result<Json<ApiResponse<csv_explorer_shared::RightRecord>>, (StatusCode, Json<ErrorResponse>)>
+) -> Result<Json<ApiResponse<csv_explorer_shared::SanadRecord>>, (StatusCode, Json<ErrorResponse>)>
 {
-    let repo = RightsRepository::new(pool);
+    let repo = SanadsRepository::new(pool);
 
-    let right = repo.get(&id).await.map_err(explorer_error)?;
+    let sanad = repo.get(&id).await.map_err(explorer_error)?;
 
-    match right {
+    match sanad {
         Some(r) => Ok(Json(ApiResponse::from(r))),
-        None => Err(not_found(&format!("Right {} not found", id))),
+        None => Err(not_found(&format!("Sanad {} not found", id))),
     }
 }
 
@@ -135,7 +135,7 @@ pub async fn get_right(
 /// Query parameters for listing transfers.
 #[derive(Deserialize)]
 pub struct ListTransfersQuery {
-    pub right_id: Option<String>,
+    pub sanad_id: Option<String>,
     pub from_chain: Option<String>,
     pub to_chain: Option<String>,
     pub status: Option<String>,
@@ -157,7 +157,7 @@ pub async fn list_transfers(
     let offset = query.offset.unwrap_or(0);
 
     let filter = TransferFilter {
-        right_id: query.right_id,
+        sanad_id: query.sanad_id,
         from_chain: query.from_chain,
         to_chain: query.to_chain,
         status: query.status.as_deref().map(|s| match s {
@@ -212,7 +212,7 @@ pub struct ListSealsQuery {
     pub chain: Option<String>,
     pub seal_type: Option<String>,
     pub status: Option<String>,
-    pub right_id: Option<String>,
+    pub sanad_id: Option<String>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
 }
@@ -245,7 +245,7 @@ pub async fn list_seals(
             "consumed" => csv_explorer_shared::SealStatus::Consumed,
             _ => csv_explorer_shared::SealStatus::Available,
         }),
-        right_id: query.right_id,
+        sanad_id: query.sanad_id,
         limit: Some(limit),
         offset: Some(offset),
     };
@@ -457,19 +457,19 @@ pub async fn get_address_data(
     Path(address): Path<String>,
     State((_, pool)): State<AppState>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, (StatusCode, Json<ErrorResponse>)> {
-    use csv_explorer_shared::{RightFilter, SealFilter, TransferFilter};
+    use csv_explorer_shared::{SanadFilter, SealFilter, TransferFilter};
 
-    // Get rights for this address
-    let rights_repo = RightsRepository::new(pool.clone());
-    let rights_filter = RightFilter {
+    // Get sanads for this address
+    let sanads_repo = SanadsRepository::new(pool.clone());
+    let sanads_filter = SanadFilter {
         owner: Some(address.clone()),
         limit: Some(100),
         offset: Some(0),
         chain: None,
         status: None,
     };
-    let rights = rights_repo
-        .list(rights_filter)
+    let sanads = sanads_repo
+        .list(sanads_filter)
         .await
         .map_err(explorer_error)?;
 
@@ -482,7 +482,7 @@ pub async fn get_address_data(
         chain: None,
         seal_type: None,
         status: None,
-        right_id: None,
+        sanad_id: None,
     };
     let seals = seals_repo
         .list(seals_filter)
@@ -494,7 +494,7 @@ pub async fn get_address_data(
     let transfers_filter = TransferFilter {
         limit: Some(100),
         offset: Some(0),
-        right_id: None,
+        sanad_id: None,
         from_chain: None,
         to_chain: None,
         status: None,
@@ -512,28 +512,28 @@ pub async fn get_address_data(
 
     Ok(Json(ApiResponse::from(serde_json::json!({
         "address": address,
-        "rights": rights,
+        "sanads": sanads,
         "seals": seals,
         "transfers": filtered_transfers,
         "summary": {
-            "total_rights": rights.len(),
+            "total_sanads": sanads.len(),
             "total_seals": seals.len(),
             "total_transfers": filtered_transfers.len(),
         }
     }))))
 }
 
-/// GET /api/v1/wallet/address/{address}/rights
-pub async fn get_address_rights(
+/// GET /api/v1/wallet/address/{address}/sanads
+pub async fn get_address_sanads(
     Path(address): Path<String>,
     State((_, pool)): State<AppState>,
 ) -> Result<
-    Json<ApiResponse<Vec<csv_explorer_shared::RightRecord>>>,
+    Json<ApiResponse<Vec<csv_explorer_shared::SanadRecord>>>,
     (StatusCode, Json<ErrorResponse>),
 > {
-    let repo = RightsRepository::new(pool);
+    let repo = SanadsRepository::new(pool);
 
-    let filter = RightFilter {
+    let filter = SanadFilter {
         owner: Some(address),
         limit: Some(100),
         offset: Some(0),
@@ -541,9 +541,9 @@ pub async fn get_address_rights(
         status: None,
     };
 
-    let rights = repo.list(filter).await.map_err(explorer_error)?;
+    let sanads = repo.list(filter).await.map_err(explorer_error)?;
 
-    Ok(Json(ApiResponse::from(rights)))
+    Ok(Json(ApiResponse::from(sanads)))
 }
 
 /// GET /api/v1/wallet/address/{address}/seals
@@ -562,7 +562,7 @@ pub async fn get_address_seals(
         chain: None,
         seal_type: None,
         status: None,
-        right_id: None,
+        sanad_id: None,
     };
 
     let seals = repo.list(filter).await.map_err(explorer_error)?;
@@ -583,7 +583,7 @@ pub async fn get_address_transfers(
     let filter = TransferFilter {
         limit: Some(100),
         offset: Some(0),
-        right_id: None,
+        sanad_id: None,
         from_chain: None,
         to_chain: None,
         status: None,
@@ -662,12 +662,12 @@ fn explorer_error(e: ExplorerError) -> (StatusCode, Json<ErrorResponse>) {
 }
 
 // ---------------------------------------------------------------------------
-// Enhanced rights and proof metadata handlers
+// Enhanced sanads and proof metadata handlers
 // ---------------------------------------------------------------------------
 
-/// Query parameters for listing enhanced rights.
+/// Query parameters for listing enhanced sanads.
 #[derive(Deserialize)]
-pub struct EnhancedRightsQuery {
+pub struct EnhancedSanadsQuery {
     pub chain: Option<String>,
     pub owner: Option<String>,
     pub commitment_scheme: Option<String>,
@@ -676,20 +676,20 @@ pub struct EnhancedRightsQuery {
     pub offset: Option<usize>,
 }
 
-/// GET /api/v1/rights/enhanced
-pub async fn list_enhanced_rights(
-    Query(query): Query<EnhancedRightsQuery>,
+/// GET /api/v1/sanads/enhanced
+pub async fn list_enhanced_sanads(
+    Query(query): Query<EnhancedSanadsQuery>,
     State((_, pool)): State<AppState>,
 ) -> Result<
-    Json<ApiResponse<Vec<csv_explorer_shared::EnhancedRightRecord>>>,
+    Json<ApiResponse<Vec<csv_explorer_shared::EnhancedSanadRecord>>>,
     (StatusCode, Json<ErrorResponse>),
 > {
-    use csv_explorer_shared::RightProofFilter;
+    use csv_explorer_shared::SanadProofFilter;
     use csv_explorer_storage::repositories::AdvancedProofRepository;
 
     let repo = AdvancedProofRepository::new(pool);
 
-    let filter = RightProofFilter {
+    let filter = SanadProofFilter {
         chain: query.chain,
         owner: query.owner,
         commitment_scheme: query
@@ -706,27 +706,27 @@ pub async fn list_enhanced_rights(
     };
 
     let records = repo
-        .query_enhanced_rights(filter)
+        .query_enhanced_sanads(filter)
         .await
         .map_err(internal_error)?;
 
     Ok(Json(ApiResponse::from(records)))
 }
 
-/// GET /api/v1/rights/enhanced/:id
-pub async fn get_enhanced_right(
+/// GET /api/v1/sanads/enhanced/:id
+pub async fn get_enhanced_sanad(
     Path(id): Path<String>,
     State((_, pool)): State<AppState>,
 ) -> Result<
-    Json<ApiResponse<csv_explorer_shared::EnhancedRightRecord>>,
+    Json<ApiResponse<csv_explorer_shared::EnhancedSanadRecord>>,
     (StatusCode, Json<ErrorResponse>),
 > {
-    use csv_explorer_shared::RightProofFilter;
+    use csv_explorer_shared::SanadProofFilter;
     use csv_explorer_storage::repositories::AdvancedProofRepository;
 
     let repo = AdvancedProofRepository::new(pool);
 
-    let filter = RightProofFilter {
+    let filter = SanadProofFilter {
         chain: None,
         owner: None,
         commitment_scheme: None,
@@ -737,7 +737,7 @@ pub async fn get_enhanced_right(
     };
 
     let records = repo
-        .query_enhanced_rights(filter)
+        .query_enhanced_sanads(filter)
         .await
         .map_err(internal_error)?;
 
@@ -745,7 +745,7 @@ pub async fn get_enhanced_right(
 
     match record {
         Some(r) => Ok(Json(ApiResponse::from(r))),
-        None => Err(not_found(&format!("Enhanced right {} not found", id))),
+        None => Err(not_found(&format!("Enhanced sanad {} not found", id))),
     }
 }
 
@@ -830,15 +830,15 @@ pub async fn get_proof_statistics(
     Ok(Json(ApiResponse::from(stats)))
 }
 
-/// GET /api/v1/rights/by-scheme/:scheme
-pub async fn get_rights_by_scheme(
+/// GET /api/v1/sanads/by-scheme/:scheme
+pub async fn get_sanads_by_scheme(
     Path(scheme): Path<String>,
     State((_, pool)): State<AppState>,
 ) -> Result<
-    Json<ApiResponse<Vec<csv_explorer_shared::EnhancedRightRecord>>>,
+    Json<ApiResponse<Vec<csv_explorer_shared::EnhancedSanadRecord>>>,
     (StatusCode, Json<ErrorResponse>),
 > {
-    use csv_explorer_shared::{CommitmentScheme, RightProofFilter};
+    use csv_explorer_shared::{CommitmentScheme, SanadProofFilter};
     use csv_explorer_storage::repositories::AdvancedProofRepository;
 
     let commitment_scheme = CommitmentScheme::from_str(&scheme)
@@ -846,7 +846,7 @@ pub async fn get_rights_by_scheme(
 
     let repo = AdvancedProofRepository::new(pool);
 
-    let filter = RightProofFilter {
+    let filter = SanadProofFilter {
         chain: None,
         owner: None,
         commitment_scheme: Some(commitment_scheme),
@@ -857,22 +857,22 @@ pub async fn get_rights_by_scheme(
     };
 
     let records = repo
-        .query_enhanced_rights(filter)
+        .query_enhanced_sanads(filter)
         .await
         .map_err(internal_error)?;
 
     Ok(Json(ApiResponse::from(records)))
 }
 
-/// GET /api/v1/rights/by-proof/:proof_type
-pub async fn get_rights_by_proof_type(
+/// GET /api/v1/sanads/by-proof/:proof_type
+pub async fn get_sanads_by_proof_type(
     Path(proof_type): Path<String>,
     State((_, pool)): State<AppState>,
 ) -> Result<
-    Json<ApiResponse<Vec<csv_explorer_shared::EnhancedRightRecord>>>,
+    Json<ApiResponse<Vec<csv_explorer_shared::EnhancedSanadRecord>>>,
     (StatusCode, Json<ErrorResponse>),
 > {
-    use csv_explorer_shared::{InclusionProofType, RightProofFilter};
+    use csv_explorer_shared::{InclusionProofType, SanadProofFilter};
     use csv_explorer_storage::repositories::AdvancedProofRepository;
 
     let inclusion_proof_type = InclusionProofType::from_str(&proof_type)
@@ -880,7 +880,7 @@ pub async fn get_rights_by_proof_type(
 
     let repo = AdvancedProofRepository::new(pool);
 
-    let filter = RightProofFilter {
+    let filter = SanadProofFilter {
         chain: None,
         owner: None,
         commitment_scheme: None,
@@ -891,7 +891,7 @@ pub async fn get_rights_by_proof_type(
     };
 
     let records = repo
-        .query_enhanced_rights(filter)
+        .query_enhanced_sanads(filter)
         .await
         .map_err(internal_error)?;
 

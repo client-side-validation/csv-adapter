@@ -31,29 +31,29 @@ impl std::fmt::Display for Network {
     }
 }
 
-/// A tracked Right.
+/// A tracked Sanad.
 #[derive(Clone, Debug)]
-pub struct TrackedRight {
+pub struct TrackedSanad {
     pub id: String,
     pub chain: Chain,
     pub value: u64,
-    pub status: RightStatus,
+    pub status: SanadStatus,
     pub owner: String,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum RightStatus {
+pub enum SanadStatus {
     Active,
     Transferred,
     Consumed,
 }
 
-impl std::fmt::Display for RightStatus {
+impl std::fmt::Display for SanadStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RightStatus::Active => write!(f, "Active"),
-            RightStatus::Transferred => write!(f, "Transferred"),
-            RightStatus::Consumed => write!(f, "Consumed"),
+            SanadStatus::Active => write!(f, "Active"),
+            SanadStatus::Transferred => write!(f, "Transferred"),
+            SanadStatus::Consumed => write!(f, "Consumed"),
         }
     }
 }
@@ -64,7 +64,7 @@ pub struct TrackedTransfer {
     pub id: String,
     pub from_chain: Chain,
     pub to_chain: Chain,
-    pub right_id: String,
+    pub sanad_id: String,
     pub dest_owner: String,
     pub status: TransferStatus,
     pub created_at: u64,
@@ -112,9 +112,9 @@ pub struct DeployedContract {
 /// Seal status - shows lifecycle state
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SealStatus {
-    /// Seal created, protecting a Right
+    /// Seal created, protecting a Sanad
     Active,
-    /// Right locked, seal holding the value
+    /// Sanad locked, seal holding the value
     Locked,
     /// Seal consumed, value released
     Consumed,
@@ -136,7 +136,7 @@ impl std::fmt::Display for SealStatus {
 /// The cryptographic content sealed for verification
 #[derive(Clone, Debug, PartialEq)]
 pub struct SealContent {
-    /// Hash of the sealed right data
+    /// Hash of the sealed sanad data
     pub content_hash: String,
     /// Owner address who created the seal
     pub owner: String,
@@ -146,16 +146,16 @@ pub struct SealContent {
     pub lock_tx_hash: Option<String>,
 }
 
-/// A seal record - cryptographically protects a Right.
-/// In the CSV protocol, a Seal is created when a Right is locked for
+/// A seal record - cryptographically protects a Sanad.
+/// In the CSV protocol, a Seal is created when a Sanad is locked for
 /// cross-chain transfer or secure storage.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SealRecord {
     pub seal_ref: String,
     pub chain: Chain,
     pub value: u64,
-    /// Which Right this seal is protecting
-    pub right_id: String,
+    /// Which Sanad this seal is protecting
+    pub sanad_id: String,
     /// Current status in the seal lifecycle
     pub status: SealStatus,
     /// When the seal was created
@@ -274,8 +274,8 @@ impl ProofData {
 pub struct ProofRecord {
     /// Which chain the proof was generated on (source chain)
     pub chain: Chain,
-    /// Which Right this proof validates
-    pub right_id: String,
+    /// Which Sanad this proof validates
+    pub sanad_id: String,
     /// Which Seal this proof was generated from
     pub seal_ref: String,
     /// Type of proof (merkle, mpt, checkpoint, etc.)
@@ -297,7 +297,7 @@ pub struct ProofRecord {
 impl ProofRecord {
     /// Create a new ZK proof record from a ZkSealProof (Phase 5).
     pub fn from_zk_proof(
-        right_id: String,
+        sanad_id: String,
         seal_ref: String,
         zk_proof: &csv_core::zk_proof::ZkSealProof,
     ) -> Self {
@@ -311,7 +311,7 @@ impl ProofRecord {
 
         Self {
             chain: zk_proof.public_inputs.source_chain,
-            right_id,
+            sanad_id,
             seal_ref,
             proof_type: "zk_seal".to_string(),
             status: ProofStatus::Generated,
@@ -403,8 +403,8 @@ pub enum TransactionType {
     Transfer,
     ContractDeployment,
     ContractCall,
-    RightCreation,
-    RightTransfer,
+    SanadCreation,
+    SanadTransfer,
     SealCreation,
     SealConsumption,
     CrossChainLock,
@@ -417,8 +417,8 @@ impl std::fmt::Display for TransactionType {
             TransactionType::Transfer => write!(f, "Transfer"),
             TransactionType::ContractDeployment => write!(f, "Contract Deployment"),
             TransactionType::ContractCall => write!(f, "Contract Call"),
-            TransactionType::RightCreation => write!(f, "Right Creation"),
-            TransactionType::RightTransfer => write!(f, "Right Transfer"),
+            TransactionType::SanadCreation => write!(f, "Sanad Creation"),
+            TransactionType::SanadTransfer => write!(f, "Sanad Transfer"),
             TransactionType::SealCreation => write!(f, "Seal Creation"),
             TransactionType::SealConsumption => write!(f, "Seal Consumption"),
             TransactionType::CrossChainLock => write!(f, "Cross-Chain Lock"),

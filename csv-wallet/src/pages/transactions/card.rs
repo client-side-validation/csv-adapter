@@ -37,7 +37,7 @@ pub fn TransactionCard(transaction: TransactionRecord) -> Element {
                         }
                     }
                 }
-                div { class: "text-right",
+                div { class: "text-sanad",
                     span { class: "inline-flex items-center px-2 py-1 rounded text-xs font-medium {status_class}",
                         "{transaction.status.to_string()}"
                     }

@@ -2,7 +2,7 @@
 
 ## Quick Start
 
-The CSV Explorer UI is a Dioxus web application that connects to the API server to display rights, transfers, seals, contracts, and statistics.
+The CSV Explorer UI is a Dioxus web application that connects to the API server to display sanads, transfers, seals, contracts, and statistics.
 
 ### Step 1: Start the API Server
 
@@ -89,21 +89,21 @@ API_URL=http://localhost:9000 ./target/release/csv-explorer-ui serve
 ### 1. Home Dashboard (`/`)
 
 The landing page shows:
-- **Statistics Cards**: Total rights, transfers, seals, contracts
+- **Statistics Cards**: Total sanads, transfers, seals, contracts
 - **Chain Status**: Real-time status of all 5 chains (Bitcoin, Ethereum, Sui, Aptos, Solana)
 - **Recent Activity**: Latest transfers and seal operations
 - **Quick Search**: Search by ID or address
 
-### 2. Rights Management (`/rights`)
+### 2. Sanads Management (`/sanads`)
 
 **List View:**
-- Browse all rights with pagination
+- Browse all sanads with pagination
 - Filter by chain (Bitcoin, Ethereum, Sui, Aptos, Solana)
 - Filter by status (Active, Spent, Pending)
-- Click any right to view details
+- Click any sanad to view details
 
-**Detail View (`/rights/:id`):**
-- Full right information (ID, chain, owner, commitment, seal reference)
+**Detail View (`/sanads/:id`):**
+- Full sanad information (ID, chain, owner, commitment, seal reference)
 - Transfer history with links to individual transfers
 - Associated seals with status
 - Metadata display
@@ -133,7 +133,7 @@ The landing page shows:
 **Detail View (`/seals/:id`):**
 - Seal information and type
 - Chain-specific details
-- Linked right (if consumed)
+- Linked sanad (if consumed)
 - Seal type explanation
 
 ### 5. Contracts Registry (`/contracts`)
@@ -155,13 +155,13 @@ The landing page shows:
 - Aggregate statistics
 - Transfer success rate
 - Average transfer time
-- Rights distribution by chain
+- Sanads distribution by chain
 - Transfer volume by chain pair
 
 ### 8. Wallet (`/wallet`)
 
 - Connect CSV wallet
-- View wallet rights
+- View wallet sanads
 - Initiate transfers
 - Balance display
 
@@ -233,10 +233,10 @@ API_URL=http://localhost:8080 ./target/release/csv-explorer-ui serve
 
 ```bash
 # 1. Check database has data
-sqlite3 data/explorer.db "SELECT COUNT(*) FROM rights;"
+sqlite3 data/explorer.db "SELECT COUNT(*) FROM sanads;"
 
 # 2. Verify API returns data
-curl http://localhost:8080/api/v1/rights
+curl http://localhost:8080/api/v1/sanads
 
 # 3. Check UI logs for errors
 ./target/release/csv-explorer-ui serve 2>&1 | tail -n 50
@@ -248,7 +248,7 @@ If you see CORS errors in browser console, the API should already have CORS enab
 
 ```bash
 # Test CORS
-curl -H "Origin: http://localhost:3000" -H "Access-Control-Request-Method: GET" -X OPTIONS http://localhost:8080/api/v1/rights -v
+curl -H "Origin: http://localhost:3000" -H "Access-Control-Request-Method: GET" -X OPTIONS http://localhost:8080/api/v1/sanads -v
 ```
 
 ## Advanced Configuration
@@ -338,8 +338,8 @@ ui/
 │   │   └── timeline.rs      # Transfer timeline
 │   ├── pages/               # Page components
 │   │   ├── home.rs          # Dashboard
-│   │   ├── rights.rs        # Rights list
-│   │   ├── right_detail.rs  # Right details
+│   │   ├── sanads.rs        # Sanads list
+│   │   ├── sanad_detail.rs  # Sanad details
 │   │   ├── transfers.rs     # Transfers list
 │   │   ├── transfer_detail.rs # Transfer details
 │   │   ├── seals.rs         # Seals list
@@ -358,14 +358,14 @@ ui/
 The UI uses `ApiClient` (from `hooks/use_api.rs`) to communicate with the backend:
 
 ```rust
-// Example: Fetch rights in a component
+// Example: Fetch sanads in a component
 let api = use_resource(|| async move { ApiClient::new() });
 
-let rights = use_resource({
+let sanads = use_resource({
     let api = api.clone();
     move || async move {
         if let Some(client) = api.read().as_ref() {
-            client.get_rights(None, None, Some(10), None).await.ok()
+            client.get_sanads(None, None, Some(10), None).await.ok()
         } else {
             None
         }
@@ -384,7 +384,7 @@ let rights = use_resource({
 
 After getting the UI running:
 
-1. **Explore the Data**: Browse rights, transfers, and seals
+1. **Explore the Data**: Browse sanads, transfers, and seals
 2. **Test Filtering**: Use chain and status filters
 3. **View Details**: Click into individual records
 4. **Check Statistics**: View aggregate data on `/stats`

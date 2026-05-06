@@ -1,12 +1,12 @@
-import { SealRef, AnchorRef } from './seal';
-import { Right, OwnershipProof } from './right';
+import { SealPoint, CommitAnchor } from './seal';
+import { Sanad, OwnershipProof } from './sanad';
 
 /**
  * Commitment — encodes state transition rules.
  * Mirrors csv_adapter_core::commitment::Commitment
  *
  * Commitments are published on-chain and form a hash-linked chain
- * that provides tamper-evident provenance for Rights.
+ * that provides tamper-evident provenance for Sanads.
  */
 export interface Commitment {
   /** Currently always 2 */
@@ -15,7 +15,7 @@ export interface Commitment {
   protocolId: Uint8Array;
   /** Merkle root of MPC tree */
   mpcRoot: string;
-  /** Unique contract/right identifier — 32 bytes hex */
+  /** Unique contract/sanad identifier — 32 bytes hex */
   contractId: string;
   /** Hash of previous commitment in chain — 32 bytes hex */
   previousCommitment: string;
@@ -51,7 +51,7 @@ export interface GlobalState {
  */
 export interface OwnedState {
   typeId: number;
-  seal: SealRef;
+  seal: SealPoint;
   data: Uint8Array;
 }
 
@@ -61,7 +61,7 @@ export interface OwnedState {
  */
 export interface StateAssignment {
   typeId: number;
-  seal: SealRef;
+  seal: SealPoint;
   data: Uint8Array;
 }
 
@@ -76,7 +76,7 @@ export interface StateRef {
 }
 
 /**
- * Genesis — the root of a Right's provenance chain.
+ * Genesis — the root of a Sanad's provenance chain.
  * Mirrors csv_adapter_core::genesis::Genesis
  */
 export interface Genesis {
@@ -93,7 +93,7 @@ export interface Genesis {
 }
 
 /**
- * State transition — evolves a Right's state.
+ * State transition — evolves a Sanad's state.
  * Mirrors csv_adapter_core::transition::Transition
  */
 export interface Transition {
@@ -119,7 +119,7 @@ export interface Transition {
  */
 export interface ConsignmentAnchor {
   /** Anchor reference */
-  anchorRef: AnchorRef;
+  anchorRef: CommitAnchor;
   /** Commitment hash that was anchored — 32 bytes hex */
   commitment: string;
   /** Inclusion proof bytes */
@@ -134,7 +134,7 @@ export interface ConsignmentAnchor {
  */
 export interface SealAssignment {
   /** Seal being assigned */
-  sealRef: SealRef;
+  sealRef: SealPoint;
   /** State being assigned to this seal */
   assignment: StateAssignment;
   /** Metadata for this assignment */
@@ -146,7 +146,7 @@ export interface SealAssignment {
  * Mirrors csv_adapter_core::consignment::Consignment
  *
  * A consignment contains everything needed to verify and accept
- * a Right from another party. It includes:
+ * a Sanad from another party. It includes:
  * - The genesis (root of trust)
  * - All state transitions in topological order
  * - Seal assignments

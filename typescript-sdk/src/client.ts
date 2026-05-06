@@ -1,6 +1,6 @@
 import { Chain, ProtocolVersion, Capabilities, SyncStatus, TransferStatus } from './types';
-import { Right } from './right';
-import { SealRef, AnchorRef } from './seal';
+import { Sanad } from './sanad';
+import { SealPoint, CommitAnchor } from './seal';
 import { ProofBundle } from './proof';
 import { Consignment } from './consignment';
 import { VerificationResult, verifyProofBundle, verifyConsignment } from './verify';
@@ -25,8 +25,8 @@ export interface CsvClientConfig {
  * Mirrors csv_adapter::client::CsvClient but in TypeScript.
  *
  * Key concepts:
- * - **Right**: A verifiable, single-use digital right. Exists in client state.
- * - **Seal**: The on-chain mechanism enforcing a Right's single-use.
+ * - **Sanad**: A verifiable, single-use digital sanad. Exists in client state.
+ * - **Seal**: The on-chain mechanism enforcing a Sanad's single-use.
  * - **Client-Side Validation**: The client verifies, not the blockchain.
  *
  * Usage:
@@ -36,8 +36,8 @@ export interface CsvClientConfig {
  *   network: 'signet',
  * });
  *
- * // List rights
- * const rights = await client.getRights('bc1q...');
+ * // List sanads
+ * const sanads = await client.getSanads('bc1q...');
  *
  * // Verify a proof bundle offline
  * const result = client.verifyProofBundle(bundleJson);
@@ -45,7 +45,7 @@ export interface CsvClientConfig {
  */
 export class CsvClient {
   private config: CsvClientConfig;
-  private rightsCache: Map<string, Right[]> = new Map();
+  private sanadsCache: Map<string, Sanad[]> = new Map();
 
   constructor(config: CsvClientConfig = {}) {
     this.config = {
@@ -99,19 +99,19 @@ export class CsvClient {
   }
 
   // =========================================================================
-  // Rights operations
+  // Sanads operations
   // =========================================================================
 
   /**
-   * List rights for an address.
+   * List sanads for an address.
    *
    * @param address - The address to query
    * @param chain - Optional chain filter
-   * @returns Array of Rights
+   * @returns Array of Sanads
    */
-  async getRights(address: string, chain?: Chain): Promise<Right[]> {
+  async getSanads(address: string, chain?: Chain): Promise<Sanad[]> {
     const cacheKey = `${address}:${chain ?? this.config.defaultChain}`;
-    const cached = this.rightsCache.get(cacheKey);
+    const cached = this.sanadsCache.get(cacheKey);
     if (cached) return cached;
 
     // In production, this would query the chain adapter or explorer API
@@ -120,31 +120,31 @@ export class CsvClient {
   }
 
   /**
-   * Get a specific right by ID.
+   * Get a specific sanad by ID.
    *
-   * @param rightId - The right ID (32-byte hex string)
-   * @returns The Right, or null if not found
+   * @param sanadId - The sanad ID (32-byte hex string)
+   * @returns The Sanad, or null if not found
    */
-  async getRight(rightId: string): Promise<Right | null> {
+  async getSanad(sanadId: string): Promise<Sanad | null> {
     // In production, this would query the store or chain
     return null;
   }
 
   /**
-   * Create a new right.
+   * Create a new sanad.
    *
    * @param commitment - The commitment hash
    * @param owner - The ownership proof
-   * @param salt - The salt for right ID generation
-   * @returns The created Right
+   * @param salt - The salt for sanad ID generation
+   * @returns The created Sanad
    */
-  async createRight(
+  async createSanad(
     commitment: string,
     owner: { proof: string; owner: string; scheme: string | null },
     salt: string,
-  ): Promise<Right> {
-    // In production, this would create a seal first, then the right
-    throw new Error('Right creation requires chain adapter integration');
+  ): Promise<Sanad> {
+    // In production, this would create a seal first, then the sanad
+    throw new Error('Sanad creation requires chain adapter integration');
   }
 
   // =========================================================================
@@ -155,13 +155,13 @@ export class CsvClient {
    * Create a seal on a chain.
    *
    * A seal is a chain-native single-use lock that enforces
-   * the single-use property of a Right.
+   * the single-use property of a Sanad.
    *
    * @param chain - The blockchain to create the seal on
    * @param value - Optional value to lock (chain-specific units)
-   * @returns The SealRef
+   * @returns The SealPoint
    */
-  async createSeal(chain: Chain, value?: number): Promise<SealRef> {
+  async createSeal(chain: Chain, value?: number): Promise<SealPoint> {
     // In production, this would call the chain adapter's create_seal()
     throw new Error('Seal creation requires chain adapter integration');
   }
@@ -172,7 +172,7 @@ export class CsvClient {
    * @param sealRef - The seal reference to check
    * @returns true if the seal has been consumed
    */
-  async isSealConsumed(sealRef: SealRef): Promise<boolean> {
+  async isSealConsumed(sealRef: SealPoint): Promise<boolean> {
     // In production, this would check the seal registry
     return false;
   }
@@ -182,7 +182,7 @@ export class CsvClient {
   // =========================================================================
 
   /**
-   * Generate a proof bundle for a right.
+   * Generate a proof bundle for a sanad.
    *
    * A proof bundle contains:
    * - The state transition DAG
@@ -192,11 +192,11 @@ export class CsvClient {
    * - Inclusion proof (Merkle branch)
    * - Finality proof (confirmations)
    *
-   * @param rightId - The right to prove
+   * @param sanadId - The sanad to prove
    * @param chain - The source chain
    * @returns The ProofBundle
    */
-  async generateProofBundle(rightId: string, chain: Chain): Promise<ProofBundle> {
+  async generateProofBundle(sanadId: string, chain: Chain): Promise<ProofBundle> {
     // In production, this would build the bundle from chain data
     throw new Error('Proof bundle generation requires chain adapter integration');
   }
@@ -252,16 +252,16 @@ export class CsvClient {
    * 5. Final acceptance
    *
    * @param consignment - The verified Consignment to accept
-   * @returns The accepted Right
+   * @returns The accepted Sanad
    */
-  async acceptConsignment(consignment: Consignment): Promise<Right> {
+  async acceptConsignment(consignment: Consignment): Promise<Sanad> {
     // First verify
     const result = this.verifyConsignment(consignment);
     if (!result.valid) {
       throw new Error(`Consignment verification failed: ${result.steps.find(s => !s.passed)?.details}`);
     }
 
-    // In production, this would add the right to local state
+    // In production, this would add the sanad to local state
     throw new Error('Consignment acceptance requires store integration');
   }
 
@@ -275,21 +275,21 @@ export class CsvClient {
    * The transfer follows this state machine:
    * Locked → AwaitingFinality → BuildingProof → ProofReady → Minting → Complete
    *
-   * @param rightId - The right to transfer
+   * @param sanadId - The sanad to transfer
    * @param sourceChain - The source chain
    * @param destinationChain - The destination chain
    * @param destinationOwner - The destination owner address
    * @returns Transfer ID
    */
   async startCrossChainTransfer(
-    rightId: string,
+    sanadId: string,
     sourceChain: Chain,
     destinationChain: Chain,
     destinationOwner: string,
   ): Promise<string> {
     // In production, this would:
     // 1. Create a seal on the source chain
-    // 2. Lock the right
+    // 2. Lock the sanad
     // 3. Return a transfer ID
     throw new Error('Cross-chain transfer requires chain adapter integration');
   }
@@ -310,27 +310,27 @@ export class CsvClient {
   // =========================================================================
 
   /**
-   * Export all rights as JSON.
+   * Export all sanads as JSON.
    */
-  async exportRights(): Promise<string> {
-    const allRights: Right[] = [];
-    for (const rights of this.rightsCache.values()) {
-      allRights.push(...rights);
+  async exportSanads(): Promise<string> {
+    const allSanads: Sanad[] = [];
+    for (const sanads of this.sanadsCache.values()) {
+      allSanads.push(...sanads);
     }
-    return JSON.stringify(allRights, null, 2);
+    return JSON.stringify(allSanads, null, 2);
   }
 
   /**
-   * Import rights from JSON.
+   * Import sanads from JSON.
    */
-  async importRights(json: string): Promise<void> {
-    const rights: Right[] = JSON.parse(json);
-    for (const right of rights) {
+  async importSanads(json: string): Promise<void> {
+    const sanads: Sanad[] = JSON.parse(json);
+    for (const sanad of sanads) {
       // Store by owner address
-      const ownerHex = bytesToHex(right.owner.owner);
-      const existing = this.rightsCache.get(ownerHex) ?? [];
-      existing.push(right);
-      this.rightsCache.set(ownerHex, existing);
+      const ownerHex = bytesToHex(sanad.owner.owner);
+      const existing = this.sanadsCache.get(ownerHex) ?? [];
+      existing.push(sanad);
+      this.sanadsCache.set(ownerHex, existing);
     }
   }
 }

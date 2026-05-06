@@ -8,7 +8,7 @@
 //! - **ChainBroadcaster**: Submitting and confirming transactions
 //! - **ChainDeployer**: Deploying contracts and programs
 //! - **ChainProofProvider**: Building and verifying cryptographic proofs
-//! - **ChainRightOps**: Managing rights (create, consume, lock, mint, refund)
+//! - **ChainSanadOps**: Managing sanads (create, consume, lock, mint, refund)
 //!
 //! All adapters must implement these traits to be registered in the production registry.
 
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hash::Hash;
 use crate::proof::{FinalityProof, InclusionProof};
-use crate::right::RightId;
+use crate::title::SanadId;
 use crate::seal::SealPoint;
 
 /// Result type for chain operations
@@ -200,30 +200,28 @@ pub struct TransactionInfo {
     pub raw_data: Option<Vec<u8>>,
 }
 
-/// Right operation types
+/// Sanad operation types
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum RightOperation {
-    /// Create a new right
+pub enum SanadOperation {
+    /// Create a new sanad
     Create,
-    /// Consume a right
+    /// Consume a sanad
     Consume,
-    /// Lock a right for cross-chain transfer
+    /// Lock a sanad for cross-chain transfer
     Lock,
-    /// Mint a right on destination chain
+    /// Mint a sanad on destination chain
     Mint,
-    /// Refund a locked right
+    /// Refund a locked sanad
     Refund,
-    /// Record right metadata
+    /// Record sanad metadata
     RecordMetadata,
 }
 
-/// Result of a right operation
+/// Result of a sanad operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RightOperationResult {
-    /// The right ID
-    pub right_id: RightId,
-    /// Operation performed
-    pub operation: RightOperation,
+pub struct SanadOperationResult {
+    pub sanad_id: SanadId,
+    pub operation: SanadOperation,
     /// Transaction hash
     pub transaction_hash: String,
     /// Block height
@@ -344,18 +342,18 @@ pub trait ChainBroadcaster: Send + Sync {
 /// No test deployments or temporary addresses allowed.
 #[async_trait]
 pub trait ChainDeployer: Send + Sync {
-    /// Deploy a lock contract for cross-chain rights
+    /// Deploy a lock contract for cross-chain sanads
     ///
-    /// This contract locks rights on the source chain during transfers.
+    /// This contract locks sanads on the source chain during transfers.
     async fn deploy_lock_contract(
         &self,
         admin_address: &str,
         config: serde_json::Value,
     ) -> ChainOpResult<DeploymentStatus>;
 
-    /// Deploy a mint contract for cross-chain rights
+    /// Deploy a mint contract for cross-chain sanads
     ///
-    /// This contract mints rights on the destination chain after proof verification.
+    /// This contract mints sanads on the destination chain after proof verification.
     async fn deploy_mint_contract(
         &self,
         admin_address: &str,
@@ -430,86 +428,86 @@ pub trait ChainProofProvider: Send + Sync {
     ) -> ChainOpResult<bool>;
 }
 
-/// Trait for right operations
+/// Trait for sanad operations
 ///
 /// All operations must be backed by real chain transactions.
-/// No artificial right state changes allowed.
+/// No artificial sanad state changes allowed.
 #[async_trait]
-pub trait ChainRightOps: Send + Sync {
-    /// Create a new right on this chain
+pub trait ChainSanadOps: Send + Sync {
+    /// Create a new sanad on this chain
     ///
     /// Returns the operation result with transaction details.
-    async fn create_right(
+    async fn create_sanad(
         &self,
         owner: &str,
         asset_class: &str,
         asset_id: &str,
         metadata: serde_json::Value,
-    ) -> ChainOpResult<RightOperationResult>;
+    ) -> ChainOpResult<SanadOperationResult>;
 
-    /// Consume a right on this chain
+    /// Consume a sanad on this chain
     ///
-    /// Marks the right as consumed and records the nullifier.
-    async fn consume_right(
+    /// Marks the sanad as consumed and records the nullifier.
+    async fn consume_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult>;
+    ) -> ChainOpResult<SanadOperationResult>;
 
-    /// Lock a right for cross-chain transfer
+    /// Lock a sanad for cross-chain transfer
     ///
-    /// Locks the right on this chain and prepares for cross-chain mint.
-    async fn lock_right(
+    /// Locks the sanad on this chain and prepares for cross-chain mint.
+    async fn lock_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         destination_chain: &str,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult>;
+    ) -> ChainOpResult<SanadOperationResult>;
 
-    /// Mint a right on this chain (destination chain of cross-chain transfer)
+    /// Mint a sanad on this chain (destination chain of cross-chain transfer)
     ///
-    /// Creates a corresponding right after verifying the lock proof.
-    async fn mint_right(
+    /// Creates a corresponding sanad after verifying the lock proof.
+    async fn mint_sanad(
         &self,
         source_chain: &str,
-        source_right_id: &RightId,
+        source_sanad_id: &SanadId,
         lock_proof: &InclusionProof,
         new_owner: &str,
-    ) -> ChainOpResult<RightOperationResult>;
+    ) -> ChainOpResult<SanadOperationResult>;
 
-    /// Refund a locked right
+    /// Refund a locked sanad
     ///
-    /// Returns the right to the owner if the cross-chain transfer times out.
-    async fn refund_right(
+    /// Returns the sanad to the owner if the cross-chain transfer times out.
+    async fn refund_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult>;
+    ) -> ChainOpResult<SanadOperationResult>;
 
-    /// Record right metadata on-chain
+    /// Record sanad metadata on-chain
     ///
-    /// Updates or adds metadata for a right.
-    async fn record_right_metadata(
+    /// Updates or adds metadata for a sanad.
+    async fn record_sanad_metadata(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         metadata: serde_json::Value,
         owner_key_id: &str,
-    ) -> ChainOpResult<RightOperationResult>;
+    ) -> ChainOpResult<SanadOperationResult>;
 
-    /// Verify that a right exists and is in the expected state
-    async fn verify_right_state(
+    /// Verify that a sanad exists and is in the expected state
+    async fn verify_sanad_state(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         expected_state: &str,
     ) -> ChainOpResult<bool>;
 }
 
-/// Combined trait for full chain adapter capabilities
+/// Combined trait for full chain backend capabilities
 ///
 /// Implementors must provide real implementations for all operations.
 /// Use `CapabilityUnavailable` error for operations not supported on a chain.
-pub trait FullChainAdapter:
-    ChainQuery + ChainSigner + ChainBroadcaster + ChainDeployer + ChainProofProvider + ChainRightOps
+pub trait ChainBackend:
+    ChainQuery + ChainSigner + ChainBroadcaster + ChainDeployer + ChainProofProvider + ChainSanadOps
 {
     /// Get the chain identifier
     fn chain_id(&self) -> &'static str;
@@ -524,7 +522,7 @@ pub trait FullChainAdapter:
     ///
     /// This method creates a real chain-native seal that can be used for
     /// anchoring commitments. The seal is created via the chain adapter's
-    /// AnchorLayer implementation.
+    /// SealProtocol implementation.
     ///
     /// # Arguments
     /// * `value` - Optional value/funding for the seal (chain-specific units)
@@ -554,16 +552,16 @@ pub enum ChainCapability {
     BuildFinalityProofs,
     /// Can verify finality proofs
     VerifyFinalityProofs,
-    /// Can create rights
-    CreateRights,
-    /// Can consume rights
-    ConsumeRights,
-    /// Can lock rights for cross-chain
-    LockRights,
-    /// Can mint rights on destination
-    MintRights,
-    /// Can refund locked rights
-    RefundRights,
+    /// Can create sanads
+    CreateSanads,
+    /// Can consume sanads
+    ConsumeSanads,
+    /// Can lock sanads for cross-chain
+    LockSanads,
+    /// Can mint sanads on destination
+    MintSanads,
+    /// Can refund locked sanads
+    RefundSanads,
     /// Supports smart contracts
     SmartContracts,
     /// Supports NFTs
@@ -573,8 +571,8 @@ pub enum ChainCapability {
 }
 
 /// Blanket implementation to allow trait objects
-impl<T: ChainQuery + ChainSigner + ChainBroadcaster + ChainDeployer + ChainProofProvider + ChainRightOps + Send + Sync>
-    FullChainAdapter for T
+impl<T: ChainQuery + ChainSigner + ChainBroadcaster + ChainDeployer + ChainProofProvider + ChainSanadOps + Send + Sync>
+    ChainBackend for T
 {
     fn chain_id(&self) -> &'static str {
         "unknown"

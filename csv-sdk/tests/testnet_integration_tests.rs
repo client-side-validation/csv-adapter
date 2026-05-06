@@ -316,13 +316,13 @@ async fn test_fail_closed_with_invalid_rpc() {
 fn test_bitcoin_zk_proof_generation() {
     use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
     use csv_core::zk_proof::{ZkProver, ChainWitness};
-    use csv_core::{Chain, hash::Hash, seal::SealRef};
+    use csv_core::{Chain, hash::Hash, seal::SealPoint};
 
     // Create a mock prover
     let prover = BitcoinSpvProver::new();
 
     // Create a test seal
-    let seal = SealRef::new(vec![0xAB; 32], Some(0)).expect("Failed to create seal");
+    let seal = SealPoint::new(vec![0xAB; 32], Some(0)).expect("Failed to create seal");
 
     // Create mock witness data
     let witness = ChainWitness {
@@ -354,13 +354,13 @@ fn test_bitcoin_zk_proof_generation() {
 fn test_bitcoin_zk_proof_verification() {
     use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
     use csv_core::zk_proof::{ZkProver, ZkVerifier, ChainWitness};
-    use csv_core::{Chain, hash::Hash, seal::SealRef};
+    use csv_core::{Chain, hash::Hash, seal::SealPoint};
 
     // Create prover/verifier
     let prover = BitcoinSpvProver::new();
 
     // Create test data
-    let seal = SealRef::new(vec![0xAB; 32], Some(0)).expect("Failed to create seal");
+    let seal = SealPoint::new(vec![0xAB; 32], Some(0)).expect("Failed to create seal");
     let witness = ChainWitness {
         chain: Chain::Bitcoin,
         block_hash: Hash::new([0x01; 32]),
@@ -398,13 +398,13 @@ fn test_bitcoin_zk_proof_verification() {
 fn test_ethereum_groth16_verifier() {
     use csv_adapter_ethereum::zk_verifier::EthereumGroth16Verifier;
     use csv_core::zk_proof::{ZkVerifier, ZkSealProof, VerifierKey, ZkPublicInputs, ProofSystem};
-    use csv_core::{Chain, hash::Hash, seal::SealRef};
+    use csv_core::{Chain, hash::Hash, seal::SealPoint};
 
     // Create verifier
     let verifier = EthereumGroth16Verifier::new();
 
     // Create a mock Groth16 proof
-    let seal = SealRef::new(vec![0xAB; 32], Some(0)).expect("Failed to create seal");
+    let seal = SealPoint::new(vec![0xAB; 32], Some(0)).expect("Failed to create seal");
     let public_inputs = ZkPublicInputs {
         seal_ref: seal,
         block_hash: Hash::new([0x01; 32]),
@@ -440,10 +440,10 @@ fn test_ethereum_groth16_verifier() {
 #[cfg(feature = "bitcoin")]
 fn test_sp1_guest_spv_verification() {
     use csv_adapter_bitcoin::sp1_guest::{Sp1BtcSpvInput, verify_bitcoin_spv};
-    use csv_core::{seal::SealRef, hash::Hash};
+    use csv_core::{seal::SealPoint, hash::Hash};
 
     // Create test input
-    let seal = SealRef::new(vec![0xAB; 32], Some(0)).expect("Failed to create seal");
+    let seal = SealPoint::new(vec![0xAB; 32], Some(0)).expect("Failed to create seal");
     
     // Compute expected block hash from empty header (for testing)
     let block_header = [0u8; 80];

@@ -1,6 +1,6 @@
 //! Cross-Chain Subscriptions Example
 //!
-//! This example demonstrates how to create and manage subscription rights
+//! This example demonstrates how to create and manage subscription sanads
 //! that can be transferred across chains.
 //!
 //! Run with: `cargo run --example subscriptions --features "all-chains,tokio"`
@@ -18,29 +18,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("✓ Client initialized with all chains\n");
 
-    // Create a subscription right on Bitcoin
-    println!("Creating subscription right on Bitcoin...");
+    // Create a subscription sanad on Bitcoin
+    println!("Creating subscription sanad on Bitcoin...");
     let commitment = Hash::from([1u8; 32]);
 
-    let right = client.rights().create(commitment, Chain::Bitcoin)?;
+    let sanad = client.sanads().create(commitment, Chain::Bitcoin)?;
 
-    println!("✓ Created right: {:?}\n", right.id);
+    println!("✓ Created sanad: {:?}\n", sanad.id);
 
-    // Query the right
-    println!("Querying right status...");
-    if let Some(found_right) = client.rights().get(&right.id)? {
-        println!("✓ Found right: {:?}\n", found_right.id);
+    // Query the sanad
+    println!("Querying sanad status...");
+    if let Some(found_sanad) = client.sanads().get(&sanad.id)? {
+        println!("✓ Found sanad: {:?}\n", found_sanad.id);
     }
 
     // Simulate cross-chain transfer to Ethereum
     println!("Initiating cross-chain transfer to Ethereum...");
-    println!("  1. Locking right on Bitcoin...");
+    println!("  1. Locking sanad on Bitcoin...");
     println!("  2. Generating proof bundle...");
     println!("  3. Verifying on Ethereum...");
-    println!("  4. Minting destination right...");
+    println!("  4. Minting destination sanad...");
 
     let transfer_id = client.transfers()
-        .cross_chain(right.id.clone(), Chain::Ethereum)
+        .cross_chain(sanad.id.clone(), Chain::Ethereum)
         .to_address("0x1234567890abcdef".to_string())
         .execute()?;
 
@@ -56,7 +56,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  - Wait for finality (6 confirmations)");
     println!("  - Generate inclusion proof");
     println!("  - Submit proof to Ethereum contract");
-    println!("  - Mint equivalent right on Ethereum");
+    println!("  - Mint equivalent sanad on Ethereum");
 
     Ok(())
 }

@@ -258,10 +258,10 @@ mod tests {
     }
 
     #[test]
-    fn test_right_status_display() {
-        assert_eq!(RightStatus::Active.to_string(), "active");
-        assert_eq!(RightStatus::Transferred.to_string(), "transferred");
-        assert_eq!(RightStatus::Consumed.to_string(), "consumed");
+    fn test_sanad_status_display() {
+        assert_eq!(SanadStatus::Active.to_string(), "active");
+        assert_eq!(SanadStatus::Transferred.to_string(), "transferred");
+        assert_eq!(SanadStatus::Consumed.to_string(), "consumed");
     }
 
     #[test]

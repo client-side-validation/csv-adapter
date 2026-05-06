@@ -2,7 +2,7 @@
 //!
 //! Organized into feature modules:
 //! - `accounts` - Dashboard and account management
-//! - `rights` - Rights management (list, create, show, transfer, consume)
+//! - `sanads` - Sanads management (list, create, show, transfer, consume)
 //! - `proofs` - Proof generation and verification
 //! - `cross_chain` - Cross-chain transfers
 //! - `contracts` - Contract deployment and management
@@ -28,7 +28,7 @@ pub mod accounts;
 pub mod contracts;
 pub mod cross_chain;
 pub mod proofs;
-pub mod rights;
+pub mod sanads;
 pub mod seals;
 pub mod settings;
 pub mod tests;
@@ -43,8 +43,8 @@ pub use wallet_page::WalletPage;
 // Re-exports from accounts module
 pub use accounts::{AccountTransactions, Dashboard};
 
-// Re-exports from rights module (already migrated)
-pub use rights::{ConsumeRight, CreateRight, RightJourney, Rights, ShowRight, TransferRight};
+// Re-exports from sanads module (already migrated)
+pub use sanads::{ConsumeSanad, CreateSanad, SanadJourney, Sanads, ShowSanad, TransferSanad};
 
 // Re-exports from proofs module
 pub use proofs::{GenerateProof, ProofBundlePage, Proofs, VerifyCrossChainProof, VerifyProof};

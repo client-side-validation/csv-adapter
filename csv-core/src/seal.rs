@@ -1,6 +1,6 @@
 //! Seal and Anchor reference types
 //!
-//! Seals represent single-use rights to authorize state transitions.
+//! Seals represent single-use sanads to authorize state transitions.
 //! Anchors represent on-chain references containing commitments.
 
 use alloc::vec::Vec;
@@ -378,7 +378,7 @@ mod tests {
 
 // Backward compatibility type aliases
 #[deprecated(since = "0.4.0", note = "Use SealPoint instead")]
-pub type SealRef = SealPoint;
+pub type SealPoint = SealPoint;
 
 #[deprecated(since = "0.4.0", note = "Use CommitAnchor instead")]
-pub type AnchorRef = CommitAnchor;
+pub type CommitAnchor = CommitAnchor;

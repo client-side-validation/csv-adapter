@@ -70,7 +70,7 @@ impl WalletContext {
         let Some(store) = &self.store else { return };
         let mut s = self.state.write();
 
-        // Load app state (rights, seals, etc.)
+        // Load app state (sanads, seals, etc.)
         if let Some(persisted) =
             store.try_load::<csv_adapter_store::state::UnifiedStorage>(UNIFIED_STORAGE_KEY)
         {
@@ -82,21 +82,21 @@ impl WalletContext {
                 Some(csv_adapter_store::state::Network::Main) => Network::Main,
                 _ => Network::Test,
             };
-            s.rights = persisted
-                .rights
+            s.sanads = persisted
+                .sanads
                 .into_iter()
                 .filter_map(|r| {
-                    Some(TrackedRight {
+                    Some(TrackedSanad {
                         id: r.id,
                         chain: convert_chain_from_store(r.chain),
                         value: r.value,
                         status: match r.status {
-                            csv_adapter_store::state::RightStatus::Active => RightStatus::Active,
-                            csv_adapter_store::state::RightStatus::Transferred => {
-                                RightStatus::Transferred
+                            csv_adapter_store::state::SanadStatus::Active => SanadStatus::Active,
+                            csv_adapter_store::state::SanadStatus::Transferred => {
+                                SanadStatus::Transferred
                             }
-                            csv_adapter_store::state::RightStatus::Consumed => {
-                                RightStatus::Consumed
+                            csv_adapter_store::state::SanadStatus::Consumed => {
+                                SanadStatus::Consumed
                             }
                         },
                         owner: r.owner,
@@ -111,7 +111,7 @@ impl WalletContext {
                         id: t.id,
                         from_chain: convert_chain_from_store(t.source_chain),
                         to_chain: convert_chain_from_store(t.dest_chain),
-                        right_id: t.right_id,
+                        sanad_id: t.sanad_id,
                         dest_owner: t.destination_address.unwrap_or_default(),
                         status: match t.status {
                             csv_adapter_store::state::TransferStatus::Initiated => {
@@ -157,7 +157,7 @@ impl WalletContext {
                         seal_ref: s_rec.seal_ref,
                         chain: convert_chain_from_store(s_rec.chain),
                         value: s_rec.value,
-                        right_id: String::new(), // Old format doesn't have this
+                        sanad_id: String::new(), // Old format doesn't have this
                         status,
                         created_at: s_rec.created_at,
                         content: None,
@@ -180,7 +180,7 @@ impl WalletContext {
                         crate::context::ProofData::Zk {
                             proof_system: system.clone(),
                             proof_bytes: p.proof_data.clone().unwrap_or_default(),
-                            seal_id: p.right_id.clone(),
+                            seal_id: p.sanad_id.clone(),
                             block_hash: String::new(),
                             block_height: p.block_height.unwrap_or(0),
                             verifier_key_hash: String::new(),
@@ -188,7 +188,7 @@ impl WalletContext {
                     });
                     Some(ProofRecord {
                         chain: convert_chain_from_store(p.chain),
-                        right_id: p.right_id,
+                        sanad_id: p.sanad_id,
                         seal_ref: String::new(), // Old format doesn't have this
                         proof_type: p.proof_type,
                         status,
@@ -240,7 +240,7 @@ impl WalletContext {
         let s = self.state.read();
 
         // Convert local types to unified storage types
-        use csv_adapter_store::state::{ContractRecord, RightRecord, TransferRecord, WalletConfig};
+        use csv_adapter_store::state::{ContractRecord, SanadRecord, TransferRecord, WalletConfig};
 
         let persisted = csv_adapter_store::state::UnifiedStorage {
             version: 1,
@@ -251,23 +251,23 @@ impl WalletContext {
                 Network::Test => csv_adapter_store::state::Network::Test,
                 Network::Main => csv_adapter_store::state::Network::Main,
             }),
-            rights: s
-                .rights
+            sanads: s
+                .sanads
                 .iter()
-                .map(|r| RightRecord {
+                .map(|r| SanadRecord {
                     id: r.id.clone(),
                     chain: convert_chain_to_store(r.chain.clone()),
-                    seal_ref: String::new(), // Field populated when seal is linked to right
+                    seal_ref: String::new(), // Field populated when seal is linked to sanad
                     owner: r.owner.clone(),
                     value: r.value,
-                    commitment: r.id.clone(), // Using right ID as commitment reference
+                    commitment: r.id.clone(), // Using sanad ID as commitment reference
                     nullifier: None,
                     status: match r.status {
-                        RightStatus::Active => csv_adapter_store::state::RightStatus::Active,
-                        RightStatus::Transferred => {
-                            csv_adapter_store::state::RightStatus::Transferred
+                        SanadStatus::Active => csv_adapter_store::state::SanadStatus::Active,
+                        SanadStatus::Transferred => {
+                            csv_adapter_store::state::SanadStatus::Transferred
                         }
-                        RightStatus::Consumed => csv_adapter_store::state::RightStatus::Consumed,
+                        SanadStatus::Consumed => csv_adapter_store::state::SanadStatus::Consumed,
                     },
                     created_at: 0, // Creation time tracking to be implemented
                 })
@@ -279,7 +279,7 @@ impl WalletContext {
                     id: t.id.clone(),
                     source_chain: convert_chain_to_store(t.from_chain.clone()),
                     dest_chain: convert_chain_to_store(t.to_chain.clone()),
-                    right_id: t.right_id.clone(),
+                    sanad_id: t.sanad_id.clone(),
                     sender_address: None, // Sender address from wallet context
                     destination_address: Some(t.dest_owner.clone()),
                     source_tx_hash: t.source_tx_hash.clone(),
@@ -324,7 +324,7 @@ impl WalletContext {
                 .iter()
                 .map(|p| csv_adapter_store::state::ProofRecord {
                     chain: convert_chain_to_store(p.chain.clone()),
-                    right_id: p.right_id.clone(),
+                    sanad_id: p.sanad_id.clone(),
                     proof_type: p.proof_type.clone(),
                     proof_system: p.data.as_ref().and_then(|d| d.zk_proof_system().map(|s| s.to_string())),
                     verified: p.status == ProofStatus::Verified,
@@ -453,14 +453,14 @@ impl WalletContext {
         self.state.read().wallet.to_json()
     }
 
-    pub fn rights(&self) -> Vec<TrackedRight> {
-        self.state.read().rights.clone()
+    pub fn sanads(&self) -> Vec<TrackedSanad> {
+        self.state.read().sanads.clone()
     }
 
-    pub fn rights_for_chain(&self, chain: Chain) -> Vec<TrackedRight> {
+    pub fn sanads_for_chain(&self, chain: Chain) -> Vec<TrackedSanad> {
         self.state
             .read()
-            .rights
+            .sanads
             .iter()
             .filter(|r| r.chain == chain)
             .cloned()
@@ -534,8 +534,8 @@ impl WalletContext {
             .map(|account| wallet_connection::native_wallet(account))
     }
 
-    /// Refresh rights list from blockchain
-    pub async fn refresh_rights(&mut self) {
+    /// Refresh sanads list from blockchain
+    pub async fn refresh_sanads(&mut self) {
         // This will be implemented properly with chain sync
         // For now just reload persisted data
         self.reload_from_storage();
@@ -613,22 +613,22 @@ impl WalletContext {
         self.save_persisted();
     }
 
-    pub fn add_right(&mut self, right: TrackedRight) {
+    pub fn add_sanad(&mut self, sanad: TrackedSanad) {
         let mut s = self.state.write();
-        if let Some(pos) = s.rights.iter().position(|r| r.id == right.id) {
-            s.rights[pos] = right;
+        if let Some(pos) = s.sanads.iter().position(|r| r.id == sanad.id) {
+            s.sanads[pos] = sanad;
         } else {
-            s.rights.push(right);
+            s.sanads.push(sanad);
         }
         drop(s);
         self.save_persisted();
     }
 
-    pub fn remove_right(&mut self, id: &str) -> bool {
+    pub fn remove_sanad(&mut self, id: &str) -> bool {
         let mut s = self.state.write();
-        let before = s.rights.len();
-        s.rights.retain(|r| r.id != id);
-        let removed = s.rights.len() < before;
+        let before = s.sanads.len();
+        s.sanads.retain(|r| r.id != id);
+        let removed = s.sanads.len() < before;
         drop(s);
         if removed {
             self.save_persisted();
@@ -636,10 +636,10 @@ impl WalletContext {
         removed
     }
 
-    pub fn get_right(&self, id: &str) -> Option<TrackedRight> {
+    pub fn get_sanad(&self, id: &str) -> Option<TrackedSanad> {
         self.state
             .read()
-            .rights
+            .sanads
             .iter()
             .find(|r| r.id == id)
             .cloned()
@@ -704,13 +704,13 @@ impl WalletContext {
         }
     }
 
-    /// Get seal for a specific right
-    pub fn seal_for_right(&self, right_id: &str) -> Option<SealRecord> {
+    /// Get seal for a specific sanad
+    pub fn seal_for_sanad(&self, sanad_id: &str) -> Option<SealRecord> {
         self.state
             .read()
             .seals
             .iter()
-            .find(|s| s.right_id == right_id)
+            .find(|s| s.sanad_id == sanad_id)
             .cloned()
     }
 
@@ -778,22 +778,22 @@ impl WalletContext {
         self.proof_for_seal(seal_ref)
     }
 
-    /// Get all proofs for a right
-    pub fn proofs_for_right(&self, right_id: &str) -> Vec<ProofRecord> {
+    /// Get all proofs for a sanad
+    pub fn proofs_for_sanad(&self, sanad_id: &str) -> Vec<ProofRecord> {
         self.state
             .read()
             .proofs
             .iter()
-            .filter(|p| p.right_id == right_id)
+            .filter(|p| p.sanad_id == sanad_id)
             .cloned()
             .collect()
     }
 
-    pub fn remove_proof(&mut self, right_id: &str, proof_type: &str) -> bool {
+    pub fn remove_proof(&mut self, sanad_id: &str, proof_type: &str) -> bool {
         let mut s = self.state.write();
         let before = s.proofs.len();
         s.proofs
-            .retain(|p| !(p.right_id == right_id && p.proof_type == proof_type));
+            .retain(|p| !(p.sanad_id == sanad_id && p.proof_type == proof_type));
         let removed = s.proofs.len() < before;
         drop(s);
         if removed {
@@ -834,7 +834,7 @@ impl WalletContext {
     pub fn lock(&mut self) {
         let mut s = self.state.write();
         s.wallet = WalletData::default();
-        s.rights.clear();
+        s.sanads.clear();
         s.transfers.clear();
         s.contracts.clear();
         s.seals.clear();

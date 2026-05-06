@@ -21,7 +21,7 @@ pub fn Wallet() -> Element {
                     }
                     h2 { class: "text-xl font-semibold mb-2", "Connect Your CSV Wallet" }
                     p { class: "text-gray-400 mb-6",
-                        "Connect your wallet to view your rights and initiate transfers across chains."
+                        "Connect your wallet to view your sanads and initiate transfers across chains."
                     }
                     button {
                         onclick: move |_| {
@@ -57,16 +57,16 @@ pub fn Wallet() -> Element {
                         }
                     }
 
-                    // Rights owned by wallet
+                    // Sanads owned by wallet
                     div {
                         div { class: "flex items-center justify-between mb-4",
-                            h2 { class: "text-lg font-semibold", "Your Rights" }
-                            Link { to: Route::RightsList {},
+                            h2 { class: "text-lg font-semibold", "Your Sanads" }
+                            Link { to: Route::SanadsList {},
                                 span { class: "text-blue-400 hover:text-blue-300 text-sm", "View all →" }
                             }
                         }
                         div { class: "bg-gray-900 rounded-xl border border-gray-800 p-8 text-center text-gray-500",
-                            "No rights found for this wallet"
+                            "No sanads found for this wallet"
                         }
                     }
 
@@ -76,13 +76,13 @@ pub fn Wallet() -> Element {
                         div { class: "grid grid-cols-2 gap-4",
                             button { class: "p-4 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors text-left",
                                 div { class: "text-xl mb-2", "⇄" }
-                                div { class: "font-medium text-sm", "Transfer Right" }
-                                div { class: "text-xs text-gray-500", "Move a right to another chain" }
+                                div { class: "font-medium text-sm", "Transfer Sanad" }
+                                div { class: "text-xs text-gray-500", "Move a sanad to another chain" }
                             }
                             button { class: "p-4 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors text-left",
                                 div { class: "text-xl mb-2", "🔍" }
                                 div { class: "font-medium text-sm", "Search Explorer" }
-                                div { class: "text-xs text-gray-500", "Find rights and transfers" }
+                                div { class: "text-xs text-gray-500", "Find sanads and transfers" }
                             }
                         }
                     }

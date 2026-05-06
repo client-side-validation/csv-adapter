@@ -1,4 +1,4 @@
-//! Chain adapter trait for dynamic chain support.
+//! Chain driver trait for dynamic chain support.
 
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -48,9 +48,9 @@ pub enum ChainError {
 /// Result type for chain operations
 pub type ChainResult<T> = Result<T, ChainError>;
 
-/// Standard interface for all chain adapters
+/// Standard interface for all chain drivers
 #[async_trait]
-pub trait ChainAdapter: Send + Sync {
+pub trait ChainDriver: Send + Sync {
     /// Get unique identifier for this chain
     fn chain_id(&self) -> &'static str;
 
@@ -88,10 +88,10 @@ pub trait ChainAdapter: Send + Sync {
     fn default_network(&self) -> &'static str;
 }
 
-/// Helper trait for object-safe chain adapter operations
-pub trait ChainAdapterExt: ChainAdapter {
-    /// Box the adapter for storage in registry
-    fn boxed(self) -> Box<dyn ChainAdapter>
+/// Helper trait for object-safe chain driver operations
+pub trait ChainDriverExt: ChainDriver {
+    /// Box the driver for storage in registry
+    fn boxed(self) -> Box<dyn ChainDriver>
     where
         Self: Sized + 'static,
     {
@@ -99,7 +99,7 @@ pub trait ChainAdapterExt: ChainAdapter {
     }
 }
 
-impl<T: ChainAdapter + 'static> ChainAdapterExt for T {}
+impl<T: ChainDriver + 'static> ChainDriverExt for T {}
 
 /// Standard interface for chain RPC clients
 #[async_trait]
@@ -159,9 +159,9 @@ pub trait Wallet: Send + Sync {
     fn import_from_private_key(&self, private_key: &str) -> ChainResult<()>;
 }
 
-/// Registry for managing chain adapters
+/// Registry for managing chain drivers
 pub struct ChainRegistry {
-    adapters: HashMap<String, Box<dyn ChainAdapter>>,
+    adapters: HashMap<String, Box<dyn ChainDriver>>,
     capabilities: HashMap<String, ChainCapabilities>,
 }
 
@@ -174,17 +174,17 @@ impl ChainRegistry {
         }
     }
 
-    /// Register a new chain adapter
-    pub fn register_adapter(&mut self, adapter: Box<dyn ChainAdapter>) {
-        let chain_id = adapter.chain_id();
-        let capabilities = adapter.capabilities();
+    /// Register a new chain driver
+    pub fn register_driver(&mut self, driver: Box<dyn ChainDriver>) {
+        let chain_id = driver.chain_id();
+        let capabilities = driver.capabilities();
 
-        self.adapters.insert(chain_id.to_string(), adapter);
+        self.adapters.insert(chain_id.to_string(), driver);
         self.capabilities.insert(chain_id.to_string(), capabilities);
     }
 
-    /// Get adapter by chain ID
-    pub fn get_adapter(&self, chain_id: &str) -> Option<&dyn ChainAdapter> {
+    /// Get driver by chain ID
+    pub fn get_driver(&self, chain_id: &str) -> Option<&dyn ChainDriver> {
         self.adapters.get(chain_id).map(|b| b.as_ref())
     }
 

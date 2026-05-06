@@ -28,7 +28,7 @@
                     </h1>
                     <nav class="hidden md:flex gap-6">
                         <a href="#" onclick="showPage('home')" class="nav-link">Home</a>
-                        <a href="#" onclick="showPage('rights')" class="nav-link">Rights</a>
+                        <a href="#" onclick="showPage('sanads')" class="nav-link">Sanads</a>
                         <a href="#" onclick="showPage('transfers')" class="nav-link">Transfers</a>
                         <a href="#" onclick="showPage('seals')" class="nav-link">Seals</a>
                         <a href="#" onclick="showPage('stats')" class="nav-link">Stats</a>
@@ -44,17 +44,17 @@
         <!-- Home Page -->
         <div id="page-home">
             <div class="text-center py-8">
-                <h2 class="text-4xl font-bold mb-4">Cross-Chain Sealed Verifiable Rights Explorer</h2>
+                <h2 class="text-4xl font-bold mb-4">Cross-Chain Sealed Verifiable Sanads Explorer</h2>
                 <p class="text-gray-400 text-lg max-w-2xl mx-auto">
-                    Track, search, and analyze CSV rights, transfers, and seals across Bitcoin, Ethereum, Sui, Aptos, and Solana.
+                    Track, search, and analyze CSV sanads, transfers, and seals across Bitcoin, Ethereum, Sui, Aptos, and Solana.
                 </p>
             </div>
 
             <!-- Stats Cards -->
             <div id="stats-cards" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 <div class="card rounded-xl p-6 text-center">
-                    <div class="text-3xl font-bold mb-1" id="stat-rights">—</div>
-                    <div class="text-gray-400 text-sm">Total Rights</div>
+                    <div class="text-3xl font-bold mb-1" id="stat-sanads">—</div>
+                    <div class="text-gray-400 text-sm">Total Sanads</div>
                 </div>
                 <div class="card rounded-xl p-6 text-center">
                     <div class="text-3xl font-bold mb-1" id="stat-transfers">—</div>
@@ -94,24 +94,24 @@
             </div>
         </div>
 
-        <!-- Rights Page -->
-        <div id="page-rights" class="hidden">
+        <!-- Sanads Page -->
+        <div id="page-sanads" class="hidden">
             <div class="flex items-center justify-between mb-6">
-                <h2 class="text-2xl font-bold">Rights</h2>
-                <span id="rights-count" class="text-gray-400 text-sm"></span>
+                <h2 class="text-2xl font-bold">Sanads</h2>
+                <span id="sanads-count" class="text-gray-400 text-sm"></span>
             </div>
             <div class="card rounded-xl overflow-hidden">
                 <table class="w-full">
                     <thead class="border-b border-gray-800 text-left text-sm text-gray-400">
                         <tr>
-                            <th class="px-6 py-3 font-medium">Right ID</th>
+                            <th class="px-6 py-3 font-medium">Sanad ID</th>
                             <th class="px-6 py-3 font-medium">Chain</th>
                             <th class="px-6 py-3 font-medium">Owner</th>
                             <th class="px-6 py-3 font-medium">Status</th>
                             <th class="px-6 py-3 font-medium">Transfers</th>
                         </tr>
                     </thead>
-                    <tbody id="rights-table" class="divide-y divide-gray-800"></tbody>
+                    <tbody id="sanads-table" class="divide-y divide-gray-800"></tbody>
                 </table>
             </div>
         </div>
@@ -183,8 +183,8 @@
                     case 'home':
                         await loadHome();
                         break;
-                    case 'rights':
-                        await loadRights();
+                    case 'sanads':
+                        await loadSanads();
                         break;
                     case 'transfers':
                         await loadTransfers();
@@ -221,20 +221,20 @@
                 const json = await resp.json();
                 const stats = json.data;
 
-                document.getElementById('stat-rights').textContent = stats.total_rights;
+                document.getElementById('stat-sanads').textContent = stats.total_sanads;
                 document.getElementById('stat-transfers').textContent = stats.total_transfers;
                 document.getElementById('stat-seals').textContent = stats.total_seals;
                 document.getElementById('stat-contracts').textContent = stats.total_contracts;
 
                 // Chain status
                 const chainDiv = document.getElementById('chain-status');
-                chainDiv.innerHTML = stats.rights_by_chain.map(rc => `
+                chainDiv.innerHTML = stats.sanads_by_chain.map(rc => `
                     <div class="card rounded-xl p-4">
                         <div class="flex items-center gap-2 mb-2">
                             <span class="w-2 h-2 rounded-full bg-green-500"></span>
                             <span class="font-medium capitalize">${rc.chain}</span>
                         </div>
-                        <div class="text-sm text-gray-400">${rc.count} rights</div>
+                        <div class="text-sm text-gray-400">${rc.count} sanads</div>
                     </div>
                 `).join('');
 
@@ -249,26 +249,26 @@
         async function loadActivity() {
             try {
                 // Fetch recent items from all sources
-                const [rightsResp, transfersResp, sealsResp] = await Promise.all([
-                    fetch(`${API_URL}/api/v1/rights?limit=10`),
+                const [sanadsResp, transfersResp, sealsResp] = await Promise.all([
+                    fetch(`${API_URL}/api/v1/sanads?limit=10`),
                     fetch(`${API_URL}/api/v1/transfers?limit=10`),
                     fetch(`${API_URL}/api/v1/seals?limit=10`)
                 ]);
 
-                const rightsJson = await rightsResp.json();
+                const sanadsJson = await sanadsResp.json();
                 const transfersJson = await transfersResp.json();
                 const sealsJson = await sealsResp.json();
 
-                const rights = rightsJson.data.data || [];
+                const sanads = sanadsJson.data.data || [];
                 const transfers = transfersJson.data.data || [];
                 const seals = sealsJson.data.data || [];
 
                 // Merge and sort by time
                 const activities = [
-                    ...rights.map(r => ({
-                        type: 'right',
+                    ...sanads.map(r => ({
+                        type: 'sanad',
                         icon: '📜',
-                        title: `Right Created`,
+                        title: `Sanad Created`,
                         subtitle: `${r.id}`,
                         chain: r.chain,
                         status: r.status,
@@ -284,7 +284,7 @@
                         chain: t.from_chain,
                         status: t.status,
                         time: new Date(t.created_at),
-                        details: `Right: ${t.right_id.substring(0, 20)}...`,
+                        details: `Sanad: ${t.sanad_id.substring(0, 20)}...`,
                         link: null
                     })),
                     ...seals.map(s => ({
@@ -318,7 +318,7 @@
                                         <div class="text-xs text-gray-500 mt-0.5">${act.details}</div>
                                     </div>
                                 </div>
-                                <div class="text-right">
+                                <div class="text-sanad">
                                     <div class="text-sm text-gray-400 capitalize">${act.chain}</div>
                                     <div class="text-xs text-gray-500">${timeAgo}</div>
                                 </div>
@@ -354,22 +354,22 @@
             return 'bg-gray-800 text-gray-400';
         }
 
-        // Load rights
-        async function loadRights() {
-            const resp = await fetch(`${API_URL}/api/v1/rights?limit=50`);
+        // Load sanads
+        async function loadSanads() {
+            const resp = await fetch(`${API_URL}/api/v1/sanads?limit=50`);
             const json = await resp.json();
-            const rights = json.data.data;
+            const sanads = json.data.data;
 
-            document.getElementById('rights-count').textContent = `${rights.length} rights found`;
+            document.getElementById('sanads-count').textContent = `${sanads.length} sanads found`;
 
-            const tbody = document.getElementById('rights-table');
-            tbody.innerHTML = rights.map(right => `
+            const tbody = document.getElementById('sanads-table');
+            tbody.innerHTML = sanads.map(sanad => `
                 <tr class="hover:bg-gray-800/50">
-                    <td class="px-6 py-4 mono text-sm text-blue-400">${right.id}</td>
-                    <td class="px-6 py-4 capitalize">${right.chain}</td>
-                    <td class="px-6 py-4 mono text-sm text-gray-300 truncate max-w-xs">${right.owner}</td>
-                    <td class="px-6 py-4"><span class="badge badge-${right.status}">${right.status}</span></td>
-                    <td class="px-6 py-4 text-sm text-gray-300">${right.transfer_count}</td>
+                    <td class="px-6 py-4 mono text-sm text-blue-400">${sanad.id}</td>
+                    <td class="px-6 py-4 capitalize">${sanad.chain}</td>
+                    <td class="px-6 py-4 mono text-sm text-gray-300 truncate max-w-xs">${sanad.owner}</td>
+                    <td class="px-6 py-4"><span class="badge badge-${sanad.status}">${sanad.status}</span></td>
+                    <td class="px-6 py-4 text-sm text-gray-300">${sanad.transfer_count}</td>
                 </tr>
             `).join('');
         }
@@ -431,8 +431,8 @@
                     ${stats.average_transfer_time_ms ? `<div class="text-gray-400 mt-2">Avg time: ${(stats.average_transfer_time_ms / 3600000).toFixed(2)} hours</div>` : ''}
                 </div>
                 <div class="card rounded-xl p-6">
-                    <h3 class="text-lg font-semibold mb-4">Rights by Chain</h3>
-                    ${stats.rights_by_chain.map(rc => `
+                    <h3 class="text-lg font-semibold mb-4">Sanads by Chain</h3>
+                    ${stats.sanads_by_chain.map(rc => `
                         <div class="flex justify-between mb-2">
                             <span class="capitalize">${rc.chain}</span>
                             <span class="font-mono">${rc.count}</span>

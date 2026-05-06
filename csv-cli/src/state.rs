@@ -3,7 +3,7 @@
 use std::path::Path;
 
 pub use csv_adapter_store::state::{
-    Chain, ContractRecord, GasAccount, RightRecord, RightStatus, SealRecord, TransactionRecord,
+    Chain, ContractRecord, GasAccount, SanadRecord, SanadStatus, SealRecord, TransactionRecord,
     TransactionStatus, TransactionType, TransferRecord, TransferStatus, UnifiedStorage,
     WalletAccount,
 };
@@ -82,25 +82,25 @@ impl UnifiedStateManager {
         Ok(())
     }
 
-    // --- Rights Management ---
+    // --- Sanads Management ---
 
-    /// Add a Right to tracking
-    pub fn add_right(&mut self, right: RightRecord) {
-        self.storage.rights.push(right);
+    /// Add a Sanad to tracking
+    pub fn add_sanad(&mut self, sanad: SanadRecord) {
+        self.storage.sanads.push(sanad);
     }
 
-    /// Get a Right by ID
-    pub fn get_right(&self, id: &str) -> Option<&RightRecord> {
-        self.storage.get_right(id)
+    /// Get a Sanad by ID
+    pub fn get_sanad(&self, id: &str) -> Option<&SanadRecord> {
+        self.storage.get_sanad(id)
     }
 
-    /// Mark a Right as consumed
-    pub fn consume_right(&mut self, id: &str) -> anyhow::Result<()> {
-        if let Some(right) = self.storage.rights.iter_mut().find(|r| r.id == id) {
-            right.status = RightStatus::Consumed;
+    /// Mark a Sanad as consumed
+    pub fn consume_sanad(&mut self, id: &str) -> anyhow::Result<()> {
+        if let Some(sanad) = self.storage.sanads.iter_mut().find(|r| r.id == id) {
+            sanad.status = SanadStatus::Consumed;
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Right {} not found", id))
+            Err(anyhow::anyhow!("Sanad {} not found", id))
         }
     }
 
@@ -283,7 +283,7 @@ impl UnifiedStateManager {
                 _ => transfer.source_chain.clone(),
             },
             tx_hash: match tx_type {
-                TransactionType::CrossChainLock | TransactionType::RightTransfer => {
+                TransactionType::CrossChainLock | TransactionType::SanadTransfer => {
                     transfer.source_tx_hash.clone().unwrap_or_default()
                 }
                 TransactionType::CrossChainMint => {

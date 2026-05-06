@@ -3,7 +3,7 @@
 //! Provides REST API endpoints for wallet-to-explorer communication
 //! and real-time transfer monitoring.
 
-use crate::indexing::{IndexedRight, IndexedTransfer, IndexingManager, IndexingMetrics};
+use crate::indexing::{IndexedSanad, IndexedTransfer, IndexingManager, IndexingMetrics};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio_tungstenite::WebSocketStream;
@@ -60,9 +60,9 @@ impl<T> ApiResponse<T> {
     }
 }
 
-/// Rights search request
+/// Sanads search request
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RightsSearchRequest {
+pub struct SanadsSearchRequest {
     pub owner: Option<String>,
     pub chain: Option<String>,
     pub status: Option<String>,
@@ -82,10 +82,10 @@ pub struct TransfersSearchRequest {
     pub offset: Option<usize>,
 }
 
-/// Rights response
+/// Sanads response
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RightsResponse {
-    pub rights: Vec<IndexedRight>,
+pub struct SanadsResponse {
+    pub sanads: Vec<IndexedSanad>,
     pub total_count: u64,
     pub has_more: bool,
 }
@@ -101,7 +101,7 @@ pub struct TransfersResponse {
 /// Real-time transfer monitoring request
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferMonitorRequest {
-    pub right_id: Option<String>,
+    pub sanad_id: Option<String>,
     pub owner: Option<String>,
     pub chains: Option<Vec<String>>,
 }
@@ -110,7 +110,7 @@ pub struct TransferMonitorRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferStatusUpdate {
     pub transfer_id: String,
-    pub right_id: String,
+    pub sanad_id: String,
     pub status: String,
     pub from_chain: String,
     pub to_chain: String,
@@ -164,26 +164,26 @@ impl ExplorerApi {
             .and(warp::get())
             .map(|| warp::reply::json(&ApiResponse::success("OK")));
 
-        // Get rights by owner
-        let rights_by_owner = {
+        // Get sanads by owner
+        let sanads_by_owner = {
             let indexing_manager = indexing_manager.clone();
-            warp::path("rights")
+            warp::path("sanads")
                 .and(warp::path("owner"))
                 .and(warp::path::param::<String>())
                 .and(warp::get())
                 .and(warp::any().map(move || indexing_manager.clone()))
-                .and_then(handlers::get_rights_by_owner)
+                .and_then(handlers::get_sanads_by_owner)
         };
 
-        // Search rights
-        let search_rights = {
+        // Search sanads
+        let search_sanads = {
             let indexing_manager = indexing_manager.clone();
-            warp::path("rights")
+            warp::path("sanads")
                 .and(warp::path("search"))
                 .and(warp::post())
                 .and(warp::body::json())
                 .and(warp::any().map(move || indexing_manager.clone()))
-                .and_then(handlers::search_rights)
+                .and_then(handlers::search_sanads)
         };
 
         // Get transfer by hash
@@ -237,8 +237,8 @@ impl ExplorerApi {
 
         // Combine all routes
         health
-            .or(rights_by_owner)
-            .or(search_rights)
+            .or(sanads_by_owner)
+            .or(search_sanads)
             .or(transfer_by_hash)
             .or(search_transfers)
             .or(metrics)
@@ -273,14 +273,14 @@ impl ExplorerApiClient {
         }
     }
 
-    /// Get rights by owner
-    pub async fn get_rights_by_owner(
+    /// Get sanads by owner
+    pub async fn get_sanads_by_owner(
         &self,
         owner: &str,
-    ) -> Result<RightsResponse, Box<dyn std::error::Error + Send + Sync>> {
-        let url = format!("{}/rights/owner/{}", self.base_url, owner);
+    ) -> Result<SanadsResponse, Box<dyn std::error::Error + Send + Sync>> {
+        let url = format!("{}/sanads/owner/{}", self.base_url, owner);
         let response = self.client.get(&url).send().await?;
-        let api_response: ApiResponse<RightsResponse> = response.json().await?;
+        let api_response: ApiResponse<SanadsResponse> = response.json().await?;
 
         if api_response.success {
             api_response
@@ -294,14 +294,14 @@ impl ExplorerApiClient {
         }
     }
 
-    /// Search rights
-    pub async fn search_rights(
+    /// Search sanads
+    pub async fn search_sanads(
         &self,
-        request: &RightsSearchRequest,
-    ) -> Result<RightsResponse, Box<dyn std::error::Error + Send + Sync>> {
-        let url = format!("{}/rights/search", self.base_url);
+        request: &SanadsSearchRequest,
+    ) -> Result<SanadsResponse, Box<dyn std::error::Error + Send + Sync>> {
+        let url = format!("{}/sanads/search", self.base_url);
         let response = self.client.post(&url).json(request).send().await?;
-        let api_response: ApiResponse<RightsResponse> = response.json().await?;
+        let api_response: ApiResponse<SanadsResponse> = response.json().await?;
 
         if api_response.success {
             api_response

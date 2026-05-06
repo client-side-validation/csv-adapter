@@ -1,6 +1,6 @@
 //! Test adapters for testing.
 
-use crate::chain_adapter::{ChainAdapter, ChainResult, RpcClient, Wallet};
+use crate::chain_adapter::{ChainDriver, ChainResult, RpcClient, Wallet};
 use crate::chain_config::{AccountModel, ChainCapabilities, ChainConfig};
 use crate::protocol_version::Chain;
 
@@ -8,7 +8,7 @@ use crate::protocol_version::Chain;
 pub struct MockAdapter;
 
 #[async_trait::async_trait]
-impl ChainAdapter for MockAdapter {
+impl ChainDriver for MockAdapter {
     fn chain_id(&self) -> &'static str {
         "mock"
     }

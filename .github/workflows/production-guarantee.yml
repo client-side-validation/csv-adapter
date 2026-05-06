@@ -316,8 +316,8 @@ jobs:
             exit 1
           fi
 
-          if ! grep -q "ChainRightOps" csv-adapter-core/src/lib.rs; then
-            echo "ERROR: ChainRightOps trait not re-exported"
+          if ! grep -q "ChainSanadOps" csv-adapter-core/src/lib.rs; then
+            echo "ERROR: ChainSanadOps trait not re-exported"
             exit 1
           fi
 

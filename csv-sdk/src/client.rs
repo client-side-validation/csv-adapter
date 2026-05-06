@@ -1,7 +1,7 @@
 //! Unified CSV client with builder pattern.
 //!
 //! The [`CsvClient`] is the main entry point for all CSV operations.
-//! It provides access to managers for rights, transfers, proofs, wallet,
+//! It provides access to managers for sanads, transfers, proofs, wallet,
 //! and event streaming.
 //!
 //! # Example
@@ -17,7 +17,7 @@
 //!         .build()?;
 //!
 //!     // Access managers
-//!     let rights = client.rights();
+//!     let titles = client.titles();
 //!     let transfers = client.transfers();
 //!     let proofs = client.proofs();
 //!
@@ -44,7 +44,7 @@ use crate::errors::CsvError;
 use crate::events::EventStream;
 use crate::facade::ChainFacade;
 use crate::proofs::ProofManager;
-use crate::rights::RightsManager;
+use crate::titles::SanadsManager;
 use crate::scalable_builder::ScalableClientBuilder;
 use crate::transfers::TransferManager;
 use crate::wallet::Wallet;
@@ -60,96 +60,96 @@ pub enum StoreHandle {
 }
 
 impl StoreHandle {
-    /// Save a Right to the store.
-    pub fn save_right(&mut self, record: &csv_core::RightRecord) -> Result<(), CsvError> {
-        use csv_core::RightStore;
+    /// Save a Sanad to the store.
+    pub fn save_sanad(&mut self, record: &csv_core::SanadRecord) -> Result<(), CsvError> {
+        use csv_core::SanadStore;
         match self {
             StoreHandle::InMemory(store) => store
-                .save_right(record)
+                .save_sanad(record)
                 .map_err(|e| CsvError::StoreError(e.to_string())),
             #[cfg(feature = "sqlite")]
             StoreHandle::Sqlite(store) => store
-                .save_right(record)
+                .save_sanad(record)
                 .map_err(|e| CsvError::StoreError(e.to_string())),
         }
     }
 
-    /// Get a Right by its ID.
-    pub fn get_right(
+    /// Get a Sanad by its ID.
+    pub fn get_sanad(
         &self,
-        right_id: &csv_core::RightId,
-    ) -> Result<Option<csv_core::RightRecord>, CsvError> {
-        use csv_core::RightStore;
+        sanad_id: &csv_core::SanadId,
+    ) -> Result<Option<csv_core::SanadRecord>, CsvError> {
+        use csv_core::SanadStore;
         match self {
             StoreHandle::InMemory(store) => store
-                .get_right(right_id)
+                .get_sanad(sanad_id)
                 .map_err(|e| CsvError::StoreError(e.to_string())),
             #[cfg(feature = "sqlite")]
             StoreHandle::Sqlite(store) => store
-                .get_right(right_id)
+                .get_sanad(sanad_id)
                 .map_err(|e| CsvError::StoreError(e.to_string())),
         }
     }
 
-    /// List all Rights for a specific chain.
-    pub fn list_rights_by_chain(
+    /// List all Sanads for a specific chain.
+    pub fn list_sanads_by_chain(
         &self,
         chain: &str,
-    ) -> Result<Vec<csv_core::RightRecord>, CsvError> {
-        use csv_core::RightStore;
+    ) -> Result<Vec<csv_core::SanadRecord>, CsvError> {
+        use csv_core::SanadStore;
         match self {
             StoreHandle::InMemory(store) => store
-                .list_rights_by_chain(chain)
+                .list_sanads_by_chain(chain)
                 .map_err(|e| CsvError::StoreError(e.to_string())),
             #[cfg(feature = "sqlite")]
             StoreHandle::Sqlite(store) => store
-                .list_rights_by_chain(chain)
+                .list_sanads_by_chain(chain)
                 .map_err(|e| CsvError::StoreError(e.to_string())),
         }
     }
 
-    /// Mark a Right as consumed.
-    pub fn consume_right(
+    /// Mark a Sanad as consumed.
+    pub fn consume_sanad(
         &mut self,
-        right_id: &csv_core::RightId,
+        sanad_id: &csv_core::SanadId,
         consumed_at: u64,
     ) -> Result<(), CsvError> {
-        use csv_core::RightStore;
+        use csv_core::SanadStore;
         match self {
             StoreHandle::InMemory(store) => store
-                .consume_right(right_id, consumed_at)
+                .consume_sanad(sanad_id, consumed_at)
                 .map_err(|e| CsvError::StoreError(e.to_string())),
             #[cfg(feature = "sqlite")]
             StoreHandle::Sqlite(store) => store
-                .consume_right(right_id, consumed_at)
+                .consume_sanad(sanad_id, consumed_at)
                 .map_err(|e| CsvError::StoreError(e.to_string())),
         }
     }
 
-    /// List all active (unconsumed) Rights.
-    pub fn list_active_rights(&self) -> Result<Vec<csv_core::RightRecord>, CsvError> {
-        use csv_core::RightStore;
+    /// List all active (unconsumed) Sanads.
+    pub fn list_active_sanads(&self) -> Result<Vec<csv_core::SanadRecord>, CsvError> {
+        use csv_core::SanadStore;
         match self {
             StoreHandle::InMemory(store) => store
-                .list_active_rights()
+                .list_active_sanads()
                 .map_err(|e| CsvError::StoreError(e.to_string())),
             #[cfg(feature = "sqlite")]
             StoreHandle::Sqlite(store) => store
-                .list_active_rights()
+                .list_active_sanads()
                 .map_err(|e| CsvError::StoreError(e.to_string())),
         }
     }
 
-    /// Check if a Right exists.
-    pub fn has_right(&self, right_id: &csv_core::RightId) -> Result<bool, CsvError> {
-        use csv_core::RightStore;
+    /// Check if a Sanad exists.
+    pub fn has_sanad(&self, sanad_id: &csv_core::SanadId) -> Result<bool, CsvError> {
+        use csv_core::SanadStore;
         match self {
             StoreHandle::InMemory(store) => store
-                .has_right(right_id)
+                .has_sanad(sanad_id)
                 .map_err(|e| CsvError::StoreError(e.to_string())),
             #[cfg(feature = "sqlite")]
             StoreHandle::Sqlite(store) => store
-                .has_right(right_id)
+                .has_sanad(sanad_id)
                 .map_err(|e| CsvError::StoreError(e.to_string())),
         }
     }
@@ -175,7 +175,7 @@ impl NetworkType {
 ///
 /// This is the main entry point for all CSV operations. Construct it
 /// using [`CsvClient::builder()`] or [`CsvClient::scalable_builder()`] and access the various managers for
-/// rights, transfers, proofs, and wallet operations.
+/// sanads, transfers, proofs, and wallet operations.
 ///
 /// # Thread Safety
 ///
@@ -244,9 +244,9 @@ impl CsvClient {
         ScalableClientBuilder::new()
     }
 
-    /// Get a [`RightsManager`] for creating, querying, and managing Rights.
-    pub fn rights(&self) -> RightsManager {
-        RightsManager::new(Arc::new(self.clone_ref()))
+    /// Get a [`SanadsManager`] for creating, querying, and managing Sanads.
+    pub fn titles(&self) -> SanadsManager {
+        SanadsManager::new(Arc::new(self.clone_ref()))
     }
 
     /// Get a [`TransferManager`] for cross-chain transfer operations.

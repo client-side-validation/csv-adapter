@@ -9,7 +9,7 @@
 use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
 use csv_core::hash::Hash;
 use csv_core::protocol_version::Chain;
-use csv_core::seal::SealRef;
+use csv_core::seal::SealPoint;
 use csv_core::zk_proof::{ChainWitness, ProofSystem, ZkProver, ZkSealProof};
 
 /// Test the complete ZK proof lifecycle
@@ -17,7 +17,7 @@ use csv_core::zk_proof::{ChainWitness, ProofSystem, ZkProver, ZkSealProof};
 fn test_zk_proof_lifecycle() {
     // 1. Create a seal reference (simulating a Bitcoin UTXO)
     let seal_id = [0xABu8; 32];
-    let seal = SealRef::new(seal_id.to_vec(), Some(0)).expect("valid seal");
+    let seal = SealPoint::new(seal_id.to_vec(), Some(0)).expect("valid seal");
 
     // 2. Create witness data (simulating Bitcoin SPV data)
     let witness = ChainWitness {
@@ -51,7 +51,7 @@ fn test_zk_proof_lifecycle() {
 /// Test ZK proof serialization and deserialization
 #[test]
 fn test_zk_proof_serialization() {
-    let seal = SealRef::new(vec![0xCD; 32], Some(42)).expect("valid seal");
+    let seal = SealPoint::new(vec![0xCD; 32], Some(42)).expect("valid seal");
     let witness = ChainWitness {
         chain: Chain::Bitcoin,
         block_hash: Hash::new([0xEF; 32]),
@@ -83,7 +83,7 @@ fn test_zk_proof_serialization() {
 /// Test that wrong chain witness fails
 #[test]
 fn test_wrong_chain_fails() {
-    let seal = SealRef::new(vec![0x12; 32], Some(1)).expect("valid seal");
+    let seal = SealPoint::new(vec![0x12; 32], Some(1)).expect("valid seal");
 
     // Create witness for wrong chain
     let witness = ChainWitness {
@@ -105,7 +105,7 @@ fn test_wrong_chain_fails() {
 /// Test that missing inclusion proof fails
 #[test]
 fn test_missing_inclusion_proof_fails() {
-    let seal = SealRef::new(vec![0xAB; 32], Some(1)).expect("valid seal");
+    let seal = SealPoint::new(vec![0xAB; 32], Some(1)).expect("valid seal");
 
     let witness = ChainWitness {
         chain: Chain::Bitcoin,
@@ -168,8 +168,8 @@ fn test_proof_witness_consistency() {
 /// Test proof generation with different seals produces different proofs
 #[test]
 fn test_different_seals_different_proofs() {
-    let seal1 = SealRef::new(vec![0xAA; 32], Some(1)).expect("valid seal");
-    let seal2 = SealRef::new(vec![0xBB; 32], Some(2)).expect("valid seal");
+    let seal1 = SealPoint::new(vec![0xAA; 32], Some(1)).expect("valid seal");
+    let seal2 = SealPoint::new(vec![0xBB; 32], Some(2)).expect("valid seal");
 
     let witness = ChainWitness {
         chain: Chain::Bitcoin,

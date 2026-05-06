@@ -1,33 +1,33 @@
-//! Create right page.
+//! Create sanad page.
 
-use crate::context::{generate_id, use_wallet_context, RightStatus, TrackedRight};
+use crate::context::{generate_id, use_wallet_context, SanadStatus, TrackedSanad};
 use crate::pages::common::*;
 use csv_core::Chain;
 use dioxus::prelude::*;
 use std::rc::Rc;
 
 #[component]
-pub fn CreateRight() -> Element {
+pub fn CreateSanad() -> Element {
     let mut wallet_ctx = use_wallet_context();
 
     if let Some(n) = wallet_ctx.notification() {
         return rsx! {
             div { class: "max-w-2xl space-y-6",
                 {notification_banner(n.kind, n.message, move || { wallet_ctx.clear_notification(); })}
-                CreateRightForm {}
+                CreateSanadForm {}
             }
         };
     }
 
     rsx! {
         div { class: "max-w-2xl space-y-6",
-            CreateRightForm {}
+            CreateSanadForm {}
         }
     }
 }
 
 #[component]
-pub fn CreateRightForm() -> Element {
+pub fn CreateSanadForm() -> Element {
     let mut wallet_ctx = use_wallet_context();
     let mut selected_chain = use_signal(|| Chain::Bitcoin);
     let mut value = use_signal(String::new);
@@ -37,7 +37,7 @@ pub fn CreateRightForm() -> Element {
     rsx! {
         div { class: "{card_class()} p-6 space-y-5",
             div { class: "{card_header_class()} -mx-6 -mt-6 mb-4",
-                h2 { class: "font-semibold text-sm", "Create New Right" }
+                h2 { class: "font-semibold text-sm", "Create New Sanad" }
             }
 
             {form_field("Chain", chain_select(move |v: Rc<FormData>| {
@@ -57,21 +57,21 @@ pub fn CreateRightForm() -> Element {
                 div { class: "p-3 bg-red-900/30 border border-red-700/50 rounded-lg text-sm text-red-300", "{e}" }
             }
 
-            if let Some(right_id) = result.read().clone() {
+            if let Some(sanad_id) = result.read().clone() {
                 div { class: "p-4 bg-green-900/30 border border-green-700/50 rounded-lg space-y-2",
-                    p { class: "text-green-300 font-medium", "Right Created!" }
-                    p { class: "font-mono text-sm text-green-400 break-all", "{right_id}" }
+                    p { class: "text-green-300 font-medium", "Sanad Created!" }
+                    p { class: "font-mono text-sm text-green-400 break-all", "{sanad_id}" }
                     div { class: "flex gap-2 mt-2",
                         button {
                             onclick: move |_| {
-                                let right = TrackedRight {
-                                    id: right_id.clone(),
+                                let sanad = TrackedSanad {
+                                    id: sanad_id.clone(),
                                     chain: *selected_chain.read(),
                                     value: value.read().parse().unwrap_or(0),
-                                    status: RightStatus::Active,
+                                    status: SanadStatus::Active,
                                     owner: wallet_ctx.address_for_chain(*selected_chain.read()).unwrap_or_default(),
                                 };
-                                wallet_ctx.add_right(right);
+                                wallet_ctx.add_sanad(sanad);
                                 result.set(None);
                                 value.set(String::new());
                             },
@@ -94,7 +94,7 @@ pub fn CreateRightForm() -> Element {
                     error.set(None);
                 },
                 class: "{btn_full_primary_class()}",
-                "Create Right"
+                "Create Sanad"
             }
         }
     }

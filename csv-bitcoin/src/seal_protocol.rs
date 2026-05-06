@@ -20,10 +20,10 @@ use csv_core::dag::DAGSegment;
 use csv_core::error::AdapterError;
 use csv_core::error::Result as CoreResult;
 use csv_core::proof::{FinalityProof, ProofBundle};
-use csv_core::right::RightId;
-use csv_core::seal::AnchorRef as CoreAnchorRef;
-use csv_core::seal::SealRef as CoreSealRef;
-use csv_core::AnchorLayer;
+use csv_core::sanad::SanadId;
+use csv_core::seal::CommitAnchor as CoreCommitAnchor;
+use csv_core::seal::SealPoint as CoreSealPoint;
+use csv_core::SealProtocol;
 use csv_core::Hash;
 
 use crate::config::BitcoinConfig;
@@ -31,7 +31,7 @@ use crate::error::{BitcoinError, BitcoinResult};
 use crate::rpc::BitcoinRpc;
 use crate::seal::SealRegistry;
 use crate::tx_builder::CommitmentTxBuilder;
-use crate::types::{BitcoinAnchorRef, BitcoinFinalityProof, BitcoinInclusionProof, BitcoinSealRef};
+use crate::types::{BitcoinCommitAnchor, BitcoinFinalityProof, BitcoinInclusionProof, BitcoinSealPoint};
 use crate::wallet::SealWallet;
 
 /// Bitcoin implementation of the SealProtocol trait with HD wallet support
@@ -165,7 +165,7 @@ impl BitcoinSealProtocol {
     fn derive_next_seal(
         &self,
         value_sat: u64,
-    ) -> Result<(BitcoinSealRef, crate::wallet::Bip86Path), AdapterError> {
+    ) -> Result<(BitcoinSealPoint, crate::wallet::Bip86Path), AdapterError> {
         let mut next_index = self
             .next_seal_index
             .lock()
@@ -183,7 +183,7 @@ impl BitcoinSealProtocol {
 
         *next_index += 1;
 
-        Ok((BitcoinSealRef::new(txid, 0, Some(value_sat)), path))
+        Ok((BitcoinSealPoint::new(txid, 0, Some(value_sat)), path))
     }
 
     /// Create a seal backed by a real on-chain UTXO
@@ -200,7 +200,7 @@ impl BitcoinSealProtocol {
     pub fn fund_seal(
         &self,
         outpoint: bitcoin::OutPoint,
-    ) -> Result<(BitcoinSealRef, crate::wallet::Bip86Path), AdapterError> {
+    ) -> Result<(BitcoinSealPoint, crate::wallet::Bip86Path), AdapterError> {
         // Get the UTXO from the wallet
         let utxo = self.wallet.get_utxo(&outpoint).ok_or_else(|| {
             AdapterError::Generic(format!(
@@ -211,7 +211,7 @@ impl BitcoinSealProtocol {
 
         // Create a seal reference from the actual outpoint
         let txid = outpoint.txid.to_byte_array();
-        let seal_ref = BitcoinSealRef::new(txid, outpoint.vout, Some(utxo.amount_sat));
+        let seal_ref = BitcoinSealPoint::new(txid, outpoint.vout, Some(utxo.amount_sat));
 
         // Check if seal is already used
         if self
@@ -300,7 +300,7 @@ impl BitcoinSealProtocol {
     }
 
     /// Verify a UTXO is unspent
-    fn verify_utxo_unspent(&self, seal: &BitcoinSealRef) -> BitcoinResult<()> {
+    fn verify_utxo_unspent(&self, seal: &BitcoinSealPoint) -> BitcoinResult<()> {
         if let Some(rpc) = &self.rpc {
             let unspent = rpc
                 .is_utxo_unspent(seal.txid, seal.vout)
@@ -343,21 +343,21 @@ impl BitcoinSealProtocol {
         &self.config
     }
 
-    /// Find a seal for a given right_id
+    /// Find a seal for a given sanad_id
     /// 
     /// Searches through the wallet's UTXOs to find a seal (UTXO) that is 
-    /// associated with the given right_id. Returns the seal reference if found.
-    pub fn find_seal_for_right(&self, right_id: &RightId) -> Option<BitcoinSealRef> {
-        let _right_bytes = right_id.as_bytes();
+    /// associated with the given sanad_id. Returns the seal reference if found.
+    pub fn find_seal_for_sanad(&self, sanad_id: &SanadId) -> Option<BitcoinSealPoint> {
+        let _sanad_bytes = sanad_id.as_bytes();
         
         for utxo in self.wallet.list_utxos() {
             let outpoint = utxo.outpoint;
             let utxo_key = format!("{}:{}", hex::encode(outpoint.txid), outpoint.vout);
             let seal_id = format!("seal:{}", utxo_key);
             
-            let derived_right = RightId::from_bytes(seal_id.as_bytes());
-            if derived_right == *right_id {
-                return Some(BitcoinSealRef {
+            let derived_sanad = SanadId::from_bytes(seal_id.as_bytes());
+            if derived_sanad == *sanad_id {
+                return Some(BitcoinSealPoint {
                     txid: outpoint.txid.to_byte_array(),
                     vout: outpoint.vout,
                     nonce: Some(utxo.amount_sat),
@@ -386,13 +386,13 @@ fn get_address_utxos(
     Err("get_address_utxos not implemented for this RPC backend".to_string())
 }
 
-impl AnchorLayer for BitcoinSealProtocol {
-    type SealRef = BitcoinSealRef;
-    type AnchorRef = BitcoinAnchorRef;
+impl SealProtocol for BitcoinSealProtocol {
+    type SealPoint = BitcoinSealPoint;
+    type CommitAnchor = BitcoinCommitAnchor;
     type InclusionProof = BitcoinInclusionProof;
     type FinalityProof = BitcoinFinalityProof;
 
-    fn publish(&self, commitment: Hash, seal: Self::SealRef) -> CoreResult<Self::AnchorRef> {
+    fn publish(&self, commitment: Hash, seal: Self::SealPoint) -> CoreResult<Self::CommitAnchor> {
         self.verify_utxo_unspent(&seal)
             .map_err(AdapterError::from)?;
 
@@ -441,7 +441,7 @@ impl AnchorLayer for BitcoinSealProtocol {
             );
 
             let current_height = self.get_current_height();
-            return Ok(BitcoinAnchorRef::new(broadcast_txid, 0, current_height));
+            return Ok(BitcoinCommitAnchor::new(broadcast_txid, 0, current_height));
         }
 
         // Fall back to fallback mode if no RPC client attached
@@ -453,10 +453,10 @@ impl AnchorLayer for BitcoinSealProtocol {
         let _ = registry.mark_seal_used(&seal).map_err(AdapterError::from);
 
         let current_height = self.get_current_height();
-        Ok(BitcoinAnchorRef::new(txid, 0, current_height))
+        Ok(BitcoinCommitAnchor::new(txid, 0, current_height))
     }
 
-    fn verify_inclusion(&self, anchor: Self::AnchorRef) -> CoreResult<Self::InclusionProof> {
+    fn verify_inclusion(&self, anchor: Self::CommitAnchor) -> CoreResult<Self::InclusionProof> {
         // If we have an RPC client, fetch real Merkle proof from the blockchain
         if let Some(rpc) = &self.rpc {
             // Get the block containing the anchor transaction
@@ -480,7 +480,7 @@ impl AnchorLayer for BitcoinSealProtocol {
         Ok(proof)
     }
 
-    fn verify_finality(&self, anchor: Self::AnchorRef) -> CoreResult<Self::FinalityProof> {
+    fn verify_finality(&self, anchor: Self::CommitAnchor) -> CoreResult<Self::FinalityProof> {
         let current_height = self.get_current_height();
 
         if anchor.block_height == 0 {
@@ -502,12 +502,12 @@ impl AnchorLayer for BitcoinSealProtocol {
         Ok(proof)
     }
 
-    fn enforce_seal(&self, seal: Self::SealRef) -> CoreResult<()> {
+    fn enforce_seal(&self, seal: Self::SealPoint) -> CoreResult<()> {
         let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
         registry.mark_seal_used(&seal).map_err(AdapterError::from)
     }
 
-    fn create_seal(&self, value: Option<u64>) -> CoreResult<Self::SealRef> {
+    fn create_seal(&self, value: Option<u64>) -> CoreResult<Self::SealPoint> {
         let value_sat = value.unwrap_or(100_000);
         let (seal_ref, _path) = self.derive_next_seal(value_sat)?;
         Ok(seal_ref)
@@ -518,10 +518,10 @@ impl AnchorLayer for BitcoinSealProtocol {
         contract_id: Hash,
         previous_commitment: Hash,
         transition_payload_hash: Hash,
-        seal_ref: &Self::SealRef,
+        seal_point: &Self::SealPoint,
     ) -> Hash {
         let core_seal =
-            CoreSealRef::new(seal_ref.to_vec(), seal_ref.nonce).expect("valid seal reference");
+            CoreSealPoint::new(seal_ref.to_vec(), seal_ref.nonce).expect("valid seal reference");
         Commitment::simple(
             contract_id,
             previous_commitment,
@@ -534,16 +534,16 @@ impl AnchorLayer for BitcoinSealProtocol {
 
     fn build_proof_bundle(
         &self,
-        anchor: Self::AnchorRef,
+        anchor: Self::CommitAnchor,
         transition_dag: DAGSegment,
     ) -> CoreResult<ProofBundle> {
         let inclusion = self.verify_inclusion(anchor.clone())?;
         let finality = self.verify_finality(anchor.clone())?;
 
-        let seal_ref = CoreSealRef::new(anchor.txid.to_vec(), Some(0))
+        let seal_ref = CoreSealPoint::new(anchor.txid.to_vec(), Some(0))
             .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
-        let anchor_ref = CoreAnchorRef::new(anchor.txid.to_vec(), anchor.block_height, vec![])
+        let anchor_ref = CoreCommitAnchor::new(anchor.txid.to_vec(), anchor.block_height, vec![])
             .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
         let mut proof_bytes = Vec::new();
@@ -575,7 +575,7 @@ impl AnchorLayer for BitcoinSealProtocol {
         .map_err(|e| AdapterError::Generic(e.to_string()))
     }
 
-    fn rollback(&self, anchor: Self::AnchorRef) -> CoreResult<()> {
+    fn rollback(&self, anchor: Self::CommitAnchor) -> CoreResult<()> {
         let current_height = self.get_current_height();
         if anchor.block_height > current_height {
             return Err(AdapterError::ReorgInvalid(format!(
@@ -591,7 +591,7 @@ impl AnchorLayer for BitcoinSealProtocol {
             // The seal txid is derived from the anchor's txid
             let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
             // Try to clear using anchor txid as seal identifier
-            let dummy_seal = BitcoinSealRef::new(anchor.txid, anchor.output_index, None);
+            let dummy_seal = BitcoinSealPoint::new(anchor.txid, anchor.output_index, None);
             registry.clear_seal(&dummy_seal);
         }
 
@@ -641,7 +641,7 @@ mod tests {
         let adapter = test_adapter();
         // block_height = 100 means it's confirmed at height 100
         // current_height is 200, so confirmations = 100 which is > 6 (default finality_depth)
-        let anchor = BitcoinAnchorRef::new([1u8; 32], 0, 100);
+        let anchor = BitcoinCommitAnchor::new([1u8; 32], 0, 100);
         let result = adapter.verify_finality(anchor);
         assert!(result.is_ok());
     }

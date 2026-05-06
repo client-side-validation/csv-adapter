@@ -1,7 +1,7 @@
-//! CSV Explorer - Real-time indexing and visualization for cross-chain rights
+//! CSV Explorer - Real-time indexing and visualization for cross-chain sanads
 //!
 //! Provides real-time indexing, API contracts, and dashboard capabilities
-//! for monitoring rights, transfers, and proofs across all supported chains.
+//! for monitoring sanads, transfers, and proofs across all supported chains.
 
 pub mod api;
 pub mod dashboard;

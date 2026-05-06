@@ -1,6 +1,6 @@
 //! Asset tracker.
 //!
-//! Tracks all assets (Rights) owned by the wallet using IndexedDB for persistent
+//! Tracks all assets (Sanads) owned by the wallet using IndexedDB for persistent
 //! browser storage with optimized queries and secure data handling.
 //!
 //! # Security Features
@@ -10,12 +10,12 @@
 //! - Support for encrypted asset storage (future enhancement)
 //!
 //! # Performance Features
-//! - Indexed queries by chain and right_id
+//! - Indexed queries by chain and sanad_id
 //! - Batch operations for multiple assets
 //! - Lazy loading with cursor-based iteration
 //! - Connection pooling for database access
 
-use csv_core::{Chain, Right, RightId, OwnershipProof};
+use csv_core::{Chain, Sanad, SanadId, OwnershipProof};
 use indexed_db_futures::prelude::*;
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;
@@ -33,11 +33,11 @@ const STORE_NAME: &str = "assets";
 /// Index name for chain-based queries.
 const CHAIN_INDEX: &str = "by_chain";
 
-/// Asset record representing a Right with ownership proof.
+/// Asset record representing a Sanad with ownership proof.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetRecord {
-    /// Right ID (primary key)
-    pub right_id: RightId,
+    /// Sanad ID (primary key)
+    pub sanad_id: SanadId,
     /// Chain where the seal is anchored
     pub chain: Chain,
     /// Commitment hash (hex encoded)
@@ -62,7 +62,7 @@ pub enum AssetTrackerError {
     /// Database connection failed
     DatabaseError(String),
     /// Asset not found
-    NotFound(RightId),
+    NotFound(SanadId),
     /// Serialization failed
     SerializationError(String),
     /// Transaction failed
@@ -138,7 +138,7 @@ impl AssetTracker {
                 // Create object store if it doesn't exist
                 if !db.object_store_names().any(|n| n == STORE_NAME) {
                     let store_params = IdbObjectStoreParams::new()
-                        .with_key_path("right_id")
+                        .with_key_path("sanad_id")
                         .with_auto_increment(false);
                     
                     let store = db
@@ -212,8 +212,8 @@ impl AssetTracker {
             .object_store(&self.store_name)
             .map_err(|e| AssetTrackerError::TransactionError(format!("Failed to access store: {:?}", e)))?;
         
-        // Convert RightId to string key
-        let key = js_sys::JsString::from(hex::encode(asset.right_id.as_bytes()));
+        // Convert SanadId to string key
+        let key = js_sys::JsString::from(hex::encode(asset.sanad_id.as_bytes()));
         
         // Put the asset (insert or update)
         store
@@ -225,7 +225,7 @@ impl AssetTracker {
         tx.await
             .map_err(|e| AssetTrackerError::TransactionError(format!("Transaction failed: {:?}", e)))?;
         
-        web_sys::console::log_1(&format!("Asset added/updated: {:?}", asset.right_id).into());
+        web_sys::console::log_1(&format!("Asset added/updated: {:?}", asset.sanad_id).into());
         
         Ok(())
     }
@@ -233,16 +233,16 @@ impl AssetTracker {
     /// Remove an asset from the database.
     ///
     /// # Arguments
-    /// * `right_id` - ID of the asset to remove
+    /// * `sanad_id` - ID of the asset to remove
     ///
     /// # Returns
     /// * `Ok(())` on success
     /// * `Err(AssetTrackerError::NotFound)` if asset doesn't exist
-    pub async fn remove_asset(&self, right_id: &RightId) -> Result<(), AssetTrackerError> {
+    pub async fn remove_asset(&self, sanad_id: &SanadId) -> Result<(), AssetTrackerError> {
         // First check if asset exists
-        let exists = self.get_asset(right_id).await.is_ok();
+        let exists = self.get_asset(sanad_id).await.is_ok();
         if !exists {
-            return Err(AssetTrackerError::NotFound(right_id.clone()));
+            return Err(AssetTrackerError::NotFound(sanad_id.clone()));
         }
         
         // Get database reference
@@ -260,8 +260,8 @@ impl AssetTracker {
             .object_store(&self.store_name)
             .map_err(|e| AssetTrackerError::TransactionError(format!("Failed to access store: {:?}", e)))?;
         
-        // Create key from right_id
-        let key = js_sys::JsString::from(hex::encode(right_id.as_bytes()));
+        // Create key from sanad_id
+        let key = js_sys::JsString::from(hex::encode(sanad_id.as_bytes()));
         
         // Delete the asset
         store
@@ -273,20 +273,20 @@ impl AssetTracker {
         tx.await
             .map_err(|e| AssetTrackerError::TransactionError(format!("Transaction failed: {:?}", e)))?;
         
-        web_sys::console::log_1(&format!("Asset removed: {:?}", right_id).into());
+        web_sys::console::log_1(&format!("Asset removed: {:?}", sanad_id).into());
         
         Ok(())
     }
 
-    /// Get an asset by its Right ID.
+    /// Get an asset by its Sanad ID.
     ///
     /// # Arguments
-    /// * `right_id` - ID of the asset to retrieve
+    /// * `sanad_id` - ID of the asset to retrieve
     ///
     /// # Returns
     /// * `Ok(AssetRecord)` if found
     /// * `Err(AssetTrackerError::NotFound)` if not found
-    pub async fn get_asset(&self, right_id: &RightId) -> Result<AssetRecord, AssetTrackerError> {
+    pub async fn get_asset(&self, sanad_id: &SanadId) -> Result<AssetRecord, AssetTrackerError> {
         // Get database reference
         let db_guard = self.db.read().await;
         let db = db_guard
@@ -302,8 +302,8 @@ impl AssetTracker {
             .object_store(&self.store_name)
             .map_err(|e| AssetTrackerError::TransactionError(format!("Failed to access store: {:?}", e)))?;
         
-        // Create key from right_id
-        let key = js_sys::JsString::from(hex::encode(right_id.as_bytes()));
+        // Create key from sanad_id
+        let key = js_sys::JsString::from(hex::encode(sanad_id.as_bytes()));
         
         // Get the asset
         let result = store
@@ -322,7 +322,7 @@ impl AssetTracker {
                     .map_err(|e| AssetTrackerError::SerializationError(format!("Failed to deserialize: {:?}", e)))?;
                 Ok(asset)
             }
-            None => Err(AssetTrackerError::NotFound(right_id.clone())),
+            None => Err(AssetTrackerError::NotFound(sanad_id.clone())),
         }
     }
 
@@ -468,10 +468,10 @@ impl AssetTracker {
         Ok(assets.iter().filter_map(|a| a.value).sum())
     }
 
-    /// Update asset value by Right ID.
+    /// Update asset value by Sanad ID.
     ///
     /// # Arguments
-    /// * `right_id` - ID of asset to update
+    /// * `sanad_id` - ID of asset to update
     /// * `new_value` - New value to set
     ///
     /// # Returns
@@ -479,11 +479,11 @@ impl AssetTracker {
     /// * `Err(AssetTrackerError::NotFound)` if asset doesn't exist
     pub async fn update_asset_value(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
         new_value: f64,
     ) -> Result<(), AssetTrackerError> {
         // First get the asset
-        let mut asset = self.get_asset(right_id).await?;
+        let mut asset = self.get_asset(sanad_id).await?;
         
         // Update value
         asset.value = Some(new_value);
@@ -491,7 +491,7 @@ impl AssetTracker {
         // Save updated asset
         self.add_asset(asset).await?;
         
-        web_sys::console::log_1(&format!("Updated asset value: {:?} = {}", right_id, new_value).into());
+        web_sys::console::log_1(&format!("Updated asset value: {:?} = {}", sanad_id, new_value).into());
         
         Ok(())
     }
@@ -540,7 +540,7 @@ impl AssetTracker {
                 }
             };
             
-            let key = js_sys::JsString::from(hex::encode(asset.right_id.as_bytes()));
+            let key = js_sys::JsString::from(hex::encode(asset.sanad_id.as_bytes()));
             
             match store.put_with_key(&asset_json, &key).await {
                 Ok(_) => added += 1,

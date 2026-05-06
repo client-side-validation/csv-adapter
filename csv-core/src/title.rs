@@ -59,21 +59,21 @@ impl SanadId {
     }
 }
 
-impl From<crate::right::RightId> for SanadId {
-    fn from(right_id: crate::right::RightId) -> Self {
-        SanadId(right_id.0)
+impl From<crate::sanad::SanadId> for SanadId {
+    fn from(sanad_id: crate::sanad::SanadId) -> Self {
+        SanadId(sanad_id.0)
     }
 }
 
-impl From<&crate::right::RightId> for SanadId {
-    fn from(right_id: &crate::right::RightId) -> Self {
-        SanadId(right_id.0)
+impl From<&crate::sanad::SanadId> for SanadId {
+    fn from(sanad_id: &crate::sanad::SanadId) -> Self {
+        SanadId(sanad_id.0)
     }
 }
 
-impl From<SanadId> for crate::right::RightId {
+impl From<SanadId> for crate::sanad::SanadId {
     fn from(sanad_id: SanadId) -> Self {
-        crate::right::RightId(sanad_id.0)
+        crate::sanad::SanadId(sanad_id.0)
     }
 }
 
@@ -93,8 +93,8 @@ pub struct OwnershipProof {
     pub scheme: Option<crate::signature::SignatureScheme>,
 }
 
-impl From<crate::right::OwnershipProof> for OwnershipProof {
-    fn from(proof: crate::right::OwnershipProof) -> Self {
+impl From<crate::sanad::OwnershipProof> for OwnershipProof {
+    fn from(proof: crate::sanad::OwnershipProof) -> Self {
         Self {
             proof: proof.proof,
             owner: proof.owner,
@@ -103,7 +103,7 @@ impl From<crate::right::OwnershipProof> for OwnershipProof {
     }
 }
 
-impl From<OwnershipProof> for crate::right::OwnershipProof {
+impl From<OwnershipProof> for crate::sanad::OwnershipProof {
     fn from(proof: OwnershipProof) -> Self {
         Self {
             proof: proof.proof,
@@ -538,21 +538,21 @@ impl Sanad {
     }
 }
 
-impl From<crate::right::Right> for Sanad {
-    fn from(right: crate::right::Right) -> Self {
+impl From<crate::sanad::Sanad> for Sanad {
+    fn from(sanad: crate::sanad::Sanad) -> Self {
         Self {
-            id: right.id.into(),
-            commitment: right.commitment,
-            owner: right.owner.into(),
-            salt: right.salt,
-            nullifier: right.nullifier,
-            state_root: right.state_root,
-            execution_proof: right.execution_proof,
+            id: sanad.id.into(),
+            commitment: sanad.commitment,
+            owner: sanad.owner.into(),
+            salt: sanad.salt,
+            nullifier: sanad.nullifier,
+            state_root: sanad.state_root,
+            execution_proof: sanad.execution_proof,
         }
     }
 }
 
-impl From<Sanad> for crate::right::Right {
+impl From<Sanad> for crate::sanad::Sanad {
     fn from(sanad: Sanad) -> Self {
         Self {
             id: sanad.id.into(),
@@ -592,16 +592,16 @@ pub enum SanadError {
     InvalidSanadId,
 }
 
-impl From<crate::right::RightError> for SanadError {
-    fn from(err: crate::right::RightError) -> Self {
+impl From<crate::sanad::SanadError> for SanadError {
+    fn from(err: crate::sanad::SanadError) -> Self {
         match err {
-            crate::right::RightError::MissingOwnershipProof => SanadError::MissingOwnershipProof,
-            crate::right::RightError::InvalidOwnershipProof => SanadError::InvalidOwnershipProof,
-            crate::right::RightError::InvalidCommitment => SanadError::InvalidCommitment,
-            crate::right::RightError::AlreadyConsumed => SanadError::AlreadyConsumed,
-            crate::right::RightError::InvalidNullifier => SanadError::InvalidNullifier,
-            crate::right::RightError::InvalidEncoding => SanadError::InvalidEncoding,
-            crate::right::RightError::InvalidRightId => SanadError::InvalidSanadId,
+            crate::sanad::SanadError::MissingOwnershipProof => SanadError::MissingOwnershipProof,
+            crate::sanad::SanadError::InvalidOwnershipProof => SanadError::InvalidOwnershipProof,
+            crate::sanad::SanadError::InvalidCommitment => SanadError::InvalidCommitment,
+            crate::sanad::SanadError::AlreadyConsumed => SanadError::AlreadyConsumed,
+            crate::sanad::SanadError::InvalidNullifier => SanadError::InvalidNullifier,
+            crate::sanad::SanadError::InvalidEncoding => SanadError::InvalidEncoding,
+            crate::sanad::SanadError::InvalidSanadId => SanadError::InvalidSanadId,
         }
     }
 }

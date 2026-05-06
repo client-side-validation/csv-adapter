@@ -34,21 +34,21 @@ pub enum CsvError {
         chain: Chain,
     },
 
-    /// The specified Right ID is invalid or malformed.
-    #[error("Invalid Right ID: {0}")]
-    InvalidRightId(String),
+    /// The specified Sanad ID is invalid or malformed.
+    #[error("Invalid Sanad ID: {0}")]
+    InvalidSanadId(String),
 
-    /// The specified Right was not found.
-    #[error("Right not found: {0}")]
-    RightNotFound(String),
+    /// The specified Sanad was not found.
+    #[error("Sanad not found: {0}")]
+    SanadNotFound(String),
 
     /// The specified transfer was not found.
     #[error("Transfer not found: {0}")]
     TransferNotFound(String),
 
-    /// A Right has already been consumed (single-use violation).
-    #[error("Right already consumed: {0}")]
-    RightAlreadyConsumed(String),
+    /// A Sanad has already been consumed (single-use violation).
+    #[error("Sanad already consumed: {0}")]
+    SanadAlreadyConsumed(String),
 
     /// The commitment hash is invalid.
     #[error("Invalid commitment: {0}")]
@@ -134,10 +134,10 @@ impl HasErrorSuggestion for CsvError {
             Self::ChainNotSupported(_) => error_codes::CSV_CHAIN_NOT_SUPPORTED,
             Self::ChainNotEnabled(_) => error_codes::CSV_CHAIN_NOT_ENABLED,
             Self::InsufficientFunds { .. } => error_codes::CSV_INSUFFICIENT_FUNDS,
-            Self::InvalidRightId(_) => error_codes::CSV_INVALID_RIGHT_ID,
-            Self::RightNotFound(_) => error_codes::CSV_RIGHT_NOT_FOUND,
+            Self::InvalidSanadId(_) => error_codes::CSV_INVALID_SANAD_ID,
+            Self::SanadNotFound(_) => error_codes::CSV_SANAD_NOT_FOUND,
             Self::TransferNotFound(_) => error_codes::CSV_TRANSFER_NOT_FOUND,
-            Self::RightAlreadyConsumed(_) => error_codes::CSV_RIGHT_ALREADY_CONSUMED,
+            Self::SanadAlreadyConsumed(_) => error_codes::CSV_SANAD_ALREADY_CONSUMED,
             Self::InvalidCommitment(_) => error_codes::CSV_INVALID_COMMITMENT,
             Self::ProofVerificationFailed(_) => error_codes::CSV_PROOF_VERIFICATION_FAILED,
             Self::WalletError(_) => error_codes::CSV_WALLET_ERROR,
@@ -181,17 +181,17 @@ impl HasErrorSuggestion for CsvError {
                     chain, needed, chain
                 )
             }
-            Self::InvalidRightId(id) => {
+            Self::InvalidSanadId(id) => {
                 format!(
-                    "Right ID '{}' is invalid. Right IDs must be 32-byte hex strings (0x + 64 hex chars). \
+                    "Sanad ID '{}' is invalid. Sanad IDs must be 32-byte hex strings (0x + 64 hex chars). \
                      Verify the ID format and try again.",
                     id
                 )
             }
-            Self::RightNotFound(id) => {
+            Self::SanadNotFound(id) => {
                 format!(
-                    "Right '{}' not found. Rights exist in client-side state, not on-chain. \
-                     Check: 1) The ID is correct, 2) You own this right, 3) It wasn't already consumed.",
+                    "Sanad '{}' not found. Sanads exist in client-side state, not on-chain. \
+                     Check: 1) The ID is correct, 2) You own this sanad, 3) It wasn't already consumed.",
                     id
                 )
             }
@@ -202,10 +202,10 @@ impl HasErrorSuggestion for CsvError {
                     id
                 )
             }
-            Self::RightAlreadyConsumed(id) => {
+            Self::SanadAlreadyConsumed(id) => {
                 format!(
-                    "Right '{}' has already been consumed. Rights are single-use seals. \
-                     You cannot transfer or use this right again.",
+                    "Sanad '{}' has already been consumed. Sanads are single-use seals. \
+                     You cannot transfer or use this sanad again.",
                     id
                 )
             }

@@ -1,6 +1,6 @@
-//! Dashboard server for rights and transfers visualization
+//! Dashboard server for sanads and transfers visualization
 //!
-//! Provides a web-based dashboard for monitoring cross-chain rights,
+//! Provides a web-based dashboard for monitoring cross-chain sanads,
 //! transfers, and real-time indexing status.
 
 use crate::indexing::IndexingManager;
@@ -81,14 +81,14 @@ impl DashboardServer {
             }))
             .and_then(handlers::get_metrics);
 
-        let api_rights = warp::path("api")
-            .and(warp::path("rights"))
+        let api_sanads = warp::path("api")
+            .and(warp::path("sanads"))
             .and(warp::get())
             .and(warp::any().map({
                 let indexing_manager = self.indexing_manager.clone();
                 move || indexing_manager.clone()
             }))
-            .and_then(handlers::get_rights_summary);
+            .and_then(handlers::get_sanads_summary);
 
         let api_transfers = warp::path("api")
             .and(warp::path("transfers"))
@@ -122,7 +122,7 @@ impl DashboardServer {
         // Combine all routes
         dashboard
             .or(api_metrics)
-            .or(api_rights)
+            .or(api_sanads)
             .or(api_transfers)
             .or(api_chains)
             .or(static_files)
@@ -143,7 +143,7 @@ impl DashboardServer {
 /// Dashboard request handlers
 pub mod handlers {
     use super::*;
-    use crate::indexing::{RightsQuery, TransferQuery};
+    use crate::indexing::{SanadsQuery, TransferQuery};
 
     /// Serve the main dashboard HTML page
     pub async fn serve_dashboard(
@@ -161,11 +161,11 @@ pub mod handlers {
         Ok(warp::reply::json(&metrics))
     }
 
-    /// Get rights summary for dashboard
-    pub async fn get_rights_summary(
+    /// Get sanads summary for dashboard
+    pub async fn get_sanads_summary(
         indexing_manager: Arc<IndexingManager>,
     ) -> Result<impl Reply, warp::Rejection> {
-        let query = RightsQuery {
+        let query = SanadsQuery {
             owner: None,
             chain: None,
             status: None,
@@ -173,13 +173,13 @@ pub mod handlers {
             offset: Some(0),
         };
 
-        match indexing_manager.search_rights(&query).await {
-            Ok(rights) => {
+        match indexing_manager.search_sanads(&query).await {
+            Ok(sanads) => {
                 let summary = serde_json::json!({
-                    "total_rights": rights.len(),
-                    "rights": rights,
-                    "by_chain": group_rights_by_chain(&rights),
-                    "by_status": group_rights_by_status(&rights)
+                    "total_sanads": sanads.len(),
+                    "sanads": sanads,
+                    "by_chain": group_sanads_by_chain(&sanads),
+                    "by_status": group_sanads_by_status(&sanads)
                 });
                 Ok(warp::reply::json(&summary))
             }
@@ -265,23 +265,23 @@ pub mod handlers {
         Ok(warp::reply::json(&chain_status))
     }
 
-    /// Group rights by chain
-    fn group_rights_by_chain(rights: &[crate::indexing::IndexedRight]) -> serde_json::Value {
+    /// Group sanads by chain
+    fn group_sanads_by_chain(sanads: &[crate::indexing::IndexedSanad]) -> serde_json::Value {
         let mut chain_counts = HashMap::new();
 
-        for right in rights {
-            *chain_counts.entry(&right.chain).or_insert(0) += 1;
+        for sanad in sanads {
+            *chain_counts.entry(&sanad.chain).or_insert(0) += 1;
         }
 
         serde_json::to_value(chain_counts).unwrap_or(serde_json::Value::Object(Default::default()))
     }
 
-    /// Group rights by status
-    fn group_rights_by_status(rights: &[crate::indexing::IndexedRight]) -> serde_json::Value {
+    /// Group sanads by status
+    fn group_sanads_by_status(sanads: &[crate::indexing::IndexedSanad]) -> serde_json::Value {
         let mut status_counts = HashMap::new();
 
-        for right in rights {
-            let status_str = format!("{:?}", right.status);
+        for sanad in sanads {
+            let status_str = format!("{:?}", sanad.status);
             *status_counts.entry(status_str).or_insert(0) += 1;
         }
 
@@ -410,7 +410,7 @@ async fn generate_dashboard_html() -> String {
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            margin-right: 0.5rem;
+            margin-sanad: 0.5rem;
         }
         
         .status-active {
@@ -478,11 +478,11 @@ async fn generate_dashboard_html() -> String {
         
         <div class="grid">
             <div class="card">
-                <h2>Rights Summary</h2>
-                <div id="rights-content">
-                    <p>Loading rights data...</p>
+                <h2>Sanads Summary</h2>
+                <div id="sanads-content">
+                    <p>Loading sanads data...</p>
                 </div>
-                <button class="refresh-btn" onclick="refreshRights()">Refresh</button>
+                <button class="refresh-btn" onclick="refreshSanads()">Refresh</button>
             </div>
             
             <div class="card">
@@ -500,7 +500,7 @@ async fn generate_dashboard_html() -> String {
         window.addEventListener('load', () => {
             loadMetrics();
             loadChainStatus();
-            loadRights();
+            loadSanads();
             loadTransfers();
         });
         
@@ -516,8 +516,8 @@ async fn generate_dashboard_html() -> String {
                         <span class="metric-value">${metrics.events_processed || 0}</span>
                     </div>
                     <div class="metric">
-                        <span class="metric-label">Rights Indexed</span>
-                        <span class="metric-value">${metrics.rights_indexed || 0}</span>
+                        <span class="metric-label">Sanads Indexed</span>
+                        <span class="metric-value">${metrics.sanads_indexed || 0}</span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">Transfers Indexed</span>
@@ -562,30 +562,30 @@ async fn generate_dashboard_html() -> String {
             }
         }
         
-        // Load rights
-        async function loadRights() {
+        // Load sanads
+        async function loadSanads() {
             try {
-                const response = await fetch('/api/rights');
-                const rights = await response.json();
+                const response = await fetch('/api/sanads');
+                const sanads = await response.json();
                 
                 let html = `
                     <div class="metric">
-                        <span class="metric-label">Total Rights</span>
-                        <span class="metric-value">${rights.total_rights || 0}</span>
+                        <span class="metric-label">Total Sanads</span>
+                        <span class="metric-value">${sanads.total_sanads || 0}</span>
                     </div>
                 `;
                 
-                if (rights.by_chain && Object.keys(rights.by_chain).length > 0) {
+                if (sanads.by_chain && Object.keys(sanads.by_chain).length > 0) {
                     html += '<h3 style="margin-top: 1rem; margin-bottom: 0.5rem;">By Chain</h3>';
-                    Object.entries(rights.by_chain).forEach(([chain, count]) => {
+                    Object.entries(sanads.by_chain).forEach(([chain, count]) => {
                         html += `<div class="metric"><span class="metric-label">${chain}</span><span class="metric-value">${count}</span></div>`;
                     });
                 }
                 
-                document.getElementById('rights-content').innerHTML = html;
+                document.getElementById('sanads-content').innerHTML = html;
             } catch (error) {
-                console.error('Error loading rights:', error);
-                document.getElementById('rights-content').innerHTML = '<p>Error loading rights</p>';
+                console.error('Error loading sanads:', error);
+                document.getElementById('sanads-content').innerHTML = '<p>Error loading sanads</p>';
             }
         }
         
@@ -617,8 +617,8 @@ async fn generate_dashboard_html() -> String {
         }
         
         // Refresh functions
-        function refreshRights() {
-            loadRights();
+        function refreshSanads() {
+            loadSanads();
         }
         
         function refreshTransfers() {
@@ -629,7 +629,7 @@ async fn generate_dashboard_html() -> String {
         setInterval(() => {
             loadMetrics();
             loadChainStatus();
-            loadRights();
+            loadSanads();
             loadTransfers();
         }, 30000);
     </script>

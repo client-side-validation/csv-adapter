@@ -2,14 +2,14 @@
 /**
  * CSV MCP Server — AI Agent Integration
  *
- * Enables AI agents (Claude, GPT, etc.) to operate CSV rights workflows
+ * Enables AI agents (Claude, GPT, etc.) to operate CSV sanads workflows
  * through the Model Context Protocol (MCP).
  *
  * High-value actions for MCP:
  * - create_seal(chain, value) — agent creates a seal
- * - transfer_right(right_id, destination) — agent transfers a right
+ * - transfer_sanad(sanad_id, destination) — agent transfers a sanad
  * - verify_proof(bundle_json) — agent verifies a proof bundle
- * - get_rights(address) — agent lists rights for an address
+ * - get_sanads(address) — agent lists sanads for an address
  * - monitor_transfer(transfer_id) — agent watches transfer status
  *
  * Usage:
@@ -56,7 +56,7 @@ function getTools() {
       name: 'create_seal',
       description:
         'Create a single-use seal on a blockchain. ' +
-        'A seal is a chain-native lock that enforces the single-use property of a digital right. ' +
+        'A seal is a chain-native lock that enforces the single-use property of a digital sanad. ' +
         'Each chain has its own seal format (Bitcoin: UTXO, Ethereum: storage slot, Sui: ObjectId, etc.).',
       inputSchema: {
         type: 'object',
@@ -75,17 +75,17 @@ function getTools() {
       },
     },
     {
-      name: 'transfer_right',
+      name: 'transfer_sanad',
       description:
-        'Transfer a digital right to a new owner. ' +
+        'Transfer a digital sanad to a new owner. ' +
         'This consumes the current seal and creates a new one for the destination. ' +
         'The transfer is recorded in the commitment chain for provenance.',
       inputSchema: {
         type: 'object',
         properties: {
-          right_id: {
+          sanad_id: {
             type: 'string',
-            description: 'The right ID to transfer (32-byte hex string)',
+            description: 'The sanad ID to transfer (32-byte hex string)',
           },
           destination: {
             type: 'string',
@@ -94,17 +94,17 @@ function getTools() {
           chain: {
             type: 'string',
             enum: ['bitcoin', 'ethereum', 'sui', 'aptos', 'solana'],
-            description: 'The chain where the right exists',
+            description: 'The chain where the sanad exists',
           },
         },
-        required: ['right_id', 'destination'],
+        required: ['sanad_id', 'destination'],
       },
     },
     {
       name: 'verify_proof',
       description:
         'Verify a proof bundle offline. ' +
-        'A proof bundle contains all cryptographic evidence needed to verify a right. ' +
+        'A proof bundle contains all cryptographic evidence needed to verify a sanad. ' +
         'This verification requires NO blockchain RPC calls — pure cryptography. ' +
         'This is the CSV competitive advantage over traditional bridges.',
       inputSchema: {
@@ -119,10 +119,10 @@ function getTools() {
       },
     },
     {
-      name: 'get_rights',
+      name: 'get_sanads',
       description:
-        'List all rights owned by an address on a specific chain. ' +
-        'Returns right IDs, values, and current status.',
+        'List all sanads owned by an address on a specific chain. ' +
+        'Returns sanad IDs, values, and current status.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -174,12 +174,12 @@ function getTools() {
       inputSchema: {
         type: 'object',
         properties: {
-          right_id: {
+          sanad_id: {
             type: 'string',
-            description: 'The right ID to generate a proof bundle for',
+            description: 'The sanad ID to generate a proof bundle for',
           },
         },
-        required: ['right_id'],
+        required: ['sanad_id'],
       },
     },
     {
@@ -229,14 +229,14 @@ async function startServer(transportType: 'stdio' | 'sse' = 'stdio', port?: numb
     };
   });
 
-  // transfer_right tool
-  server.registerTool('transfer_right', {
-    description: tools.find((t) => t.name === 'transfer_right')!.description,
-    inputSchema: tools.find((t) => t.name === 'transfer_right')!.inputSchema as any,
+  // transfer_sanad tool
+  server.registerTool('transfer_sanad', {
+    description: tools.find((t) => t.name === 'transfer_sanad')!.description,
+    inputSchema: tools.find((t) => t.name === 'transfer_sanad')!.inputSchema as any,
   }, async (args: any) => {
     const result = await executeCsvCommand([
-      'right', 'transfer',
-      '--right-id', args.right_id,
+      'sanad', 'transfer',
+      '--sanad-id', args.sanad_id,
       '--destination', args.destination,
       ...(args.chain ? ['--chain', args.chain] : []),
     ]);
@@ -258,13 +258,13 @@ async function startServer(transportType: 'stdio' | 'sse' = 'stdio', port?: numb
     };
   });
 
-  // get_rights tool
-  server.registerTool('get_rights', {
-    description: tools.find((t) => t.name === 'get_rights')!.description,
-    inputSchema: tools.find((t) => t.name === 'get_rights')!.inputSchema as any,
+  // get_sanads tool
+  server.registerTool('get_sanads', {
+    description: tools.find((t) => t.name === 'get_sanads')!.description,
+    inputSchema: tools.find((t) => t.name === 'get_sanads')!.inputSchema as any,
   }, async (args: any) => {
     const result = await executeCsvCommand([
-      'right', 'list',
+      'sanad', 'list',
       '--address', args.address,
       ...(args.chain ? ['--chain', args.chain] : []),
     ]);
@@ -304,7 +304,7 @@ async function startServer(transportType: 'stdio' | 'sse' = 'stdio', port?: numb
         zkProofs: true,
       },
       competitiveAdvantages: [
-        'No custody — rights are off-chain state, seals are chain-enforced',
+        'No custody — sanads are off-chain state, seals are chain-enforced',
         'No trusted bridge — proof bundles are self-verifying',
         'Offline verification — anyone with the bundle can verify',
         'Cryptographic double-spend prevention',
@@ -322,7 +322,7 @@ async function startServer(transportType: 'stdio' | 'sse' = 'stdio', port?: numb
     description: tools.find((t) => t.name === 'export_proof_bundle')!.description,
     inputSchema: tools.find((t) => t.name === 'export_proof_bundle')!.inputSchema as any,
   }, async (args: any) => {
-    const result = await executeCsvCommand(['proof', 'export', '--right-id', args.right_id]);
+    const result = await executeCsvCommand(['proof', 'export', '--sanad-id', args.sanad_id]);
     return {
       content: [{ type: 'text', text: result.stdout }],
       isError: result.exitCode !== 0,

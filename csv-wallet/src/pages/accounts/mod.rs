@@ -1,6 +1,6 @@
 //! Account management and dashboard pages.
 
-use crate::context::types::{RightStatus, TransferStatus};
+use crate::context::types::{SanadStatus, TransferStatus};
 use crate::context::use_wallet_context;
 use crate::hooks::{format_balance_display, AccountBalance};
 use crate::pages::common::*;
@@ -17,7 +17,7 @@ pub use transactions::AccountTransactions;
 pub fn Dashboard() -> Element {
     let wallet_ctx = use_wallet_context();
     let accounts = wallet_ctx.accounts();
-    let rights = wallet_ctx.rights();
+    let sanads = wallet_ctx.sanads();
     let transfers = wallet_ctx.transfers();
     let has_wallet = wallet_ctx.is_initialized();
 
@@ -85,9 +85,9 @@ pub fn Dashboard() -> Element {
         };
     }
 
-    let active_rights = rights
+    let active_sanads = sanads
         .iter()
-        .filter(|r| r.status == RightStatus::Active)
+        .filter(|r| r.status == SanadStatus::Active)
         .count();
     let completed_transfers = transfers
         .iter()
@@ -101,7 +101,7 @@ pub fn Dashboard() -> Element {
             // Stats row
             div { class: "grid grid-cols-2 lg:grid-cols-4 gap-4",
                 {stat_card("Accounts", &accounts.len().to_string(), "\u{1F4B3}")}
-                {stat_card("Active Rights", &active_rights.to_string(), "\u{1F48E}")}
+                {stat_card("Active Sanads", &active_sanads.to_string(), "\u{1F48E}")}
                 {stat_card("Transfers", &completed_transfers.to_string(), "\u{21C4}")}
                 {stat_card("Network", "Testnet", "\u{1F310}")}
             }
@@ -159,10 +159,10 @@ pub fn Dashboard() -> Element {
 
             // Quick Actions
             div { class: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4",
-                Link { to: Route::CreateRight {}, class: "{card_class()} p-5 block",
+                Link { to: Route::CreateSanad {}, class: "{card_class()} p-5 block",
                     div { class: "flex items-center gap-3",
                         span { class: "text-2xl", "\u{1F48E}" },
-                        h3 { class: "font-semibold text-sm", "Create Right" }
+                        h3 { class: "font-semibold text-sm", "Create Sanad" }
                     }
                 }
                 Link { to: Route::CrossChainTransfer {}, class: "{card_class()} p-5 block",

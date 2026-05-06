@@ -366,7 +366,7 @@ fn validate_anchor_reference(bundle: &ProofBundle) -> Result<()> {
 ///
 /// This function performs **cryptographic signature verification** on all
 /// signatures in the bundle. It is a critical security check that ensures
-/// the proof was authorized by the rightful owner(s).
+/// the proof was authorized by the sanadful owner(s).
 ///
 /// # Signature Format
 ///

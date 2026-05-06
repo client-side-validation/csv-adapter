@@ -1,7 +1,7 @@
 //! Proof management facade.
 //!
 //! The [`ProofManager`] handles generation and verification of
-//! cryptographic proofs for Rights and cross-chain transfers.
+//! cryptographic proofs for Sanads and cross-chain transfers.
 //!
 //! # Proof Types
 //!
@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use csv_core::{Chain, Hash, ProofBundle, RightId};
+use csv_core::{Chain, Hash, ProofBundle, SanadId};
 
 use crate::client::ClientRef;
 use crate::errors::CsvError;
@@ -34,8 +34,8 @@ use crate::errors::CsvError;
 /// #     .build()?;
 /// let proofs = client.proofs();
 ///
-/// // Generate a proof bundle for a right
-/// let bundle = proofs.generate(&right_id, Chain::Bitcoin)?;
+/// // Generate a proof bundle for a sanad
+/// let bundle = proofs.generate(&sanad_id, Chain::Bitcoin)?;
 /// # Ok(())
 /// # }
 /// ```
@@ -48,7 +48,7 @@ impl ProofManager {
         Self { client }
     }
 
-    /// Generate a proof bundle for a Right on the specified chain.
+    /// Generate a proof bundle for a Sanad on the specified chain.
     ///
     /// This creates a complete [`ProofBundle`] containing:
     /// - Inclusion proof (chain-specific format)
@@ -57,8 +57,8 @@ impl ProofManager {
     ///
     /// # Arguments
     ///
-    /// * `right_id` — The Right to generate a proof for.
-    /// * `chain` — The chain where the Right's seal is anchored.
+    /// * `sanad_id` — The Sanad to generate a proof for.
+    /// * `chain` — The chain where the Sanad's seal is anchored.
     ///
     /// # Chain-Specific Proof Formats
     ///
@@ -66,7 +66,7 @@ impl ProofManager {
     /// - **Ethereum**: MPT receipt proof + log inclusion
     /// - **Sui**: Checkpoint certification + transaction effects
     /// - **Aptos**: Ledger info proof + event stream
-    pub fn generate(&self, _right_id: &RightId, chain: Chain) -> Result<ProofBundle, CsvError> {
+    pub fn generate(&self, _sanad_id: &SanadId, chain: Chain) -> Result<ProofBundle, CsvError> {
         if !self.client.is_chain_enabled(chain) {
             return Err(CsvError::ChainNotSupported(chain));
         }
@@ -79,18 +79,18 @@ impl ProofManager {
         })
     }
 
-    /// Verify a proof bundle against an expected Right ID.
+    /// Verify a proof bundle against an expected Sanad ID.
     ///
     /// This is the core client-side validation function. It verifies:
     /// 1. The inclusion proof is valid (transaction is in a block)
     /// 2. The finality proof is sufficient (block is finalized)
     /// 3. The seal was consumed exactly once (single-use enforcement)
-    /// 4. If `expected_right_id` is provided, the proof resolves to it
+    /// 4. If `expected_sanad_id` is provided, the proof resolves to it
     ///
     /// # Arguments
     ///
     /// * `proof` — The proof bundle to verify.
-    /// * `expected_right_id` — Optional expected Right ID after verification.
+    /// * `expected_sanad_id` — Optional expected Sanad ID after verification.
     ///
     /// # Returns
     ///
@@ -98,13 +98,13 @@ impl ProofManager {
     pub fn verify(
         &self,
         proof: &ProofBundle,
-        expected_right_id: Option<&RightId>,
+        expected_sanad_id: Option<&SanadId>,
     ) -> Result<bool, CsvError> {
         // In a full implementation, this would:
         // 1. Extract the inclusion proof and verify it against the source chain
         // 2. Verify the finality proof meets the required depth
         // 3. Check the seal registry for double-spend
-        // 4. If expected_right_id is provided, verify the proof resolves to it
+        // 4. If expected_sanad_id is provided, verify the proof resolves to it
         //
         // The chain adapters provide chain-specific verification:
         // - Bitcoin: SPV verification with merkle proof
@@ -112,7 +112,7 @@ impl ProofManager {
         // - Sui: Checkpoint verification with Narwhal consensus
         // - Aptos: Ledger info verification with HotStuff
 
-        let _ = expected_right_id;
+        let _ = expected_sanad_id;
 
         // Basic validation: proof bundle must have valid structure
         // In production, full cryptographic verification happens here

@@ -32,7 +32,7 @@ In order of impact:
 
 **Impact 1 — MPC Tree (Already Designed, Not Wired)**  
 `csv-adapter-core/src/mpc.rs` is the single biggest gas lever. Multiple commitments
-share one Bitcoin transaction output via the MPC Merkle root. 10 rights, 1 tx fee split
+share one Bitcoin transaction output via the MPC Merkle root. 10 sanads, 1 tx fee split
 10 ways. This is a ~10x cost reduction for active users. Phase 4.5 in the main plan.
 
 **Impact 2 — Real Fee Estimation**  
@@ -77,8 +77,8 @@ pub enum SignatureScheme {
 }
 ```
 
-`SealRef.seal_id: Vec<u8>` is generic enough to hold any key material including PQ keys.
-The `SealRef` serialization format is forward-compatible. The signature trait is the extension point.
+`SealPoint.seal_id: Vec<u8>` is generic enough to hold any key material including PQ keys.
+The `SealPoint` serialization format is forward-compatible. The signature trait is the extension point.
 
 ### Why This Matters for CSV Specifically
 
@@ -148,13 +148,13 @@ clarify which proof components need PQ hardening.
 pub struct SubscriptionManager {
     subscriptions: Arc<RwLock<HashMap<String, Vec<mpsc::UnboundedSender<SubscriptionEvent>>>>>,
 }
-// Broadcasts: broadcast_new_right, broadcast_new_seal, broadcast_new_transfer
+// Broadcasts: broadcast_new_sanad, broadcast_new_seal, broadcast_new_transfer
 ```
 
 `csv-adapter/src/events.rs` — `EventStream` type with `broadcast::Receiver<Event>`
 
-`csv-adapter-core/src/events.rs` — Standardized `CsvEvent` types: RightCreated,
-RightConsumed, CrossChainLock, CrossChainMint, NullifierRegistered
+`csv-adapter-core/src/events.rs` — Standardized `CsvEvent` types: SanadCreated,
+SanadConsumed, CrossChainLock, CrossChainMint, NullifierRegistered
 
 **What's missing:**
 
@@ -177,7 +177,7 @@ The wallet should subscribe to the explorer WebSocket and receive events for its
 User opens wallet
   → use_wallet.rs connects to explorer WebSocket
   → Subscribes to address events for all ChainAccounts
-  → On RightTransferred event → update AppState.rights
+  → On SanadTransferred event → update AppState.sanads
   → On SealConsumed event → update AppState.seals  
   → On CrossChainMint event → update AppState.transfers
   → No polling needed
@@ -187,7 +187,7 @@ Files to change:
 
 - `csv-wallet/src/hooks/use_wallet_connection.rs` (exists) — add WebSocket connect
 - `csv-wallet/src/hooks/use_seals.rs` — subscribe to seal events
-- `csv-wallet/src/hooks/use_assets.rs` — subscribe to right events
+- `csv-wallet/src/hooks/use_assets.rs` — subscribe to sanad events
 - `csv-wallet/src/context/wallet.rs` — add `on_event(CsvEvent)` handler
 
 This is NOT advanced. The infrastructure exists. It's ~200 lines of connection code.
@@ -362,7 +362,7 @@ Schema: EventTicket
       Constraint: seal.consume() must succeed on chain
       
   Genesis: Ticket issuer creates seal + initial Valid state
-  Transfer: Ticket holder can transfer the right (resale) before use
+  Transfer: Ticket holder can transfer the sanad (resale) before use
   Consumption: Gate operator's signature + seal spend = atomic validation
 ```
 
@@ -410,11 +410,11 @@ contract code required. If one party abandons, funds are locked for the timeout 
 
 With seals (Diffie-Hellman-style atomic swap):
 
-1. Alice has Right A on Bitcoin. Bob has Right B on Ethereum.
+1. Alice has Sanad A on Bitcoin. Bob has Sanad B on Ethereum.
 2. Alice creates seal S_A on Bitcoin committing to `hash(secret)`.
 3. Bob sees S_A, creates seal S_B on Ethereum committing to `hash(secret)`.
-4. Alice reveals `secret` to consume S_B on Ethereum → gets Right B.
-5. Bob sees `secret` on Ethereum, uses it to consume S_A on Bitcoin → gets Right A.
+4. Alice reveals `secret` to consume S_B on Ethereum → gets Sanad B.
+5. Bob sees `secret` on Ethereum, uses it to consume S_A on Bitcoin → gets Sanad A.
 6. Both seals consumed atomically with respect to each other. No escrow. No timeout.
 
 The commitment chain proves the full swap history. Neither party can claim only half
@@ -423,8 +423,8 @@ happened — the seal consumption is the atomic event.
 ```
 Schema: AtomicSwap
   State types:
-    - Offered { secret_hash: Hash, offer: Right, want_chain: Chain, want_schema: Hash }
-    - Matched { secret_hash: Hash, counterparty_seal: SealRef }
+    - Offered { secret_hash: Hash, offer: Sanad, want_chain: Chain, want_schema: Hash }
+    - Matched { secret_hash: Hash, counterparty_seal: SealPoint }
     - Complete { secret: [u8; 32] }
     - Expired
     
@@ -442,7 +442,7 @@ the physical item — nothing binds them.
 
 With seals: Each physical custody transfer IS a seal consumption + new seal opening.
 The commitment chain IS the audit trail. The chain cannot be edited because each
-commitment links to the prior commitment's hash. The "token" (right) moves with the
+commitment links to the prior commitment's hash. The "token" (sanad) moves with the
 physical item — custody = key possession = ability to consume the seal.
 
 ```
@@ -466,7 +466,7 @@ state. Off-chain licenses (SaaS) require trusting the vendor's server.
 
 With seals: A license is a seal + expiry commitment. Using the software = presenting
 a proof of unconsumed seal. The seal expiry is in the commitment — client-verified.
-Renewal = issuer opens a new seal, sends new right via consignment. No on-chain
+Renewal = issuer opens a new seal, sends new sanad via consignment. No on-chain
 transaction for verification (offline works). On-chain only for issuance and renewal.
 
 ```
@@ -513,7 +513,7 @@ Each schema module contains:
 2. `struct [Name]Genesis` — genesis parameters
 3. `enum [Name]State` — valid state variants
 4. `enum [Name]Transition` — valid transitions with constraints
-5. `fn create(params) -> (Right, SealRef)` — deploy a contract instance
+5. `fn create(params) -> (Sanad, SealPoint)` — deploy a contract instance
 6. Integration with `csv-adapter-core::schema::Schema` for AluVM validation
 
 **Matching on-chain contracts:**

@@ -21,12 +21,12 @@ That's it! Everything starts automatically.
 
 ### 2. Web UI (Port 3000)
 - Dashboard with statistics
-- Browse rights, transfers, seals
+- Browse sanads, transfers, seals
 - Real-time data from API
 
 ### 3. Database (SQLite)
 - Pre-seeded with test data
-- 8 rights across 5 chains
+- 8 sanads across 5 chains
 - 7 cross-chain transfers
 - 11 seals
 - 11 contracts
@@ -37,13 +37,13 @@ That's it! Everything starts automatically.
 
 ### Home (`http://localhost:3000`)
 Dashboard showing:
-- **4 Stats Cards**: Rights (8), Transfers (7), Seals (11), Contracts (11)
+- **4 Stats Cards**: Sanads (8), Transfers (7), Seals (11), Contracts (11)
 - **Chain Status**: Bitcoin, Ethereum, Sui, Aptos, Solana
 - Click navigation to explore
 
-### Rights (`/rights`)
-Table with all rights:
-- Right ID (clickable)
+### Sanads (`/sanads`)
+Table with all sanads:
+- Sanad ID (clickable)
 - Chain (Bitcoin, Ethereum, etc.)
 - Owner address
 - Status (active/spent/pending)
@@ -68,7 +68,7 @@ Seal inventory:
 Detailed statistics:
 - Transfer success rate: **80.0%**
 - Average transfer time: **4.0 hours**
-- Rights by chain breakdown
+- Sanads by chain breakdown
 - Transfers by chain pair
 - Active seals by chain
 
@@ -108,8 +108,8 @@ curl http://localhost:8080/health
 # Statistics
 curl http://localhost:8080/api/v1/stats
 
-# Rights
-curl http://localhost:8080/api/v1/rights?limit=10
+# Sanads
+curl http://localhost:8080/api/v1/sanads?limit=10
 
 # Transfers
 curl http://localhost:8080/api/v1/transfers?limit=10
@@ -126,7 +126,7 @@ curl http://localhost:8080/api/v1/chains
 # GraphQL
 curl -X POST http://localhost:8080/graphql \
   -H "Content-Type: application/json" \
-  -d '{"query": "{ stats { totalRights totalTransfers } }"}'
+  -d '{"query": "{ stats { totalSanads totalTransfers } }"}'
 ```
 
 ---
@@ -142,8 +142,8 @@ data/explorer.db
 ```bash
 sqlite3 data/explorer.db
 
-# List rights
-SELECT id, chain, status FROM rights LIMIT 5;
+# List sanads
+SELECT id, chain, status FROM sanads LIMIT 5;
 
 # Count transfers by status
 SELECT status, COUNT(*) FROM transfers GROUP BY status;
@@ -159,7 +159,7 @@ SELECT id, chain, seal_type, status FROM seals;
 
 ## 🎯 Test Data Included
 
-### Rights (8 total)
+### Sanads (8 total)
 | Chain | Count | Status |
 |-------|-------|--------|
 | Bitcoin | 2 | Active |
@@ -299,14 +299,14 @@ curl http://localhost:8080/health
 
 # 2. Statistics
 curl http://localhost:8080/api/v1/stats | python3 -m json.tool
-# Expected: JSON with total_rights: 8
+# Expected: JSON with total_sanads: 8
 
 # 3. Web UI
 curl http://localhost:3000 | grep "CSV Explorer"
 # Expected: <title>CSV Explorer</title>
 
 # 4. Database
-sqlite3 data/explorer.db "SELECT COUNT(*) FROM rights;"
+sqlite3 data/explorer.db "SELECT COUNT(*) FROM sanads;"
 # Expected: 8
 ```
 

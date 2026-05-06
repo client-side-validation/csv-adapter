@@ -8,29 +8,29 @@ Chain-agnostic core traits and types for **CSV (Client-Side Validation)** adapte
 
 ## Overview
 
-This crate provides the foundational types and traits for the CSV protocol, a client-side validation system built on the **Universal Seal Primitive (USP)**. Rights are anchored to single-use seals on any chain. To transfer a Right, the seal is consumed on-chain and the new owner verifies the consumption proof locally — no bridges, no minting, no cross-chain messaging.
+This crate provides the foundational types and traits for the CSV protocol, a client-side validation system built on the **Universal Seal Primitive (USP)**. Sanads are anchored to single-use seals on any chain. To transfer a Sanad, the seal is consumed on-chain and the new owner verifies the consumption proof locally — no bridges, no minting, no cross-chain messaging.
 
 ### Key Types
 
-- **[`Right`]** — A verifiable, single-use digital right that can be transferred cross-chain
+- **[`Sanad`]** — A verifiable, single-use digital sanad that can be transferred cross-chain
 - **[`Hash`]** — A 32-byte cryptographic hash (SHA-256 based)
-- **[`Commitment`]** — A binding between a right's state and its anchor on a blockchain
-- **[`SealRef`]** / **[`AnchorRef`]** — References to consumed seals and published anchors
+- **[`Commitment`]** — A binding between a sanad's state and its anchor on a blockchain
+- **[`SealPoint`]** / **[`CommitAnchor`]** — References to consumed seals and published anchors
 - **[`InclusionProof`]** / **[`FinalityProof`]** / **[`ProofBundle`]** — Cryptographic proofs
-- **[`AnchorLayer`]** — The core trait each blockchain adapter implements
-- **[`ChainAdapter`]** — Scalable chain adapter trait for dynamic registration
+- **[`SealProtocol`]** — The core trait each blockchain adapter implements
+- **[`ChainDriver`]** — Scalable chain adapter trait for dynamic registration
 - **[`AdapterFactory`]** — Factory for creating chain adapters dynamically
 - **[`SignatureScheme`]** — Supported signing algorithms (secp256k1, Ed25519)
 
-[`Right`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/struct.Right.html
+[`Sanad`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/struct.Sanad.html
 [`Hash`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/struct.Hash.html
 [`Commitment`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/struct.Commitment.html
-[`SealRef`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/struct.SealRef.html
-[`AnchorRef`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/struct.AnchorRef.html
+[`SealPoint`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/struct.SealPoint.html
+[`CommitAnchor`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/struct.CommitAnchor.html
 [`InclusionProof`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/struct.InclusionProof.html
 [`FinalityProof`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/struct.FinalityProof.html
 [`ProofBundle`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/struct.ProofBundle.html
-[`AnchorLayer`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/trait.AnchorLayer.html
+[`SealProtocol`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/trait.SealProtocol.html
 [`SignatureScheme`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/enum.SignatureScheme.html
 
 ## Installation
@@ -55,10 +55,10 @@ csv-adapter-core = "0.1"
 
 ## Quick Start
 
-### Creating a Right
+### Creating a Sanad
 
 ```rust
-use csv_adapter_core::{Right, Hash, OwnershipProof, SignatureScheme};
+use csv_adapter_core::{Sanad, Hash, OwnershipProof, SignatureScheme};
 
 // Create a commitment hash
 let commitment = Hash::new([0xAB; 32]);
@@ -70,8 +70,8 @@ let owner = OwnershipProof {
     scheme: Some(SignatureScheme::Secp256k1),
 };
 
-// Create a Right
-let right = Right::new(commitment, owner, b"unique-salt");
+// Create a Sanad
+let sanad = Sanad::new(commitment, owner, b"unique-salt");
 
 // Transfer to a new owner
 let new_owner = OwnershipProof {
@@ -79,17 +79,17 @@ let new_owner = OwnershipProof {
     owner: vec![/* new owner address bytes */],
     scheme: Some(SignatureScheme::Secp256k1),
 };
-let transferred = right.transfer(new_owner, b"transfer-salt");
+let transferred = sanad.transfer(new_owner, b"transfer-salt");
 ```
 
 ### Working with Commitments
 
 ```rust
-use csv_adapter_core::{Commitment, SealRef};
+use csv_adapter_core::{Commitment, SealPoint};
 
 // Create a commitment with all fields
 let commitment = Commitment::simple(
-    contract_id,       // What Right this is for
+    contract_id,       // What Sanad this is for
     previous_commitment, // Hash of previous commitment (or zero for genesis)
     payload_hash,       // What changed
     &seal_ref,          // What seal was consumed
@@ -120,7 +120,7 @@ The new scalable architecture uses a **plugin-based registry pattern** for dynam
 ┌──────────────────────────────────────────────────────────────┐
 │                    csv-adapter-core                           │
 │                                                               │
-│   ChainAdapter ─────── Trait for all chain adapters          │
+│   ChainDriver ─────── Trait for all chain adapters          │
 │   ├─ chain_id() ─────── Returns chain identifier             │
 │   ├─ capabilities() ─── Returns ChainCapabilities            │
 │   ├─ create_client() ── Creates RPC client                   │
@@ -137,7 +137,7 @@ The new scalable architecture uses a **plugin-based registry pattern** for dynam
                │                               │
     ┌──────────┴──────────┐          ┌──────────┴──────────┐
     │  Built-in Adapters  │          │  Custom Adapters    │
-    │  • BitcoinAdapter   │          │  • YourChainAdapter │
+    │  • BitcoinAdapter   │          │  • YourChainDriver │
     │  • EthereumAdapter  │          │  (dynamically       │
     │  • SolanaAdapter    │          │   registered)       │
     │  • SuiAdapter       │          │                     │
@@ -145,16 +145,16 @@ The new scalable architecture uses a **plugin-based registry pattern** for dynam
     └─────────────────────┘          └─────────────────────┘
 ```
 
-### Legacy AnchorLayer System
+### Legacy SealProtocol System
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                    csv-adapter-core                           │
 │                                                               │
-│   Right ────────────── Portable digital right                 │
+│   Sanad ────────────── Portable digital sanad                 │
 │   Commitment ──────── Hash chain of state transitions         │
-│   SealRef ─────────── Reference to consumed seal              │
-│   AnchorLayer ─────── Trait: per-chain implementation         │
+│   SealPoint ─────────── Reference to consumed seal              │
+│   SealProtocol ─────── Trait: per-chain implementation         │
 │   ProofBundle ─────── Inclusion + finality proofs             │
 │   SealRegistry ────── Cross-chain double-spend prevention     │
 └──────────────┬──────────┬──────────┬──────────────────────────┘
@@ -165,7 +165,7 @@ The new scalable architecture uses a **plugin-based registry pattern** for dynam
       └─────────┘  └────────┘  └──────────┘
 ```
 
-Each chain adapter implements `AnchorLayer` using its native single-use mechanism:
+Each chain adapter implements `SealProtocol` using its native single-use mechanism:
 
 | Chain | Level | Seal Type | Guarantee |
 |-------|-------|-----------|-----------|
@@ -180,7 +180,7 @@ Each chain adapter implements `AnchorLayer` using its native single-use mechanis
 ### Using the Adapter Factory
 
 ```rust
-use csv_adapter_core::{AdapterFactory, ChainAdapter, ChainCapabilities};
+use csv_adapter_core::{AdapterFactory, ChainDriver, ChainCapabilities};
 
 // Create factory with all built-in adapters
 let factory = AdapterFactory::new();
@@ -199,11 +199,11 @@ if let Some(adapter) = factory.create_adapter("solana") {
 ### Registering Custom Adapters
 
 ```rust
-use csv_adapter_core::{AdapterFactory, ChainAdapter};
+use csv_adapter_core::{AdapterFactory, ChainDriver};
 
 // Create your custom adapter
-pub struct MyChainAdapter;
-impl ChainAdapter for MyChainAdapter {
+pub struct MyChainDriver;
+impl ChainDriver for MyChainDriver {
     fn chain_id(&self) -> &'static str { "mychain" }
     fn chain_name(&self) -> &'static str { "My Chain" }
     fn capabilities(&self) -> ChainCapabilities { /* ... */ }
@@ -212,7 +212,7 @@ impl ChainAdapter for MyChainAdapter {
 
 // Register with factory
 let mut factory = AdapterFactory::new();
-factory.register("mychain", Arc::new(|| Box::new(MyChainAdapter)));
+factory.register("mychain", Arc::new(|| Box::new(MyChainDriver)));
 
 // Now available everywhere
 let adapter = factory.create_adapter("mychain");
@@ -239,14 +239,14 @@ if let Some(adapter) = registry.get("solana") {
 
 See the [`examples/`](examples/) directory for usage patterns:
 
-- **`basic_right`** — Creating, transferring, and verifying Rights
+- **`basic_sanad`** — Creating, transferring, and verifying Sanads
 - **`commitment_chain`** — Building and validating commitment chains
 - **`complete_scalable_demo`** — Using the new scalable architecture
 
 Run examples with:
 
 ```bash
-cargo run --example basic_right
+cargo run --example basic_sanad
 cargo run --example commitment_chain
 cargo run --example complete_scalable_demo
 ```

@@ -8,9 +8,9 @@ Aptos adapter for **CSV (Client-Side Validation)** with resource-based seals.
 
 ## Overview
 
-This crate implements the [`AnchorLayer`] trait for Aptos, using Move resources with key + delete as seals. Aptos provides **L2 Type-Enforced** single-use through the Move language's resource model — resources cannot be duplicated or dropped, only moved or destroyed.
+This crate implements the [`SealProtocol`] trait for Aptos, using Move resources with key + delete as seals. Aptos provides **L2 Type-Enforced** single-use through the Move language's resource model — resources cannot be duplicated or dropped, only moved or destroyed.
 
-[`AnchorLayer`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/trait.AnchorLayer.html
+[`SealProtocol`]: https://docs.rs/csv-adapter-core/latest/csv_adapter_core/trait.SealProtocol.html
 
 ### Key Features
 
@@ -46,24 +46,24 @@ csv-adapter-aptos = "0.1"
 ### Creating an Aptos Anchor Layer
 
 ```rust
-use csv_adapter_aptos::{AptosAnchorLayer, AptosConfig, AptosNetwork};
+use csv_adapter_aptos::{AptosSealProtocol, AptosConfig, AptosNetwork};
 
 // Create adapter with mock RPC for testing
-let adapter = AptosAnchorLayer::with_mock().unwrap();
+let adapter = AptosSealProtocol::with_mock().unwrap();
 
 // Or with configuration (requires `rpc` feature)
 // let config = AptosConfig::new(AptosNetwork::Devnet);
 // let rpc = ...;
-// let adapter = AptosAnchorLayer::from_config(config, rpc).unwrap();
+// let adapter = AptosSealProtocol::from_config(config, rpc).unwrap();
 ```
 
 ### Working with Resource Seals
 
 ```rust
-use csv_adapter_aptos::AptosAnchorLayer;
-use csv_adapter_core::{Hash, AnchorLayer};
+use csv_adapter_aptos::AptosSealProtocol;
+use csv_adapter_core::{Hash, SealProtocol};
 
-let adapter = AptosAnchorLayer::with_mock()?;
+let adapter = AptosSealProtocol::with_mock()?;
 
 // Create a seal from a Move resource
 let seal = adapter.create_seal(Some(resource_address))?;
@@ -86,7 +86,7 @@ let is_final = verifier.verify_finality(&transaction)?;
 ## Architecture
 
 ```
-AptosAnchorLayer
+AptosSealProtocol
 ├── Resource Seals     ← L2 Type-Enforced single-use (Move)
 ├── Event Proofs       ← Commitment publication via events
 ├── Ledger Info        ← HotStuff consensus finality

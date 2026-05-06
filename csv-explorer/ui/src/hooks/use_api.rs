@@ -68,15 +68,15 @@ impl ApiClient {
             .unwrap_or(serde_json::Value::Null))
     }
 
-    /// Fetch rights from the REST API.
-    pub async fn get_rights(
+    /// Fetch sanads from the REST API.
+    pub async fn get_sanads(
         &self,
         chain: Option<&str>,
         status: Option<&str>,
         limit: Option<usize>,
         offset: Option<usize>,
-    ) -> Result<Vec<csv_explorer_shared::RightRecord>, ApiError> {
-        let mut url = format!("{}/api/v1/rights", self.base_url);
+    ) -> Result<Vec<csv_explorer_shared::SanadRecord>, ApiError> {
+        let mut url = format!("{}/api/v1/sanads", self.base_url);
         let mut params = Vec::new();
 
         if let Some(c) = chain {
@@ -96,18 +96,18 @@ impl ApiClient {
             url.push_str(&format!("?{}", params.join("&")));
         }
 
-        let response: ApiResponse<Vec<csv_explorer_shared::RightRecord>> =
+        let response: ApiResponse<Vec<csv_explorer_shared::SanadRecord>> =
             self.client.get(&url).send().await?.json().await?;
         Ok(response.data)
     }
 
-    /// Fetch a single right by ID.
-    pub async fn get_right(
+    /// Fetch a single sanad by ID.
+    pub async fn get_sanad(
         &self,
         id: &str,
-    ) -> Result<Option<csv_explorer_shared::RightRecord>, ApiError> {
-        let url = format!("{}/api/v1/rights/{}", self.base_url, id);
-        let response: ApiResponse<csv_explorer_shared::RightRecord> =
+    ) -> Result<Option<csv_explorer_shared::SanadRecord>, ApiError> {
+        let url = format!("{}/api/v1/sanads/{}", self.base_url, id);
+        let response: ApiResponse<csv_explorer_shared::SanadRecord> =
             self.client.get(&url).send().await?.json().await?;
         Ok(Some(response.data))
     }
@@ -115,7 +115,7 @@ impl ApiClient {
     /// Fetch transfers.
     pub async fn get_transfers(
         &self,
-        right_id: Option<&str>,
+        sanad_id: Option<&str>,
         from_chain: Option<&str>,
         to_chain: Option<&str>,
         status: Option<&str>,
@@ -125,8 +125,8 @@ impl ApiClient {
         let mut url = format!("{}/api/v1/transfers", self.base_url);
         let mut params = Vec::new();
 
-        if let Some(rid) = right_id {
-            params.push(format!("right_id={}", rid));
+        if let Some(rid) = sanad_id {
+            params.push(format!("sanad_id={}", rid));
         }
         if let Some(fc) = from_chain {
             params.push(format!("from_chain={}", fc));

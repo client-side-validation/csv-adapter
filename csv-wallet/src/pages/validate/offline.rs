@@ -12,7 +12,7 @@
 //!
 //! Why this matters: This is the CSV competitive advantage over bridges.
 //! "Your counterparty doesn't need to trust any server. They can verify \
-//! your right with this file alone."
+//! your sanad with this file alone."
 
 use crate::pages::common::*;
 use crate::routes::Route;

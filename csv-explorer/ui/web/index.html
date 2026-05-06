@@ -27,7 +27,7 @@
         .detail-section { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .search-highlight { background-color: rgba(96, 165, 250, 0.3); padding: 0 2px; border-radius: 2px; }
-        .toast { position: fixed; bottom: 20px; right: 20px; z-index: 1000; animation: slideIn 0.3s ease-out; }
+        .toast { position: fixed; bottom: 20px; sanad: 20px; z-index: 1000; animation: slideIn 0.3s ease-out; }
         @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .live-indicator { animation: pulse 2s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
@@ -44,7 +44,7 @@
                     </h1>
                     <nav class="hidden md:flex gap-4">
                         <a href="#" onclick="showPage('home')" class="nav-link px-2 py-1" data-page="home">Home</a>
-                        <a href="#" onclick="showPage('rights')" class="nav-link px-2 py-1" data-page="rights">Rights</a>
+                        <a href="#" onclick="showPage('sanads')" class="nav-link px-2 py-1" data-page="sanads">Sanads</a>
                         <a href="#" onclick="showPage('transfers')" class="nav-link px-2 py-1" data-page="transfers">Transfers</a>
                         <a href="#" onclick="showPage('seals')" class="nav-link px-2 py-1" data-page="seals">Seals</a>
                         <a href="#" onclick="showPage('contracts')" class="nav-link px-2 py-1" data-page="contracts">Contracts</a>
@@ -79,7 +79,7 @@
                     <input type="text" id="global-search" placeholder="Search by ID, owner address, chain, or status..." 
                            class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 text-sm"
                            onkeypress="if(event.key==='Enter') performSearch()">
-                    <button onclick="performSearch()" class="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition-colors">
+                    <button onclick="performSearch()" class="absolute sanad-2 top-1/2 -translate-y-1/2 px-4 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition-colors">
                         Search
                     </button>
                 </div>
@@ -107,17 +107,17 @@
         <!-- Home Page -->
         <div id="page-home">
             <div class="text-center py-8">
-                <h2 class="text-4xl font-bold mb-4">Cross-Chain Sealed Verifiable Rights Explorer</h2>
+                <h2 class="text-4xl font-bold mb-4">Cross-Chain Sealed Verifiable Sanads Explorer</h2>
                 <p class="text-gray-400 text-lg max-w-2xl mx-auto">
-                    Track, search, and analyze CSV rights, transfers, and seals across Bitcoin, Ethereum, Sui, Aptos, and Solana.
+                    Track, search, and analyze CSV sanads, transfers, and seals across Bitcoin, Ethereum, Sui, Aptos, and Solana.
                 </p>
             </div>
 
             <!-- Stats Cards -->
             <div id="stats-cards" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div class="card rounded-xl p-6 text-center clickable" onclick="showPage('rights')">
-                    <div class="text-3xl font-bold mb-1" id="stat-rights">—</div>
-                    <div class="text-gray-400 text-sm">Total Rights</div>
+                <div class="card rounded-xl p-6 text-center clickable" onclick="showPage('sanads')">
+                    <div class="text-3xl font-bold mb-1" id="stat-sanads">—</div>
+                    <div class="text-gray-400 text-sm">Total Sanads</div>
                 </div>
                 <div class="card rounded-xl p-6 text-center clickable" onclick="showPage('transfers')">
                     <div class="text-3xl font-bold mb-1" id="stat-transfers">—</div>
@@ -157,17 +157,17 @@
             </div>
         </div>
 
-        <!-- Rights Page -->
-        <div id="page-rights" class="hidden">
+        <!-- Sanads Page -->
+        <div id="page-sanads" class="hidden">
             <div class="flex items-center justify-between mb-6">
-                <h2 class="text-2xl font-bold">Rights</h2>
-                <span id="rights-count" class="text-gray-400 text-sm"></span>
+                <h2 class="text-2xl font-bold">Sanads</h2>
+                <span id="sanads-count" class="text-gray-400 text-sm"></span>
             </div>
             <div class="card rounded-xl overflow-hidden">
                 <table class="w-full">
                     <thead class="border-b border-gray-800 text-left text-sm text-gray-400">
                         <tr>
-                            <th class="px-6 py-3 font-medium">Right ID</th>
+                            <th class="px-6 py-3 font-medium">Sanad ID</th>
                             <th class="px-6 py-3 font-medium">Chain</th>
                             <th class="px-6 py-3 font-medium">Owner</th>
                             <th class="px-6 py-3 font-medium">Status</th>
@@ -175,21 +175,21 @@
                             <th class="px-6 py-3 font-medium">Created</th>
                         </tr>
                     </thead>
-                    <tbody id="rights-table" class="divide-y divide-gray-800"></tbody>
+                    <tbody id="sanads-table" class="divide-y divide-gray-800"></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Right Detail Page -->
-        <div id="page-right-detail" class="hidden detail-section">
+        <!-- Sanad Detail Page -->
+        <div id="page-sanad-detail" class="hidden detail-section">
             <div class="mb-6">
-                <button onclick="showPage('rights')" class="text-blue-400 hover:text-blue-300 mb-4 flex items-center gap-2">
-                    ← Back to Rights
+                <button onclick="showPage('sanads')" class="text-blue-400 hover:text-blue-300 mb-4 flex items-center gap-2">
+                    ← Back to Sanads
                 </button>
-                <h2 class="text-2xl font-bold mb-2">Right Details</h2>
+                <h2 class="text-2xl font-bold mb-2">Sanad Details</h2>
             </div>
             
-            <div id="right-detail-content" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div id="sanad-detail-content" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- Populated dynamically -->
             </div>
         </div>
@@ -536,8 +536,8 @@
             currentPage = page;
             
             // Load data for page
-            if (page.startsWith('right-detail') && params.id) {
-                loadRightDetail(params.id);
+            if (page.startsWith('sanad-detail') && params.id) {
+                loadSanadDetail(params.id);
             } else if (page.startsWith('transfer-detail') && params.id) {
                 loadTransferDetail(params.id);
             } else if (page.startsWith('seal-detail') && params.id) {
@@ -557,7 +557,7 @@
             try {
                 switch(page) {
                     case 'home': await loadHome(); break;
-                    case 'rights': await loadRights(); break;
+                    case 'sanads': await loadSanads(); break;
                     case 'transfers': await loadTransfers(); break;
                     case 'seals': await loadSeals(); break;
                     case 'contracts': await loadContracts(); break;
@@ -667,28 +667,28 @@
 
         async function searchAllData() {
             try {
-                const [rightsResp, transfersResp, sealsResp] = await Promise.all([
-                    fetch(`${API_URL}/api/v1/rights?limit=100`),
+                const [sanadsResp, transfersResp, sealsResp] = await Promise.all([
+                    fetch(`${API_URL}/api/v1/sanads?limit=100`),
                     fetch(`${API_URL}/api/v1/transfers?limit=100`),
                     fetch(`${API_URL}/api/v1/seals?limit=100`)
                 ]);
                 
-                const rights = (await rightsResp.json()).data.data || [];
+                const sanads = (await sanadsResp.json()).data.data || [];
                 const transfers = (await transfersResp.json()).data.data || [];
                 const seals = (await sealsResp.json()).data.data || [];
                 
                 let results = [];
                 
-                // Filter and search rights
-                results = results.concat(rights.filter(r => 
+                // Filter and search sanads
+                results = results.concat(sanads.filter(r => 
                     matchesSearch(r) && matchesChainFilter(r.chain)
                 ).map(r => ({
-                    type: 'Right',
+                    type: 'Sanad',
                     id: r.id,
-                    title: `Right: ${r.id.substring(0, 20)}...`,
+                    title: `Sanad: ${r.id.substring(0, 20)}...`,
                     chain: r.chain,
                     status: r.status,
-                    page: 'right-detail',
+                    page: 'sanad-detail',
                     params: { id: r.id }
                 })));
                 
@@ -807,14 +807,14 @@
                 const json = await resp.json();
                 const stats = json.data;
 
-                document.getElementById('stat-rights').textContent = stats.total_rights;
+                document.getElementById('stat-sanads').textContent = stats.total_sanads;
                 document.getElementById('stat-transfers').textContent = stats.total_transfers;
                 document.getElementById('stat-seals').textContent = stats.total_seals;
                 document.getElementById('stat-contracts').textContent = stats.total_contracts;
 
                 // Chain status with external links
                 const chainDiv = document.getElementById('chain-status');
-                chainDiv.innerHTML = stats.rights_by_chain.map(rc => {
+                chainDiv.innerHTML = stats.sanads_by_chain.map(rc => {
                     const explorer = CHAIN_EXPLORERS[rc.chain.toLowerCase()] || { name: rc.chain, icon: '●', color: '#6b7280' };
                     return `
                         <div class="card rounded-xl p-4 chain-link clickable" onclick="filterByChain('${rc.chain}')">
@@ -822,7 +822,7 @@
                                 <span class="w-2 h-2 rounded-full bg-green-500"></span>
                                 <span class="font-medium">${explorer.icon} ${explorer.name}</span>
                             </div>
-                            <div class="text-sm text-gray-400">${rc.count} rights</div>
+                            <div class="text-sm text-gray-400">${rc.count} sanads</div>
                             <div class="text-xs text-blue-400 mt-2">View on ${explorer.name} Explorer ↗</div>
                         </div>
                     `;
@@ -837,38 +837,38 @@
         function filterByChain(chain) {
             document.getElementById('search-filter').value = chain.toLowerCase();
             document.getElementById('global-search').value = '';
-            showPage('rights');
-            loadRights();
+            showPage('sanads');
+            loadSanads();
         }
 
         // ==================== Activity Feed ====================
         async function loadActivity() {
             try {
-                const [rightsResp, transfersResp, sealsResp] = await Promise.all([
-                    fetch(`${API_URL}/api/v1/rights?limit=10`),
+                const [sanadsResp, transfersResp, sealsResp] = await Promise.all([
+                    fetch(`${API_URL}/api/v1/sanads?limit=10`),
                     fetch(`${API_URL}/api/v1/transfers?limit=10`),
                     fetch(`${API_URL}/api/v1/seals?limit=10`)
                 ]);
 
-                const rightsJson = await rightsResp.json();
+                const sanadsJson = await sanadsResp.json();
                 const transfersJson = await transfersResp.json();
                 const sealsJson = await sealsResp.json();
 
-                const rights = rightsJson.data.data || [];
+                const sanads = sanadsJson.data.data || [];
                 const transfers = transfersJson.data.data || [];
                 const seals = sealsJson.data.data || [];
 
                 const activities = [
-                    ...rights.map(r => ({
-                        type: 'right',
+                    ...sanads.map(r => ({
+                        type: 'sanad',
                         icon: '📜',
-                        title: `Right Created`,
+                        title: `Sanad Created`,
                         subtitle: r.id,
                         chain: r.chain,
                         status: r.status,
                         time: new Date(r.created_at),
                         details: `Owner: ${r.owner.substring(0, 20)}...`,
-                        page: 'right-detail',
+                        page: 'sanad-detail',
                         params: { id: r.id }
                     })),
                     ...transfers.map(t => ({
@@ -879,7 +879,7 @@
                         chain: t.from_chain,
                         status: t.status,
                         time: new Date(t.created_at),
-                        details: `Right: ${t.right_id.substring(0, 20)}...`,
+                        details: `Sanad: ${t.sanad_id.substring(0, 20)}...`,
                         page: 'transfer-detail',
                         params: { id: t.id }
                     })),
@@ -916,7 +916,7 @@
                                         <div class="text-xs text-gray-500 mt-0.5">${act.details}</div>
                                     </div>
                                 </div>
-                                <div class="text-right">
+                                <div class="text-sanad">
                                     ${createChainBadge(act.chain)}
                                     <div class="text-xs text-gray-500 mt-1">${timeAgo}</div>
                                 </div>
@@ -932,67 +932,67 @@
             }
         }
 
-        // ==================== Rights ====================
-        async function loadRights() {
-            const resp = await fetch(`${API_URL}/api/v1/rights?limit=50`);
+        // ==================== Sanads ====================
+        async function loadSanads() {
+            const resp = await fetch(`${API_URL}/api/v1/sanads?limit=50`);
             const json = await resp.json();
-            const rights = json.data.data;
+            const sanads = json.data.data;
 
-            document.getElementById('rights-count').textContent = `${rights.length} rights found`;
+            document.getElementById('sanads-count').textContent = `${sanads.length} sanads found`;
 
-            const tbody = document.getElementById('rights-table');
-            tbody.innerHTML = rights.map(right => `
+            const tbody = document.getElementById('sanads-table');
+            tbody.innerHTML = sanads.map(sanad => `
                 <tr class="hover:bg-gray-800/50">
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2">
-                            <span class="mono text-sm text-blue-400 clickable" onclick="showPage('right-detail', {id: '${right.id}'})">
-                                ${right.id.substring(0, 20)}...
+                            <span class="mono text-sm text-blue-400 clickable" onclick="showPage('sanad-detail', {id: '${sanad.id}'})">
+                                ${sanad.id.substring(0, 20)}...
                             </span>
-                            ${createCopyButton(right.id, 'Right ID')}
+                            ${createCopyButton(sanad.id, 'Sanad ID')}
                         </div>
                     </td>
-                    <td class="px-6 py-4">${createChainBadge(right.chain)}</td>
+                    <td class="px-6 py-4">${createChainBadge(sanad.chain)}</td>
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2">
-                            <span class="mono text-sm text-gray-300 truncate max-w-xs">${right.owner.substring(0, 16)}...</span>
-                            ${createCopyButton(right.owner, 'Owner Address')}
+                            <span class="mono text-sm text-gray-300 truncate max-w-xs">${sanad.owner.substring(0, 16)}...</span>
+                            ${createCopyButton(sanad.owner, 'Owner Address')}
                         </div>
                     </td>
-                    <td class="px-6 py-4"><span class="badge badge-${right.status}">${right.status}</span></td>
-                    <td class="px-6 py-4 text-sm text-gray-300">${right.transfer_count}</td>
-                    <td class="px-6 py-4 text-sm text-gray-400">${new Date(right.created_at).toLocaleDateString()}</td>
+                    <td class="px-6 py-4"><span class="badge badge-${sanad.status}">${sanad.status}</span></td>
+                    <td class="px-6 py-4 text-sm text-gray-300">${sanad.transfer_count}</td>
+                    <td class="px-6 py-4 text-sm text-gray-400">${new Date(sanad.created_at).toLocaleDateString()}</td>
                 </tr>
             `).join('');
         }
 
-        async function loadRightDetail(id) {
+        async function loadSanadDetail(id) {
             try {
-                const resp = await fetch(`${API_URL}/api/v1/rights/${id}`);
+                const resp = await fetch(`${API_URL}/api/v1/sanads/${id}`);
                 const json = await resp.json();
-                const right = json.data;
+                const sanad = json.data;
 
-                const content = document.getElementById('right-detail-content');
+                const content = document.getElementById('sanad-detail-content');
                 content.innerHTML = `
                     <div class="card rounded-xl p-6">
-                        <h3 class="text-lg font-semibold mb-4">Right Information</h3>
+                        <h3 class="text-lg font-semibold mb-4">Sanad Information</h3>
                         <div class="space-y-4">
                             <div>
-                                <div class="text-sm text-gray-400 mb-1">Right ID</div>
+                                <div class="text-sm text-gray-400 mb-1">Sanad ID</div>
                                 <div class="flex items-center gap-2">
-                                    <span class="mono text-sm bg-gray-800 px-3 py-2 rounded flex-1">${right.id}</span>
-                                    <button onclick="copyToClipboard('${right.id}', 'Right ID')" class="p-2 bg-gray-700 hover:bg-gray-600 rounded">📋</button>
+                                    <span class="mono text-sm bg-gray-800 px-3 py-2 rounded flex-1">${sanad.id}</span>
+                                    <button onclick="copyToClipboard('${sanad.id}', 'Sanad ID')" class="p-2 bg-gray-700 hover:bg-gray-600 rounded">📋</button>
                                 </div>
                             </div>
                             <div>
                                 <div class="text-sm text-gray-400 mb-1">Chain</div>
-                                <div>${createChainBadge(right.chain)}</div>
+                                <div>${createChainBadge(sanad.chain)}</div>
                             </div>
                             <div>
                                 <div class="text-sm text-gray-400 mb-1">Owner</div>
                                 <div class="flex items-center gap-2">
-                                    <span class="mono text-sm bg-gray-800 px-3 py-2 rounded flex-1">${right.owner}</span>
-                                    <button onclick="copyToClipboard('${right.owner}', 'Owner')" class="p-2 bg-gray-700 hover:bg-gray-600 rounded">📋</button>
-                                    <a href="${CHAIN_EXPLORERS[right.chain.toLowerCase()]?.address(right.owner) || '#'}" 
+                                    <span class="mono text-sm bg-gray-800 px-3 py-2 rounded flex-1">${sanad.owner}</span>
+                                    <button onclick="copyToClipboard('${sanad.owner}', 'Owner')" class="p-2 bg-gray-700 hover:bg-gray-600 rounded">📋</button>
+                                    <a href="${CHAIN_EXPLORERS[sanad.chain.toLowerCase()]?.address(sanad.owner) || '#'}" 
                                        target="_blank" class="p-2 bg-blue-600 hover:bg-blue-700 rounded text-sm" title="View on Explorer">
                                         ↗
                                     </a>
@@ -1000,45 +1000,45 @@
                             </div>
                             <div>
                                 <div class="text-sm text-gray-400 mb-1">Status</div>
-                                <span class="badge badge-${right.status}">${right.status}</span>
+                                <span class="badge badge-${sanad.status}">${sanad.status}</span>
                             </div>
                             <div>
                                 <div class="text-sm text-gray-400 mb-1">Transfer Count</div>
-                                <div class="text-2xl font-bold">${right.transfer_count}</div>
+                                <div class="text-2xl font-bold">${sanad.transfer_count}</div>
                             </div>
                             <div>
                                 <div class="text-sm text-gray-400 mb-1">Created At</div>
-                                <div>${new Date(right.created_at).toLocaleString()}</div>
+                                <div>${new Date(sanad.created_at).toLocaleString()}</div>
                             </div>
                         </div>
                     </div>
                     
                     <div class="card rounded-xl p-6">
                         <h3 class="text-lg font-semibold mb-4">Transfer History</h3>
-                        <div id="right-transfers" class="space-y-2">
+                        <div id="sanad-transfers" class="space-y-2">
                             <div class="text-gray-400">Loading transfers...</div>
                         </div>
                     </div>
                 `;
 
-                // Load transfers for this right
-                loadTransfersForRight(id);
+                // Load transfers for this sanad
+                loadTransfersForSanad(id);
 
             } catch (error) {
-                console.error('Failed to load right detail:', error);
-                showToast('Failed to load right details', 'error');
+                console.error('Failed to load sanad detail:', error);
+                showToast('Failed to load sanad details', 'error');
             }
         }
 
-        async function loadTransfersForRight(rightId) {
+        async function loadTransfersForSanad(sanadId) {
             try {
-                const resp = await fetch(`${API_URL}/api/v1/transfers?right_id=${rightId}`);
+                const resp = await fetch(`${API_URL}/api/v1/transfers?sanad_id=${sanadId}`);
                 const json = await resp.json();
                 const transfers = json.data.data || [];
 
-                const container = document.getElementById('right-transfers');
+                const container = document.getElementById('sanad-transfers');
                 if (transfers.length === 0) {
-                    container.innerHTML = '<div class="text-gray-400">No transfers found for this right</div>';
+                    container.innerHTML = '<div class="text-gray-400">No transfers found for this sanad</div>';
                 } else {
                     container.innerHTML = transfers.map(t => `
                         <div class="bg-gray-800 rounded-lg p-4 clickable" onclick="showPage('transfer-detail', {id: '${t.id}'})">
@@ -1119,13 +1119,13 @@
                                 </div>
                             </div>
                             <div>
-                                <div class="text-sm text-gray-400 mb-1">Right ID</div>
+                                <div class="text-sm text-gray-400 mb-1">Sanad ID</div>
                                 <div class="flex items-center gap-2">
                                     <span class="mono text-sm bg-gray-800 px-3 py-2 rounded flex-1 clickable text-blue-400" 
-                                          onclick="showPage('right-detail', {id: '${transfer.right_id}'})">
-                                        ${transfer.right_id}
+                                          onclick="showPage('sanad-detail', {id: '${transfer.sanad_id}'})">
+                                        ${transfer.sanad_id}
                                     </span>
-                                    <button onclick="copyToClipboard('${transfer.right_id}', 'Right ID')" class="p-2 bg-gray-700 hover:bg-gray-600 rounded">📋</button>
+                                    <button onclick="copyToClipboard('${transfer.sanad_id}', 'Sanad ID')" class="p-2 bg-gray-700 hover:bg-gray-600 rounded">📋</button>
                                 </div>
                             </div>
                             <div>
@@ -1399,8 +1399,8 @@
                     ${stats.average_transfer_time_ms ? `<div class="text-gray-400 mt-2">Avg time: ${(stats.average_transfer_time_ms / 3600000).toFixed(2)} hours</div>` : ''}
                 </div>
                 <div class="card rounded-xl p-6">
-                    <h3 class="text-lg font-semibold mb-4">Rights by Chain</h3>
-                    ${stats.rights_by_chain.map(rc => `
+                    <h3 class="text-lg font-semibold mb-4">Sanads by Chain</h3>
+                    ${stats.sanads_by_chain.map(rc => `
                         <div class="flex justify-between mb-2 clickable" onclick="filterByChain('${rc.chain}')">
                             <span class="flex items-center gap-2">${createChainBadge(rc.chain)}</span>
                             <span class="font-mono">${rc.count}</span>

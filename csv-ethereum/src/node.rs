@@ -17,7 +17,7 @@ mod real_rpc_impl {
 
     use crate::rpc::{EthereumRpc, LogEntry, RpcBlock, RpcTransaction, SingleStorageProof, StorageProof, TransactionReceipt};
     use crate::seal_contract::CsvSealAbi;
-    use crate::types::EthereumSealRef;
+    use crate::types::EthereumSealPoint;
 
     /// Error type for Alloy-based RPC operations
     #[derive(Debug, thiserror::Error)]
@@ -562,7 +562,7 @@ mod real_rpc_impl {
     /// Publishes a seal consumption transaction: builds calldata -> signs -> broadcasts -> returns tx hash.
     pub async fn publish(
         rpc: &RealEthereumRpc,
-        seal: &EthereumSealRef,
+        seal: &EthereumSealPoint,
         commitment: [u8; 32],
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
         let signer = rpc
@@ -642,7 +642,7 @@ mod real_rpc_impl {
     /// Expects pre-signed transaction bytes. For signing + sending, use `publish()`.
     pub async fn publish_seal_consumption(
         rpc: &dyn EthereumRpc,
-        seal: &EthereumSealRef,
+        seal: &EthereumSealPoint,
         commitment: [u8; 32],
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
         let calldata = CsvSealAbi::encode_mark_seal_used(seal.seal_id, commitment);

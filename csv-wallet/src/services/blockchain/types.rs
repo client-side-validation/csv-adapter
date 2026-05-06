@@ -52,7 +52,7 @@ pub enum CrossChainStatus {
 pub struct CrossChainProof {
     pub source_chain: Chain,
     pub target_chain: Chain,
-    pub right_id: String,
+    pub sanad_id: String,
     pub lock_tx_hash: String,
     pub proof_data: ProofData,
     pub timestamp: u64,

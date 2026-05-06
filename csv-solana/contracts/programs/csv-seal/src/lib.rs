@@ -1,14 +1,14 @@
-//! CSV Seal — Cross-Chain Right Transfer on Solana
+//! CSV Seal — Cross-Chain Sanad Transfer on Solana
 //!
 //! This Anchor program implements:
-//! - `create_seal()` — Create a new Right anchored to a Solana account
-//! - `consume_seal()` — Consume a Right (single-use enforcement via account closure)
-//! - `lock_right()` — Lock a Right for cross-chain transfer (consumes seal, emits event)
-//! - `mint_right()` — Mint a new Right from a cross-chain transfer proof
-//! - `refund_right()` — Recover a Right after lock timeout (settlement strategy)
+//! - `create_seal()` — Create a new Sanad anchored to a Solana account
+//! - `consume_seal()` — Consume a Sanad (single-use enforcement via account closure)
+//! - `lock_sanad()` — Lock a Sanad for cross-chain transfer (consumes seal, emits event)
+//! - `mint_sanad()` — Mint a new Sanad from a cross-chain transfer proof
+//! - `refund_sanad()` — Recover a Sanad after lock timeout (settlement strategy)
 //!
 //! Architecture:
-//! - RightAccount: PDA storing right data (right_id, commitment, owner, etc.)
+//! - SanadAccount: PDA storing sanad data (sanad_id, commitment, owner, etc.)
 //! - LockRegistry: Tracks lock records for refunds with 24h timeout
 //! - Events emitted for all cross-chain operations
 
@@ -33,7 +33,7 @@ pub mod csv_seal {
     use super::*;
 
     const ASSET_CLASS_UNSPECIFIED: u8 = 0;
-    const ASSET_CLASS_PROOF_RIGHT: u8 = 3;
+    const ASSET_CLASS_PROOF_SANAD: u8 = 3;
     const PROOF_SYSTEM_UNSPECIFIED: u8 = 0;
 
     /// Initialize the LockRegistry (called once during deployment)
@@ -52,94 +52,94 @@ pub mod csv_seal {
         Ok(())
     }
 
-    /// Create a new Right on Solana
+    /// Create a new Sanad on Solana
     pub fn create_seal(
         ctx: Context<CreateSeal>,
-        right_id: [u8; 32],
+        sanad_id: [u8; 32],
         commitment: [u8; 32],
         state_root: [u8; 32],
     ) -> Result<()> {
-        let right = &mut ctx.accounts.right_account;
+        let sanad = &mut ctx.accounts.sanad_account;
         let owner = ctx.accounts.owner.key();
 
-        right.owner = owner;
-        right.right_id = right_id;
-        right.commitment = commitment;
-        right.state_root = state_root;
-        right.nullifier = [0u8; 32];
-        right.asset_class = ASSET_CLASS_UNSPECIFIED;
-        right.asset_id = [0u8; 32];
-        right.metadata_hash = [0u8; 32];
-        right.proof_system = PROOF_SYSTEM_UNSPECIFIED;
-        right.proof_root = [0u8; 32];
-        right.consumed = false;
-        right.locked = false;
-        right.created_at = Clock::get()?.unix_timestamp;
-        right.bump = ctx.bumps.right_account;
+        sanad.owner = owner;
+        sanad.sanad_id = sanad_id;
+        sanad.commitment = commitment;
+        sanad.state_root = state_root;
+        sanad.nullifier = [0u8; 32];
+        sanad.asset_class = ASSET_CLASS_UNSPECIFIED;
+        sanad.asset_id = [0u8; 32];
+        sanad.metadata_hash = [0u8; 32];
+        sanad.proof_system = PROOF_SYSTEM_UNSPECIFIED;
+        sanad.proof_root = [0u8; 32];
+        sanad.consumed = false;
+        sanad.locked = false;
+        sanad.created_at = Clock::get()?.unix_timestamp;
+        sanad.bump = ctx.bumps.sanad_account;
 
-        emit!(RightCreated {
-            right_id,
+        emit!(SanadCreated {
+            sanad_id,
             commitment,
             owner,
-            account: right.key(),
-            asset_class: right.asset_class,
-            asset_id: right.asset_id,
-            metadata_hash: right.metadata_hash,
-            proof_system: right.proof_system,
-            proof_root: right.proof_root,
+            account: sanad.key(),
+            asset_class: sanad.asset_class,
+            asset_id: sanad.asset_id,
+            metadata_hash: sanad.metadata_hash,
+            proof_system: sanad.proof_system,
+            proof_root: sanad.proof_root,
         });
 
         Ok(())
     }
 
-    /// Consume a Right (single-use enforcement)
-    /// Marks the right as consumed and emits an event
+    /// Consume a Sanad (single-use enforcement)
+    /// Marks the sanad as consumed and emits an event
     pub fn consume_seal(ctx: Context<ConsumeSeal>) -> Result<()> {
-        let right = &mut ctx.accounts.right_account;
+        let sanad = &mut ctx.accounts.sanad_account;
         let consumer = ctx.accounts.consumer.key();
 
-        require!(!right.consumed, CsvError::AlreadyConsumed);
+        require!(!sanad.consumed, CsvError::AlreadyConsumed);
 
-        right.consumed = true;
+        sanad.consumed = true;
 
-        emit!(RightConsumed {
-            right_id: right.right_id,
-            commitment: right.commitment,
+        emit!(SanadConsumed {
+            sanad_id: sanad.sanad_id,
+            commitment: sanad.commitment,
             consumer,
-            account: right.key(),
+            account: sanad.key(),
         });
 
         Ok(())
     }
 
-    /// Lock a Right for cross-chain transfer
-    /// Consumes the Right and records it in the LockRegistry
-    pub fn lock_right(
-        ctx: Context<LockRight>,
+    /// Lock a Sanad for cross-chain transfer
+    /// Consumes the Sanad and records it in the LockRegistry
+    pub fn lock_sanad(
+        ctx: Context<LockSanad>,
         destination_chain: u8,
         destination_owner: [u8; 32],
     ) -> Result<()> {
-        let right = &mut ctx.accounts.right_account;
+        let sanad = &mut ctx.accounts.sanad_account;
         let registry = &mut ctx.accounts.registry;
         let owner = ctx.accounts.owner.key();
 
-        require!(!right.consumed, CsvError::AlreadyConsumed);
-        require!(!right.locked, CsvError::AlreadyLocked);
+        require!(!sanad.consumed, CsvError::AlreadyConsumed);
+        require!(!sanad.locked, CsvError::AlreadyLocked);
 
         let locked_at = Clock::get()?.unix_timestamp;
 
         // Record the lock in registry
         let lock_record = LockRecord {
-            right_id: right.right_id,
-            commitment: right.commitment,
+            sanad_id: sanad.sanad_id,
+            commitment: sanad.commitment,
             owner,
             destination_chain,
             destination_owner,
-            asset_class: right.asset_class,
-            asset_id: right.asset_id,
-            metadata_hash: right.metadata_hash,
-            proof_system: right.proof_system,
-            proof_root: right.proof_root,
+            asset_class: sanad.asset_class,
+            asset_id: sanad.asset_id,
+            metadata_hash: sanad.metadata_hash,
+            proof_system: sanad.proof_system,
+            proof_root: sanad.proof_root,
             locked_at,
             refunded: false,
         };
@@ -147,102 +147,102 @@ pub mod csv_seal {
         registry.locks.push(lock_record);
         registry.lock_count += 1;
 
-        right.locked = true;
-        right.consumed = true;
+        sanad.locked = true;
+        sanad.consumed = true;
 
         // Get transaction signature for source_tx_hash
         // In practice, this would be the actual tx signature
         let source_tx_hash = ctx.accounts.recent_blockhashes.key().to_bytes();
 
         emit!(CrossChainLock {
-            right_id: right.right_id,
-            commitment: right.commitment,
+            sanad_id: sanad.sanad_id,
+            commitment: sanad.commitment,
             owner,
             destination_chain,
             destination_owner,
             source_tx_hash,
             locked_at,
-            asset_class: right.asset_class,
-            asset_id: right.asset_id,
-            metadata_hash: right.metadata_hash,
-            proof_system: right.proof_system,
-            proof_root: right.proof_root,
+            asset_class: sanad.asset_class,
+            asset_id: sanad.asset_id,
+            metadata_hash: sanad.metadata_hash,
+            proof_system: sanad.proof_system,
+            proof_root: sanad.proof_root,
         });
 
-        emit!(RightMetadataRecorded {
-            right_id: right.right_id,
-            asset_class: right.asset_class,
-            asset_id: right.asset_id,
-            metadata_hash: right.metadata_hash,
-            proof_system: right.proof_system,
-            proof_root: right.proof_root,
+        emit!(SanadMetadataRecorded {
+            sanad_id: sanad.sanad_id,
+            asset_class: sanad.asset_class,
+            asset_id: sanad.asset_id,
+            metadata_hash: sanad.metadata_hash,
+            proof_system: sanad.proof_system,
+            proof_root: sanad.proof_root,
         });
 
-        emit!(RightConsumed {
-            right_id: right.right_id,
-            commitment: right.commitment,
+        emit!(SanadConsumed {
+            sanad_id: sanad.sanad_id,
+            commitment: sanad.commitment,
             consumer: owner,
-            account: right.key(),
+            account: sanad.key(),
         });
 
         Ok(())
     }
 
-    /// Mint a new Right from a cross-chain transfer proof
-    /// Creates a new RightAccount with the same commitment as the source chain
-    pub fn mint_right(
-        ctx: Context<MintRight>,
-        right_id: [u8; 32],
+    /// Mint a new Sanad from a cross-chain transfer proof
+    /// Creates a new SanadAccount with the same commitment as the source chain
+    pub fn mint_sanad(
+        ctx: Context<MintSanad>,
+        sanad_id: [u8; 32],
         commitment: [u8; 32],
         state_root: [u8; 32],
         source_chain: u8,
         source_seal_ref: [u8; 32],
     ) -> Result<()> {
-        let right = &mut ctx.accounts.right_account;
+        let sanad = &mut ctx.accounts.sanad_account;
         let owner = ctx.accounts.owner.key();
 
-        right.owner = owner;
-        right.right_id = right_id;
-        right.commitment = commitment;
-        right.state_root = state_root;
-        right.nullifier = [0u8; 32];
-        right.asset_class = ASSET_CLASS_UNSPECIFIED;
-        right.asset_id = [0u8; 32];
-        right.metadata_hash = [0u8; 32];
-        right.proof_system = PROOF_SYSTEM_UNSPECIFIED;
-        right.proof_root = [0u8; 32];
-        right.consumed = false;
-        right.locked = false;
-        right.created_at = Clock::get()?.unix_timestamp;
-        right.bump = ctx.bumps.right_account;
+        sanad.owner = owner;
+        sanad.sanad_id = sanad_id;
+        sanad.commitment = commitment;
+        sanad.state_root = state_root;
+        sanad.nullifier = [0u8; 32];
+        sanad.asset_class = ASSET_CLASS_UNSPECIFIED;
+        sanad.asset_id = [0u8; 32];
+        sanad.metadata_hash = [0u8; 32];
+        sanad.proof_system = PROOF_SYSTEM_UNSPECIFIED;
+        sanad.proof_root = [0u8; 32];
+        sanad.consumed = false;
+        sanad.locked = false;
+        sanad.created_at = Clock::get()?.unix_timestamp;
+        sanad.bump = ctx.bumps.sanad_account;
 
         emit!(CrossChainMint {
-            right_id,
+            sanad_id,
             commitment,
             owner,
             source_chain,
             source_seal_ref,
-            account: right.key(),
-            asset_class: right.asset_class,
-            asset_id: right.asset_id,
-            metadata_hash: right.metadata_hash,
-            proof_system: right.proof_system,
-            proof_root: right.proof_root,
+            account: sanad.key(),
+            asset_class: sanad.asset_class,
+            asset_id: sanad.asset_id,
+            metadata_hash: sanad.metadata_hash,
+            proof_system: sanad.proof_system,
+            proof_root: sanad.proof_root,
         });
 
         Ok(())
     }
 
-    /// Refund a Right after the lock timeout has elapsed
-    /// Re-creates the RightAccount if the lock has expired and not refunded
-    pub fn refund_right(
-        ctx: Context<RefundRight>,
+    /// Refund a Sanad after the lock timeout has elapsed
+    /// Re-creates the SanadAccount if the lock has expired and not refunded
+    pub fn refund_sanad(
+        ctx: Context<RefundSanad>,
         state_root: [u8; 32],
     ) -> Result<()> {
         let registry = &mut ctx.accounts.registry;
-        let right = &mut ctx.accounts.new_right_account;
+        let sanad = &mut ctx.accounts.new_sanad_account;
         let claimant = ctx.accounts.claimant.key();
-        let right_id = ctx.accounts.original_right.right_id;
+        let sanad_id = ctx.accounts.original_sanad.sanad_id;
 
         // Cache refund_timeout before mutable borrow
         let refund_timeout = registry.refund_timeout;
@@ -251,7 +251,7 @@ pub mod csv_seal {
         let lock_idx = registry
             .locks
             .iter()
-            .position(|lock| lock.right_id == right_id)
+            .position(|lock| lock.sanad_id == sanad_id)
             .ok_or(CsvError::LockNotFound)?;
 
         let lock = &mut registry.locks[lock_idx];
@@ -267,24 +267,24 @@ pub mod csv_seal {
         // Mark as refunded
         lock.refunded = true;
 
-        // Create new right account
-        right.owner = claimant;
-        right.right_id = lock.right_id;
-        right.commitment = lock.commitment;
-        right.state_root = state_root;
-        right.nullifier = [0u8; 32];
-        right.asset_class = lock.asset_class;
-        right.asset_id = lock.asset_id;
-        right.metadata_hash = lock.metadata_hash;
-        right.proof_system = lock.proof_system;
-        right.proof_root = lock.proof_root;
-        right.consumed = false;
-        right.locked = false;
-        right.created_at = now;
-        right.bump = ctx.bumps.new_right_account;
+        // Create new sanad account
+        sanad.owner = claimant;
+        sanad.sanad_id = lock.sanad_id;
+        sanad.commitment = lock.commitment;
+        sanad.state_root = state_root;
+        sanad.nullifier = [0u8; 32];
+        sanad.asset_class = lock.asset_class;
+        sanad.asset_id = lock.asset_id;
+        sanad.metadata_hash = lock.metadata_hash;
+        sanad.proof_system = lock.proof_system;
+        sanad.proof_root = lock.proof_root;
+        sanad.consumed = false;
+        sanad.locked = false;
+        sanad.created_at = now;
+        sanad.bump = ctx.bumps.new_sanad_account;
 
         emit!(CrossChainRefund {
-            right_id: lock.right_id,
+            sanad_id: lock.sanad_id,
             commitment: lock.commitment,
             claimant,
             refunded_at: now,
@@ -293,36 +293,36 @@ pub mod csv_seal {
         Ok(())
     }
 
-    /// Attach token/NFT/proof metadata to an unconsumed Right.
-    pub fn record_right_metadata(
-        ctx: Context<RecordRightMetadata>,
+    /// Attach token/NFT/proof metadata to an unconsumed Sanad.
+    pub fn record_sanad_metadata(
+        ctx: Context<RecordSanadMetadata>,
         asset_class: u8,
         asset_id: [u8; 32],
         metadata_hash: [u8; 32],
         proof_system: u8,
         proof_root: [u8; 32],
     ) -> Result<()> {
-        require!(asset_class <= ASSET_CLASS_PROOF_RIGHT, CsvError::InvalidRightMetadata);
+        require!(asset_class <= ASSET_CLASS_PROOF_SANAD, CsvError::InvalidSanadMetadata);
         require!(
             asset_class == ASSET_CLASS_UNSPECIFIED || asset_id != [0u8; 32],
-            CsvError::InvalidRightMetadata
+            CsvError::InvalidSanadMetadata
         );
         require!(
             proof_system == PROOF_SYSTEM_UNSPECIFIED || proof_root != [0u8; 32],
-            CsvError::InvalidRightMetadata
+            CsvError::InvalidSanadMetadata
         );
 
-        let right = &mut ctx.accounts.right_account;
-        require!(!right.consumed, CsvError::AlreadyConsumed);
+        let sanad = &mut ctx.accounts.sanad_account;
+        require!(!sanad.consumed, CsvError::AlreadyConsumed);
 
-        right.asset_class = asset_class;
-        right.asset_id = asset_id;
-        right.metadata_hash = metadata_hash;
-        right.proof_system = proof_system;
-        right.proof_root = proof_root;
+        sanad.asset_class = asset_class;
+        sanad.asset_id = asset_id;
+        sanad.metadata_hash = metadata_hash;
+        sanad.proof_system = proof_system;
+        sanad.proof_root = proof_root;
 
-        emit!(RightMetadataRecorded {
-            right_id: right.right_id,
+        emit!(SanadMetadataRecorded {
+            sanad_id: sanad.sanad_id,
             asset_class,
             asset_id,
             metadata_hash,
@@ -333,24 +333,24 @@ pub mod csv_seal {
         Ok(())
     }
 
-    /// Transfer ownership of a Right
-    pub fn transfer_right(
-        ctx: Context<TransferRight>,
+    /// Transfer ownership of a Sanad
+    pub fn transfer_sanad(
+        ctx: Context<TransferSanad>,
         new_owner: Pubkey,
     ) -> Result<()> {
-        let right = &mut ctx.accounts.right_account;
+        let sanad = &mut ctx.accounts.sanad_account;
         let current_owner = ctx.accounts.current_owner.key();
 
         require!(
-            right.owner == current_owner,
+            sanad.owner == current_owner,
             CsvError::NotAuthorized
         );
-        require!(!right.consumed, CsvError::AlreadyConsumed);
+        require!(!sanad.consumed, CsvError::AlreadyConsumed);
 
-        right.owner = new_owner;
+        sanad.owner = new_owner;
 
-        emit!(RightTransferred {
-            right_id: right.right_id,
+        emit!(SanadTransferred {
+            sanad_id: sanad.sanad_id,
             from: current_owner,
             to: new_owner,
         });
@@ -358,23 +358,23 @@ pub mod csv_seal {
         Ok(())
     }
 
-    /// Register a nullifier for a Right (prevents double-spend)
+    /// Register a nullifier for a Sanad (prevents double-spend)
     pub fn register_nullifier(
         ctx: Context<RegisterNullifier>,
         nullifier: [u8; 32],
     ) -> Result<()> {
-        let right = &mut ctx.accounts.right_account;
+        let sanad = &mut ctx.accounts.sanad_account;
         
         require!(
-            right.nullifier == [0u8; 32],
+            sanad.nullifier == [0u8; 32],
             CsvError::NullifierAlreadyRegistered
         );
 
-        right.nullifier = nullifier;
+        sanad.nullifier = nullifier;
 
         emit!(NullifierRegistered {
             nullifier,
-            right_id: right.right_id,
+            sanad_id: sanad.sanad_id,
         });
 
         Ok(())
@@ -401,16 +401,16 @@ pub struct InitializeRegistry<'info> {
 
 /// Create a new seal accounts
 #[derive(Accounts)]
-#[instruction(right_id: [u8; 32], commitment: [u8; 32], state_root: [u8; 32])]
+#[instruction(sanad_id: [u8; 32], commitment: [u8; 32], state_root: [u8; 32])]
 pub struct CreateSeal<'info> {
     #[account(
         init,
         payer = owner,
-        space = 8 + RightAccount::SIZE,
-        seeds = [b"right", owner.key().as_ref(), &right_id],
+        space = 8 + SanadAccount::SIZE,
+        seeds = [b"sanad", owner.key().as_ref(), &sanad_id],
         bump
     )]
-    pub right_account: Account<'info, RightAccount>,
+    pub sanad_account: Account<'info, SanadAccount>,
     
     #[account(mut)]
     pub owner: Signer<'info>,
@@ -423,26 +423,26 @@ pub struct CreateSeal<'info> {
 pub struct ConsumeSeal<'info> {
     #[account(
         mut,
-        seeds = [b"right", right_account.owner.as_ref(), &right_account.right_id],
-        bump = right_account.bump,
-        constraint = right_account.owner == consumer.key() @ CsvError::NotAuthorized
+        seeds = [b"sanad", sanad_account.owner.as_ref(), &sanad_account.sanad_id],
+        bump = sanad_account.bump,
+        constraint = sanad_account.owner == consumer.key() @ CsvError::NotAuthorized
     )]
-    pub right_account: Account<'info, RightAccount>,
+    pub sanad_account: Account<'info, SanadAccount>,
     
     pub consumer: Signer<'info>,
 }
 
-/// Lock a right accounts
+/// Lock a sanad accounts
 #[derive(Accounts)]
 #[instruction(destination_chain: u8, destination_owner: [u8; 32])]
-pub struct LockRight<'info> {
+pub struct LockSanad<'info> {
     #[account(
         mut,
-        seeds = [b"right", right_account.owner.as_ref(), &right_account.right_id],
-        bump = right_account.bump,
-        constraint = right_account.owner == owner.key() @ CsvError::NotAuthorized
+        seeds = [b"sanad", sanad_account.owner.as_ref(), &sanad_account.sanad_id],
+        bump = sanad_account.bump,
+        constraint = sanad_account.owner == owner.key() @ CsvError::NotAuthorized
     )]
-    pub right_account: Account<'info, RightAccount>,
+    pub sanad_account: Account<'info, SanadAccount>,
     
     #[account(
         mut,
@@ -460,18 +460,18 @@ pub struct LockRight<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Mint a right accounts
+/// Mint a sanad accounts
 #[derive(Accounts)]
-#[instruction(right_id: [u8; 32], commitment: [u8; 32], state_root: [u8; 32], source_chain: u8, source_seal_ref: [u8; 32])]
-pub struct MintRight<'info> {
+#[instruction(sanad_id: [u8; 32], commitment: [u8; 32], state_root: [u8; 32], source_chain: u8, source_seal_ref: [u8; 32])]
+pub struct MintSanad<'info> {
     #[account(
         init,
         payer = owner,
-        space = 8 + RightAccount::SIZE,
-        seeds = [b"right", owner.key().as_ref(), &right_id],
+        space = 8 + SanadAccount::SIZE,
+        seeds = [b"sanad", owner.key().as_ref(), &sanad_id],
         bump
     )]
-    pub right_account: Account<'info, RightAccount>,
+    pub sanad_account: Account<'info, SanadAccount>,
     
     #[account(mut)]
     pub owner: Signer<'info>,
@@ -479,10 +479,10 @@ pub struct MintRight<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Refund a right accounts
+/// Refund a sanad accounts
 #[derive(Accounts)]
 #[instruction(state_root: [u8; 32])]
-pub struct RefundRight<'info> {
+pub struct RefundSanad<'info> {
     #[account(
         mut,
         seeds = [b"lock_registry"],
@@ -490,21 +490,21 @@ pub struct RefundRight<'info> {
     )]
     pub registry: Account<'info, LockRegistry>,
     
-    /// CHECK: Original right account that was locked (for verification)
+    /// CHECK: Original sanad account that was locked (for verification)
     #[account(
-        seeds = [b"right", original_right.owner.as_ref(), &original_right.right_id],
-        bump = original_right.bump
+        seeds = [b"sanad", original_sanad.owner.as_ref(), &original_sanad.sanad_id],
+        bump = original_sanad.bump
     )]
-    pub original_right: Account<'info, RightAccount>,
+    pub original_sanad: Account<'info, SanadAccount>,
     
     #[account(
         init,
         payer = claimant,
-        space = 8 + RightAccount::SIZE,
-        seeds = [b"right", claimant.key().as_ref(), &original_right.right_id, b"refund"],
+        space = 8 + SanadAccount::SIZE,
+        seeds = [b"sanad", claimant.key().as_ref(), &original_sanad.sanad_id, b"refund"],
         bump
     )]
-    pub new_right_account: Account<'info, RightAccount>,
+    pub new_sanad_account: Account<'info, SanadAccount>,
     
     #[account(mut)]
     pub claimant: Signer<'info>,
@@ -512,16 +512,16 @@ pub struct RefundRight<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Transfer right accounts
+/// Transfer sanad accounts
 #[derive(Accounts)]
 #[instruction(new_owner: Pubkey)]
-pub struct TransferRight<'info> {
+pub struct TransferSanad<'info> {
     #[account(
         mut,
-        seeds = [b"right", right_account.owner.as_ref(), &right_account.right_id],
-        bump = right_account.bump
+        seeds = [b"sanad", sanad_account.owner.as_ref(), &sanad_account.sanad_id],
+        bump = sanad_account.bump
     )]
-    pub right_account: Account<'info, RightAccount>,
+    pub sanad_account: Account<'info, SanadAccount>,
     
     pub current_owner: Signer<'info>,
 }
@@ -532,11 +532,11 @@ pub struct TransferRight<'info> {
 pub struct RegisterNullifier<'info> {
     #[account(
         mut,
-        seeds = [b"right", right_account.owner.as_ref(), &right_account.right_id],
-        bump = right_account.bump,
-        constraint = right_account.owner == authority.key() || right_account.owner == authority.key() @ CsvError::NotAuthorized
+        seeds = [b"sanad", sanad_account.owner.as_ref(), &sanad_account.sanad_id],
+        bump = sanad_account.bump,
+        constraint = sanad_account.owner == authority.key() || sanad_account.owner == authority.key() @ CsvError::NotAuthorized
     )]
-    pub right_account: Account<'info, RightAccount>,
+    pub sanad_account: Account<'info, SanadAccount>,
     
     pub authority: Signer<'info>,
 }
@@ -544,14 +544,14 @@ pub struct RegisterNullifier<'info> {
 /// Record metadata accounts
 #[derive(Accounts)]
 #[instruction(asset_class: u8, asset_id: [u8; 32], metadata_hash: [u8; 32], proof_system: u8, proof_root: [u8; 32])]
-pub struct RecordRightMetadata<'info> {
+pub struct RecordSanadMetadata<'info> {
     #[account(
         mut,
-        seeds = [b"right", right_account.owner.as_ref(), &right_account.right_id],
-        bump = right_account.bump,
-        constraint = right_account.owner == authority.key() @ CsvError::NotAuthorized
+        seeds = [b"sanad", sanad_account.owner.as_ref(), &sanad_account.sanad_id],
+        bump = sanad_account.bump,
+        constraint = sanad_account.owner == authority.key() @ CsvError::NotAuthorized
     )]
-    pub right_account: Account<'info, RightAccount>,
+    pub sanad_account: Account<'info, SanadAccount>,
 
     pub authority: Signer<'info>,
 }

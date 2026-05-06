@@ -20,11 +20,11 @@ lazy_static! {
         &["chain"]
     ).expect("Failed to create metric");
 
-    /// Counter for total rights indexed per chain.
-    pub static ref RIGHTS_INDEXED_TOTAL: CounterVec = CounterVec::new(
+    /// Counter for total sanads indexed per chain.
+    pub static ref SANADS_INDEXED_TOTAL: CounterVec = CounterVec::new(
         prometheus::Opts::new(
-            "csv_indexer_rights_indexed_total",
-            "Total number of rights indexed per chain"
+            "csv_indexer_sanads_indexed_total",
+            "Total number of sanads indexed per chain"
         ),
         &["chain"]
     ).expect("Failed to create metric");
@@ -99,7 +99,7 @@ pub fn init_metrics() -> Arc<Registry> {
         .register(Box::new(BLOCKS_INDEXED_TOTAL.clone()))
         .expect("Failed to register metric");
     REGISTRY
-        .register(Box::new(RIGHTS_INDEXED_TOTAL.clone()))
+        .register(Box::new(SANADS_INDEXED_TOTAL.clone()))
         .expect("Failed to register metric");
     REGISTRY
         .register(Box::new(SEALS_INDEXED_TOTAL.clone()))
@@ -129,7 +129,7 @@ pub fn init_metrics() -> Arc<Registry> {
 /// Record metrics for a processed block.
 pub fn record_block_processed(
     chain: &str,
-    rights_count: u64,
+    sanads_count: u64,
     seals_count: u64,
     transfers_count: u64,
     contracts_count: u64,
@@ -137,9 +137,9 @@ pub fn record_block_processed(
     latest_block: u64,
 ) {
     BLOCKS_INDEXED_TOTAL.with_label_values(&[chain]).inc();
-    RIGHTS_INDEXED_TOTAL
+    SANADS_INDEXED_TOTAL
         .with_label_values(&[chain])
-        .inc_by(rights_count as f64);
+        .inc_by(sanads_count as f64);
     SEALS_INDEXED_TOTAL
         .with_label_values(&[chain])
         .inc_by(seals_count as f64);

@@ -21,7 +21,7 @@ pub fn Stats() -> Element {
 
             // Summary cards
             div { class: "grid grid-cols-1 md:grid-cols-4 gap-4",
-                SummaryCard { label: "Total Rights", value: stats.with(|s| s.as_ref().map(|s| s.total_rights.to_string()).unwrap_or_else(|| "—".to_string())) }
+                SummaryCard { label: "Total Sanads", value: stats.with(|s| s.as_ref().map(|s| s.total_sanads.to_string()).unwrap_or_else(|| "—".to_string())) }
                 SummaryCard { label: "Total Transfers", value: stats.with(|s| s.as_ref().map(|s| s.total_transfers.to_string()).unwrap_or_else(|| "—".to_string())) }
                 SummaryCard { label: "Total Seals", value: stats.with(|s| s.as_ref().map(|s| s.total_seals.to_string()).unwrap_or_else(|| "—".to_string())) }
                 SummaryCard { label: "Total Contracts", value: stats.with(|s| s.as_ref().map(|s| s.total_contracts.to_string()).unwrap_or_else(|| "—".to_string())) }
@@ -46,17 +46,17 @@ pub fn Stats() -> Element {
                     }
                 }
 
-                // Rights by chain (bar chart area)
+                // Sanads by chain (bar chart area)
                 div { class: "bg-gray-900 rounded-xl border border-gray-800 p-6",
-                    h2 { class: "text-lg font-semibold mb-4", "Rights by Chain" }
+                    h2 { class: "text-lg font-semibold mb-4", "Sanads by Chain" }
                     if let Some(ref s) = *stats.read() {
                         div { class: "space-y-3",
-                            {s.rights_by_chain.iter().map(|rc| rsx! {
+                            {s.sanads_by_chain.iter().map(|rc| rsx! {
                                 ChainBar {
                                     key: "{rc.chain}",
                                     chain: rc.chain.clone(),
                                     count: rc.count,
-                                    max: s.rights_by_chain.first().map(|c| c.count).unwrap_or(1),
+                                    max: s.sanads_by_chain.first().map(|c| c.count).unwrap_or(1),
                                 }
                             })}
                         }
@@ -78,7 +78,7 @@ pub fn Stats() -> Element {
                                 tr { class: "border-b border-gray-800 text-left text-sm text-gray-400",
                                     th { class: "px-4 py-2", "From" }
                                     th { class: "px-4 py-2", "To" }
-                                    th { class: "px-4 py-2 text-right", "Count" }
+                                    th { class: "px-4 py-2 text-sanad", "Count" }
                                 }
                             }
                             tbody { class: "divide-y divide-gray-800",
@@ -90,7 +90,7 @@ pub fn Stats() -> Element {
                                         td { class: "px-4 py-2",
                                             span { class: "px-2 py-1 rounded-full text-xs bg-gray-800", "{tp.to_chain}" }
                                         }
-                                        td { class: "px-4 py-2 text-right font-mono", "{tp.count}" }
+                                        td { class: "px-4 py-2 text-sanad font-mono", "{tp.count}" }
                                     }
                                 })}
                             }

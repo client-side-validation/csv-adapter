@@ -12,7 +12,7 @@ pub const CHAIN_ETHEREUM: u8 = 3;
 pub const CHAIN_SOLANA: u8 = 4;
 
 /// Seed prefixes for PDA derivation
-pub const SEED_RIGHT: &[u8] = b"right";
+pub const SEED_SANAD: &[u8] = b"sanad";
 pub const SEED_LOCK_REGISTRY: &[u8] = b"lock_registry";
 pub const SEED_REFUND: &[u8] = b"refund";
 

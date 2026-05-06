@@ -67,7 +67,7 @@ pub fn verify_storage_proof(
     // the storage_root, then verify storage_proof against that storage_root.
     //
     // For the nullifier registry use case (L3), the storage slot key is
-    // keccak256(rightId || slot_position). We verify the MPT proof reconstructs
+    // keccak256(sanadId || slot_position). We verify the MPT proof reconstructs
     // to the expected storage value.
 
     // Step 2a: Encode the storage key (slot position)

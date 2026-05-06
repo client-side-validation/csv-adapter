@@ -3,7 +3,7 @@
 //! In-memory storage for seal records.
 
 use super::manager::SealRecord;
-use csv_core::{Chain, RightId};
+use csv_core::{Chain, SanadId};
 use csv_core::mcp::{HasErrorSuggestion, FixAction, error_codes};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -103,14 +103,14 @@ impl SealStore {
             .collect())
     }
 
-    /// Get seals for a specific right.
-    pub fn get_seals_for_right(
+    /// Get seals for a specific sanad.
+    pub fn get_seals_for_sanad(
         &self,
-        right_id: &RightId,
+        sanad_id: &SanadId,
     ) -> Result<Vec<SealRecord>, SealStoreError> {
         let seals = self.seals.lock().unwrap();
         Ok(seals.values()
-            .filter(|s| s.right_id.as_ref() == Some(right_id))
+            .filter(|s| s.sanad_id.as_ref() == Some(sanad_id))
             .cloned()
             .collect())
     }

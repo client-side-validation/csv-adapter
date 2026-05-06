@@ -31,9 +31,9 @@ export interface ProtocolVersion {
  */
 export enum ErrorCode {
   ProtocolVersionMismatch = 'protocol_version_mismatch',
-  InvalidRightId = 'invalid_right_id',
-  RightAlreadySpent = 'right_already_spent',
-  InvalidSealRef = 'invalid_seal_ref',
+  InvalidSanadId = 'invalid_sanad_id',
+  SanadAlreadySpent = 'sanad_already_spent',
+  InvalidSealPoint = 'invalid_seal_ref',
   InvalidCommitment = 'invalid_commitment',
   ChainNotSupported = 'chain_not_supported',
   AdapterNotInitialized = 'adapter_not_initialized',

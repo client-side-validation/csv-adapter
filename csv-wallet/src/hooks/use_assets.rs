@@ -23,9 +23,9 @@ impl AssetContext {
         self.state.write().assets.push(asset);
     }
 
-    pub fn update_value(&mut self, right_id: String, value: f64) {
+    pub fn update_value(&mut self, sanad_id: String, value: f64) {
         if let Some(asset) = self.state.write().assets.iter_mut()
-            .find(|a| format!("{:x}", a.right_id.0) == right_id) 
+            .find(|a| format!("{:x}", a.sanad_id.0) == sanad_id) 
         {
             asset.value = Some(value);
         }

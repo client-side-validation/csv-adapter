@@ -12,7 +12,7 @@ pub type WalletStorage = LocalStorageManager;
 
 /// Storage keys used by the wallet.
 pub mod keys {
-    /// Key for unified storage (rights, transfers, seals, proofs, contracts).
+    /// Key for unified storage (sanads, transfers, seals, proofs, contracts).
     pub const UNIFIED_STORAGE_KEY: &str = "csv_unified_storage";
 
     /// Key for wallet mnemonic/seed data.

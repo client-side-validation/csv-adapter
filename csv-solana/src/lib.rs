@@ -26,9 +26,9 @@ pub use backend::{create_solana_adapter, SolanaRpcClient, SolanaWallet};
 pub use config::{Network, SolanaConfig};
 pub use deploy::{deploy_csv_program, deploy_csv_seal_program, ProgramDeployer, ProgramDeployment};
 pub use error::{SolanaError, SolanaResult};
-pub use mint::mint_right_from_hex_key;
+pub use mint::mint_sanad_from_hex_key;
 pub use rpc::SolanaRpc;
-pub use types::{SolanaAnchorRef, SolanaFinalityProof, SolanaInclusionProof, SolanaSealRef};
+pub use types::{SolanaCommitAnchor, SolanaFinalityProof, SolanaInclusionProof, SolanaSealPoint};
 pub use wallet::{ProgramWallet, WalletError};
 
 // Chain operations exports

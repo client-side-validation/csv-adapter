@@ -1,4 +1,4 @@
-//! Core AnchorLayer trait - SECURITY CRITICAL
+//! Core SealProtocol trait - SECURITY CRITICAL
 //!
 //! This trait defines the interface that all chain-specific adapters must implement.
 //! It is the primary security boundary for the entire CSV protocol.
@@ -41,7 +41,7 @@ use crate::hash::Hash;
 use crate::proof::ProofBundle;
 use crate::signature::SignatureScheme;
 
-/// The AnchorLayer trait defines the security-critical interface for chain-specific adapters.
+/// The SealProtocol trait defines the security-critical interface for chain-specific adapters.
 ///
 /// # Implementation Requirements for Security Auditors
 ///
@@ -74,12 +74,12 @@ use crate::signature::SignatureScheme;
 /// All methods must either perform real chain-backed operations or return a typed
 /// error indicating the capability is unavailable. "Fake success" implementations
 /// are security vulnerabilities that enable fraud.
-pub trait AnchorLayer {
-    /// Chain-specific seal reference type
-    type SealRef;
+pub trait SealProtocol {
+    /// Chain-specific seal point type
+    type SealPoint;
 
-    /// Chain-specific anchor reference type
-    type AnchorRef;
+    /// Chain-specific commit anchor type
+    type CommitAnchor;
 
     /// Chain-specific inclusion proof type
     type InclusionProof;
@@ -104,7 +104,7 @@ pub trait AnchorLayer {
     /// # Returns
     /// * `Ok(CommitAnchor)` - The anchor reference for inclusion/finality proofs
     /// * `Err` - If publication fails or seal already consumed
-    fn publish(&self, commitment: Hash, seal: Self::SealRef) -> Result<Self::AnchorRef>;
+    fn publish(&self, commitment: Hash, seal: Self::SealPoint) -> Result<Self::CommitAnchor>;
 
     /// Verify and extract inclusion proof from the base layer.
     ///
@@ -129,7 +129,7 @@ pub trait AnchorLayer {
     /// - Bitcoin: Merkle branch verification against block header
     /// - Ethereum: MPT proof verification against state root
     /// - Sui: Checkpoint content verification
-    fn verify_inclusion(&self, anchor: Self::AnchorRef) -> Result<Self::InclusionProof>;
+    fn verify_inclusion(&self, anchor: Self::CommitAnchor) -> Result<Self::InclusionProof>;
 
     /// Verify finality according to base-layer consensus rules.
     ///
@@ -158,7 +158,7 @@ pub trait AnchorLayer {
     /// # Returns
     /// * `Ok(FinalityProof)` - Proof that anchor has reached finality
     /// * `Err` - If finality not yet reached or proof invalid
-    fn verify_finality(&self, anchor: Self::AnchorRef) -> Result<Self::FinalityProof>;
+    fn verify_finality(&self, anchor: Self::CommitAnchor) -> Result<Self::FinalityProof>;
 
     /// Enforce that the seal is single-use and non-replayable.
     ///
@@ -188,13 +188,13 @@ pub trait AnchorLayer {
     /// 1. It queries the actual chain state (not cached state)
     /// 2. It uses the appropriate native primitive for the chain
     /// 3. It cannot be bypassed or fooled by malicious inputs
-    fn enforce_seal(&self, seal: Self::SealRef) -> Result<()>;
+    fn enforce_seal(&self, seal: Self::SealPoint) -> Result<()>;
 
     /// Create a new seal for authorizing state transitions.
     ///
     /// # Arguments
     /// * `value` - Optional value/funding for the seal (chain-specific units)
-    fn create_seal(&self, value: Option<u64>) -> Result<Self::SealRef>;
+    fn create_seal(&self, value: Option<u64>) -> Result<Self::SealPoint>;
 
     /// Compute a domain-separated commitment hash from components.
     ///
@@ -231,7 +231,7 @@ pub trait AnchorLayer {
         contract_id: Hash,
         previous_commitment: Hash,
         transition_payload_hash: Hash,
-        seal_ref: &Self::SealRef,
+        seal_point: &Self::SealPoint,
     ) -> Hash;
 
     /// Build a complete proof bundle for peer-to-peer verification.
@@ -261,7 +261,7 @@ pub trait AnchorLayer {
     /// Complete `ProofBundle` ready for cross-chain transport and verification
     fn build_proof_bundle(
         &self,
-        anchor: Self::AnchorRef,
+        anchor: Self::CommitAnchor,
         transition_dag: DAGSegment,
     ) -> Result<ProofBundle>;
 
@@ -288,7 +288,7 @@ pub trait AnchorLayer {
     /// # Returns
     /// * `Ok(())` - Rollback processed successfully
     /// * `Err` - If rollback handling fails
-    fn rollback(&self, anchor: Self::AnchorRef) -> Result<()>;
+    fn rollback(&self, anchor: Self::CommitAnchor) -> Result<()>;
 
     /// Get the domain separator for this adapter.
     ///

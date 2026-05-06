@@ -49,5 +49,5 @@ cd contracts && anchor test --provider.cluster ${NETWORK} --skip-build 2>&1 | ta
 echo ""
 echo "LockRegistry initialization attempted."
 echo ""
-echo "Note: The LockRegistry is also automatically created when calling lock_right"
+echo "Note: The LockRegistry is also automatically created when calling lock_sanad"
 echo "if it doesn't exist, thanks to Anchor's init_if_needed feature."

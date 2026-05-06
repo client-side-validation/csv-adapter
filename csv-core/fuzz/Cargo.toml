@@ -16,8 +16,8 @@ libfuzzer-sys = "0.4"
 path = ".."
 
 [[bin]]
-name = "fuzz_right_from_canonical_bytes"
-path = "fuzz_targets/fuzz_right_from_canonical_bytes.rs"
+name = "fuzz_sanad_from_canonical_bytes"
+path = "fuzz_targets/fuzz_sanad_from_canonical_bytes.rs"
 test = false
 doc = false
 bench = false

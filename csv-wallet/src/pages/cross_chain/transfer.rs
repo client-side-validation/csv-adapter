@@ -1,7 +1,7 @@
 //! Cross-chain transfer page.
 
 use crate::context::{
-    use_wallet_context, ProofData, ProofRecord, ProofStatus, RightStatus, SealContent, SealRecord,
+    use_wallet_context, ProofData, ProofRecord, ProofStatus, SanadStatus, SealContent, SealRecord,
     SealStatus, TrackedTransfer, TransferStatus,
 };
 use crate::pages::common::*;
@@ -16,7 +16,7 @@ pub fn CrossChainTransfer() -> Element {
     let wallet_ctx = use_wallet_context();
     let mut from_chain = use_signal(|| Chain::Bitcoin);
     let mut to_chain = use_signal(|| Chain::Sui);
-    let mut selected_right_index = use_signal(|| 0usize);
+    let mut selected_sanad_index = use_signal(|| 0usize);
     let mut dest_owner = use_signal(String::new);
     let mut step = use_signal(|| 0);
     let result = use_signal(|| Option::<String>::None);
@@ -25,26 +25,26 @@ pub fn CrossChainTransfer() -> Element {
     let mut selected_account_index = use_signal(|| 0usize);
     let mut selected_target_contract_index = use_signal(|| 0usize);
 
-    // Get rights for the source chain (filtered to active only)
+    // Get sanads for the source chain (filtered to active only)
     let from_chain_val = *from_chain.read();
-    let rights_for_source: Vec<_> = wallet_ctx
-        .rights_for_chain(from_chain_val)
+    let sanads_for_source: Vec<_> = wallet_ctx
+        .sanads_for_chain(from_chain_val)
         .into_iter()
-        .filter(|r| r.status == RightStatus::Active)
+        .filter(|r| r.status == SanadStatus::Active)
         .collect();
-    let has_rights = !rights_for_source.is_empty();
+    let has_sanads = !sanads_for_source.is_empty();
 
-    // Reset right selection when chain changes
+    // Reset sanad selection when chain changes
     use_effect(move || {
-        selected_right_index.set(0);
+        selected_sanad_index.set(0);
     });
 
     // Clone for use in memo
-    let rights_for_memo = rights_for_source.clone();
-    // Get the selected right ID
-    let right_id = use_memo(move || {
-        rights_for_memo
-            .get(*selected_right_index.read())
+    let sanads_for_memo = sanads_for_source.clone();
+    // Get the selected sanad ID
+    let sanad_id = use_memo(move || {
+        sanads_for_memo
+            .get(*selected_sanad_index.read())
             .map(|r| r.id.clone())
             .unwrap_or_default()
     });
@@ -127,19 +127,19 @@ pub fn CrossChainTransfer() -> Element {
 
     let steps = [
         "Select Account",
-        "Lock Right on source chain",
+        "Lock Sanad on source chain",
         "Generate cryptographic proof",
         "Verify proof on destination",
-        "Mint Right on destination",
+        "Mint Sanad on destination",
         "Complete transfer",
     ];
 
     // Clone before moving into closure to avoid borrow after move
-    let rights_for_closure = rights_for_source.clone();
+    let sanads_for_closure = sanads_for_source.clone();
 
     // Execute real cross-chain transfer using native signing
     let execute_transfer = move |_| {
-        let rights_for_source_closure = rights_for_closure.clone();
+        let sanads_for_source_closure = sanads_for_closure.clone();
         if !_has_source_contract {
             error.set(Some(format!(
                 "No contract deployed on {:?}. Deploy a contract first.",
@@ -187,9 +187,9 @@ pub fn CrossChainTransfer() -> Element {
             return;
         }
 
-        if !has_rights {
+        if !has_sanads {
             error.set(Some(format!(
-                "No active rights available for {:?}. Create a right first.",
+                "No active sanads available for {:?}. Create a sanad first.",
                 *from_chain.read()
             )));
             return;
@@ -210,7 +210,7 @@ pub fn CrossChainTransfer() -> Element {
 
         // Spawn async task for blockchain operations
         spawn({
-            let right = right_id.read().clone();
+            let sanad = sanad_id.read().clone();
             let dest = dest_owner.read().clone();
             let account_idx = *selected_account_index.read();
             let target_contract_idx = *selected_target_contract_index.read();
@@ -258,9 +258,9 @@ pub fn CrossChainTransfer() -> Element {
                     dest
                 };
 
-                // Step 1: Lock right on source chain
+                // Step 1: Lock sanad on source chain
                 step_signal.set(1);
-                web_sys::console::log_1(&"Step 1: Locking right on source chain...".into());
+                web_sys::console::log_1(&"Step 1: Locking sanad on source chain...".into());
 
                 // Build contracts map with both source and target contracts
                 let mut contracts = std::collections::HashMap::new();
@@ -301,7 +301,7 @@ pub fn CrossChainTransfer() -> Element {
                 }
 
                 match service
-                    .execute_cross_chain_transfer(from, to, &right, &dest_addr, &contracts, &signer)
+                    .execute_cross_chain_transfer(from, to, &sanad, &dest_addr, &contracts, &signer)
                     .await
                 {
                     Ok(transfer_result) => {
@@ -322,7 +322,7 @@ pub fn CrossChainTransfer() -> Element {
                         // Create linked Seal record
                         let seal_ref = format!("seal_{}", &transfer_id[..16]);
                         let seal_content = SealContent {
-                            content_hash: format!("0x{}", &right[..40.min(right.len())]),
+                            content_hash: format!("0x{}", &sanad[..40.min(sanad.len())]),
                             owner: dest_addr.clone(),
                             block_number: None,
                             lock_tx_hash: Some(transfer_result.lock_tx_hash.clone()),
@@ -330,11 +330,11 @@ pub fn CrossChainTransfer() -> Element {
                         let seal = SealRecord {
                             seal_ref: seal_ref.clone(),
                             chain: from,
-                            value: rights_for_source_closure
-                                .get(*selected_right_index.read())
+                            value: sanads_for_source_closure
+                                .get(*selected_sanad_index.read())
                                 .map(|r| r.value)
                                 .unwrap_or(0),
-                            right_id: right.clone(),
+                            sanad_id: sanad.clone(),
                             status: SealStatus::Locked,
                             created_at: now,
                             content: Some(seal_content),
@@ -346,12 +346,12 @@ pub fn CrossChainTransfer() -> Element {
                         let proof_data = match from {
                             Chain::Bitcoin => ProofData::Merkle {
                                 root: format!("0x{}", &transfer_result.lock_tx_hash[..40]),
-                                path: vec![format!("0x{}", &right[..40])],
+                                path: vec![format!("0x{}", &sanad[..40])],
                                 leaf_index: 0,
                             },
                             Chain::Ethereum => ProofData::Mpt {
                                 root: format!("0x{}", &transfer_result.lock_tx_hash[..40]),
-                                account_proof: vec![format!("0x{}", &right[..40])],
+                                account_proof: vec![format!("0x{}", &sanad[..40])],
                                 storage_proof: vec![format!("0x{}", &transfer_id[..40])],
                             },
                             Chain::Sui => ProofData::Checkpoint {
@@ -369,11 +369,11 @@ pub fn CrossChainTransfer() -> Element {
                             Chain::Solana => ProofData::Solana {
                                 slot: now,
                                 bank_hash: format!("0x{}", &transfer_result.lock_tx_hash[..40]),
-                                merkle_proof: vec![format!("0x{}", &right[..40])],
+                                merkle_proof: vec![format!("0x{}", &sanad[..40])],
                             },
                             _ => ProofData::Merkle {
                                 root: format!("0x{}", &transfer_result.lock_tx_hash[..40]),
-                                path: vec![format!("0x{}", &right[..40])],
+                                path: vec![format!("0x{}", &sanad[..40])],
                                 leaf_index: 0,
                             },
                         };
@@ -389,7 +389,7 @@ pub fn CrossChainTransfer() -> Element {
 
                         let proof = ProofRecord {
                             chain: from,
-                            right_id: right.clone(),
+                            sanad_id: sanad.clone(),
                             seal_ref: seal_ref.clone(),
                             proof_type: proof_type.to_string(),
                             status: ProofStatus::Verified,
@@ -412,7 +412,7 @@ pub fn CrossChainTransfer() -> Element {
                             id: transfer_id.clone(),
                             from_chain: from,
                             to_chain: to,
-                            right_id: right.clone(),
+                            sanad_id: sanad.clone(),
                             dest_owner: dest_addr.clone(),
                             status: TransferStatus::Completed,
                             created_at: now,
@@ -425,8 +425,8 @@ pub fn CrossChainTransfer() -> Element {
                         });
 
                         result_signal.set(Some(format!(
-                            "Transfer complete!\nTransfer ID: {}\nRight {} moved from {:?} to {:?}\n\nSeal: {}\nProof: {}\nLock TX: {}\nMint TX: {}",
-                            transfer_id, right, from, to,
+                            "Transfer complete!\nTransfer ID: {}\nSanad {} moved from {:?} to {:?}\n\nSeal: {}\nProof: {}\nLock TX: {}\nMint TX: {}",
+                            transfer_id, sanad, from, to,
                             truncate_address(&seal_ref, 12),
                             proof_type,
                             transfer_result.lock_tx_hash,
@@ -560,25 +560,25 @@ pub fn CrossChainTransfer() -> Element {
                     }
                 }
 
-                {form_field("Available Rights", rsx! {
-                    if rights_for_source.is_empty() {
+                {form_field("Available Sanads", rsx! {
+                    if sanads_for_source.is_empty() {
                         p { class: "text-sm text-red-400",
-                            {format!("No active rights available for {:?}. Create a right on this chain first.", from_chain_val)}
+                            {format!("No active sanads available for {:?}. Create a sanad on this chain first.", from_chain_val)}
                         }
                     } else {
                         select {
                             class: "{input_mono_class()}",
                             onchange: move |evt| {
                                 if let Ok(idx) = evt.value().parse::<usize>() {
-                                    selected_right_index.set(idx);
+                                    selected_sanad_index.set(idx);
                                 }
                             },
-                            for (idx, right) in rights_for_source.iter().enumerate() {
-                                option { key: "right-{idx}", value: idx.to_string(), selected: idx == *selected_right_index.read(),
+                            for (idx, sanad) in sanads_for_source.iter().enumerate() {
+                                option { key: "sanad-{idx}", value: idx.to_string(), selected: idx == *selected_sanad_index.read(),
                                     {format!("{}... - Value: {} - {}",
-                                        &right.id[..16.min(right.id.len())],
-                                        right.value,
-                                        right.status
+                                        &sanad.id[..16.min(sanad.id.len())],
+                                        sanad.value,
+                                        sanad.status
                                     )}
                                 }
                             }
@@ -586,15 +586,15 @@ pub fn CrossChainTransfer() -> Element {
                     }
                 })}
 
-                // Show selected right details
-                if let Some(right) = rights_for_source.get(*selected_right_index.read()) {
+                // Show selected sanad details
+                if let Some(sanad) = sanads_for_source.get(*selected_sanad_index.read()) {
                     div { class: "bg-gray-800/50 rounded-lg p-3 border border-gray-700",
-                        p { class: "text-xs text-gray-400 mb-2", "Selected Right Details:" }
+                        p { class: "text-xs text-gray-400 mb-2", "Selected Sanad Details:" }
                         div { class: "grid grid-cols-2 gap-2 text-xs",
-                            div { span { class: "text-gray-500", "Full ID: " }, span { class: "font-mono text-gray-300 break-all", "{&right.id}" } }
-                            div { span { class: "text-gray-500", "Value: " }, span { class: "font-mono text-gray-300", "{right.value}" } }
-                            div { span { class: "text-gray-500", "Status: " }, span { class: "{right_status_class(&right.status)}", "{right.status}" } }
-                            div { span { class: "text-gray-500", "Owner: " }, span { class: "font-mono text-gray-300", "{truncate_address(&right.owner, 8)}" } }
+                            div { span { class: "text-gray-500", "Full ID: " }, span { class: "font-mono text-gray-300 break-all", "{&sanad.id}" } }
+                            div { span { class: "text-gray-500", "Value: " }, span { class: "font-mono text-gray-300", "{sanad.value}" } }
+                            div { span { class: "text-gray-500", "Status: " }, span { class: "{sanad_status_class(&sanad.status)}", "{sanad.status}" } }
+                            div { span { class: "text-gray-500", "Owner: " }, span { class: "font-mono text-gray-300", "{truncate_address(&sanad.owner, 8)}" } }
                         }
                     }
                 }
@@ -645,7 +645,7 @@ pub fn CrossChainTransfer() -> Element {
                     onclick: execute_transfer,
                     disabled: *executing.read()
                         || *step.read() >= 5
-                        || !has_rights
+                        || !has_sanads
                         || !has_account
                         || is_watch_only
                         || !has_target_contract
@@ -658,8 +658,8 @@ pub fn CrossChainTransfer() -> Element {
                         "Add Source Account First"
                     } else if is_watch_only {
                         "Watch-Only Account (Cannot Sign)"
-                    } else if !has_rights {
-                        "No Rights Available"
+                    } else if !has_sanads {
+                        "No Sanads Available"
                     } else if !has_target_contract {
                         "Deploy Target Contract First"
                     } else if !has_dest_account {
@@ -682,9 +682,9 @@ pub fn CrossChainTransfer() -> Element {
                         "Note: This account is watch-only. Import the private key to transfer."
                     }
                 }
-                if !has_rights {
+                if !has_sanads {
                     p { class: "text-xs text-red-500 mt-2",
-                        {format!("Note: Create a Right on {:?} source chain first", *from_chain.read())}
+                        {format!("Note: Create a Sanad on {:?} source chain first", *from_chain.read())}
                     }
                 }
                 if !has_target_contract {

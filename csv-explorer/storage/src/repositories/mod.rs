@@ -2,7 +2,7 @@
 pub mod advanced_proofs;
 pub mod contracts;
 pub mod priority_addresses;
-pub mod rights;
+pub mod sanads;
 pub mod seals;
 pub mod stats;
 pub mod sync;
@@ -11,7 +11,7 @@ pub mod transfers;
 pub use advanced_proofs::AdvancedProofRepository;
 pub use contracts::ContractsRepository;
 pub use priority_addresses::{IndexingActivityRequest, PriorityAddressRepository};
-pub use rights::RightsRepository;
+pub use sanads::SanadsRepository;
 pub use seals::SealsRepository;
 pub use stats::StatsRepository;
 pub use sync::SyncRepository;

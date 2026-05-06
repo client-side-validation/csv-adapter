@@ -1,6 +1,6 @@
 # CSV Explorer
 
-A high-performance multi-chain indexer and explorer UI for CSV (Cross-Chain Sealed Verifiable) rights, built entirely in Rust with Dioxus for the UI.
+A high-performance multi-chain indexer and explorer UI for CSV (Cross-Chain Sealed Verifiable) sanads, built entirely in Rust with Dioxus for the UI.
 
 ## Architecture
 
@@ -18,7 +18,7 @@ csv-explorer/
 
 ### Components
 
-- **Shared** - Core explorer types (`RightRecord`, `TransferRecord`, `SealRecord`, `CsvContract`), configuration, and error handling
+- **Shared** - Core explorer types (`SanadRecord`, `TransferRecord`, `SealRecord`, `CsvContract`), configuration, and error handling
 - **Storage** - SQLite database with typed repositories for all entity types, sync progress tracking, and aggregate statistics
 - **Indexer** - Chain-agnostic indexing daemon with pluggable `ChainIndexer` trait implementations for Bitcoin, Ethereum, Sui, Aptos, and Solana
 - **API** - GraphQL API (primary) + REST API (secondary) with flexible querying, pagination, and filtering
@@ -81,8 +81,8 @@ Endpoint: `http://localhost:8080/graphql`
 Key queries:
 
 ```graphql
-query GetRights($filter: RightFilterInput) {
-  rights(filter: $filter) {
+query GetSanads($filter: SanadFilterInput) {
+  sanads(filter: $filter) {
     edges {
       node {
         id
@@ -101,7 +101,7 @@ query GetRights($filter: RightFilterInput) {
 
 query GetStats {
   stats {
-    totalRights
+    totalSanads
     totalTransfers
     totalSeals
     totalContracts
@@ -113,8 +113,8 @@ query GetStats {
 
 Endpoints:
 
-- `GET /api/v1/rights` - List rights with filtering
-- `GET /api/v1/rights/:id` - Get single right
+- `GET /api/v1/sanads` - List sanads with filtering
+- `GET /api/v1/sanads/:id` - Get single sanad
 - `GET /api/v1/transfers` - List transfers
 - `GET /api/v1/seals` - List seals
 - `GET /api/v1/stats` - Aggregate statistics
@@ -148,7 +148,7 @@ csv-explorer-indexer reset          # Reset sync progress
 
 The UI supports CSV wallet connection for:
 
-- Viewing connected wallet rights
+- Viewing connected wallet sanads
 - Quick transfer initiation
 - Balance display
 
@@ -173,7 +173,7 @@ docker compose -f docker-compose.yml up -d
 Prometheus metrics are exposed at `/metrics` on the API server:
 
 - `csv_indexer_blocks_indexed_total` - Total blocks indexed per chain
-- `csv_indexer_rights_indexed_total` - Total rights indexed
+- `csv_indexer_sanads_indexed_total` - Total sanads indexed
 - `csv_indexer_transfers_indexed_total` - Total transfers indexed
 - `csv_indexer_sync_lag_seconds` - Sync lag per chain
 - `csv_indexer_errors_total` - Error counts

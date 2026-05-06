@@ -54,9 +54,9 @@ impl ScalarType for JsonValueScalar {
 // GraphQL entity types
 // ---------------------------------------------------------------------------
 
-/// GraphQL Right type.
+/// GraphQL Sanad type.
 #[derive(SimpleObject)]
-pub struct Right {
+pub struct Sanad {
     pub id: String,
     pub chain: String,
     pub seal_ref: String,
@@ -70,8 +70,8 @@ pub struct Right {
     pub last_transfer_at: Option<DateTimeScalar>,
 }
 
-impl From<csv_explorer_shared::RightRecord> for Right {
-    fn from(r: csv_explorer_shared::RightRecord) -> Self {
+impl From<csv_explorer_shared::SanadRecord> for Sanad {
+    fn from(r: csv_explorer_shared::SanadRecord) -> Self {
         Self {
             id: r.id,
             chain: r.chain,
@@ -92,7 +92,7 @@ impl From<csv_explorer_shared::RightRecord> for Right {
 #[derive(SimpleObject)]
 pub struct Transfer {
     pub id: String,
-    pub right_id: String,
+    pub sanad_id: String,
     pub from_chain: String,
     pub to_chain: String,
     pub from_owner: String,
@@ -110,7 +110,7 @@ impl From<csv_explorer_shared::TransferRecord> for Transfer {
     fn from(t: csv_explorer_shared::TransferRecord) -> Self {
         Self {
             id: t.id,
-            right_id: t.right_id,
+            sanad_id: t.sanad_id,
             from_chain: t.from_chain,
             to_chain: t.to_chain,
             from_owner: t.from_owner,
@@ -133,7 +133,7 @@ pub struct Seal {
     pub chain: String,
     pub seal_type: String,
     pub seal_ref: String,
-    pub right_id: Option<String>,
+    pub sanad_id: Option<String>,
     pub status: String,
     pub consumed_at: Option<DateTimeScalar>,
     pub consumed_tx: Option<String>,
@@ -147,7 +147,7 @@ impl From<csv_explorer_shared::SealRecord> for Seal {
             chain: s.chain,
             seal_type: s.seal_type.to_string(),
             seal_ref: s.seal_ref,
-            right_id: s.right_id,
+            sanad_id: s.sanad_id,
             status: s.status.to_string(),
             consumed_at: s.consumed_at.map(DateTimeScalar),
             consumed_tx: s.consumed_tx,
@@ -215,7 +215,7 @@ impl From<csv_explorer_shared::ChainInfo> for ChainInfoGql {
 /// GraphQL Stats type.
 #[derive(SimpleObject)]
 pub struct Stats {
-    pub total_rights: i64,
+    pub total_sanads: i64,
     pub total_transfers: i64,
     pub total_seals: i64,
     pub total_contracts: i64,
@@ -226,7 +226,7 @@ pub struct Stats {
 impl From<csv_explorer_shared::ExplorerStats> for Stats {
     fn from(s: csv_explorer_shared::ExplorerStats) -> Self {
         Self {
-            total_rights: s.total_rights as i64,
+            total_sanads: s.total_sanads as i64,
             total_transfers: s.total_transfers as i64,
             total_seals: s.total_seals as i64,
             total_contracts: s.total_contracts as i64,
@@ -255,17 +255,17 @@ pub struct ChainPairCount {
 // Pagination types
 // ---------------------------------------------------------------------------
 
-/// Connection for paginated Right results.
+/// Connection for paginated Sanad results.
 #[derive(SimpleObject)]
-pub struct RightConnection {
-    pub edges: Vec<RightEdge>,
+pub struct SanadConnection {
+    pub edges: Vec<SanadEdge>,
     pub page_info: PageInfo,
     pub total_count: i64,
 }
 
 #[derive(SimpleObject)]
-pub struct RightEdge {
-    pub node: Right,
+pub struct SanadEdge {
+    pub node: Sanad,
     pub cursor: String,
 }
 
@@ -340,9 +340,9 @@ impl PageInfo {
 // Input types
 // ---------------------------------------------------------------------------
 
-/// Input type for filtering rights.
+/// Input type for filtering sanads.
 #[derive(Default, InputObject)]
-pub struct RightFilterInput {
+pub struct SanadFilterInput {
     pub chain: Option<String>,
     pub owner: Option<String>,
     pub status: Option<String>,
@@ -353,7 +353,7 @@ pub struct RightFilterInput {
 /// Input type for filtering transfers.
 #[derive(Default, InputObject)]
 pub struct TransferFilterInput {
-    pub right_id: Option<String>,
+    pub sanad_id: Option<String>,
     pub from_chain: Option<String>,
     pub to_chain: Option<String>,
     pub status: Option<String>,
@@ -367,7 +367,7 @@ pub struct SealFilterInput {
     pub chain: Option<String>,
     pub seal_type: Option<String>,
     pub status: Option<String>,
-    pub right_id: Option<String>,
+    pub sanad_id: Option<String>,
     pub limit: Option<i32>,
     pub offset: Option<i32>,
 }
@@ -386,9 +386,9 @@ pub struct ContractFilterInput {
 // Advanced commitment and proof types
 // ---------------------------------------------------------------------------
 
-/// GraphQL EnhancedRight type with commitment metadata.
+/// GraphQL EnhancedSanad type with commitment metadata.
 #[derive(SimpleObject)]
-pub struct EnhancedRight {
+pub struct EnhancedSanad {
     pub id: String,
     pub chain: String,
     pub seal_ref: String,
@@ -408,8 +408,8 @@ pub struct EnhancedRight {
     pub confirmations: Option<i64>,
 }
 
-impl From<csv_explorer_shared::EnhancedRightRecord> for EnhancedRight {
-    fn from(r: csv_explorer_shared::EnhancedRightRecord) -> Self {
+impl From<csv_explorer_shared::EnhancedSanadRecord> for EnhancedSanad {
+    fn from(r: csv_explorer_shared::EnhancedSanadRecord) -> Self {
         Self {
             id: r.id,
             chain: r.chain,
@@ -439,7 +439,7 @@ pub struct EnhancedSeal {
     pub chain: String,
     pub seal_type: String,
     pub seal_ref: String,
-    pub right_id: Option<String>,
+    pub sanad_id: Option<String>,
     pub status: String,
     pub consumed_at: Option<DateTimeScalar>,
     pub consumed_tx: Option<String>,
@@ -455,7 +455,7 @@ impl From<csv_explorer_shared::EnhancedSealRecord> for EnhancedSeal {
             chain: s.chain,
             seal_type: s.seal_type,
             seal_ref: s.seal_ref,
-            right_id: s.right_id,
+            sanad_id: s.sanad_id,
             status: s.status,
             consumed_at: s.consumed_at.map(DateTimeScalar),
             consumed_tx: s.consumed_tx,
@@ -469,31 +469,31 @@ impl From<csv_explorer_shared::EnhancedSealRecord> for EnhancedSeal {
 /// GraphQL ProofStatistics type.
 #[derive(SimpleObject)]
 pub struct ProofStatisticsGql {
-    pub total_rights: i64,
+    pub total_sanads: i64,
     pub total_seals: i64,
-    pub rights_by_commitment_scheme: Vec<SchemeCountGql>,
-    pub rights_by_inclusion_proof: Vec<InclusionProofCountGql>,
-    pub rights_by_finality_proof: Vec<FinalityProofCountGql>,
+    pub sanads_by_commitment_scheme: Vec<SchemeCountGql>,
+    pub sanads_by_inclusion_proof: Vec<InclusionProofCountGql>,
+    pub sanads_by_finality_proof: Vec<FinalityProofCountGql>,
     pub seals_by_proof_type: Vec<SealProofCountGql>,
 }
 
 impl From<csv_explorer_shared::ProofStatistics> for ProofStatisticsGql {
     fn from(s: csv_explorer_shared::ProofStatistics) -> Self {
         Self {
-            total_rights: s.total_rights as i64,
+            total_sanads: s.total_sanads as i64,
             total_seals: s.total_seals as i64,
-            rights_by_commitment_scheme: s
-                .rights_by_commitment_scheme
+            sanads_by_commitment_scheme: s
+                .sanads_by_commitment_scheme
                 .into_iter()
                 .map(|c| c.into())
                 .collect(),
-            rights_by_inclusion_proof: s
-                .rights_by_inclusion_proof
+            sanads_by_inclusion_proof: s
+                .sanads_by_inclusion_proof
                 .into_iter()
                 .map(|c| c.into())
                 .collect(),
-            rights_by_finality_proof: s
-                .rights_by_finality_proof
+            sanads_by_finality_proof: s
+                .sanads_by_finality_proof
                 .into_iter()
                 .map(|c| c.into())
                 .collect(),
@@ -506,7 +506,7 @@ impl From<csv_explorer_shared::ProofStatistics> for ProofStatisticsGql {
     }
 }
 
-/// Count of rights by commitment scheme.
+/// Count of sanads by commitment scheme.
 #[derive(SimpleObject)]
 pub struct SchemeCountGql {
     pub scheme: String,
@@ -522,7 +522,7 @@ impl From<csv_explorer_shared::SchemeCount> for SchemeCountGql {
     }
 }
 
-/// Count of rights by inclusion proof type.
+/// Count of sanads by inclusion proof type.
 #[derive(SimpleObject)]
 pub struct InclusionProofCountGql {
     pub proof_type: String,
@@ -538,7 +538,7 @@ impl From<csv_explorer_shared::InclusionProofCount> for InclusionProofCountGql {
     }
 }
 
-/// Count of rights by finality proof type.
+/// Count of sanads by finality proof type.
 #[derive(SimpleObject)]
 pub struct FinalityProofCountGql {
     pub proof_type: String,

@@ -10,7 +10,7 @@
 //! ├── mod.rs       # Re-exports
 //! ├── core.rs      # Chain, Network, ChainConfig
 //! ├── wallet.rs    # WalletAccount, WalletConfig
-//! ├── domain.rs    # Rights, transfers, contracts, seals, proofs
+//! ├── domain.rs    # Sanads, transfers, contracts, seals, proofs
 //! ├── storage.rs   # StateStorage (main storage struct)
 //! └── backend.rs   # StorageBackend trait + FileStorage
 //! ```
@@ -30,7 +30,7 @@
 
 // Core types
 pub mod core;
-// Domain-specific types (rights, transfers, contracts)
+// Domain-specific types (sanads, transfers, contracts)
 pub mod domain;
 // Storage backend trait and implementations
 pub mod backend;
@@ -45,7 +45,7 @@ pub use backend::FileStorage;
 pub use backend::{StorageBackend, StorageError};
 pub use core::{Chain, ChainConfig, Network};
 pub use domain::{
-    ContractRecord, ProofRecord, RightRecord, RightStatus, SealRecord, TransactionRecord,
+    ContractRecord, ProofRecord, SanadRecord, SanadStatus, SealRecord, TransactionRecord,
     TransactionStatus, TransactionType, TransferRecord, TransferStatus,
 };
 pub use storage::StateStorage;
