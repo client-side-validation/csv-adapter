@@ -77,8 +77,8 @@ pub mod schema;
 pub mod state;
 pub mod transition;
 
-// MPC Tree (Phase 2) - 🧪 EXPERIMENTAL (re-exports gated, module always available)
-pub mod mpc;
+// CommitMux (Phase 2) - 🧪 EXPERIMENTAL (re-exports gated, module always available)
+pub mod commit_mux;
 
 // Deterministic VM (Phase 3) - 🧪 EXPERIMENTAL
 #[cfg(feature = "experimental")]
@@ -255,7 +255,7 @@ pub use chain_plugin::{
 /// Experimental module — feature-gated behind `experimental`.
 /// These APIs may change or be removed without notice.
 #[cfg(feature = "experimental")]
-pub use mpc::{MerkleBranchNode, MpcLeaf, MpcProof, MpcTree, ProtocolId};
+pub use commit_mux::{MerkleBranchNode, MuxLeaf, MuxProof, CommitMux, ProtocolId};
 
 /// Experimental module — feature-gated behind `experimental`.
 /// These APIs may change or be removed without notice.

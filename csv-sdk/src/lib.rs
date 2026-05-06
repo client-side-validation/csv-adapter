@@ -105,7 +105,7 @@ pub use csv_core::{AdapterError, Result as CoreResult, StoreError};
 /// These APIs may change or be removed without notice.
 #[cfg(feature = "experimental")]
 pub mod experimental {
-    pub use csv_core::mpc::{MpcLeaf, MpcProof, MpcTree};
+    pub use csv_core::commit_mux::{MuxLeaf, MuxProof, CommitMux};
     pub use csv_core::rgb_compat::{
         CrossChainError, RgbValidationError, RgbValidationResult,
     };

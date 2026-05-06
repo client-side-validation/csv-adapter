@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::hash::Hash;
-use crate::mpc::MpcTree;
+use crate::commit_mux::MpcTree;
 use crate::seal::SealPoint;
 use crate::tagged_hash::csv_tagged_hash;
 
@@ -336,7 +336,7 @@ impl Commitment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mpc::MpcTree;
+    use crate::commit_mux::MpcTree;
 
     fn test_commitment_commitment() -> Commitment {
         Commitment::simple(

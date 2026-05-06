@@ -28,7 +28,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use csv_core::hash::Hash;
-use csv_core::mpc::{MpcLeaf, MpcProof, MpcTree};
+use csv_core::commit_mux::{MpcLeaf, MpcProof, MpcTree};
 
 use crate::error::{BitcoinError, BitcoinResult};
 use crate::types::BitcoinSealRef;
@@ -233,11 +233,11 @@ impl MpcBatcher {
 /// Extension trait for MpcTree to generate Merkle branches
 pub trait MpcTreeExt {
     /// Generate the Merkle branch for a leaf at the given index
-    fn merkle_branch(&self, leaf_index: usize) -> Option<Vec<csv_core::mpc::MerkleBranchNode>>;
+    fn merkle_branch(&self, leaf_index: usize) -> Option<Vec<csv_core::commit_mux::MerkleBranchNode>>;
 }
 
 impl MpcTreeExt for MpcTree {
-    fn merkle_branch(&self, leaf_index: usize) -> Option<Vec<csv_core::mpc::MerkleBranchNode>> {
+    fn merkle_branch(&self, leaf_index: usize) -> Option<Vec<csv_core::commit_mux::MerkleBranchNode>> {
         if leaf_index >= self.leaves.len() {
             return None;
         }
@@ -266,13 +266,13 @@ impl MpcTreeExt for MpcTree {
                     let pair_start_index = next_level.len() * 2;
                     if current_index == pair_start_index {
                         // Target is left, sibling is right
-                        branch.push(csv_core::mpc::MerkleBranchNode {
+                        branch.push(csv_core::commit_mux::MerkleBranchNode {
                             hash: right,
                             is_left: false,
                         });
                     } else if current_index == pair_start_index + 1 {
                         // Target is right, sibling is left
-                        branch.push(csv_core::mpc::MerkleBranchNode {
+                        branch.push(csv_core::commit_mux::MerkleBranchNode {
                             hash: left,
                             is_left: true,
                         });

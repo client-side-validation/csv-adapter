@@ -17,14 +17,14 @@ pub type ProtocolId = [u8; 32];
 
 /// A leaf in the MPC tree
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct MpcLeaf {
+pub struct MuxLeaf {
     /// Protocol identifier
     pub protocol_id: ProtocolId,
     /// Protocol's commitment hash
     pub commitment: Hash,
 }
 
-impl MpcLeaf {
+impl MuxLeaf {
     /// Create a new MPC leaf
     pub fn new(protocol_id: ProtocolId, commitment: Hash) -> Self {
         Self {
@@ -44,7 +44,7 @@ impl MpcLeaf {
 
 /// Merkle branch proof for a specific protocol's inclusion
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct MpcProof {
+pub struct MuxProof {
     /// Protocol being proven
     pub protocol_id: ProtocolId,
     /// Commitment being proven
@@ -64,7 +64,7 @@ pub struct MerkleBranchNode {
     pub is_left: bool,
 }
 
-impl MpcProof {
+impl MuxProof {
     /// Verify this proof against the claimed root
     pub fn verify(&self, root: &Hash) -> bool {
         let mut data = Vec::with_capacity(64);
@@ -93,12 +93,12 @@ impl MpcProof {
 
 /// Multi-Protocol Commitment tree
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct MpcTree {
+pub struct CommitMux {
     /// Leaves in deterministic order
     pub leaves: Vec<MpcLeaf>,
 }
 
-impl MpcTree {
+impl CommitMux {
     /// Create a new MPC tree from leaves
     pub fn new(leaves: Vec<MpcLeaf>) -> Self {
         Self { leaves }
@@ -507,3 +507,13 @@ mod tests {
         assert_eq!(proof_2.leaf_index, 2);
     }
 }
+
+// Backward compatibility type aliases
+#[deprecated(since = "0.4.0", note = "Use CommitMux instead")]
+pub type MpcTree = CommitMux;
+
+#[deprecated(since = "0.4.0", note = "Use MuxLeaf instead")]
+pub type MpcLeaf = MuxLeaf;
+
+#[deprecated(since = "0.4.0", note = "Use MuxProof instead")]
+pub type MpcProof = MuxProof;
