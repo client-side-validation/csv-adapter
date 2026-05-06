@@ -2,7 +2,7 @@
 
 use dioxus::prelude::*;
 use crate::seals::manager::{SealRecord, SealStatus};
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Seal state.
 #[derive(Clone, PartialEq)]

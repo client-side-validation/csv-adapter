@@ -5,7 +5,7 @@
 use crate::indexing::events::IndexingEvent;
 use crate::indexing::storage::IndexStorage;
 use chrono::{DateTime, Utc};
-use csv_adapter_core::{Chain, Hash, TransferStatus};
+use csv_core::{Chain, Hash, TransferStatus};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -179,7 +179,7 @@ impl EventProcessor {
         to_chain: Chain,
         transfer_id: Hash,
         created_at: DateTime<Utc>,
-        proof_bundle: Option<&csv_adapter_core::proof::ProofBundle>,
+        proof_bundle: Option<&csv_core::proof::ProofBundle>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let indexed_transfer = crate::indexing::IndexedTransfer {
             id: transfer_id,

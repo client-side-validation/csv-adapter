@@ -18,7 +18,7 @@ use crate::indexing::events::IndexingEvent;
 use crate::indexing::processor::EventProcessor;
 use crate::indexing::storage::IndexStorage;
 use crate::indexing::sync::ChainSynchronizer;
-use csv_adapter_core::{Hash, TransferStatus};
+use csv_core::{Hash, TransferStatus};
 
 /// Real-time indexing manager
 pub struct IndexingManager {
@@ -236,7 +236,7 @@ pub struct IndexedTransfer {
     pub status: TransferStatus,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    pub proof_bundle: Option<csv_adapter_core::proof::ProofBundle>,
+    pub proof_bundle: Option<csv_core::proof::ProofBundle>,
     pub metadata: serde_json::Value,
 }
 

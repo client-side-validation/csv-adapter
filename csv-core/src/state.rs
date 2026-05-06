@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use crate::hash::Hash;
-use crate::seal::SealRef;
+use crate::seal::SealPoint;
 
 /// Unique identifier for a state type within a schema
 pub type StateTypeId = u16;
@@ -61,14 +61,14 @@ pub struct OwnedState {
     /// Type identifier (defined in the schema)
     pub type_id: StateTypeId,
     /// The seal that owns this state
-    pub seal: SealRef,
+    pub seal: SealPoint,
     /// Serialized state data (schema-defined format)
     pub data: Vec<u8>,
 }
 
 impl OwnedState {
     /// Create new owned state
-    pub fn new(type_id: StateTypeId, seal: SealRef, data: Vec<u8>) -> Self {
+    pub fn new(type_id: StateTypeId, seal: SealPoint, data: Vec<u8>) -> Self {
         Self {
             type_id,
             seal,
@@ -77,7 +77,7 @@ impl OwnedState {
     }
 
     /// Create owned state from a single hash value
-    pub fn from_hash(type_id: StateTypeId, seal: SealRef, value: Hash) -> Self {
+    pub fn from_hash(type_id: StateTypeId, seal: SealPoint, value: Hash) -> Self {
         Self {
             type_id,
             seal,
@@ -140,14 +140,14 @@ pub struct StateAssignment {
     /// Type of state being assigned
     pub type_id: StateTypeId,
     /// Seal that will own this state
-    pub seal: SealRef,
+    pub seal: SealPoint,
     /// State data
     pub data: Vec<u8>,
 }
 
 impl StateAssignment {
     /// Create new state assignment
-    pub fn new(type_id: StateTypeId, seal: SealRef, data: Vec<u8>) -> Self {
+    pub fn new(type_id: StateTypeId, seal: SealPoint, data: Vec<u8>) -> Self {
         Self {
             type_id,
             seal,
@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn test_owned_state_creation() {
-        let seal = SealRef::new(vec![1, 2, 3], Some(42)).unwrap();
+        let seal = SealPoint::new(vec![1, 2, 3], Some(42)).unwrap();
         let state = OwnedState::new(2, seal.clone(), vec![4, 5, 6]);
         assert_eq!(state.type_id, 2);
         assert_eq!(state.seal, seal);
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_owned_state_from_hash() {
-        let seal = SealRef::new(vec![1, 2, 3], Some(42)).unwrap();
+        let seal = SealPoint::new(vec![1, 2, 3], Some(42)).unwrap();
         let hash = Hash::new([99u8; 32]);
         let state = OwnedState::from_hash(2, seal.clone(), hash);
         assert_eq!(state.seal, seal);
@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     fn test_state_assignment() {
-        let seal = SealRef::new(vec![1, 2, 3], Some(42)).unwrap();
+        let seal = SealPoint::new(vec![1, 2, 3], Some(42)).unwrap();
         let assignment = StateAssignment::new(3, seal.clone(), vec![7, 8, 9]);
         assert_eq!(assignment.type_id, 3);
         assert_eq!(assignment.seal, seal);
@@ -258,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_state_serialization_roundtrip() {
-        let seal = SealRef::new(vec![1, 2, 3], Some(42)).unwrap();
+        let seal = SealPoint::new(vec![1, 2, 3], Some(42)).unwrap();
         let state = OwnedState::new(2, seal, vec![4, 5, 6]);
         let bytes = bincode::serialize(&state).unwrap();
         let restored: OwnedState = bincode::deserialize(&bytes).unwrap();

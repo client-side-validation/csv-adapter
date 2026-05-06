@@ -16,7 +16,7 @@ use alloc::vec::Vec;
 use crate::commitment::Commitment;
 use crate::hash::Hash;
 use crate::right::Right;
-use crate::seal::SealRef;
+use crate::seal::SealPoint;
 
 /// A recorded state transition in the contract history.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -24,7 +24,7 @@ pub struct StateTransitionRecord {
     /// The commitment that resulted from this transition
     pub commitment: Commitment,
     /// The seal that was consumed or assigned
-    pub seal_ref: SealRef,
+    pub seal_ref: SealPoint,
     /// The Rights involved in this transition
     pub rights: Vec<Right>,
     /// Block height when this was anchored on-chain
@@ -43,7 +43,7 @@ pub struct ContractHistory {
     /// Current active Rights (not yet consumed)
     pub active_rights: BTreeMap<Hash, Right>,
     /// All consumed seals indexed by seal ID
-    pub consumed_seals: BTreeMap<Vec<u8>, SealRef>,
+    pub consumed_seals: BTreeMap<Vec<u8>, SealPoint>,
     /// The latest commitment hash in the chain
     pub latest_commitment_hash: Hash,
 }
@@ -94,12 +94,12 @@ impl ContractHistory {
     }
 
     /// Check if a seal has been consumed.
-    pub fn is_seal_consumed(&self, seal_ref: &SealRef) -> bool {
+    pub fn is_seal_consumed(&self, seal_ref: &SealPoint) -> bool {
         self.consumed_seals.contains_key(&seal_ref.to_vec())
     }
 
     /// Mark a seal as consumed.
-    pub fn mark_seal_consumed(&mut self, seal_ref: SealRef) {
+    pub fn mark_seal_consumed(&mut self, seal_ref: SealPoint) {
         self.consumed_seals.insert(seal_ref.to_vec(), seal_ref);
     }
 
@@ -200,7 +200,7 @@ mod tests {
 
     fn make_test_commitment(previous: Hash, seal_id: u8) -> Commitment {
         let domain = [0u8; 32];
-        let seal = SealRef::new(vec![seal_id], None).unwrap();
+        let seal = SealPoint::new(vec![seal_id], None).unwrap();
         Commitment::simple(
             Hash::new([0xAB; 32]),
             previous,
@@ -227,7 +227,7 @@ mod tests {
 
         let transition = StateTransitionRecord {
             commitment: make_test_commitment(genesis.hash(), 0x02),
-            seal_ref: SealRef::new(vec![0x02], None).unwrap(),
+            seal_ref: SealPoint::new(vec![0x02], None).unwrap(),
             rights: Vec::new(),
             block_height: 100,
             verified: true,
@@ -265,7 +265,7 @@ mod tests {
         let genesis = make_test_commitment(Hash::new([0u8; 32]), 0x01);
         let mut history = ContractHistory::from_genesis(genesis);
 
-        let seal = SealRef::new(vec![0xAB], None).unwrap();
+        let seal = SealPoint::new(vec![0xAB], None).unwrap();
         assert!(!history.is_seal_consumed(&seal));
 
         history.mark_seal_consumed(seal.clone());

@@ -16,15 +16,15 @@ use std::sync::Mutex;
 #[cfg(feature = "rpc")]
 use tokio::runtime::Handle;
 
-use csv_adapter_core::commitment::Commitment;
-use csv_adapter_core::dag::DAGSegment;
-use csv_adapter_core::error::AdapterError;
-use csv_adapter_core::error::Result as CoreResult;
-use csv_adapter_core::proof::{FinalityProof, ProofBundle};
-use csv_adapter_core::seal::AnchorRef as CoreAnchorRef;
-use csv_adapter_core::seal::SealRef as CoreSealRef;
-use csv_adapter_core::AnchorLayer;
-use csv_adapter_core::Hash;
+use csv_core::commitment::Commitment;
+use csv_core::dag::DAGSegment;
+use csv_core::error::AdapterError;
+use csv_core::error::Result as CoreResult;
+use csv_core::proof::{FinalityProof, ProofBundle};
+use csv_core::seal::AnchorRef as CoreAnchorRef;
+use csv_core::seal::SealRef as CoreSealRef;
+use csv_core::AnchorLayer;
+use csv_core::Hash;
 
 use crate::checkpoint::CheckpointVerifier;
 use crate::config::{AptosConfig, AptosNetwork};
@@ -677,7 +677,7 @@ impl AnchorLayer for AptosAnchorLayer {
         let anchor_ref = CoreAnchorRef::new(anchor.event_handle.to_vec(), anchor.version, vec![])
             .map_err(|e| AdapterError::Generic(e.to_string()))?;
 
-        let inclusion_proof = csv_adapter_core::InclusionProof::new(
+        let inclusion_proof = csv_core::InclusionProof::new(
             inclusion.transaction_proof,
             Hash::zero(),
             inclusion.version,
@@ -749,8 +749,8 @@ impl AnchorLayer for AptosAnchorLayer {
         self.domain_separator
     }
 
-    fn signature_scheme(&self) -> csv_adapter_core::SignatureScheme {
-        csv_adapter_core::SignatureScheme::Ed25519
+    fn signature_scheme(&self) -> csv_core::SignatureScheme {
+        csv_core::SignatureScheme::Ed25519
     }
 }
 

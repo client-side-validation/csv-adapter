@@ -3,7 +3,7 @@
 #![allow(missing_docs)]
 
 #[cfg(feature = "sqlite")]
-use csv_adapter_core::{AnchorRecord, Hash, RightRecord, RightStore, SealStore, StoreError};
+use csv_core::{AnchorRecord, Hash, RightRecord, RightStore, SealStore, StoreError};
 
 #[cfg(feature = "sqlite")]
 use rusqlite::{params, Connection};
@@ -110,7 +110,7 @@ impl SqliteSealStore {
 
 #[cfg(feature = "sqlite")]
 impl SealStore for SqliteSealStore {
-    fn save_seal(&mut self, record: &csv_adapter_core::SealRecord) -> Result<(), StoreError> {
+    fn save_seal(&mut self, record: &csv_core::SealRecord) -> Result<(), StoreError> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "INSERT OR IGNORE INTO seals (chain, seal_id, consumed_at_height, commitment_hash, recorded_at)
@@ -138,7 +138,7 @@ impl SealStore for SqliteSealStore {
         Ok(count > 0)
     }
 
-    fn get_seals(&self, chain: &str) -> Result<Vec<csv_adapter_core::SealRecord>, StoreError> {
+    fn get_seals(&self, chain: &str) -> Result<Vec<csv_core::SealRecord>, StoreError> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let mut stmt = conn.prepare(
             "SELECT seal_id, consumed_at_height, commitment_hash, recorded_at FROM seals WHERE chain = ?1"
@@ -152,7 +152,7 @@ impl SealStore for SqliteSealStore {
                 let recorded_at: i64 = row.get(3)?;
                 let mut hash_bytes = [0u8; 32];
                 hash_bytes.copy_from_slice(&commitment_hash);
-                Ok(csv_adapter_core::SealRecord {
+                Ok(csv_core::SealRecord {
                     chain: chain.to_string(),
                     seal_id,
                     consumed_at_height: consumed_at_height as u64,
@@ -316,7 +316,7 @@ impl RightStore for SqliteSealStore {
         Ok(())
     }
 
-    fn get_right(&self, right_id: &csv_adapter_core::RightId) -> Result<Option<RightRecord>, StoreError> {
+    fn get_right(&self, right_id: &csv_core::RightId) -> Result<Option<RightRecord>, StoreError> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let mut stmt = conn
             .prepare(
@@ -374,7 +374,7 @@ impl RightStore for SqliteSealStore {
                 hash_bytes.copy_from_slice(&right_id_bytes);
 
                 Ok(RightRecord {
-                    right_id: csv_adapter_core::RightId(Hash::new(hash_bytes)),
+                    right_id: csv_core::RightId(Hash::new(hash_bytes)),
                     chain: chain.to_string(),
                     owner,
                     right_data,
@@ -412,7 +412,7 @@ impl RightStore for SqliteSealStore {
                 hash_bytes.copy_from_slice(&right_id_bytes);
 
                 Ok(RightRecord {
-                    right_id: csv_adapter_core::RightId(Hash::new(hash_bytes)),
+                    right_id: csv_core::RightId(Hash::new(hash_bytes)),
                     chain,
                     owner: owner.to_vec(),
                     right_data,
@@ -430,7 +430,7 @@ impl RightStore for SqliteSealStore {
 
     fn consume_right(
         &mut self,
-        right_id: &csv_adapter_core::RightId,
+        right_id: &csv_core::RightId,
         consumed_at: u64,
     ) -> Result<(), StoreError> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
@@ -488,7 +488,7 @@ impl RightStore for SqliteSealStore {
                 hash_bytes.copy_from_slice(&right_id_bytes);
 
                 Ok(RightRecord {
-                    right_id: csv_adapter_core::RightId(Hash::new(hash_bytes)),
+                    right_id: csv_core::RightId(Hash::new(hash_bytes)),
                     chain,
                     owner,
                     right_data,
@@ -525,7 +525,7 @@ impl RightStore for SqliteSealStore {
                 hash_bytes.copy_from_slice(&right_id_bytes);
 
                 Ok(RightRecord {
-                    right_id: csv_adapter_core::RightId(Hash::new(hash_bytes)),
+                    right_id: csv_core::RightId(Hash::new(hash_bytes)),
                     chain,
                     owner,
                     right_data,
@@ -541,7 +541,7 @@ impl RightStore for SqliteSealStore {
             .map_err(|e| StoreError::IoError(e.to_string()))
     }
 
-    fn has_right(&self, right_id: &csv_adapter_core::RightId) -> Result<bool, StoreError> {
+    fn has_right(&self, right_id: &csv_core::RightId) -> Result<bool, StoreError> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let count: i64 = conn
             .query_row(
@@ -553,7 +553,7 @@ impl RightStore for SqliteSealStore {
         Ok(count > 0)
     }
 
-    fn delete_right(&mut self, right_id: &csv_adapter_core::RightId) -> Result<(), StoreError> {
+    fn delete_right(&mut self, right_id: &csv_core::RightId) -> Result<(), StoreError> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let deleted = conn
             .execute(
@@ -575,7 +575,7 @@ impl RightStore for SqliteSealStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use csv_adapter_core::SealRecord;
+    use csv_core::SealRecord;
 
     fn test_seal_record(chain: &str, height: u64) -> SealRecord {
         let mut seal_id = vec![0u8; 16];

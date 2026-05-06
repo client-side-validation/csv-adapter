@@ -4,7 +4,7 @@
 //! following BIP-44 standards with chain-specific paths.
 
 use crate::memory::SecretKey;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use thiserror::Error;
 
 /// Error type for BIP-44 operations.

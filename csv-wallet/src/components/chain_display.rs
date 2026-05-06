@@ -2,7 +2,7 @@
 
 use crate::chains::supported_wallet_chains;
 use crate::context::Network;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Display wrapper for Chain with emoji and name.
 pub struct ChainDisplay(pub Chain);

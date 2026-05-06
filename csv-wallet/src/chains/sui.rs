@@ -1,6 +1,6 @@
 //! Sui chain integration.
 
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Format Sui address.
 pub fn format_address(hash_bytes: &[u8]) -> String {

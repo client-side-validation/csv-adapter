@@ -15,7 +15,7 @@
 //! - Lazy loading with cursor-based iteration
 //! - Connection pooling for database access
 
-use csv_adapter_core::{Chain, Right, RightId, OwnershipProof};
+use csv_core::{Chain, Right, RightId, OwnershipProof};
 use indexed_db_futures::prelude::*;
 use serde::{Serialize, Deserialize};
 use std::sync::Arc;

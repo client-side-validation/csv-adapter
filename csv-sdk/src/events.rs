@@ -36,7 +36,7 @@
 //! # }
 //! ```
 
-use csv_adapter_core::{Chain, RightId};
+use csv_core::{Chain, RightId};
 #[cfg(feature = "tokio")]
 use tokio::sync::broadcast;
 

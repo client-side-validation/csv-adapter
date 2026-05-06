@@ -6,7 +6,7 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 use crate::config::{Chain as ConfigChain, Config};
 use crate::state::UnifiedStateManager;

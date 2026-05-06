@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 
-use csv_adapter_core::{
+use csv_core::{
     AccountModel, AdapterFactory, Chain, ChainAdapter, ChainCapabilities, ChainConfig, ChainError,
     ChainPluginBuilder, ChainResult, RpcClient, Wallet,
 };
@@ -69,7 +69,7 @@ fn example_config() -> ChainConfig {
 
 fn main() {
     let plugin = ChainPluginBuilder::new("example-chain", "Example Chain")
-        .version(csv_adapter_core::PROTOCOL_VERSION)
+        .version(csv_core::PROTOCOL_VERSION)
         .author("csv-adapter")
         .description("Example custom chain plugin registered at runtime")
         .capabilities(ExampleChainAdapter.capabilities())
@@ -87,7 +87,7 @@ fn main() {
         .expect("plugin should build");
 
     let mut factory = AdapterFactory::empty();
-    let mut registry = csv_adapter_core::ChainPluginRegistry::new();
+    let mut registry = csv_core::ChainPluginRegistry::new();
     registry.register(plugin);
     factory.register_plugins_from_registry(&registry);
 

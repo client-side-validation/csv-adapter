@@ -1,6 +1,6 @@
 //! Blockchain service types and error definitions.
 
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use serde::{Deserialize, Serialize};
 
 /// Blockchain operation error.

@@ -1,6 +1,6 @@
 //! Balance fetching hook.
 
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use dioxus::prelude::*;
 use std::collections::HashMap;
 

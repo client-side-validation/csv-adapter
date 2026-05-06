@@ -13,8 +13,8 @@
 
 use csv_adapter::prelude::{CsvClient, NetworkType};
 use csv_adapter::StoreBackend;
-use csv_adapter_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
-use csv_adapter_core::Chain;
+use csv_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::Chain;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for a chain API endpoint.

@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::hash::Hash;
 use crate::proof::{FinalityProof, InclusionProof};
 use crate::right::RightId;
-use crate::seal::SealRef;
+use crate::seal::SealPoint;
 
 /// Result type for chain operations
 pub type ChainOpResult<T> = Result<T, ChainOpError>;
@@ -530,9 +530,9 @@ pub trait FullChainAdapter:
     /// * `value` - Optional value/funding for the seal (chain-specific units)
     ///
     /// # Returns
-    /// * `Ok(SealRef)` - The created seal reference
+    /// * `Ok(SealPoint)` - The created seal reference
     /// * `Err` - If seal creation fails or is not supported
-    fn create_seal(&self, value: Option<u64>) -> ChainOpResult<SealRef>;
+    fn create_seal(&self, value: Option<u64>) -> ChainOpResult<SealPoint>;
 }
 
 /// Chain capabilities that may not be available on all chains
@@ -590,7 +590,7 @@ impl<T: ChainQuery + ChainSigner + ChainBroadcaster + ChainDeployer + ChainProof
         true
     }
 
-    fn create_seal(&self, _value: Option<u64>) -> ChainOpResult<SealRef> {
+    fn create_seal(&self, _value: Option<u64>) -> ChainOpResult<SealPoint> {
         // Default implementation returns error - adapters must override
         Err(ChainOpError::CapabilityUnavailable(
             "Seal creation not implemented for this chain".into(),

@@ -4,11 +4,11 @@
 //! enabling Bitcoin to be used through the unified chain adapter interface.
 
 use async_trait::async_trait;
-use csv_adapter_core::chain_adapter::{
+use csv_core::chain_adapter::{
     AccountModel, ChainAdapter, ChainCapabilities, ChainError, ChainResult, RpcClient, Wallet,
 };
-use csv_adapter_core::chain_config::ChainConfig;
-use csv_adapter_core::Chain;
+use csv_core::chain_config::ChainConfig;
+use csv_core::Chain;
 
 use crate::adapter::BitcoinAnchorLayer;
 use crate::config::{BitcoinConfig, Network};

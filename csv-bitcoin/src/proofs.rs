@@ -18,7 +18,7 @@ use bitcoin_hashes::Hash as _;
 
 use bitcoin::{Txid, merkle_tree::PartialMerkleTree, blockdata::block::Header};
 use crate::types::BitcoinInclusionProof;
-use csv_adapter_core::Hash as CoreHash;
+use csv_core::Hash as CoreHash;
 
 /// Double-SHA256 hash of two 32-byte inputs (Bitcoin Merkle node hash).
 #[inline]
@@ -486,7 +486,7 @@ pub fn verify_block_merkle_root_rust_bitcoin(txids: &[Txid], expected_root: [u8;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Convert Bitcoin inclusion proof to core CSV inclusion proof.
-pub fn to_core_inclusion_proof(proof: &BitcoinInclusionProof) -> csv_adapter_core::InclusionProof {
+pub fn to_core_inclusion_proof(proof: &BitcoinInclusionProof) -> csv_core::InclusionProof {
     let mut proof_bytes = Vec::new();
     for branch in &proof.merkle_branch {
         proof_bytes.extend_from_slice(branch);
@@ -495,7 +495,7 @@ pub fn to_core_inclusion_proof(proof: &BitcoinInclusionProof) -> csv_adapter_cor
     proof_bytes.extend_from_slice(&proof.tx_index.to_le_bytes());
     proof_bytes.extend_from_slice(&proof.block_height.to_le_bytes());
 
-    csv_adapter_core::InclusionProof::new_unchecked(
+    csv_core::InclusionProof::new_unchecked(
         proof_bytes,
         CoreHash::new(proof.block_hash),
         proof.tx_index as u64,
@@ -504,7 +504,7 @@ pub fn to_core_inclusion_proof(proof: &BitcoinInclusionProof) -> csv_adapter_cor
 
 /// Convert core CSV inclusion proof to Bitcoin-specific type.
 pub fn from_core_inclusion_proof(
-    proof: &csv_adapter_core::InclusionProof,
+    proof: &csv_core::InclusionProof,
 ) -> BitcoinInclusionProof {
     let proof_bytes = &proof.proof_bytes;
     if proof_bytes.len() < 48 {
@@ -656,7 +656,7 @@ mod tests {
     #[test]
     fn test_from_core_inclusion_proof() {
         let core_proof =
-            csv_adapter_core::InclusionProof::new(vec![0xAB; 64], CoreHash::new([1u8; 32]), 5)
+            csv_core::InclusionProof::new(vec![0xAB; 64], CoreHash::new([1u8; 32]), 5)
                 .unwrap();
         let bitcoin_proof = from_core_inclusion_proof(&core_proof);
         assert_eq!(bitcoin_proof.tx_index, 5);

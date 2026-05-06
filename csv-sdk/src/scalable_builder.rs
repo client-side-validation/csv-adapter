@@ -3,8 +3,8 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use csv_adapter_core::Chain;
-use csv_adapter_core::ChainRegistry;
+use csv_core::Chain;
+use csv_core::ChainRegistry;
 
 use crate::config::Config;
 use crate::errors::CsvError;
@@ -235,7 +235,7 @@ impl ScalableClientBuilder {
         // Initialize store backend
         let store = match self.state.store_backend.unwrap_or(StoreBackend::InMemory) {
             StoreBackend::InMemory => {
-                crate::client::StoreHandle::InMemory(csv_adapter_core::InMemorySealStore::new())
+                crate::client::StoreHandle::InMemory(csv_core::InMemorySealStore::new())
             }
             #[cfg(feature = "sqlite")]
             StoreBackend::Sqlite { ref path } => crate::client::StoreHandle::Sqlite(

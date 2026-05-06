@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 // Re-export core commitment types
-pub use csv_adapter_core::{CommitmentScheme, FinalityProofType, InclusionProofType};
+pub use csv_core::{CommitmentScheme, FinalityProofType, InclusionProofType};
 
 // ---------------------------------------------------------------------------
 // Enhanced Record Types for Indexer/API

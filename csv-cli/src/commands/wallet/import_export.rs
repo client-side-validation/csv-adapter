@@ -6,7 +6,7 @@ use crate::config::{Chain, Config};
 use crate::output;
 use crate::state::UnifiedStateManager;
 use anyhow::Result;
-use csv_adapter_core::Chain as CoreChain;
+use csv_core::Chain as CoreChain;
 use serde::{Deserialize, Serialize};
 
 /// Wallet data format compatible with csv-wallet.
@@ -147,7 +147,7 @@ fn import_from_mnemonic(
 
 /// Derive address from mnemonic phrase for a specific chain.
 fn derive_address_from_mnemonic(chain: &Chain, mnemonic: &str) -> Result<String> {
-    use csv_adapter_core::Chain as CoreChain;
+    use csv_core::Chain as CoreChain;
     use csv_adapter_keystore::bip39::Mnemonic;
     use csv_adapter_keystore::bip44::{derive_key, derive_address_from_key};
 

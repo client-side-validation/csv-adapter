@@ -2,7 +2,7 @@
 
 use crate::context::use_wallet_context;
 use crate::pages::common::*;
-use csv_adapter_core::PROTOCOL_VERSION;
+use csv_core::PROTOCOL_VERSION;
 use dioxus::prelude::*;
 
 pub fn Settings() -> Element {

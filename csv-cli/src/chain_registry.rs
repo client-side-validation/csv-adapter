@@ -6,7 +6,7 @@
 #![allow(dead_code)]
 
 use crate::config::Chain;
-use csv_adapter_core::{AdapterFactory, ChainAdapter, ChainCapabilities};
+use csv_core::{AdapterFactory, ChainAdapter, ChainCapabilities};
 
 /// Get the chain ID string for a Chain enum variant
 pub fn chain_id(chain: &Chain) -> &'static str {

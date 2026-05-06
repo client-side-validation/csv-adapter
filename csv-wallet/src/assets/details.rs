@@ -2,7 +2,7 @@
 //!
 //! Provides detailed information about individual assets.
 
-use csv_adapter_core::{Chain, Right, RightId};
+use csv_core::{Chain, Right, RightId};
 use serde::{Serialize, Deserialize};
 
 /// Detailed asset information.

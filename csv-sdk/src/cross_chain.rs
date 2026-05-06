@@ -4,7 +4,7 @@
 //! as part of cross-chain transfers.
 
 use crate::CsvError;
-use csv_adapter_core::{Chain, Hash};
+use csv_core::{Chain, Hash};
 
 /// Result type for cross-chain operations.
 pub type CrossChainResult<T> = Result<T, CrossChainError>;

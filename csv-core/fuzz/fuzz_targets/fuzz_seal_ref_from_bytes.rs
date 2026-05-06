@@ -2,7 +2,7 @@
 
 #![no_main]
 
-use csv_adapter_core::seal::SealRef;
+use csv_core::seal::SealRef;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {

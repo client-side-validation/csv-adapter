@@ -12,7 +12,7 @@
 //! | Sui | 44' | 784' | m/44'/784'/0'/0'/i |
 //! | Aptos | 44' | 637' | m/44'/637'/0'/0'/i |
 
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// A unified wallet supporting multi-chain HD derivation (BIP-44).
 ///

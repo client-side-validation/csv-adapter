@@ -5,7 +5,7 @@ use crate::context::use_wallet_context;
 use crate::hooks::{format_balance_display, AccountBalance};
 use crate::pages::common::*;
 use crate::routes::Route;
-pub use csv_adapter_core::Chain;
+pub use csv_core::Chain;
 use dioxus::prelude::*;
 use std::collections::HashMap;
 

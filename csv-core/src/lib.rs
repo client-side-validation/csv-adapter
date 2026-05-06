@@ -2,16 +2,16 @@
 //!
 //! This crate provides the foundational types and traits for the CSV protocol:
 //!
-//! - **[`Right`]** — A verifiable, single-use digital right that can be
+//! - **[`Sanad`]** — A verifiable, single-use digital title (deed) that can be
 //!   transferred cross-chain
 //! - **[`struct@Hash`]** — A 32-byte cryptographic hash (SHA-256 based)
-//! - **[`Commitment`]** — A binding between a right's state and its anchor
+//! - **[`Commitment`]** — A binding between a sanad's state and its anchor
 //!   on a blockchain
-//! - **[`SealRef`]** / **[`AnchorRef`]** — References to consumed seals
+//! - **[`SealPoint`]** / **[`CommitAnchor`]** — References to consumed seals
 //!   and published anchors
 //! - **[`InclusionProof`]** / **[`FinalityProof`]** / **[`ProofBundle`]** —
-//!   Cryptographic proofs that a right was locked on the source chain
-//! - **[`AnchorLayer`]** — The core trait each blockchain adapter implements
+//!   Cryptographic proofs that a sanad was locked on the source chain
+//! - **[`SealProtocol`]** — The core trait each blockchain adapter implements
 //! - **[`SignatureScheme`]** — Supported signing algorithms (secp256k1, ed25519)
 //!
 //! ## Stability Tiers
@@ -53,9 +53,10 @@ extern crate alloc;
 // Core types
 pub mod commitment;
 pub mod hash;
-pub mod right;
+pub mod right;      // Legacy: being replaced by title
 pub mod seal;
 pub mod tagged_hash;
+pub mod title;      // New: Sanad/Title types (replaces right)
 
 // Advanced commitment types
 pub mod advanced_commitments;
@@ -95,6 +96,7 @@ pub mod traits;
 
 // Chain operation traits (Production Guarantee Plan Phase 2) - 🔒 STABLE
 pub mod chain_operations;
+pub mod ops;        // New: refactored chain operations (replaces chain_operations)
 
 // Shared event schemas (Production Guarantee Plan Phase 6) - 🔒 STABLE
 pub mod events;
@@ -108,7 +110,7 @@ pub mod store;
 pub mod client;
 pub mod commitment_chain;
 pub mod cross_chain;
-pub mod seal_registry;
+pub mod nullifier;
 pub mod state_store;
 pub mod validator;
 
@@ -147,7 +149,8 @@ pub use protocol_version::{
 pub use commitment::Commitment;
 pub use hash::Hash;
 pub use right::{OwnershipProof, Right, RightError, RightId};
-pub use seal::{AnchorRef, SealRef};
+pub use seal::{AnchorRef, CommitAnchor, SealPoint, SealRef};
+pub use title::{Sanad, SanadError, SanadId, OwnershipProof as TitleOwnershipProof};
 pub use signature::{parse_signatures_from_bytes, verify_signatures, Signature, SignatureScheme};
 
 // DAG and proofs
@@ -167,6 +170,19 @@ pub use chain_operations::{
     TransactionInfo, TransactionStatus,
 };
 
+// New refactored chain operations (replaces chain_operations)
+pub use ops::{
+    BalanceInfo as OpsBalanceInfo, ChainBackend, ChainBroadcaster as OpsChainBroadcaster,
+    ChainCapability as OpsChainCapability, ChainDeployer as OpsChainDeployer,
+    ChainOpError as OpsChainOpError, ChainOpResult as OpsChainOpResult,
+    ChainProofProvider as OpsChainProofProvider, ChainQuery as OpsChainQuery,
+    ChainSanadOps, ChainSigner as OpsChainSigner, ContractStatus as OpsContractStatus,
+    DeploymentStatus as OpsDeploymentStatus, FinalityStatus as OpsFinalityStatus,
+    SanadOperation, SanadOperationResult, SanadOperationResult as OpsSanadOperationResult,
+    TokenBalance as OpsTokenBalance, TransactionInfo as OpsTransactionInfo,
+    TransactionStatus as OpsTransactionStatus,
+};
+
 // Event schemas (Production Guarantee Plan Phase 6)
 pub use events::{
     CsvEvent, EventData, EventFilter, EventFinalityStatus, EventIndexer, EventIndexerRegistry,
@@ -176,8 +192,8 @@ pub use events::{
 // Cross-chain transfer
 pub use client::{ValidationClient, ValidationResult};
 pub use cross_chain::{CrossChainLockEvent, CrossChainRegistry, CrossChainRegistryEntry};
-pub use seal_registry::{
-    ChainId, CrossChainSealRegistry, DoubleSpendError, OptimizedCrossChainSealRegistry,
+pub use nullifier::{
+    ChainId, SealNullifier, DoubleSpendError, OptimizedSealNullifier,
     SealConsumption, SealStatus,
 };
 
@@ -197,7 +213,7 @@ pub use agent_types::{ErrorSuggestion, FixAction, HasErrorSuggestion, error_code
 pub use hardening::{
     BoundedQueue, CircuitBreaker, CircuitState, MemoryLimits, TimeoutConfig,
     DEFAULT_CIRCUIT_MAX_FAILURES, DEFAULT_CIRCUIT_RESET_TIMEOUT, DEFAULT_HEALTH_CHECK_TIMEOUT,
-    DEFAULT_RPC_TIMEOUT, MAX_CACHE_SIZE, MAX_REGISTRY_SIZE, MAX_SEAL_REGISTRY_SIZE,
+    DEFAULT_RPC_TIMEOUT, MAX_CACHE_SIZE, MAX_REGISTRY_SIZE, MAX_SEAL_NULLIFIER_SIZE,
 };
 
 // State machine (Phase 1)

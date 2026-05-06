@@ -5,8 +5,8 @@
 use crate::indexing::{IndexedRight, IndexedTransfer, RightsQuery, TransferQuery};
 use chrono::{DateTime, Utc};
 #[cfg(test)]
-use csv_adapter_core::TransferStatus;
-use csv_adapter_core::{Chain, Hash};
+use csv_core::TransferStatus;
+use csv_core::{Chain, Hash};
 use std::collections::HashMap;
 use std::sync::Arc;
 

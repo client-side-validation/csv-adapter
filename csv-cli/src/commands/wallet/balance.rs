@@ -79,7 +79,7 @@ pub fn cmd_list(_config: &Config, state: &mut UnifiedStateManager) -> Result<()>
 /// chain adapter dependencies per Phase 5 of the Production Guarantee Plan.
 async fn query_balance(chain: &Chain, address: &str, config: &Config) -> Result<f64> {
     use csv_adapter::prelude::NetworkType;
-    use csv_adapter_core::Chain as CoreChain;
+    use csv_core::Chain as CoreChain;
 
     // Map CLI Chain to core Chain
     let core_chain = match chain {

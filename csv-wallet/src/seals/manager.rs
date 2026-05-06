@@ -2,7 +2,7 @@
 //!
 //! Core seal management operations.
 
-use csv_adapter_core::{Chain, RightId, SealRef};
+use csv_core::{Chain, RightId, SealRef};
 use serde::{Serialize, Deserialize};
 
 /// Seal status.

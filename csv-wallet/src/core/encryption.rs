@@ -6,7 +6,7 @@ use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Nonce, Key,
 };
-use csv_adapter_core::agent_types::{HasErrorSuggestion, FixAction, error_codes};
+use csv_core::agent_types::{HasErrorSuggestion, FixAction, error_codes};
 use zeroize::Zeroize;
 
 /// Error type for encryption operations.

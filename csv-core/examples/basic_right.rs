@@ -5,7 +5,7 @@
 //! 2. Transferring it to a new owner
 //! 3. Verifying the Right's integrity
 
-use csv_adapter_core::{Hash, OwnershipProof, Right, SignatureScheme};
+use csv_core::{Hash, OwnershipProof, Right, SignatureScheme};
 
 fn main() {
     println!("=== CSV Adapter Core: Basic Right Example ===\n");

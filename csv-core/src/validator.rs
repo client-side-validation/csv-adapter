@@ -74,7 +74,7 @@ use alloc::vec::Vec;
 
 use crate::consignment::Consignment;
 use crate::hash::Hash;
-use crate::seal_registry::{ChainId, CrossChainSealRegistry, SealConsumption, SealStatus};
+use crate::nullifier::{ChainId, SealNullifier, SealConsumption, SealStatus};
 use crate::state_store::InMemoryStateStore;
 
 #[cfg(feature = "experimental")]
@@ -107,7 +107,7 @@ pub struct ConsignmentValidator {
     /// State history store
     store: InMemoryStateStore,
     /// Cross-chain seal registry
-    seal_registry: CrossChainSealRegistry,
+    seal_registry: SealNullifier,
     /// Validation report being built
     report: ValidationReport,
     /// VM for executing validation scripts (AluVM) - Phase 5
@@ -120,7 +120,7 @@ impl ConsignmentValidator {
     pub fn new() -> Self {
         Self {
             store: InMemoryStateStore::new(),
-            seal_registry: CrossChainSealRegistry::new(),
+            seal_registry: SealNullifier::new(),
             report: ValidationReport {
                 passed: true,
                 steps: Vec::new(),
@@ -136,7 +136,7 @@ impl ConsignmentValidator {
     pub fn with_vm_cycles(max_cycles: u64) -> Self {
         Self {
             store: InMemoryStateStore::new(),
-            seal_registry: CrossChainSealRegistry::new(),
+            seal_registry: SealNullifier::new(),
             report: ValidationReport {
                 passed: true,
                 steps: Vec::new(),
@@ -293,7 +293,7 @@ impl ConsignmentValidator {
                     let right_id = crate::right::RightId(Hash::new(
                         seal_assignment
                             .seal_ref
-                            .seal_id
+                            .id
                             .clone()
                             .try_into()
                             .unwrap_or([0u8; 32]),
@@ -458,7 +458,7 @@ impl ConsignmentValidator {
         transition: &crate::transition::Transition,
         consignment: &Consignment,
     ) -> VMInputs {
-        use crate::seal::SealRef;
+        use crate::seal::SealPoint;
         use crate::state::{GlobalState, Metadata, OwnedState};
 
         // Convert transition inputs to owned states
@@ -470,11 +470,11 @@ impl ConsignmentValidator {
             .enumerate()
             .map(|(i, input)| {
                 // Create a placeholder seal from the commitment hash
-                let seal_ref = SealRef::new(
+                let seal_ref = SealPoint::new(
                     input.commitment.as_bytes().to_vec(),
                     Some(input.output_index as u64),
                 )
-                .unwrap_or_else(|_| SealRef::new(vec![0u8; 16], Some(0)).unwrap());
+                .unwrap_or_else(|_| SealPoint::new(vec![0u8; 16], Some(0)).unwrap());
 
                 OwnedState::from_hash(i as u16, seal_ref, input.commitment)
             })
@@ -535,7 +535,7 @@ impl ConsignmentValidator {
     }
 
     /// Get access to the seal registry.
-    pub fn seal_registry(&self) -> &CrossChainSealRegistry {
+    pub fn seal_registry(&self) -> &SealNullifier {
         &self.seal_registry
     }
 }
@@ -551,7 +551,7 @@ mod tests {
     use super::*;
     use crate::consignment::Consignment;
     use crate::genesis::Genesis;
-    use crate::seal::{AnchorRef, SealRef};
+    use crate::seal::{CommitAnchor, SealPoint};
     use crate::state_store::StateHistoryStore;
 
     fn make_test_consignment() -> Consignment {
@@ -721,16 +721,16 @@ mod tests {
                     vec![],
                 ));
                 anchors.push(crate::consignment::Anchor::new(
-                    AnchorRef::new(tx_hash.to_vec(), 0, vec![]).unwrap(),
+                    CommitAnchor::new(tx_hash.to_vec(), 0, vec![]).unwrap(),
                     tx_hash,
                     vec![0x02; 32],
                     vec![0x03; 32],
                 ));
                 seal_assignments.push(crate::consignment::SealAssignment::new(
-                    SealRef::new(vec![i as u8; 16], Some(i as u64)).unwrap(),
+                    SealPoint::new(vec![i as u8; 16], Some(i as u64)).unwrap(),
                     crate::state::StateAssignment::new(
                         1,
-                        SealRef::new(vec![i as u8; 16], Some(i as u64)).unwrap(),
+                        SealPoint::new(vec![i as u8; 16], Some(i as u64)).unwrap(),
                         vec![],
                     ),
                     vec![],
@@ -772,7 +772,7 @@ mod tests {
         ];
         // Only one anchor for two transitions
         let anchors = vec![crate::consignment::Anchor::new(
-            AnchorRef::new(Hash::new([0x01; 32]).to_vec(), 0, vec![]).unwrap(),
+            CommitAnchor::new(Hash::new([0x01; 32]).to_vec(), 0, vec![]).unwrap(),
             Hash::new([0x01; 32]),
             vec![0x02; 32],
             vec![0x03; 32],
@@ -802,7 +802,7 @@ mod tests {
         let transitions = vec![crate::transition::Transition::new(0, vec![], vec![], vec![], vec![], vec![0x01; 16], vec![])];
         // Anchor with empty inclusion proof
         let anchors = vec![crate::consignment::Anchor::new(
-            AnchorRef::new(tx_hash.to_vec(), 0, vec![]).unwrap(),
+            CommitAnchor::new(tx_hash.to_vec(), 0, vec![]).unwrap(),
             tx_hash,
             vec![], // empty inclusion proof
             vec![0x03; 32],

@@ -410,13 +410,13 @@ mod tests {
     fn create_test_proof() -> ProofBundle {
         use crate::dag::DAGSegment;
         use crate::proof::{FinalityProof, InclusionProof};
-        use crate::seal::{AnchorRef, SealRef};
+        use crate::seal::{CommitAnchor, SealPoint};
 
         ProofBundle {
             transition_dag: DAGSegment::new(vec![], Hash::zero()),
             signatures: vec![],
-            seal_ref: SealRef::new_unchecked(vec![0], Some(0)),
-            anchor_ref: AnchorRef::new_unchecked(vec![0], 0, vec![]),
+            seal_ref: SealPoint::new_unchecked(vec![0], Some(0)),
+            anchor_ref: CommitAnchor::new_unchecked(vec![0], 0, vec![]),
             inclusion_proof: InclusionProof::new_unchecked(vec![], Hash::zero(), 0),
             finality_proof: FinalityProof::new_unchecked(vec![], 0, true),
         }

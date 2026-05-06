@@ -5,7 +5,7 @@
 //! 2. Linking subsequent commitments to previous ones
 //! 3. Verifying the integrity of the commitment chain
 
-use csv_adapter_core::{Commitment, Hash, SealRef};
+use csv_core::{Commitment, Hash, SealRef};
 
 fn main() {
     println!("=== CSV Adapter Core: Commitment Chain Example ===\n");

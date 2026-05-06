@@ -1,6 +1,6 @@
 //! Explorer integration service.
 
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 

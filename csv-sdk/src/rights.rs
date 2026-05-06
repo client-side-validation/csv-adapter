@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use csv_adapter_core::{Chain, Hash, Right, RightId};
+use csv_core::{Chain, Hash, Right, RightId};
 
 use crate::client::ClientRef;
 use crate::errors::CsvError;
@@ -106,7 +106,7 @@ impl RightsManager {
         //   let right = Right::new(commitment.hash(), owner_proof, salt);
 
         let salt = generate_salt();
-        let owner = csv_adapter_core::OwnershipProof {
+        let owner = csv_core::OwnershipProof {
             proof: vec![0u8; 32], // Derived from wallet in full implementation
             owner: vec![0u8; 32],
             scheme: None,
@@ -115,7 +115,7 @@ impl RightsManager {
         let right = Right::new(commitment, owner, &salt);
 
         // Persist the Right to the store
-        let record = csv_adapter_core::RightRecord {
+        let record = csv_core::RightRecord {
             right_id: right.id.clone(),
             chain: chain.to_string(),
             owner: right.owner.owner.clone(),

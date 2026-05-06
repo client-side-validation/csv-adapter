@@ -2,7 +2,7 @@
 
 #![no_main]
 
-use csv_adapter_core::consignment::Consignment;
+use csv_core::consignment::Consignment;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {

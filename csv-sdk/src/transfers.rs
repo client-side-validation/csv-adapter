@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use csv_adapter_core::{Chain, RightId};
+use csv_core::{Chain, RightId};
 
 use crate::client::ClientRef;
 use crate::errors::CsvError;

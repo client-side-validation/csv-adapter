@@ -282,11 +282,11 @@ pub fn verify_commitment_link(
 mod tests {
     use super::*;
     use crate::commitment::Commitment;
-    use crate::seal::SealRef;
+    use crate::seal::SealPoint;
 
     fn make_genesis_commitment(contract_id: Hash) -> Commitment {
         let domain = [0u8; 32];
-        let seal = SealRef::new(vec![0x01], None).unwrap();
+        let seal = SealPoint::new(vec![0x01], None).unwrap();
         Commitment::simple(
             contract_id,
             Hash::new([0u8; 32]), // Genesis has zero previous_commitment
@@ -298,7 +298,7 @@ mod tests {
 
     fn make_commitment(contract_id: Hash, previous_commitment: Hash, seal_id: u8) -> Commitment {
         let domain = [0u8; 32];
-        let seal = SealRef::new(vec![seal_id], None).unwrap();
+        let seal = SealPoint::new(vec![seal_id], None).unwrap();
         Commitment::simple(
             contract_id,
             previous_commitment,

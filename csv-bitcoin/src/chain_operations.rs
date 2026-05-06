@@ -6,20 +6,20 @@
 use async_trait::async_trait;
 use bitcoin::Network;
 use bitcoin_hashes::Hash as BitcoinHash;
-use csv_adapter_core::chain_operations::{
+use csv_core::chain_operations::{
     BalanceInfo, ChainBroadcaster, ChainDeployer, ChainOpError, ChainOpResult, ChainProofProvider,
     ChainQuery, ChainRightOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus,
     RightOperation, RightOperationResult, TransactionStatus,
 };
-use csv_adapter_core::hash::Hash;
-use csv_adapter_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
-use csv_adapter_core::right::RightId;
-use csv_adapter_core::signature::SignatureScheme;
+use csv_core::hash::Hash;
+use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
+use csv_core::right::RightId;
+use csv_core::signature::SignatureScheme;
 
 use crate::adapter::BitcoinAnchorLayer;
 use crate::rpc::BitcoinRpc;
 use crate::types::BitcoinSealRef;
-use csv_adapter_core::AnchorLayer;
+use csv_core::AnchorLayer;
 
 /// Encode a value as a Bitcoin-style variable length integer (varint)
 fn encode_varint(value: u64) -> Vec<u8> {
@@ -77,8 +77,8 @@ impl ChainQuery for BitcoinChainQuery {
         })
     }
 
-    async fn get_transaction(&self, tx_hash: &str) -> ChainOpResult<csv_adapter_core::chain_operations::TransactionInfo> {
-        use csv_adapter_core::chain_operations::{TransactionInfo, TransactionStatus};
+    async fn get_transaction(&self, tx_hash: &str) -> ChainOpResult<csv_core::chain_operations::TransactionInfo> {
+        use csv_core::chain_operations::{TransactionInfo, TransactionStatus};
         
         // Parse the txid
         let txid_bytes = hex::decode(tx_hash.trim_start_matches("0x"))
@@ -122,17 +122,17 @@ impl ChainQuery for BitcoinChainQuery {
         let tx_info = self.get_transaction(tx_hash).await?;
         
         match tx_info.status {
-            csv_adapter_core::chain_operations::TransactionStatus::Pending => Ok(FinalityStatus::Pending),
-            csv_adapter_core::chain_operations::TransactionStatus::Confirmed { block_height, .. } => {
+            csv_core::chain_operations::TransactionStatus::Pending => Ok(FinalityStatus::Pending),
+            csv_core::chain_operations::TransactionStatus::Confirmed { block_height, .. } => {
                 // Treat confirmed as finalized for Bitcoin (6+ confirmations)
                 Ok(FinalityStatus::Finalized {
                     block_height,
                     finality_block: block_height,
                 })
             }
-            csv_adapter_core::chain_operations::TransactionStatus::Failed { .. } => Ok(FinalityStatus::Orphaned),
-            csv_adapter_core::chain_operations::TransactionStatus::Dropped => Ok(FinalityStatus::Orphaned),
-            csv_adapter_core::chain_operations::TransactionStatus::Unknown => Ok(FinalityStatus::Pending),
+            csv_core::chain_operations::TransactionStatus::Failed { .. } => Ok(FinalityStatus::Orphaned),
+            csv_core::chain_operations::TransactionStatus::Dropped => Ok(FinalityStatus::Orphaned),
+            csv_core::chain_operations::TransactionStatus::Unknown => Ok(FinalityStatus::Pending),
         }
     }
 
@@ -418,7 +418,7 @@ impl ChainBroadcaster for BitcoinChainBroadcaster {
                 .map_err(|e| ChainOpError::RpcError(format!("Failed to get confirmations: {}", e)))?;
 
             if confirmations >= required_confirmations {
-                use csv_adapter_core::chain_operations::TransactionStatus;
+                use csv_core::chain_operations::TransactionStatus;
                 return Ok(TransactionStatus::Confirmed { block_height: 0, confirmations: confirmations as u64 });
             }
 
@@ -904,7 +904,7 @@ impl ChainRightOps for BitcoinChainRightOps {
 
         Ok(RightOperationResult {
             right_id: RightId(Hash::from([0u8; 32])), // Implementation note: compute from asset hash
-            operation: csv_adapter_core::chain_operations::RightOperation::Create,
+            operation: csv_core::chain_operations::RightOperation::Create,
             transaction_hash: hex::encode(seal.txid),
             block_height: 0,
             chain_id: "bitcoin".to_string(),
@@ -937,7 +937,7 @@ impl ChainRightOps for BitcoinChainRightOps {
         // The lock UTXO contains the destination chain hash in its script
         
         // Parse the destination chain to ensure it's valid
-        let _destination = destination_chain.parse::<csv_adapter_core::Chain>()
+        let _destination = destination_chain.parse::<csv_core::Chain>()
             .map_err(|_| ChainOpError::InvalidInput(format!("Invalid destination chain: {}", destination_chain)))?;
         
         // Get the right's associated UTXO (seal)
@@ -980,7 +980,7 @@ impl ChainRightOps for BitcoinChainRightOps {
         
         Ok(RightOperationResult {
             right_id: right_id.clone(),
-            operation: csv_adapter_core::chain_operations::RightOperation::Lock,
+            operation: csv_core::chain_operations::RightOperation::Lock,
             transaction_hash: signed_tx,
             block_height: self.adapter.get_current_height(),
             chain_id: "bitcoin".to_string(),
@@ -1245,7 +1245,7 @@ impl ChainQuery for BitcoinChainOperations {
         query.get_balance(address).await
     }
 
-    async fn get_transaction(&self, tx_hash: &str) -> ChainOpResult<csv_adapter_core::chain_operations::TransactionInfo> {
+    async fn get_transaction(&self, tx_hash: &str) -> ChainOpResult<csv_core::chain_operations::TransactionInfo> {
         let query = BitcoinChainQuery::new(self.rpc.clone_boxed(), self.network);
         query.get_transaction(tx_hash).await
     }

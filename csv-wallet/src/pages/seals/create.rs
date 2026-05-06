@@ -8,7 +8,7 @@ use crate::context::{
 };
 use crate::pages::common::*;
 use crate::routes::Route;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use dioxus::prelude::*;
 use std::rc::Rc;
 

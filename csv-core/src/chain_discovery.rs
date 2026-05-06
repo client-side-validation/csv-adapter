@@ -12,8 +12,8 @@
 //! # Usage
 //!
 //! ```no_run
-//! use csv_adapter_core::chain_discovery::ChainDiscovery;
-//! use csv_adapter_core::chain_plugin::ChainPlugin;
+//! use csv_core::chain_discovery::ChainDiscovery;
+//! use csv_core::chain_plugin::ChainPlugin;
 //! use std::sync::Arc;
 //!
 //! let mut discovery = ChainDiscovery::new();

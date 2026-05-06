@@ -113,7 +113,7 @@ impl Genesis {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::seal::SealRef;
+    use crate::seal::SealPoint;
 
     fn test_genesis() -> Genesis {
         Genesis::new(
@@ -126,12 +126,12 @@ mod tests {
             vec![
                 OwnedState::new(
                     10,
-                    SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                    SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                     1000u64.to_le_bytes().to_vec(),
                 ), // 1000 tokens to seal 1
                 OwnedState::new(
                     10,
-                    SealRef::new(vec![0xBB; 16], Some(2)).unwrap(),
+                    SealPoint::new(vec![0xBB; 16], Some(2)).unwrap(),
                     500u64.to_le_bytes().to_vec(),
                 ), // 500 tokens to seal 2
             ],
@@ -188,7 +188,7 @@ mod tests {
         let original_hash = g.hash();
         g.owned_state.push(OwnedState::new(
             99,
-            SealRef::new(vec![0xCC; 16], Some(3)).unwrap(),
+            SealPoint::new(vec![0xCC; 16], Some(3)).unwrap(),
             vec![42],
         ));
         assert_ne!(g.hash(), original_hash);

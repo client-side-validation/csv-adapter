@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use sha2::Digest;
 
-use csv_adapter_core::hash::Hash;
+use csv_core::hash::Hash;
 
 use crate::config::{Chain, Config};
 use crate::output;
@@ -71,7 +71,7 @@ fn cmd_create(
     // Use the new facade to create the right
     use csv_adapter::CsvClient;
     use csv_adapter::StoreBackend;
-    use csv_adapter_core::Chain as CoreChain;
+    use csv_core::Chain as CoreChain;
 
     // Map CLI Chain to core Chain
     let core_chain = match chain {
@@ -101,7 +101,7 @@ fn cmd_create(
         }
         hasher.finalize().into()
     };
-    let commitment = csv_adapter_core::Hash::new(commitment_bytes);
+    let commitment = csv_core::Hash::new(commitment_bytes);
 
     // Create the right through the facade
     match client.rights().create(commitment, core_chain) {

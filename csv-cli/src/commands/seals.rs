@@ -75,7 +75,7 @@ fn cmd_create(
     let rights = client.rights();
 
     // Generate a commitment for seal creation
-    let commitment = csv_adapter_core::Hash::new(generate_commitment());
+    let commitment = csv_core::Hash::new(generate_commitment());
 
     // Create the right (which internally creates a seal via the facade)
     match rights.create(commitment, core_chain) {
@@ -149,7 +149,7 @@ fn cmd_consume(
             padded[..seal_bytes.len().min(32)].copy_from_slice(&seal_bytes[..seal_bytes.len().min(32)]);
             padded
         });
-    let right_id = csv_adapter_core::RightId::new(right_id_bytes);
+    let right_id = csv_core::RightId::new(right_id_bytes);
 
     // Burn the right, which consumes the seal
     match rights.burn(&right_id) {
@@ -197,7 +197,7 @@ fn cmd_verify(
             padded[..seal_bytes.len().min(32)].copy_from_slice(&seal_bytes[..seal_bytes.len().min(32)]);
             padded
         });
-    let right_id = csv_adapter_core::RightId::new(right_id_bytes);
+    let right_id = csv_core::RightId::new(right_id_bytes);
 
     // Check if the right exists and get its status
     let local_consumed = state.is_seal_consumed(&hex::encode(&seal_bytes));

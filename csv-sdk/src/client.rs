@@ -31,8 +31,8 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use csv_adapter_core::Chain;
-use csv_adapter_core::ChainRegistry;
+use csv_core::Chain;
+use csv_core::ChainRegistry;
 #[cfg(feature = "tokio")]
 use tokio::sync::broadcast;
 
@@ -53,7 +53,7 @@ use crate::wallet::WalletManager;
 /// Handle to the underlying storage backend.
 pub enum StoreHandle {
     /// In-memory seal and anchor store.
-    InMemory(csv_adapter_core::InMemorySealStore),
+    InMemory(csv_core::InMemorySealStore),
     /// SQLite-backed store (requires `sqlite` feature).
     #[cfg(feature = "sqlite")]
     Sqlite(csv_adapter_store::SqliteSealStore),
@@ -61,8 +61,8 @@ pub enum StoreHandle {
 
 impl StoreHandle {
     /// Save a Right to the store.
-    pub fn save_right(&mut self, record: &csv_adapter_core::RightRecord) -> Result<(), CsvError> {
-        use csv_adapter_core::RightStore;
+    pub fn save_right(&mut self, record: &csv_core::RightRecord) -> Result<(), CsvError> {
+        use csv_core::RightStore;
         match self {
             StoreHandle::InMemory(store) => store
                 .save_right(record)
@@ -77,9 +77,9 @@ impl StoreHandle {
     /// Get a Right by its ID.
     pub fn get_right(
         &self,
-        right_id: &csv_adapter_core::RightId,
-    ) -> Result<Option<csv_adapter_core::RightRecord>, CsvError> {
-        use csv_adapter_core::RightStore;
+        right_id: &csv_core::RightId,
+    ) -> Result<Option<csv_core::RightRecord>, CsvError> {
+        use csv_core::RightStore;
         match self {
             StoreHandle::InMemory(store) => store
                 .get_right(right_id)
@@ -95,8 +95,8 @@ impl StoreHandle {
     pub fn list_rights_by_chain(
         &self,
         chain: &str,
-    ) -> Result<Vec<csv_adapter_core::RightRecord>, CsvError> {
-        use csv_adapter_core::RightStore;
+    ) -> Result<Vec<csv_core::RightRecord>, CsvError> {
+        use csv_core::RightStore;
         match self {
             StoreHandle::InMemory(store) => store
                 .list_rights_by_chain(chain)
@@ -111,10 +111,10 @@ impl StoreHandle {
     /// Mark a Right as consumed.
     pub fn consume_right(
         &mut self,
-        right_id: &csv_adapter_core::RightId,
+        right_id: &csv_core::RightId,
         consumed_at: u64,
     ) -> Result<(), CsvError> {
-        use csv_adapter_core::RightStore;
+        use csv_core::RightStore;
         match self {
             StoreHandle::InMemory(store) => store
                 .consume_right(right_id, consumed_at)
@@ -127,8 +127,8 @@ impl StoreHandle {
     }
 
     /// List all active (unconsumed) Rights.
-    pub fn list_active_rights(&self) -> Result<Vec<csv_adapter_core::RightRecord>, CsvError> {
-        use csv_adapter_core::RightStore;
+    pub fn list_active_rights(&self) -> Result<Vec<csv_core::RightRecord>, CsvError> {
+        use csv_core::RightStore;
         match self {
             StoreHandle::InMemory(store) => store
                 .list_active_rights()
@@ -141,8 +141,8 @@ impl StoreHandle {
     }
 
     /// Check if a Right exists.
-    pub fn has_right(&self, right_id: &csv_adapter_core::RightId) -> Result<bool, CsvError> {
-        use csv_adapter_core::RightStore;
+    pub fn has_right(&self, right_id: &csv_core::RightId) -> Result<bool, CsvError> {
+        use csv_core::RightStore;
         match self {
             StoreHandle::InMemory(store) => store
                 .has_right(right_id)
@@ -403,9 +403,9 @@ impl CsvClient {
         chain: Chain,
         _config: &crate::config::Config,
         network: NetworkType,
-    ) -> Result<Option<std::sync::Arc<dyn csv_adapter_core::FullChainAdapter>>, CsvError> {
+    ) -> Result<Option<std::sync::Arc<dyn csv_core::ChainBackend>>, CsvError> {
         let _builder = crate::facade::AdapterBuilder::new();
-        let is_testnet = matches!(network, NetworkType::Testnet);
+        let _is_testnet = matches!(network, NetworkType::Testnet);
 
         match chain {
             #[cfg(feature = "bitcoin")]
@@ -628,7 +628,7 @@ impl ClientRef {
             enabled_chains: HashSet::new(),
             wallet: None,
             store: Arc::new(std::sync::Mutex::new(crate::client::StoreHandle::InMemory(
-                csv_adapter_core::InMemorySealStore::new()
+                csv_core::InMemorySealStore::new()
             ))),
             config: Config::default(),
             event_tx,

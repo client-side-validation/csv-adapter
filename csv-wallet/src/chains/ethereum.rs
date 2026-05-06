@@ -1,6 +1,6 @@
 //! Ethereum chain integration.
 
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Format Ethereum address.
 pub fn format_address(address_bytes: &[u8; 20]) -> String {

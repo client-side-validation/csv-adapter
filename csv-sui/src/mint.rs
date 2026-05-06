@@ -3,7 +3,7 @@
 //! This module provides SDK-based minting using Sui's JSON-RPC with proper transaction building.
 
 use crate::error::{SuiError, SuiResult};
-use csv_adapter_core::hash::Hash as CsvHash;
+use csv_core::hash::Hash as CsvHash;
 
 /// Mint a right on Sui using direct JSON-RPC transaction submission
 ///

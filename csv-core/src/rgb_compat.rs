@@ -36,7 +36,7 @@ pub enum RgbValidationError {
     },
     /// Seal double-spend detected
     SealDoubleSpend {
-        seal_ref: crate::seal::SealRef,
+        seal_ref: crate::seal::SealPoint,
         first_seen: usize,
         second_seen: usize,
     },
@@ -216,7 +216,7 @@ impl RgbConsignmentValidator {
 
         // Check seal assignments for duplicates
         for (idx, assignment) in consignment.seal_assignments.iter().enumerate() {
-            let key = hex::encode(&assignment.seal_ref.seal_id);
+            let key = hex::encode(&assignment.seal_ref.id);
             if let Some(&first_idx) = seal_consumers.get(&key) {
                 errors.push(RgbValidationError::SealDoubleSpend {
                     seal_ref: assignment.seal_ref.clone(),
@@ -241,14 +241,14 @@ impl RgbConsignmentValidator {
 
         // Genesis states
         for assignment in consignment.genesis.owned_state.iter() {
-            let key = format!("g-{}-{}", assignment.type_id, hex::encode(assignment.seal.seal_id.as_slice()));
+            let key = format!("g-{}-{}", assignment.type_id, hex::encode(assignment.seal.id.as_slice()));
             produced_states.insert(key);
         }
 
         // Transition outputs
         for (tx_idx, tx) in consignment.transitions.iter().enumerate() {
             for (out_idx, assignment) in tx.owned_outputs.iter().enumerate() {
-                let key = format!("t-{}-{}-{}", tx_idx, out_idx, hex::encode(assignment.seal.seal_id.as_slice()));
+                let key = format!("t-{}-{}-{}", tx_idx, out_idx, hex::encode(assignment.seal.id.as_slice()));
                 produced_states.insert(key);
             }
         }
@@ -465,7 +465,7 @@ mod tests {
     use super::*;
     use crate::consignment::Anchor;
     use crate::genesis::Genesis;
-    use crate::seal::{AnchorRef, SealRef};
+    use crate::seal::{CommitAnchor, SealPoint};
     use crate::state::StateAssignment;
 
     fn test_consignment() -> Consignment {
@@ -513,7 +513,7 @@ mod tests {
         let mut consignment = test_consignment();
 
         // Add duplicate seal assignments
-        let seal = SealRef::new(vec![0xAB; 32], Some(0)).unwrap();
+        let seal = SealPoint::new(vec![0xAB; 32], Some(0)).unwrap();
         let assignment = crate::consignment::SealAssignment::new(
             seal.clone(),
             StateAssignment::new(0, seal.clone(), vec![]),
@@ -586,13 +586,13 @@ mod tests {
     fn test_cross_chain_consistency_valid() {
         let anchors = vec![
             Anchor::new(
-                AnchorRef::new(vec![0x01; 32], 100, vec![]).unwrap(),
+                CommitAnchor::new(vec![0x01; 32], 100, vec![]).unwrap(),
                 Hash::new([0xAB; 32]),
                 vec![],
                 vec![],
             ),
             Anchor::new(
-                AnchorRef::new(vec![0x02; 32], 200, vec![]).unwrap(),
+                CommitAnchor::new(vec![0x02; 32], 200, vec![]).unwrap(),
                 Hash::new([0xAB; 32]),
                 vec![],
                 vec![],
@@ -606,13 +606,13 @@ mod tests {
     fn test_cross_chain_consistency_mismatch() {
         let anchors = vec![
             Anchor::new(
-                AnchorRef::new(vec![0x01; 32], 100, vec![]).unwrap(),
+                CommitAnchor::new(vec![0x01; 32], 100, vec![]).unwrap(),
                 Hash::new([0xAB; 32]),
                 vec![],
                 vec![],
             ),
             Anchor::new(
-                AnchorRef::new(vec![0x02; 32], 200, vec![]).unwrap(),
+                CommitAnchor::new(vec![0x02; 32], 200, vec![]).unwrap(),
                 Hash::new([0xCD; 32]), // Different commitment
                 vec![],
                 vec![],

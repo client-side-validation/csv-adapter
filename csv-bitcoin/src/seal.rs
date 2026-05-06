@@ -2,7 +2,7 @@
 
 use crate::error::{BitcoinError, BitcoinResult};
 use crate::types::BitcoinSealRef;
-use csv_adapter_core::hardening::{BoundedQueue, MAX_SEAL_REGISTRY_SIZE};
+use csv_core::hardening::{BoundedQueue, MAX_SEAL_NULLIFIER_SIZE};
 
 /// Registry for tracking used seals (prevents replay)
 pub struct SealRegistry {
@@ -17,7 +17,7 @@ pub struct SealRegistry {
 impl SealRegistry {
     /// Create a new seal registry with default max size
     pub fn new() -> Self {
-        Self::with_max_size(MAX_SEAL_REGISTRY_SIZE)
+        Self::with_max_size(MAX_SEAL_NULLIFIER_SIZE)
     }
 
     /// Create a new seal registry with configurable max size

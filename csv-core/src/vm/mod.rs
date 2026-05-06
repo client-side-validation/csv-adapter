@@ -18,7 +18,7 @@
 //! ## Usage
 //!
 //! ```
-//! use csv_adapter_core::vm::{DeterministicVM, VMInputs, AluVmAdapter, execute_transition};
+//! use csv_core::vm::{DeterministicVM, VMInputs, AluVmAdapter, execute_transition};
 //!
 //! let vm = AluVmAdapter::new(1_000_000);
 //! let inputs = VMInputs::default();
@@ -38,7 +38,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
-use crate::seal::SealRef;
+use crate::seal::SealPoint;
 use crate::state::{GlobalState, Metadata, OwnedState, StateAssignment, StateRef, StateTypeId};
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ pub enum VMError {
     /// Seal was already consumed (replay detected)
     SealReplay {
         /// The seal that was replayed
-        seal: SealRef,
+        seal: SealPoint,
     },
     /// Schema validation failed
     SchemaViolation(String),
@@ -176,7 +176,7 @@ pub struct VMOutputs {
     /// Updated metadata
     pub metadata_updates: Vec<Metadata>,
     /// The next seal to be consumed (derived from the transition)
-    pub next_seal: Option<SealRef>,
+    pub next_seal: Option<SealPoint>,
 }
 
 impl Default for VMOutputs {
@@ -196,7 +196,7 @@ impl VMOutputs {
         owned_outputs: Vec<StateAssignment>,
         global_updates: Vec<GlobalState>,
         metadata_updates: Vec<Metadata>,
-        next_seal: Option<SealRef>,
+        next_seal: Option<SealPoint>,
     ) -> Self {
         Self {
             owned_outputs,
@@ -293,7 +293,7 @@ mod tests {
         VMInputs::new(
             vec![OwnedState::from_hash(
                 10,
-                SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                 Hash::new([1u8; 32]),
             )],
             vec![GlobalState::from_hash(1, Hash::new([100u8; 32]))],
@@ -324,12 +324,12 @@ mod tests {
             vec![
                 StateAssignment::new(
                     10,
-                    SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                    SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                     600u64.to_le_bytes().to_vec(),
                 ),
                 StateAssignment::new(
                     10,
-                    SealRef::new(vec![0xBB; 16], Some(2)).unwrap(),
+                    SealPoint::new(vec![0xBB; 16], Some(2)).unwrap(),
                     400u64.to_le_bytes().to_vec(),
                 ),
             ],
@@ -360,7 +360,7 @@ mod tests {
         };
         assert!(err.to_string().contains("200"));
         let err = VMError::SealReplay {
-            seal: SealRef::new(vec![1], Some(1)).unwrap(),
+            seal: SealPoint::new(vec![1], Some(1)).unwrap(),
         };
         assert!(err.to_string().contains("replay"));
     }

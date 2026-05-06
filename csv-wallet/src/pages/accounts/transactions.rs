@@ -36,11 +36,11 @@ pub fn AccountTransactions(id: String) -> Element {
         .collect();
 
     let chain_name = match account.chain {
-        csv_adapter_core::Chain::Bitcoin => "Bitcoin",
-        csv_adapter_core::Chain::Ethereum => "Ethereum",
-        csv_adapter_core::Chain::Sui => "Sui",
-        csv_adapter_core::Chain::Aptos => "Aptos",
-        csv_adapter_core::Chain::Solana => "Solana",
+        csv_core::Chain::Bitcoin => "Bitcoin",
+        csv_core::Chain::Ethereum => "Ethereum",
+        csv_core::Chain::Sui => "Sui",
+        csv_core::Chain::Aptos => "Aptos",
+        csv_core::Chain::Solana => "Solana",
         _ => "Unknown",
     };
 

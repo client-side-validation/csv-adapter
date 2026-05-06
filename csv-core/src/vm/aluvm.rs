@@ -45,7 +45,7 @@ use sha2::{Digest, Sha256};
 
 use super::{decode_integer, VMError, VMInputs, VMOutputs};
 use crate::hash::Hash;
-use crate::seal::SealRef;
+use crate::seal::SealPoint;
 use crate::state::{Metadata, StateAssignment, StateRef, StateTypeId};
 
 use super::DeterministicVM;
@@ -156,14 +156,14 @@ impl AluVmAdapter {
         let mut step_count: u64 = 0;
         let mut outputs = Vec::new();
         let mut metadata_updates = Vec::new();
-        let mut next_seal: Option<SealRef> = None;
+        let mut next_seal: Option<SealPoint> = None;
         let mut _status = ExecStatus::Ok;
 
         // Build a lookup map for owned states by their seal hash
         let mut state_map: BTreeMap<[u8; 16], Vec<u8>> = BTreeMap::new();
         for state in &inputs.owned_inputs {
             let mut key = [0u8; 16];
-            key.copy_from_slice(&state.seal.seal_id[..16]);
+            key.copy_from_slice(&state.seal.id[..16]);
             state_map.insert(key, state.data.clone());
         }
         for state in &inputs.global_state {
@@ -368,8 +368,8 @@ impl AluVmAdapter {
             .map(|(i, data)| {
                 StateAssignment::new(
                     i as StateTypeId,
-                    SealRef::new(vec![i as u8; 16], Some(1)).unwrap_or_else(|_| {
-                        SealRef::new(vec![0u8; 16], Some(1)).unwrap()
+                    SealPoint::new(vec![i as u8; 16], Some(1)).unwrap_or_else(|_| {
+                        SealPoint::new(vec![0u8; 16], Some(1)).unwrap()
                     }),
                     data.clone(),
                 )
@@ -434,9 +434,9 @@ fn pop_big_uint(stack: &mut Vec<Vec<u8>>) -> Result<u64, VMError> {
     })
 }
 
-fn parse_seal_from_data(data: &[u8]) -> Option<SealRef> {
+fn parse_seal_from_data(data: &[u8]) -> Option<SealPoint> {
     if data.len() >= 16 {
-        SealRef::new(data[..16].to_vec(), Some(1)).ok()
+        SealPoint::new(data[..16].to_vec(), Some(1)).ok()
     } else {
         None
     }
@@ -451,7 +451,7 @@ mod tests {
         VMInputs::new(
             vec![crate::state::OwnedState::from_hash(
                 10,
-                SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                 Hash::new([1u8; 32]),
             )],
             vec![],

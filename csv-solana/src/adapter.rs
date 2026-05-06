@@ -4,8 +4,8 @@
 //! as single-use seals. When a seal is consumed, the PDA account is closed, transferring
 //! lamports to the destination, making the seal cryptographically unspendable.
 
-use csv_adapter_core::traits::AnchorLayer;
-use csv_adapter_core::{
+use csv_core::traits::AnchorLayer;
+use csv_core::{
     dag::DAGSegment, proof::ProofBundle, signature::SignatureScheme, AdapterError, Hash, Result,
 };
 use sha2::{Digest, Sha256};
@@ -457,13 +457,13 @@ impl AnchorLayer for SolanaAnchorLayer {
             seals
                 .first()
                 .map(|s| {
-                    csv_adapter_core::seal::SealRef::new_unchecked(
+                    csv_core::seal::SealRef::new_unchecked(
                         s.account.to_bytes().to_vec(),
                         Some(s.lamports),
                     )
                 })
                 .unwrap_or_else(|| {
-                    csv_adapter_core::seal::SealRef::new_unchecked(
+                    csv_core::seal::SealRef::new_unchecked(
                         anchor_ref.signature.as_ref()[..32].to_vec(),
                         None,
                     )
@@ -471,20 +471,20 @@ impl AnchorLayer for SolanaAnchorLayer {
         };
 
         // Create anchor_ref from SolanaAnchorRef
-        let core_anchor_ref = csv_adapter_core::seal::AnchorRef::new_unchecked(
+        let core_anchor_ref = csv_core::seal::AnchorRef::new_unchecked(
             anchor_ref.signature.as_ref().to_vec(),
             anchor_ref.block_height,
             serde_json::to_vec(&anchor_ref.account_changes).unwrap_or_default(),
         );
 
         // Create inclusion proof
-        let inclusion_proof = csv_adapter_core::proof::InclusionProof::new_unchecked(
+        let inclusion_proof = csv_core::proof::InclusionProof::new_unchecked(
             solana_inclusion
                 .account_proofs
                 .iter()
                 .flat_map(|p| p.proof.iter().flatten().cloned())
                 .collect(),
-            csv_adapter_core::hash::Hash::new(
+            csv_core::hash::Hash::new(
                 anchor_ref.signature.as_ref()[..32]
                     .try_into()
                     .unwrap_or([0u8; 32]),
@@ -493,14 +493,14 @@ impl AnchorLayer for SolanaAnchorLayer {
         );
 
         // Create finality proof - Solana has deterministic finality after 31 slots
-        let finality_proof = csv_adapter_core::proof::FinalityProof::new_unchecked(
+        let finality_proof = csv_core::proof::FinalityProof::new_unchecked(
             solana_finality.block_hash.as_bytes().to_vec(),
             solana_finality.confirmation_depth,
             true, // Solana has deterministic finality
         );
 
         // Create a complete proof bundle
-        let bundle = csv_adapter_core::proof::ProofBundle::new_unchecked(
+        let bundle = csv_core::proof::ProofBundle::new_unchecked(
             segment,
             vec![anchor_ref.signature.as_ref().to_vec()],
             seal_ref,

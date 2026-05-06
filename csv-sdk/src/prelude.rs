@@ -21,12 +21,12 @@ pub use crate::transfers::{TransferBuilder, TransferManager};
 pub use crate::wallet::Wallet;
 
 // Re-exports from csv-adapter-core
-pub use csv_adapter_core::{
+pub use csv_core::{
     Commitment, Hash, OwnershipProof, ProofBundle, Right, RightId, SealRef,
 };
 
 // Agent-friendly types
-pub use csv_adapter_core::agent_types::{Chain, ErrorSuggestion, FixAction};
+pub use csv_core::agent_types::{Chain, ErrorSuggestion, FixAction};
 
 // Unified result type
 pub use crate::Result;

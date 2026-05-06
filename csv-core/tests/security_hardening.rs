@@ -6,7 +6,7 @@
 //! 3. Zeroization is applied to sensitive memory
 //! 4. No insecure randomness is used
 
-use csv_adapter_core::hash::Hash;
+use csv_core::hash::Hash;
 
 /// Test that Hash types don't expose internal bytes in Debug output
 #[test]
@@ -27,18 +27,18 @@ fn test_hash_debug_does_not_expose_secrets() {
 #[test]
 fn test_commitment_generation() {
     let data = b"test commitment data";
-    let commitment = csv_adapter_core::hash::hash_bytes(data);
+    let commitment = csv_core::hash::hash_bytes(data);
 
     // Should produce 32-byte hash
     assert_eq!(commitment.as_bytes().len(), 32);
 
     // Same data should produce same commitment
-    let commitment2 = csv_adapter_core::hash::hash_bytes(data);
+    let commitment2 = csv_core::hash::hash_bytes(data);
     assert_eq!(commitment.as_bytes(), commitment2.as_bytes());
 
     // Different data should produce different commitment
     let different_data = b"different data";
-    let different_commitment = csv_adapter_core::hash::hash_bytes(different_data);
+    let different_commitment = csv_core::hash::hash_bytes(different_data);
     assert_ne!(commitment.as_bytes(), different_commitment.as_bytes());
 }
 
@@ -81,7 +81,7 @@ fn test_hash_from_slice_invalid() {
 /// Test chain ID constants are stable
 #[test]
 fn test_chain_ids_are_stable() {
-    use csv_adapter_core::Chain;
+    use csv_core::Chain;
 
     // Chain IDs should never change (would break existing data)
     assert_eq!(Chain::Bitcoin.id(), 0);
@@ -94,7 +94,7 @@ fn test_chain_ids_are_stable() {
 /// Test chain display formatting
 #[test]
 fn test_chain_display() {
-    use csv_adapter_core::Chain;
+    use csv_core::Chain;
 
     assert_eq!(format!("{}", Chain::Bitcoin), "Bitcoin");
     assert_eq!(format!("{}", Chain::Ethereum), "Ethereum");
@@ -106,7 +106,7 @@ fn test_chain_display() {
 /// Test chain from ID conversion
 #[test]
 fn test_chain_from_id() {
-    use csv_adapter_core::Chain;
+    use csv_core::Chain;
 
     assert_eq!(Chain::from_id(0), Some(Chain::Bitcoin));
     assert_eq!(Chain::from_id(1), Some(Chain::Ethereum));
@@ -119,7 +119,7 @@ fn test_chain_from_id() {
 /// Test chain try_from bytes
 #[test]
 fn test_chain_try_from_bytes() {
-    use csv_adapter_core::Chain;
+    use csv_core::Chain;
 
     assert_eq!(Chain::try_from(b"BTC" as &[u8]).unwrap(), Chain::Bitcoin);
     assert_eq!(Chain::try_from(b"ETH" as &[u8]).unwrap(), Chain::Ethereum);
@@ -134,7 +134,7 @@ fn test_chain_try_from_bytes() {
 /// Test that all chains have proper SLIP-44 coin types
 #[test]
 fn test_chain_slip44_types() {
-    use csv_adapter_core::Chain;
+    use csv_core::Chain;
 
     // SLIP-44 coin types for each supported chain
     assert_eq!(Chain::Bitcoin.coin_type(), 0);
@@ -147,7 +147,7 @@ fn test_chain_slip44_types() {
 /// Test that chain serialization is consistent
 #[test]
 fn test_chain_serialization() {
-    use csv_adapter_core::Chain;
+    use csv_core::Chain;
     use serde_json;
 
     // Test serialization roundtrip
@@ -161,7 +161,7 @@ fn test_chain_serialization() {
 /// Test hash serialization is compact
 #[test]
 fn test_hash_serialization() {
-    use csv_adapter_core::hash::Hash;
+    use csv_core::hash::Hash;
     use serde_json;
 
     let hash = Hash::new([0xABu8; 32]);

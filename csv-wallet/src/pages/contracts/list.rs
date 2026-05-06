@@ -4,7 +4,7 @@ use crate::context::{use_wallet_context, DeployedContract};
 use crate::pages::common::*;
 use crate::pages::contracts::ContractDetailModal;
 use crate::routes::Route;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use dioxus::prelude::*;
 
 #[component]

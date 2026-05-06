@@ -9,15 +9,15 @@
 //! - ChainRightOps: Right management via program accounts
 
 use async_trait::async_trait;
-use csv_adapter_core::chain_operations::{
+use csv_core::chain_operations::{
     BalanceInfo, ChainBroadcaster, ChainDeployer, ChainOpError, ChainOpResult, ChainProofProvider,
     ChainQuery, ChainRightOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus,
     RightOperationResult, TransactionInfo, TransactionStatus,
 };
-use csv_adapter_core::hash::Hash;
-use csv_adapter_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
-use csv_adapter_core::right::RightId;
-use csv_adapter_core::signature::SignatureScheme;
+use csv_core::hash::Hash;
+use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
+use csv_core::right::RightId;
+use csv_core::signature::SignatureScheme;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Signature;
 

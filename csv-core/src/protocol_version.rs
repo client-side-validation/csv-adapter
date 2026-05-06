@@ -353,7 +353,7 @@ pub enum ErrorCode {
     /// Right already spent
     RightAlreadySpent,
     /// Invalid seal reference
-    InvalidSealRef,
+    InvalidSealPoint,
     /// Invalid commitment
     InvalidCommitment,
 
@@ -397,7 +397,7 @@ impl ErrorCode {
             Self::ProtocolVersionMismatch => "CSV_001",
             Self::InvalidRightId => "CSV_002",
             Self::RightAlreadySpent => "CSV_003",
-            Self::InvalidSealRef => "CSV_004",
+            Self::InvalidSealPoint => "CSV_004",
             Self::InvalidCommitment => "CSV_005",
             Self::ChainNotSupported => "CSV_101",
             Self::AdapterNotInitialized => "CSV_102",
@@ -420,7 +420,7 @@ impl ErrorCode {
             Self::ProtocolVersionMismatch
             | Self::InvalidRightId
             | Self::RightAlreadySpent
-            | Self::InvalidSealRef
+            | Self::InvalidSealPoint
             | Self::InvalidCommitment => "protocol",
             Self::ChainNotSupported | Self::AdapterNotInitialized | Self::UnsupportedOperation => {
                 "adapter"

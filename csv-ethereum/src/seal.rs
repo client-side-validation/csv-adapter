@@ -5,11 +5,11 @@
 
 use crate::error::{EthereumError, EthereumResult};
 use crate::types::EthereumSealRef;
-use csv_adapter_core::hardening::{BoundedQueue, MAX_SEAL_REGISTRY_SIZE};
+use csv_core::hardening::{BoundedQueue, MAX_SEAL_NULLIFIER_SIZE};
 #[cfg(feature = "rpc")]
-use csv_adapter_core::Hash;
+use csv_core::Hash;
 #[cfg(feature = "rpc")]
-use csv_adapter_core::SealStore;
+use csv_core::SealStore;
 #[cfg(feature = "rpc")]
 use csv_adapter_store::SqliteSealStore;
 use std::collections::HashSet;
@@ -40,7 +40,7 @@ pub struct SealRegistry {
 impl SealRegistry {
     /// Create a new in-memory seal registry
     pub fn new() -> Self {
-        Self::with_max_size(MAX_SEAL_REGISTRY_SIZE)
+        Self::with_max_size(MAX_SEAL_NULLIFIER_SIZE)
     }
 
     /// Create a new in-memory seal registry with custom max size
@@ -59,9 +59,9 @@ impl SealRegistry {
     pub fn new_with_store(store: SqliteSealStore) -> Self {
         Self {
             used_seals: Mutex::new(HashSet::new()),
-            seal_queue: Mutex::new(BoundedQueue::new(MAX_SEAL_REGISTRY_SIZE)),
+            seal_queue: Mutex::new(BoundedQueue::new(MAX_SEAL_NULLIFIER_SIZE)),
             store: Some(Arc::new(Mutex::new(store))),
-            max_size: MAX_SEAL_REGISTRY_SIZE,
+            max_size: MAX_SEAL_NULLIFIER_SIZE,
         }
     }
 
@@ -133,7 +133,7 @@ impl SealRegistry {
         if let Some(store) = &self.store {
             let seal_id = self.build_seal_id_bytes(seal);
             let commitment_hash = Hash::new(seal.seal_id);
-            let record = csv_adapter_core::SealRecord {
+            let record = csv_core::SealRecord {
                 chain: "ethereum".to_string(),
                 seal_id,
                 consumed_at_height: seal.slot_index,

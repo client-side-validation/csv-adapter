@@ -9,14 +9,14 @@
 //! - ChainRightOps: Right management via CSV seal contract
 
 use async_trait::async_trait;
-use csv_adapter_core::chain_operations::{
+use csv_core::chain_operations::{
     BalanceInfo, ChainBroadcaster, ChainDeployer, ChainOpError, ChainOpResult, ChainProofProvider,
     ChainQuery, ChainRightOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus, RightOperationResult, TransactionInfo, TransactionStatus,
 };
-use csv_adapter_core::hash::Hash;
-use csv_adapter_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
-use csv_adapter_core::right::RightId;
-use csv_adapter_core::signature::SignatureScheme;
+use csv_core::hash::Hash;
+use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
+use csv_core::right::RightId;
+use csv_core::signature::SignatureScheme;
 
 use crate::adapter::EthereumAnchorLayer;
 use crate::config::EthereumConfig;
@@ -288,7 +288,7 @@ impl ChainQuery for EthereumChainOperations {
 
         // Query the Ethereum RPC for transaction count (nonce)
         self.rpc
-            .get_transaction_count(&addr, None)
+            .get_transaction_count(addr)
             .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get nonce: {}", e)))
     }
@@ -950,7 +950,7 @@ impl ChainRightOps for EthereumChainOperations {
             Ok(tx_info) => {
                 // Transaction found - check confirmations for state
                 let has_confirmations = match &tx_info.status {
-                    csv_adapter_core::chain_operations::TransactionStatus::Confirmed { confirmations, .. } => *confirmations > 0,
+                    csv_core::chain_operations::TransactionStatus::Confirmed { confirmations, .. } => *confirmations > 0,
                     _ => false,
                 };
                 if has_confirmations {

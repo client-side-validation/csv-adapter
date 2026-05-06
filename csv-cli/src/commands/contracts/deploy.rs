@@ -6,7 +6,7 @@ use crate::config::{Chain, Config};
 use crate::output;
 use crate::state::{ContractRecord, UnifiedStateManager};
 use anyhow::Result;
-use csv_adapter_core::Chain as CoreChain;
+use csv_core::Chain as CoreChain;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Convert store Chain to core Chain for adapter usage.

@@ -7,7 +7,7 @@
 //! Production Guarantee Plan compliant - no duplicate implementations.
 
 use crate::services::blockchain::BlockchainError;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use std::str::FromStr;
 
 /// Build a complete, serialized transaction ready for signing

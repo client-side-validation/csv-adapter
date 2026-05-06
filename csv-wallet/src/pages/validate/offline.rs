@@ -16,9 +16,9 @@
 
 use crate::pages::common::*;
 use crate::routes::Route;
-use csv_adapter_core::proof::ProofBundle;
-use csv_adapter_core::proof_verify::verify_proof;
-use csv_adapter_core::signature::SignatureScheme;
+use csv_core::proof::ProofBundle;
+use csv_core::proof_verify::verify_proof;
+use csv_core::signature::SignatureScheme;
 use dioxus::prelude::*;
 
 /// Offline verification page - pure cryptographic verification

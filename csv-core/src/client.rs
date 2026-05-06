@@ -34,8 +34,8 @@ use crate::consignment::Consignment;
 use crate::cross_chain::InclusionProof as CrossChainInclusionProof;
 use crate::hash::Hash;
 use crate::right::{Right, RightError, RightId};
-use crate::seal::SealRef;
-use crate::seal_registry::{ChainId, CrossChainSealRegistry, SealConsumption, SealStatus};
+use crate::seal::SealPoint;
+use crate::nullifier::{ChainId, SealNullifier, SealConsumption, SealStatus};
 use crate::state_store::{
     ContractHistory, InMemoryStateStore, StateHistoryStore, StateTransitionRecord,
 };
@@ -94,7 +94,7 @@ pub struct SealConsumptionEvent {
     /// Which chain enforced the consumption
     pub chain: ChainId,
     /// The seal that was consumed
-    pub seal: SealRef,
+    pub seal: SealPoint,
     /// The Right after consumption (new owner, etc.)
     pub right: Right,
     /// Inclusion proof (chain-specific)
@@ -114,7 +114,7 @@ pub struct ValidationClient {
     /// Persistent state history store
     store: InMemoryStateStore,
     /// Cross-chain seal registry — prevents double-spend across all chains
-    seal_registry: CrossChainSealRegistry,
+    seal_registry: SealNullifier,
 }
 
 impl ValidationClient {
@@ -122,7 +122,7 @@ impl ValidationClient {
     pub fn new() -> Self {
         Self {
             store: InMemoryStateStore::new(),
-            seal_registry: CrossChainSealRegistry::new(),
+            seal_registry: SealNullifier::new(),
         }
     }
 
@@ -245,7 +245,7 @@ impl ValidationClient {
                 .seal_assignments
                 .first()
                 .map(|a| a.seal_ref.clone())
-                .unwrap_or_else(|| SealRef::new(vec![0x01], None).unwrap());
+                .unwrap_or_else(|| SealPoint::new(vec![0x01], None).unwrap());
 
             let commitment = Commitment::simple(
                 consignment.genesis.contract_id,
@@ -265,7 +265,7 @@ impl ValidationClient {
                 .seal_assignments
                 .first()
                 .map(|a| a.seal_ref.clone())
-                .unwrap_or_else(|| SealRef::new(vec![0x01], None).unwrap());
+                .unwrap_or_else(|| SealPoint::new(vec![0x01], None).unwrap());
 
             let root_commitment = Commitment::simple(
                 consignment.genesis.contract_id,
@@ -485,7 +485,7 @@ impl ValidationClient {
             let seal = if i < consignment.seal_assignments.len() {
                 consignment.seal_assignments[i].seal_ref.clone()
             } else {
-                SealRef::new(vec![i as u8], None).unwrap()
+                SealPoint::new(vec![i as u8], None).unwrap()
             };
 
             let domain = [0u8; 32];
@@ -524,7 +524,7 @@ impl ValidationClient {
     }
 
     /// Get the cross-chain seal registry.
-    pub fn seal_registry(&self) -> &CrossChainSealRegistry {
+    pub fn seal_registry(&self) -> &SealNullifier {
         &self.seal_registry
     }
 }
@@ -629,7 +629,7 @@ mod tests {
 
         let event = SealConsumptionEvent {
             chain: ChainId::Bitcoin,
-            seal: SealRef::new(vec![0x01], None).unwrap(),
+            seal: SealPoint::new(vec![0x01], None).unwrap(),
             right,
             inclusion,
             height: 1000,
@@ -665,7 +665,7 @@ mod tests {
             confirmations: 6,
         });
 
-        let seal = SealRef::new(vec![0x01], None).unwrap();
+        let seal = SealPoint::new(vec![0x01], None).unwrap();
 
         let event1 = SealConsumptionEvent {
             chain: ChainId::Bitcoin,
@@ -740,7 +740,7 @@ mod tests {
                 confirmations: 15,
             });
 
-        let seal = SealRef::new(vec![0x01], None).unwrap();
+        let seal = SealPoint::new(vec![0x01], None).unwrap();
 
         // Consume on Bitcoin
         let event_btc = SealConsumptionEvent {
@@ -802,7 +802,7 @@ mod tests {
 
         let event = SealConsumptionEvent {
             chain: ChainId::Bitcoin,
-            seal: SealRef::new(vec![0x01], None).unwrap(),
+            seal: SealPoint::new(vec![0x01], None).unwrap(),
             right,
             inclusion,
             height: 1000,

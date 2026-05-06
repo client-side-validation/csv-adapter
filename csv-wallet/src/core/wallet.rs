@@ -1,8 +1,8 @@
 //! Multi-chain HD wallet.
 //!
-//! Extends csv_adapter_core with additional functionality for the UI application.
+//! Extends csv_core with additional functionality for the UI application.
 
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use bip32::Mnemonic;
 use serde::{Serialize, Deserialize};
 use rand::RngCore;

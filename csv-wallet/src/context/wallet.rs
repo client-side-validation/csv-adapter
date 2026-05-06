@@ -4,7 +4,7 @@ use crate::context::state::AppState;
 use crate::context::types::*;
 use crate::storage::{self, LocalStorageManager, UNIFIED_STORAGE_KEY, WALLET_MNEMONIC_KEY};
 use crate::wallet_core::{ChainAccount, WalletData};
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use dioxus::prelude::*;
 
 /// Wallet context.
@@ -869,26 +869,26 @@ pub fn WalletProvider(children: Element) -> Element {
     }
 }
 
-/// Convert csv_adapter_core::Chain to csv_adapter_store::Chain
-fn convert_chain_to_store(chain: csv_adapter_core::Chain) -> csv_adapter_store::state::Chain {
+/// Convert csv_core::Chain to csv_adapter_store::Chain
+fn convert_chain_to_store(chain: csv_core::Chain) -> csv_adapter_store::state::Chain {
     match chain {
-        csv_adapter_core::Chain::Bitcoin => csv_adapter_store::state::Chain::Bitcoin,
-        csv_adapter_core::Chain::Ethereum => csv_adapter_store::state::Chain::Ethereum,
-        csv_adapter_core::Chain::Sui => csv_adapter_store::state::Chain::Sui,
-        csv_adapter_core::Chain::Aptos => csv_adapter_store::state::Chain::Aptos,
-        csv_adapter_core::Chain::Solana => csv_adapter_store::state::Chain::Solana,
+        csv_core::Chain::Bitcoin => csv_adapter_store::state::Chain::Bitcoin,
+        csv_core::Chain::Ethereum => csv_adapter_store::state::Chain::Ethereum,
+        csv_core::Chain::Sui => csv_adapter_store::state::Chain::Sui,
+        csv_core::Chain::Aptos => csv_adapter_store::state::Chain::Aptos,
+        csv_core::Chain::Solana => csv_adapter_store::state::Chain::Solana,
         _ => csv_adapter_store::state::Chain::Bitcoin, // fallback for any future chains
     }
 }
 
-/// Convert csv_adapter_store::Chain to csv_adapter_core::Chain
-fn convert_chain_from_store(chain: csv_adapter_store::state::Chain) -> csv_adapter_core::Chain {
+/// Convert csv_adapter_store::Chain to csv_core::Chain
+fn convert_chain_from_store(chain: csv_adapter_store::state::Chain) -> csv_core::Chain {
     match chain {
-        csv_adapter_store::state::Chain::Bitcoin => csv_adapter_core::Chain::Bitcoin,
-        csv_adapter_store::state::Chain::Ethereum => csv_adapter_core::Chain::Ethereum,
-        csv_adapter_store::state::Chain::Sui => csv_adapter_core::Chain::Sui,
-        csv_adapter_store::state::Chain::Aptos => csv_adapter_core::Chain::Aptos,
-        csv_adapter_store::state::Chain::Solana => csv_adapter_core::Chain::Solana,
+        csv_adapter_store::state::Chain::Bitcoin => csv_core::Chain::Bitcoin,
+        csv_adapter_store::state::Chain::Ethereum => csv_core::Chain::Ethereum,
+        csv_adapter_store::state::Chain::Sui => csv_core::Chain::Sui,
+        csv_adapter_store::state::Chain::Aptos => csv_core::Chain::Aptos,
+        csv_adapter_store::state::Chain::Solana => csv_core::Chain::Solana,
     }
 }
 

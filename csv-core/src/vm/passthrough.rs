@@ -107,7 +107,7 @@ mod tests {
         VMInputs::new(
             vec![OwnedState::from_hash(
                 10,
-                crate::seal::SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                crate::seal::SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                 Hash::new([1u8; 32]),
             )],
             vec![GlobalState::from_hash(1, Hash::new([100u8; 32]))],

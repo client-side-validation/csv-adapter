@@ -3,8 +3,8 @@
 //! In-memory storage for seal records.
 
 use super::manager::SealRecord;
-use csv_adapter_core::{Chain, RightId};
-use csv_adapter_core::agent_types::{HasErrorSuggestion, FixAction, error_codes};
+use csv_core::{Chain, RightId};
+use csv_core::agent_types::{HasErrorSuggestion, FixAction, error_codes};
 use std::collections::HashMap;
 use std::sync::Mutex;
 

@@ -685,7 +685,7 @@ fn commitment_node(node: &CommitmentNode, index: usize, is_genesis: bool, is_lat
 struct CommitmentNode {
     hash: String,
     previous_hash: String,
-    chain: csv_adapter_core::Chain,
+    chain: csv_core::Chain,
     anchor_tx: Option<String>,
     timestamp: Option<u64>,
 }

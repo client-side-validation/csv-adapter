@@ -37,7 +37,7 @@ fn test_mnemonic_uniqueness() {
 /// Test address derivation from private key
 #[test]
 fn test_address_derivation() {
-    use csv_adapter_core::Chain;
+    use csv_core::Chain;
 
     // Test Ethereum address derivation
     let private_key = [0x42u8; 32];
@@ -52,7 +52,7 @@ fn test_address_derivation() {
 /// Test address derivation fails for invalid key length
 #[test]
 fn test_address_derivation_invalid_key() {
-    use csv_adapter_core::Chain;
+    use csv_core::Chain;
 
     // Too short key
     let short_key = [0x42u8; 16];
@@ -63,7 +63,7 @@ fn test_address_derivation_invalid_key() {
 /// Test SLIP-44 coin type derivation paths
 #[test]
 fn test_derivation_paths() {
-    use csv_adapter_core::Chain;
+    use csv_core::Chain;
 
     // Verify derivation paths follow SLIP-44
     assert_eq!(bip44::derivation_path_for_chain(Chain::Bitcoin), "m/44'/0'/0'/0/0");
@@ -190,7 +190,7 @@ fn test_constant_time_operations() {
 /// Test hardened child key derivation
 #[test]
 fn test_hardened_derivation() {
-    use csv_adapter_core::Chain;
+    use csv_core::Chain;
 
     // Coin types in derivation paths should use hardened derivation (')
     let path = bip44::derivation_path_for_chain(Chain::Ethereum);

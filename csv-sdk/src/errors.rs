@@ -6,8 +6,8 @@
 
 use thiserror::Error;
 
-use csv_adapter_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
-use csv_adapter_core::Chain;
+use csv_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::Chain;
 
 /// Unified error type for all CSV operations.
 ///
@@ -303,14 +303,14 @@ impl HasErrorSuggestion for CsvError {
 }
 
 // Conversion from csv-adapter-core errors
-impl From<csv_adapter_core::AdapterError> for CsvError {
-    fn from(err: csv_adapter_core::AdapterError) -> Self {
+impl From<csv_core::AdapterError> for CsvError {
+    fn from(err: csv_core::AdapterError) -> Self {
         CsvError::Generic(err.to_string())
     }
 }
 
-impl From<csv_adapter_core::StoreError> for CsvError {
-    fn from(err: csv_adapter_core::StoreError) -> Self {
+impl From<csv_core::StoreError> for CsvError {
+    fn from(err: csv_core::StoreError) -> Self {
         CsvError::StoreError(err.to_string())
     }
 }

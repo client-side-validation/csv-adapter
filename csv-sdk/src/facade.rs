@@ -8,15 +8,15 @@
 //! Following the Clean Architecture documented in `docs/ARCHITECTURE.md` and `docs/BLUEPRINT.md`:
 //!
 //! 1. **csv-adapter-core**: Defines `AnchorLayer` trait (protocol primitives) and 
-//!    `FullChainAdapter` trait (chain operations like ChainQuery, ChainSigner, etc.)
+//!    `ChainBackend` trait (chain operations like ChainQuery, ChainSigner, etc.)
 //!
 //! 2. **csv-adapter-{chain}**: Each chain provides:
 //!    - `AnchorLayer` implementation (e.g., `EthereumAnchorLayer`)
-//!    - `ChainOperations` type (e.g., `EthereumChainOperations`) implementing `FullChainAdapter`
+//!    - `ChainOperations` type (e.g., `EthereumChainOperations`) implementing `ChainBackend`
 //!    - ChainOperations can be created FROM AnchorLayer via `from_anchor_layer()`
 //!
 //! 3. **csv-adapter (this facade)**: 
-//!    - Works with `Arc<dyn FullChainAdapter>` (ChainOperations, NOT AnchorLayer)
+//!    - Works with `Arc<dyn ChainBackend>` (ChainOperations, NOT AnchorLayer)
 //!    - Provides `AdapterBuilder` for constructing adapters with chain-specific configs
 //!    - `ChainFacade` delegates operations to registered adapters
 //!
@@ -41,11 +41,12 @@ use sha2::Digest as Sha2Digest;
 #[allow(unused_imports)]
 use sha3::Digest;
 
-use csv_adapter_core::{
-    Chain,
-    FullChainAdapter, BalanceInfo, TransactionInfo, TransactionStatus,
-    DeploymentStatus, RightOperationResult,
-    RightId, Hash, ProofBundle
+use csv_core::{
+    Chain, ChainBackend,
+    OpsBalanceInfo as BalanceInfo, OpsTransactionInfo as TransactionInfo, OpsTransactionStatus as TransactionStatus,
+    OpsDeploymentStatus as DeploymentStatus, SanadOperationResult,
+    SanadId, Hash, ProofBundle,
+    RightId
 };
 
 use crate::client::ClientRef;
@@ -59,7 +60,7 @@ use crate::errors::CsvError;
 ///
 /// # Architecture
 ///
-/// The facade holds `Arc<dyn FullChainAdapter>` instances which are the chain-specific
+/// The facade holds `Arc<dyn ChainBackend>` instances which are the chain-specific
 /// `ChainOperations` types (e.g., `EthereumChainOperations`), NOT the `AnchorLayer` types.
 /// This distinction is crucial for Clean Architecture compliance.
 ///
@@ -67,13 +68,13 @@ use crate::errors::CsvError;
 #[derive(Clone)]
 pub struct ChainFacade {
     client: Arc<ClientRef>,
-    adapters: Arc<Mutex<HashMap<Chain, Arc<dyn FullChainAdapter>>>>,
+    adapters: Arc<Mutex<HashMap<Chain, Arc<dyn ChainBackend>>>>,
 }
 
 /// Pre-fetched seal consumption data for verification.
 /// This avoids capturing the store lock in the closure passed to verify_proof.
 struct SealCheckData {
-    right_id: csv_adapter_core::RightId,
+    right_id: SanadId,
     is_consumed: bool,
 }
 
@@ -90,7 +91,7 @@ impl ChainFacade {
     /// This is used by the builder to auto-register adapters when chains are enabled.
     pub(crate) fn with_adapters(
         client: Arc<ClientRef>,
-        adapters: HashMap<Chain, Arc<dyn FullChainAdapter>>,
+        adapters: HashMap<Chain, Arc<dyn ChainBackend>>,
     ) -> Self {
         Self {
             client,
@@ -100,13 +101,13 @@ impl ChainFacade {
 
     /// Register a chain adapter for the given chain.
     ///
-    /// The adapter must implement `FullChainAdapter` (e.g., `EthereumChainOperations`).
+    /// The adapter must implement `ChainBackend` (e.g., `EthereumChainOperations`).
     /// Use `AdapterBuilder` to construct adapters with proper chain-specific configuration.
     ///
     /// # Example
     /// ```no_run
     /// use csv_adapter::facade::{ChainFacade, AdapterBuilder, AdapterConfig};
-    /// use csv_adapter_core::Chain;
+    /// use csv_core::Chain;
     ///
     /// let facade = ChainFacade::new(/* client ref */);
     /// let adapter = AdapterBuilder::new()
@@ -115,7 +116,7 @@ impl ChainFacade {
     ///     .build();
     /// facade.register_adapter(Chain::Ethereum, adapter);
     /// ```
-    pub async fn register_adapter(&self, chain: Chain, adapter: Arc<dyn FullChainAdapter>) {
+    pub async fn register_adapter(&self, chain: Chain, adapter: Arc<dyn ChainBackend>) {
         let mut adapters = self.adapters.lock().await;
         adapters.insert(chain, adapter);
     }
@@ -208,7 +209,7 @@ impl ChainFacade {
         chain: Chain,
         commitment: &Hash,
         block_height: u64,
-    ) -> Result<csv_adapter_core::InclusionProof, CsvError> {
+    ) -> Result<csv_core::InclusionProof, CsvError> {
         let adapter = self.get_adapter(chain).await?;
         
         adapter
@@ -262,7 +263,7 @@ impl ChainFacade {
 
     /// Create a new right on the specified chain.
     ///
-    /// Delegates to ChainRightOps::create_right.
+    /// Delegates to ChainSanadOps::create_sanad.
     pub async fn create_right(
         &self,
         chain: Chain,
@@ -270,11 +271,11 @@ impl ChainFacade {
         asset_class: &str,
         asset_id: &str,
         metadata: serde_json::Value,
-    ) -> Result<RightOperationResult, CsvError> {
+    ) -> Result<SanadOperationResult, CsvError> {
         let adapter = self.get_adapter(chain).await?;
         
         adapter
-            .create_right(owner, asset_class, asset_id, metadata)
+            .create_sanad(owner, asset_class, asset_id, metadata)
             .await
             .map_err(|e| CsvError::AdapterError {
                 chain,
@@ -284,17 +285,17 @@ impl ChainFacade {
 
     /// Consume a right on the specified chain.
     ///
-    /// Delegates to ChainRightOps::consume_right.
+    /// Delegates to ChainSanadOps::consume_sanad.
     pub async fn consume_right(
         &self,
         chain: Chain,
         right_id: &RightId,
         owner_key_id: &str,
-    ) -> Result<RightOperationResult, CsvError> {
+    ) -> Result<SanadOperationResult, CsvError> {
         let adapter = self.get_adapter(chain).await?;
         
         adapter
-            .consume_right(right_id, owner_key_id)
+            .consume_sanad(&right_id.into(), owner_key_id)
             .await
             .map_err(|e| CsvError::AdapterError {
                 chain,
@@ -304,18 +305,18 @@ impl ChainFacade {
 
     /// Lock a right for cross-chain transfer.
     ///
-    /// Delegates to ChainRightOps::lock_right.
+    /// Delegates to ChainSanadOps::lock_sanad.
     pub async fn lock_right(
         &self,
         chain: Chain,
         right_id: &RightId,
         destination_chain: &str,
         owner_key_id: &str,
-    ) -> Result<RightOperationResult, CsvError> {
+    ) -> Result<SanadOperationResult, CsvError> {
         let adapter = self.get_adapter(chain).await?;
         
         adapter
-            .lock_right(right_id, destination_chain, owner_key_id)
+            .lock_sanad(&right_id.into(), destination_chain, owner_key_id)
             .await
             .map_err(|e| CsvError::AdapterError {
                 chain,
@@ -345,7 +346,7 @@ impl ChainFacade {
         &self,
         chain: Chain,
         value: Option<u64>,
-    ) -> Result<csv_adapter_core::SealRef, CsvError> {
+    ) -> Result<csv_core::SealRef, CsvError> {
         let adapter = self.get_adapter(chain).await?;
         
         // Delegate to the adapter's create_seal method
@@ -359,19 +360,19 @@ impl ChainFacade {
 
     /// Mint a right on the destination chain.
     ///
-    /// Delegates to ChainRightOps::mint_right.
+    /// Delegates to ChainSanadOps::mint_sanad.
     pub async fn mint_right(
         &self,
         chain: Chain,
         source_chain: &str,
         source_right_id: &RightId,
-        lock_proof: &csv_adapter_core::InclusionProof,
+        lock_proof: &csv_core::InclusionProof,
         new_owner: &str,
-    ) -> Result<RightOperationResult, CsvError> {
+    ) -> Result<SanadOperationResult, CsvError> {
         let adapter = self.get_adapter(chain).await?;
         
         adapter
-            .mint_right(source_chain, source_right_id, lock_proof, new_owner)
+            .mint_sanad(source_chain, &source_right_id.into(), lock_proof, new_owner)
             .await
             .map_err(|e| CsvError::AdapterError {
                 chain,
@@ -459,38 +460,16 @@ impl ChainFacade {
         from: &str,
         nonce: u64,
     ) -> Result<Vec<u8>, CsvError> {
-        let _adapter = self.get_adapter(chain).await?;
-
-        // Encode the transaction data using chain-specific format
-        let tx_data = match chain {
-            Chain::Ethereum => {
-                // Ethereum uses ABI encoding - encode function selector + args
-                encode_eth_contract_call(contract, function, args)
-            }
-            Chain::Sui | Chain::Aptos => {
-                // Move chains use BCS encoding
-                encode_move_contract_call(contract, function, args, from, nonce)
-            }
-            Chain::Solana => {
-                // Solana uses instruction encoding
-                encode_solana_contract_call(contract, function, args, from)
-            }
-            Chain::Bitcoin => {
-                return Err(CsvError::CapabilityUnavailable {
-                    chain,
-                    capability: "contract_calls".to_string(),
-                })
-            }
-            _ => {
-                return Err(CsvError::ChainNotSupported(chain))
-            }
-        };
-
-        Ok(tx_data)
+        let adapter = self.get_adapter(chain).await?;
+        adapter.build_contract_call(contract, function, args, from, nonce)
+            .map_err(|e| CsvError::AdapterError {
+                chain,
+                message: format!("Contract call encoding failed: {}", e),
+            })
     }
 
     /// Get the adapter for the specified chain.
-    async fn get_adapter(&self, chain: Chain) -> Result<Arc<dyn FullChainAdapter>, CsvError> {
+    async fn get_adapter(&self, chain: Chain) -> Result<Arc<dyn ChainBackend>, CsvError> {
         let adapters = self.adapters.lock().await;
         adapters
             .get(&chain)
@@ -536,7 +515,7 @@ impl ChainFacade {
         })?;
 
         // Create commitment from right_id (the right's hash is the commitment)
-        let commitment = csv_adapter_core::hash::Hash::new(*right_id.as_bytes());
+        let commitment = csv_core::hash::Hash::new(*right_id.as_bytes());
 
         // Build inclusion proof from chain state
         let inclusion_proof = adapter
@@ -566,7 +545,7 @@ impl ChainFacade {
             })?;
 
         // Create a simple DAG segment with the right commitment
-        use csv_adapter_core::dag::{DAGNode, DAGSegment};
+        use csv_core::dag::{DAGNode, DAGSegment};
         let dag_node = DAGNode::new(
             commitment,
             vec![], // No inputs for lock operation
@@ -581,12 +560,12 @@ impl ChainFacade {
         let proof_bundle = ProofBundle::new(
             dag_segment,
             vec![], // Signatures will be added by the caller
-            csv_adapter_core::seal::SealRef::new(seal_id.clone(), None)
+            csv_core::seal::SealRef::new(seal_id.clone(), None)
                 .map_err(|e| CsvError::AdapterError {
                     chain,
                     message: format!("Failed to create seal ref: {}", e),
                 })?,
-            csv_adapter_core::seal::AnchorRef::new(seal_id, block_height, inclusion_proof.proof_bytes.clone())
+            csv_core::seal::AnchorRef::new(seal_id, block_height, inclusion_proof.proof_bytes.clone())
                 .map_err(|e| CsvError::AdapterError {
                     chain,
                     message: format!("Failed to create anchor ref: {}", e),
@@ -621,7 +600,7 @@ impl ChainFacade {
         &self,
         chain: Chain,
         proof_bundle: &ProofBundle,
-        right_id: &RightId,
+        right_id: &SanadId,
     ) -> Result<bool, CsvError> {
         let adapter = self.get_adapter(chain).await?;
 
@@ -629,10 +608,9 @@ impl ChainFacade {
         let signature_scheme = adapter.signature_scheme();
 
         // First verify the inclusion proof using the chain's native verification
-        let commitment = csv_adapter_core::hash::Hash::new(*right_id.as_bytes());
+        let commitment = csv_core::hash::Hash::new(*right_id.as_bytes());
         let inclusion_valid = adapter
             .verify_inclusion_proof(&proof_bundle.inclusion_proof, &commitment)
-            .await
             .map_err(|e| CsvError::AdapterError {
                 chain,
                 message: format!("Inclusion proof verification failed: {}", e),
@@ -647,7 +625,6 @@ impl ChainFacade {
         let tx_hash = hex::encode(right_id.as_bytes());
         let finality_valid = adapter
             .verify_finality_proof(&proof_bundle.finality_proof, &tx_hash)
-            .await
             .map_err(|e| CsvError::AdapterError {
                 chain,
                 message: format!("Finality proof verification failed: {}", e),
@@ -665,7 +642,7 @@ impl ChainFacade {
         // Create a seal registry checker for replay protection
         // The closure now only captures pre-fetched data, not self
         let seal_checker = move |seal_id: &[u8]| {
-            let check_right_id = csv_adapter_core::RightId::from_bytes(seal_id);
+            let check_right_id = csv_core::SanadId::from_bytes(seal_id);
             // Only return consumed if the seal_id matches the pre-fetched right_id AND it was consumed
             if check_right_id == seal_check_data.right_id {
                 if seal_check_data.is_consumed {
@@ -680,7 +657,7 @@ impl ChainFacade {
         };
 
         // Use the core proof verification pipeline for signatures and seal check
-        match csv_adapter_core::proof_verify::verify_proof(
+        match csv_core::proof_verify::verify_proof(
             proof_bundle,
             seal_checker,
             signature_scheme,
@@ -700,10 +677,10 @@ impl ChainFacade {
     /// 
     /// This fetches the right record from the store synchronously BEFORE entering
     /// the verification closure, preventing the async deadlock risk.
-    async fn pre_fetch_seal_data(&self, right_id: &RightId) -> Result<SealCheckData, CsvError> {
+    async fn pre_fetch_seal_data(&self, right_id: &SanadId) -> Result<SealCheckData, CsvError> {
         // Clone the Arc to avoid capturing self in the spawned task
         let store_arc = Arc::clone(&self.client.store);
-        let right_id_clone = right_id.clone();
+        let right_id_clone: csv_core::right::RightId = right_id.clone().into();
         
         // Run the store access in a blocking task since it uses std::sync::Mutex
         let is_consumed = tokio::task::spawn_blocking(move || {
@@ -743,7 +720,7 @@ impl Default for AdapterConfig {
     }
 }
 
-/// Builder for constructing chain-specific FullChainAdapter instances.
+/// Builder for constructing chain-specific ChainBackend instances.
 ///
 /// This builder provides chain-specific construction methods that use the correct
 /// constructors for each chain's ChainOperations type, following Clean Architecture.
@@ -758,7 +735,7 @@ impl Default for AdapterConfig {
 /// - **Solana**: Uses `from_config(config, rpc)`
 ///
 /// Chain operations are created from anchor layers via `from_anchor_layer(&anchor)`,
-/// producing `Arc<dyn FullChainAdapter>` for registration in ChainFacade.
+/// producing `Arc<dyn ChainBackend>` for registration in ChainFacade.
 ///
 /// The builder methods handle chain-specific configuration internally while
 /// presenting a unified interface for the facade.
@@ -773,14 +750,14 @@ impl AdapterBuilder {
     /// Build an Ethereum adapter from its specific configuration.
     ///
     /// Uses `EthereumChainOperations::from_anchor_layer()` internally which creates
-    /// the FullChainAdapter implementation from an EthereumAnchorLayer.
+    /// the ChainBackend implementation from an EthereumAnchorLayer.
     #[cfg(feature = "ethereum")]
     pub async fn ethereum_from_config(
         &self,
         config: csv_adapter_ethereum::config::EthereumConfig,
         rpc: Box<dyn csv_adapter_ethereum::rpc::EthereumRpc>,
         csv_seal_address: [u8; 20],
-    ) -> Result<Arc<dyn FullChainAdapter>, CsvError> {
+    ) -> Result<Arc<dyn ChainBackend>, CsvError> {
         use csv_adapter_ethereum::chain_operations::EthereumChainOperations;
         use csv_adapter_ethereum::adapter::EthereumAnchorLayer;
 
@@ -791,7 +768,7 @@ impl AdapterBuilder {
                 message: format!("Failed to create Ethereum anchor layer: {}", e),
             })?;
 
-        // Create ChainOperations from AnchorLayer (this implements FullChainAdapter)
+        // Create ChainOperations from AnchorLayer (this implements ChainBackend)
         let operations = EthereumChainOperations::from_anchor_layer(&anchor_layer)
             .map_err(|e| CsvError::AdapterError {
                 chain: Chain::Ethereum,
@@ -807,7 +784,7 @@ impl AdapterBuilder {
         &self,
         config: csv_adapter_sui::config::SuiConfig,
         rpc: Box<dyn csv_adapter_sui::rpc::SuiRpc>,
-    ) -> Result<Arc<dyn FullChainAdapter>, CsvError> {
+    ) -> Result<Arc<dyn ChainBackend>, CsvError> {
         use csv_adapter_sui::chain_operations::SuiChainOperations;
         use csv_adapter_sui::adapter::SuiAnchorLayer;
 
@@ -832,7 +809,7 @@ impl AdapterBuilder {
         &self,
         config: csv_adapter_aptos::config::AptosConfig,
         rpc: Box<dyn csv_adapter_aptos::rpc::AptosRpc>,
-    ) -> Result<Arc<dyn FullChainAdapter>, CsvError> {
+    ) -> Result<Arc<dyn ChainBackend>, CsvError> {
         use csv_adapter_aptos::chain_operations::AptosChainOperations;
         use csv_adapter_aptos::adapter::AptosAnchorLayer;
 
@@ -857,7 +834,7 @@ impl AdapterBuilder {
         &self,
         config: csv_adapter_solana::config::SolanaConfig,
         rpc: Box<dyn csv_adapter_solana::rpc::SolanaRpc>,
-    ) -> Result<Arc<dyn FullChainAdapter>, CsvError> {
+    ) -> Result<Arc<dyn ChainBackend>, CsvError> {
         use csv_adapter_solana::chain_operations::SolanaChainOperations;
         use csv_adapter_solana::adapter::SolanaAnchorLayer;
 
@@ -883,7 +860,7 @@ impl AdapterBuilder {
         &self,
         config: csv_adapter_bitcoin::config::BitcoinConfig,
         rpc: Box<dyn csv_adapter_bitcoin::rpc::BitcoinRpc + Send + Sync>,
-    ) -> Result<Arc<dyn FullChainAdapter>, CsvError> {
+    ) -> Result<Arc<dyn ChainBackend>, CsvError> {
         use csv_adapter_bitcoin::chain_operations::BitcoinChainOperations;
         use csv_adapter_bitcoin::adapter::BitcoinAnchorLayer;
 
@@ -963,7 +940,7 @@ impl AdapterFacade {
     ///
     /// Use this when you have constructed an adapter using `AdapterBuilder` or
     /// have a custom adapter implementation.
-    pub async fn register_adapter(&mut self, chain: Chain, adapter: Arc<dyn FullChainAdapter>) {
+    pub async fn register_adapter(&mut self, chain: Chain, adapter: Arc<dyn ChainBackend>) {
         self.chain_facade.register_adapter(chain, adapter).await;
     }
 

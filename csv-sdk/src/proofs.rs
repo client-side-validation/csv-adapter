@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use csv_adapter_core::{Chain, Hash, ProofBundle, RightId};
+use csv_core::{Chain, Hash, ProofBundle, RightId};
 
 use crate::client::ClientRef;
 use crate::errors::CsvError;

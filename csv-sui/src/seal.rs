@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{SuiError, SuiResult};
 use crate::types::SuiSealRef;
-use csv_adapter_core::hardening::{BoundedQueue, MAX_SEAL_REGISTRY_SIZE};
+use csv_core::hardening::{BoundedQueue, MAX_SEAL_NULLIFIER_SIZE};
 
 /// A persisted seal record that can be serialized.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -68,7 +68,7 @@ pub struct SealRegistry {
 impl SealRegistry {
     /// Create a new empty seal registry.
     pub fn new() -> Self {
-        Self::with_max_size(MAX_SEAL_REGISTRY_SIZE)
+        Self::with_max_size(MAX_SEAL_NULLIFIER_SIZE)
     }
 
     /// Create a new empty seal registry with custom max size.

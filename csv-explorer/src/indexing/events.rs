@@ -4,7 +4,7 @@
 //! and provides utilities for event handling.
 
 use chrono::{DateTime, Utc};
-use csv_adapter_core::{Chain, Hash};
+use csv_core::{Chain, Hash};
 use serde::{Deserialize, Serialize};
 
 /// Indexing event types
@@ -27,14 +27,14 @@ pub enum IndexingEvent {
         to_chain: Chain,
         transfer_id: Hash,
         created_at: DateTime<Utc>,
-        proof_bundle: Option<csv_adapter_core::proof::ProofBundle>,
+        proof_bundle: Option<csv_core::proof::ProofBundle>,
     },
 
     /// Transfer status updated
     TransferUpdated {
         transfer_id: Hash,
-        old_status: csv_adapter_core::TransferStatus,
-        new_status: csv_adapter_core::TransferStatus,
+        old_status: csv_core::TransferStatus,
+        new_status: csv_core::TransferStatus,
         updated_at: DateTime<Utc>,
     },
 

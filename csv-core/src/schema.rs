@@ -465,7 +465,7 @@ impl Schema {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::seal::SealRef;
+    use crate::seal::SealPoint;
     use crate::state::{StateAssignment, StateRef};
 
     fn test_schema() -> Schema {
@@ -610,7 +610,7 @@ mod tests {
             vec![StateRef::new(10, Hash::new([1u8; 32]), 0)],
             vec![StateAssignment::new(
                 10,
-                SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                 500u64.to_le_bytes().to_vec(),
             )],
             vec![],
@@ -657,7 +657,7 @@ mod tests {
             vec![StateRef::new(10, Hash::new([1u8; 32]), 0)],
             vec![StateAssignment::new(
                 99,
-                SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                 500u64.to_le_bytes().to_vec(),
             )],
             vec![],

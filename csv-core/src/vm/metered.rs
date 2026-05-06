@@ -128,7 +128,7 @@ mod tests {
             vec![
                 crate::state::OwnedState::from_hash(
                     10,
-                    crate::seal::SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                    crate::seal::SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                     crate::Hash::new([1u8; 32]),
                 ),
             ],
@@ -150,7 +150,7 @@ mod tests {
         let inputs = super::super::VMInputs::new(
             vec![crate::state::OwnedState::from_hash(
                 10,
-                crate::seal::SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                crate::seal::SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                 crate::Hash::new([1u8; 32]),
             )],
             vec![],
@@ -170,7 +170,7 @@ mod tests {
         let inputs = super::super::VMInputs::new(
             vec![crate::state::OwnedState::from_hash(
                 10,
-                crate::seal::SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                crate::seal::SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                 crate::Hash::new([1u8; 32]),
             )],
             vec![],

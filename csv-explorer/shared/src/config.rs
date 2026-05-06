@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use crate::types::Network;
-use csv_adapter_core::ChainDiscovery;
+use csv_core::ChainDiscovery;
 
 /// Top-level explorer configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]

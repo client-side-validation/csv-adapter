@@ -27,8 +27,8 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-use csv_adapter_core::hash::Hash;
-use csv_adapter_core::mpc::{MpcLeaf, MpcProof, MpcTree};
+use csv_core::hash::Hash;
+use csv_core::mpc::{MpcLeaf, MpcProof, MpcTree};
 
 use crate::error::{BitcoinError, BitcoinResult};
 use crate::types::BitcoinSealRef;
@@ -233,17 +233,17 @@ impl MpcBatcher {
 /// Extension trait for MpcTree to generate Merkle branches
 pub trait MpcTreeExt {
     /// Generate the Merkle branch for a leaf at the given index
-    fn merkle_branch(&self, leaf_index: usize) -> Option<Vec<csv_adapter_core::mpc::MerkleBranchNode>>;
+    fn merkle_branch(&self, leaf_index: usize) -> Option<Vec<csv_core::mpc::MerkleBranchNode>>;
 }
 
 impl MpcTreeExt for MpcTree {
-    fn merkle_branch(&self, leaf_index: usize) -> Option<Vec<csv_adapter_core::mpc::MerkleBranchNode>> {
+    fn merkle_branch(&self, leaf_index: usize) -> Option<Vec<csv_core::mpc::MerkleBranchNode>> {
         if leaf_index >= self.leaves.len() {
             return None;
         }
 
         // Collect all leaf hashes
-        let mut current_level: Vec<csv_adapter_core::hash::Hash> =
+        let mut current_level: Vec<csv_core::hash::Hash> =
             self.leaves.iter().map(|l| l.hash()).collect();
 
         let mut branch = Vec::new();
@@ -266,25 +266,25 @@ impl MpcTreeExt for MpcTree {
                     let pair_start_index = next_level.len() * 2;
                     if current_index == pair_start_index {
                         // Target is left, sibling is right
-                        branch.push(csv_adapter_core::mpc::MerkleBranchNode {
+                        branch.push(csv_core::mpc::MerkleBranchNode {
                             hash: right,
                             is_left: false,
                         });
                     } else if current_index == pair_start_index + 1 {
                         // Target is right, sibling is left
-                        branch.push(csv_adapter_core::mpc::MerkleBranchNode {
+                        branch.push(csv_core::mpc::MerkleBranchNode {
                             hash: left,
                             is_left: true,
                         });
                     }
 
                     // Hash the pair for next level
-                    use csv_adapter_core::tagged_hash::csv_tagged_hash;
+                    use csv_core::tagged_hash::csv_tagged_hash;
                     let mut data = [0u8; 64];
                     data[..32].copy_from_slice(left.as_bytes());
                     data[32..].copy_from_slice(right.as_bytes());
                     let parent_hash = csv_tagged_hash("mpc-internal", &data);
-                    next_level.push(csv_adapter_core::hash::Hash::new(parent_hash));
+                    next_level.push(csv_core::hash::Hash::new(parent_hash));
                 }
             }
 

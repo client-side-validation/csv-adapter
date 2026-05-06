@@ -10,7 +10,7 @@ use bitcoin::{
     Address, Network, ScriptBuf,
 };
 
-use csv_adapter_core::hash::Hash as CsvHash;
+use csv_core::hash::Hash as CsvHash;
 
 /// Tapret commitment for output key derivation
 #[derive(Clone, Debug, PartialEq, Eq)]

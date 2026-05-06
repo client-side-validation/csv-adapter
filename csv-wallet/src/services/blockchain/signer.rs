@@ -9,7 +9,7 @@ use crate::services::blockchain::types::{BlockchainError, SignedTransaction, Uns
 use crate::services::blockchain::wallet::NativeWallet;
 use csv_adapter::prelude::CsvClient;
 use csv_adapter::StoreBackend;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Transaction signer for different chains.
 ///

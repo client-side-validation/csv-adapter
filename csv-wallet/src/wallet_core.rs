@@ -4,7 +4,7 @@
 //! Private keys are never stored in memory longer than necessary for signing.
 
 use blake2::Blake2b;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use rand::rngs::OsRng;
 use rand::RngCore;

@@ -3,7 +3,7 @@
 use crate::context::{use_wallet_context, SealRecord, SealStatus};
 use crate::pages::common::*;
 use crate::routes::Route;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use dioxus::prelude::*;
 
 // ===== Seals Pages =====

@@ -6,7 +6,7 @@ use crate::app::routes::Route;
 use crate::pages::{Home, RightsList, SealsList, Stats, TransfersList, Wallet};
 
 /// Version from workspace Cargo.toml (via csv-adapter-core)
-const VERSION: &str = csv_adapter_core::PROTOCOL_VERSION_DISPLAY;
+const VERSION: &str = csv_core::PROTOCOL_VERSION_DISPLAY;
 
 pub mod routes;
 

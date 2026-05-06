@@ -7,10 +7,10 @@
 //! 4. Test serialization/deserialization
 
 use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
-use csv_adapter_core::hash::Hash;
-use csv_adapter_core::protocol_version::Chain;
-use csv_adapter_core::seal::SealRef;
-use csv_adapter_core::zk_proof::{ChainWitness, ProofSystem, ZkProver, ZkSealProof};
+use csv_core::hash::Hash;
+use csv_core::protocol_version::Chain;
+use csv_core::seal::SealRef;
+use csv_core::zk_proof::{ChainWitness, ProofSystem, ZkProver, ZkSealProof};
 
 /// Test the complete ZK proof lifecycle
 #[test]
@@ -126,7 +126,7 @@ fn test_missing_inclusion_proof_fails() {
 /// Test proof witness hash consistency
 #[test]
 fn test_proof_witness_consistency() {
-    use csv_adapter_core::zk_proof::ChainWitness;
+    use csv_core::zk_proof::ChainWitness;
 
     // Create two identical witnesses
     let witness1 = ChainWitness {

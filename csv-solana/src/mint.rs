@@ -4,7 +4,7 @@
 //! and JSON-RPC for submission (avoids version compatibility issues).
 
 use crate::error::{SolanaError, SolanaResult};
-use csv_adapter_core::hash::Hash as CsvHash;
+use csv_core::hash::Hash as CsvHash;
 
 /// Mint a right on Solana using JSON-RPC
 ///

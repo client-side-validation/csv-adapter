@@ -113,7 +113,7 @@ impl CommitmentTxBuilder {
         // Build Tapret commitment output
         let tapret = TapretCommitment::new(
             self.protocol_id,
-            csv_adapter_core::hash::Hash::new(commitment_hash),
+            csv_core::hash::Hash::new(commitment_hash),
         );
         let leaf_script = tapret.leaf_script();
 
@@ -207,7 +207,7 @@ impl CommitmentTxBuilder {
     /// Build legacy commitment data (for backward compatibility)
     pub fn build_commitment_data(
         &self,
-        commitment: csv_adapter_core::hash::Hash,
+        commitment: csv_core::hash::Hash,
     ) -> CommitmentData {
         let tapret = TapretCommitment::new(self.protocol_id, commitment);
         CommitmentData::Tapret {
@@ -363,7 +363,7 @@ mod tests {
     #[test]
     fn test_build_commitment_data() {
         let builder = CommitmentTxBuilder::new([1u8; 32], 10);
-        let data = builder.build_commitment_data(csv_adapter_core::hash::Hash::new([2u8; 32]));
+        let data = builder.build_commitment_data(csv_core::hash::Hash::new([2u8; 32]));
         match data {
             CommitmentData::Tapret { script, payload } => {
                 assert_eq!(payload[..32], [1u8; 32]);

@@ -15,7 +15,10 @@ pub const MAX_ANCHOR_ID_SIZE: usize = 1024;
 /// Maximum allowed size for anchor metadata (4KB)
 pub const MAX_ANCHOR_METADATA_SIZE: usize = 4096;
 
-/// A reference to a single-use seal
+/// A specific point on any chain that acts as a seal.
+///
+/// Bitcoin uses `OutPoint` (txid + vout) to identify a specific output.
+/// A Bitcoin seal IS an OutPoint. `SealPoint` generalizes this concept.
 ///
 /// The concrete meaning is chain-specific:
 /// - Bitcoin: UTXO OutPoint
@@ -23,62 +26,62 @@ pub const MAX_ANCHOR_METADATA_SIZE: usize = 4096;
 /// - Sui: Object ID
 /// - Aptos: Resource address + key
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct SealRef {
+pub struct SealPoint {
     /// Chain-specific seal identifier
-    pub seal_id: Vec<u8>,
+    pub id: Vec<u8>,
     /// Optional nonce for replay resistance
     pub nonce: Option<u64>,
 }
 
-impl SealRef {
-    /// Create a new SealRef from raw bytes
+impl SealPoint {
+    /// Create a new SealPoint from raw bytes
     ///
     /// # Arguments
-    /// * `seal_id` - Chain-specific seal identifier (max 1KB)
+    /// * `id` - Chain-specific seal identifier (max 1KB)
     /// * `nonce` - Optional nonce for replay resistance
     ///
     /// # Errors
-    /// Returns an error if the seal_id exceeds the maximum allowed size
-    pub fn new(seal_id: Vec<u8>, nonce: Option<u64>) -> Result<Self, &'static str> {
-        if seal_id.len() > MAX_SEAL_ID_SIZE {
-            return Err("seal_id exceeds maximum allowed size (1KB)");
+    /// Returns an error if the id exceeds the maximum allowed size
+    pub fn new(id: Vec<u8>, nonce: Option<u64>) -> Result<Self, &'static str> {
+        if id.len() > MAX_SEAL_ID_SIZE {
+            return Err("id exceeds maximum allowed size (1KB)");
         }
-        if seal_id.is_empty() {
-            return Err("seal_id cannot be empty");
+        if id.is_empty() {
+            return Err("id cannot be empty");
         }
-        Ok(Self { seal_id, nonce })
+        Ok(Self { id, nonce })
     }
 
-    /// Create a new SealRef without validation.
+    /// Create a new SealPoint without validation.
     ///
     /// # Safety
     /// This bypasses size validation. Use only for internal protocol conversions
     /// where the input is already known to be valid.
-    pub fn new_unchecked(seal_id: Vec<u8>, nonce: Option<u64>) -> Self {
-        Self { seal_id, nonce }
+    pub fn new_unchecked(id: Vec<u8>, nonce: Option<u64>) -> Self {
+        Self { id, nonce }
     }
 
     /// Serialize to bytes
     ///
-    /// Format: `[nonce_flag(1) | nonce_bytes(8 if flag=1) | seal_id_len(varuint) | seal_id]`
+    /// Format: `[nonce_flag(1) | nonce_bytes(8 if flag=1) | id_len(varuint) | id]`
     /// The nonce_flag is 1 for `Some(nonce)`, 0 for `None`.
     pub fn to_vec(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(9 + self.seal_id.len());
+        let mut out = Vec::with_capacity(9 + self.id.len());
         if let Some(nonce) = self.nonce {
             out.push(1);
             out.extend_from_slice(&nonce.to_le_bytes());
         } else {
             out.push(0);
         }
-        out.extend_from_slice(&(self.seal_id.len() as u32).to_le_bytes());
-        out.extend_from_slice(&self.seal_id);
+        out.extend_from_slice(&(self.id.len() as u32).to_le_bytes());
+        out.extend_from_slice(&self.id);
         out
     }
 
     /// Deserialize from bytes
     ///
     /// # Errors
-    /// Returns an error if the bytes are malformed or seal_id exceeds the maximum allowed size.
+    /// Returns an error if the bytes are malformed or id exceeds the maximum allowed size.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, &'static str> {
         if bytes.is_empty() {
             return Err("empty bytes");
@@ -105,38 +108,41 @@ impl SealRef {
         };
 
         if bytes.len() < pos + 4 {
-            return Err("truncated seal_id length");
+            return Err("truncated id length");
         }
-        let seal_id_len = u32::from_le_bytes(
+        let id_len = u32::from_le_bytes(
             bytes[pos..pos + 4]
                 .try_into()
-                .map_err(|_| "truncated seal_id length")?,
+                .map_err(|_| "truncated id length")?,
         ) as usize;
         pos += 4;
 
-        if seal_id_len > MAX_SEAL_ID_SIZE {
-            return Err("seal_id exceeds maximum allowed size (1KB)");
+        if id_len > MAX_SEAL_ID_SIZE {
+            return Err("id exceeds maximum allowed size (1KB)");
         }
-        if seal_id_len == 0 {
-            return Err("seal_id cannot be empty");
+        if id_len == 0 {
+            return Err("id cannot be empty");
         }
-        if bytes.len() < pos + seal_id_len {
-            return Err("truncated seal_id");
+        if bytes.len() < pos + id_len {
+            return Err("truncated id");
         }
-        let seal_id = bytes[pos..pos + seal_id_len].to_vec();
+        let id = bytes[pos..pos + id_len].to_vec();
 
-        Ok(Self { seal_id, nonce })
+        Ok(Self { id, nonce })
     }
+
 }
 
-/// A reference to an on-chain anchor containing a commitment
+/// The anchor for a commitment on-chain.
+///
+/// Represents where a commitment was anchored on-chain.
 ///
 /// The concrete meaning is chain-specific:
 /// - Bitcoin: Transaction ID + output index
 /// - Ethereum: Transaction hash + log index
 /// - Sui: Object ID + version
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct AnchorRef {
+pub struct CommitAnchor {
     /// Chain-specific anchor identifier
     pub anchor_id: Vec<u8>,
     /// Block height or equivalent ordering
@@ -145,8 +151,8 @@ pub struct AnchorRef {
     pub metadata: Vec<u8>,
 }
 
-impl AnchorRef {
-    /// Create a new AnchorRef
+impl CommitAnchor {
+    /// Create a new CommitAnchor
     ///
     /// # Arguments
     /// * `anchor_id` - Chain-specific anchor identifier (max 1KB)
@@ -176,7 +182,7 @@ impl AnchorRef {
         })
     }
 
-    /// Create a new $1 without validation.
+    /// Create a new CommitAnchor without validation.
     ///
     /// # Safety
     /// This bypasses validation. Use only for internal protocol conversions.
@@ -207,127 +213,127 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_seal_ref_creation() {
-        let seal = SealRef::new(vec![1, 2, 3], Some(42)).unwrap();
-        assert_eq!(seal.seal_id, vec![1, 2, 3]);
+    fn test_seal_point_creation() {
+        let seal = SealPoint::new(vec![1, 2, 3], Some(42)).unwrap();
+        assert_eq!(seal.id, vec![1, 2, 3]);
         assert_eq!(seal.nonce, Some(42));
     }
 
     #[test]
-    fn test_anchor_ref_creation() {
-        let anchor = AnchorRef::new(vec![4, 5, 6], 100, vec![7, 8]).unwrap();
+    fn test_commit_anchor_creation() {
+        let anchor = CommitAnchor::new(vec![4, 5, 6], 100, vec![7, 8]).unwrap();
         assert_eq!(anchor.anchor_id, vec![4, 5, 6]);
         assert_eq!(anchor.block_height, 100);
         assert_eq!(anchor.metadata, vec![7, 8]);
     }
 
     #[test]
-    fn test_seal_ref_serialization() {
-        let seal = SealRef::new(vec![1, 2, 3], Some(42)).unwrap();
+    fn test_seal_point_serialization() {
+        let seal = SealPoint::new(vec![1, 2, 3], Some(42)).unwrap();
         let bytes = seal.to_vec();
         assert!(!bytes.is_empty());
     }
 
     #[test]
-    fn test_seal_ref_roundtrip() {
+    fn test_seal_point_roundtrip() {
         // Test with Some(nonce)
-        let seal1 = SealRef::new(vec![1, 2, 3], Some(42)).unwrap();
+        let seal1 = SealPoint::new(vec![1, 2, 3], Some(42)).unwrap();
         let bytes1 = seal1.to_vec();
-        let restored1 = SealRef::from_bytes(&bytes1).unwrap();
-        assert_eq!(restored1.seal_id, vec![1, 2, 3]);
+        let restored1 = SealPoint::from_bytes(&bytes1).unwrap();
+        assert_eq!(restored1.id, vec![1, 2, 3]);
         assert_eq!(restored1.nonce, Some(42));
 
         // Test with None nonce
-        let seal2 = SealRef::new(vec![4, 5, 6], None).unwrap();
+        let seal2 = SealPoint::new(vec![4, 5, 6], None).unwrap();
         let bytes2 = seal2.to_vec();
-        let restored2 = SealRef::from_bytes(&bytes2).unwrap();
-        assert_eq!(restored2.seal_id, vec![4, 5, 6]);
+        let restored2 = SealPoint::from_bytes(&bytes2).unwrap();
+        assert_eq!(restored2.id, vec![4, 5, 6]);
         assert_eq!(restored2.nonce, None);
 
         // Verify that None and Some(0) produce different bytes
-        let seal_none = SealRef::new(vec![1, 2, 3], None).unwrap();
-        let seal_zero = SealRef::new(vec![1, 2, 3], Some(0)).unwrap();
+        let seal_none = SealPoint::new(vec![1, 2, 3], None).unwrap();
+        let seal_zero = SealPoint::new(vec![1, 2, 3], Some(0)).unwrap();
         assert_ne!(seal_none.to_vec(), seal_zero.to_vec());
     }
 
     #[test]
-    fn test_seal_ref_from_bytes_errors() {
+    fn test_seal_point_from_bytes_errors() {
         // Empty bytes
-        assert_eq!(SealRef::from_bytes(&[]), Err("empty bytes"));
+        assert_eq!(SealPoint::from_bytes(&[]), Err("empty bytes"));
 
         // Invalid nonce flag
-        assert_eq!(SealRef::from_bytes(&[5]), Err("invalid nonce flag"));
+        assert_eq!(SealPoint::from_bytes(&[5]), Err("invalid nonce flag"));
 
         // Truncated nonce
-        assert_eq!(SealRef::from_bytes(&[1, 0, 0]), Err("truncated nonce"));
+        assert_eq!(SealPoint::from_bytes(&[1, 0, 0]), Err("truncated nonce"));
 
-        // Truncated seal_id length
-        assert_eq!(SealRef::from_bytes(&[0]), Err("truncated seal_id length"));
+        // Truncated id length
+        assert_eq!(SealPoint::from_bytes(&[0]), Err("truncated id length"));
 
-        // Truncated seal_id data
+        // Truncated id data
         assert_eq!(
-            SealRef::from_bytes(&[0, 3, 0, 0, 0, 1]),
-            Err("truncated seal_id")
+            SealPoint::from_bytes(&[0, 3, 0, 0, 0, 1]),
+            Err("truncated id")
         );
 
-        // Seal_id too large
+        // id too large
         let mut large = vec![0, 0x01, 0x04, 0x00, 0x00]; // length 1025
         large.extend(vec![0u8; 1025]);
         assert_eq!(
-            SealRef::from_bytes(&large),
-            Err("seal_id exceeds maximum allowed size (1KB)")
+            SealPoint::from_bytes(&large),
+            Err("id exceeds maximum allowed size (1KB)")
         );
 
-        // Empty seal_id
+        // Empty id
         assert_eq!(
-            SealRef::from_bytes(&[0, 0, 0, 0, 0]),
-            Err("seal_id cannot be empty")
+            SealPoint::from_bytes(&[0, 0, 0, 0, 0]),
+            Err("id cannot be empty")
         );
     }
 
     #[test]
-    fn test_anchor_ref_serialization() {
-        let anchor = AnchorRef::new(vec![4, 5, 6], 100, vec![7, 8]).unwrap();
+    fn test_commit_anchor_serialization() {
+        let anchor = CommitAnchor::new(vec![4, 5, 6], 100, vec![7, 8]).unwrap();
         let bytes = anchor.to_vec();
         assert!(!bytes.is_empty());
     }
 
     #[test]
-    fn test_seal_ref_empty_id() {
-        let result = SealRef::new(vec![], Some(42));
+    fn test_seal_point_empty_id() {
+        let result = SealPoint::new(vec![], Some(42));
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "seal_id cannot be empty");
+        assert_eq!(result.unwrap_err(), "id cannot be empty");
     }
 
     #[test]
-    fn test_seal_ref_too_large() {
+    fn test_seal_point_too_large() {
         let large_id = vec![0u8; MAX_SEAL_ID_SIZE + 1];
-        let result = SealRef::new(large_id, Some(42));
+        let result = SealPoint::new(large_id, Some(42));
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
-            "seal_id exceeds maximum allowed size (1KB)"
+            "id exceeds maximum allowed size (1KB)"
         );
     }
 
     #[test]
-    fn test_seal_ref_at_max_size() {
+    fn test_seal_point_at_max_size() {
         let max_id = vec![0u8; MAX_SEAL_ID_SIZE];
-        let result = SealRef::new(max_id, Some(42));
+        let result = SealPoint::new(max_id, Some(42));
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_anchor_ref_empty_id() {
-        let result = AnchorRef::new(vec![], 100, vec![7, 8]);
+    fn test_commit_anchor_empty_id() {
+        let result = CommitAnchor::new(vec![], 100, vec![7, 8]);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "anchor_id cannot be empty");
     }
 
     #[test]
-    fn test_anchor_ref_id_too_large() {
+    fn test_commit_anchor_id_too_large() {
         let large_id = vec![0u8; MAX_ANCHOR_ID_SIZE + 1];
-        let result = AnchorRef::new(large_id, 100, vec![7, 8]);
+        let result = CommitAnchor::new(large_id, 100, vec![7, 8]);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
@@ -336,9 +342,9 @@ mod tests {
     }
 
     #[test]
-    fn test_anchor_ref_metadata_too_large() {
+    fn test_commit_anchor_metadata_too_large() {
         let large_metadata = vec![0u8; MAX_ANCHOR_METADATA_SIZE + 1];
-        let result = AnchorRef::new(vec![1, 2, 3], 100, large_metadata);
+        let result = CommitAnchor::new(vec![1, 2, 3], 100, large_metadata);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
@@ -347,25 +353,32 @@ mod tests {
     }
 
     #[test]
-    fn test_anchor_ref_at_max_sizes() {
+    fn test_commit_anchor_at_max_sizes() {
         let max_id = vec![0u8; MAX_ANCHOR_ID_SIZE];
         let max_metadata = vec![0u8; MAX_ANCHOR_METADATA_SIZE];
-        let result = AnchorRef::new(max_id, 100, max_metadata);
+        let result = CommitAnchor::new(max_id, 100, max_metadata);
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_seal_ref_new_unchecked() {
-        let seal = SealRef::new_unchecked(vec![1, 2, 3], Some(42));
-        assert_eq!(seal.seal_id, vec![1, 2, 3]);
+    fn test_seal_point_new_unchecked() {
+        let seal = SealPoint::new_unchecked(vec![1, 2, 3], Some(42));
+        assert_eq!(seal.id, vec![1, 2, 3]);
         assert_eq!(seal.nonce, Some(42));
     }
 
     #[test]
-    fn test_anchor_ref_new_unchecked() {
-        let anchor = AnchorRef::new_unchecked(vec![4, 5, 6], 100, vec![7, 8]);
+    fn test_commit_anchor_new_unchecked() {
+        let anchor = CommitAnchor::new_unchecked(vec![4, 5, 6], 100, vec![7, 8]);
         assert_eq!(anchor.anchor_id, vec![4, 5, 6]);
         assert_eq!(anchor.block_height, 100);
         assert_eq!(anchor.metadata, vec![7, 8]);
     }
 }
+
+// Backward compatibility type aliases
+#[deprecated(since = "0.4.0", note = "Use SealPoint instead")]
+pub type SealRef = SealPoint;
+
+#[deprecated(since = "0.4.0", note = "Use CommitAnchor instead")]
+pub type AnchorRef = CommitAnchor;

@@ -2,7 +2,7 @@
 
 use crate::context::{generate_id, use_wallet_context, RightStatus, TrackedRight};
 use crate::pages::common::*;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use dioxus::prelude::*;
 use std::rc::Rc;
 

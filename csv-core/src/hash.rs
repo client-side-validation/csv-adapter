@@ -8,7 +8,7 @@
 //! # Examples
 //!
 //! ```
-//! use csv_adapter_core::Hash;
+//! use csv_core::Hash;
 //!
 //! // Create from bytes
 //! let h = Hash::new([0xAB; 32]);

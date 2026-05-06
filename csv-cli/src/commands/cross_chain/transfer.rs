@@ -5,8 +5,8 @@
 use anyhow::Result;
 
 use csv_adapter::CsvClient;
-use csv_adapter_core::hash::Hash;
-use csv_adapter_core::Chain;
+use csv_core::hash::Hash;
+use csv_core::Chain;
 
 use crate::config::{Chain as ConfigChain, Config};
 use crate::output;

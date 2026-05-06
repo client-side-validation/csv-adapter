@@ -1,4 +1,4 @@
-use csv_adapter_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
 /// Error types for the CSV Explorer.
 use thiserror::Error;
 

@@ -44,7 +44,7 @@ use crate::services::blockchain::wallet::NativeWallet;
 use crate::wallet_core::ChainAccount;
 use csv_adapter::prelude::CsvClient;
 use csv_adapter::StoreBackend;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Main blockchain service.
 pub struct BlockchainService {
@@ -136,7 +136,7 @@ impl BlockchainService {
         // Create right ID
         let right_id_bytes: [u8; 32] = right_id.as_bytes()[..32].try_into()
             .map_err(|_| BlockchainError { message: "Invalid right_id length".into(), chain: Some(chain), code: Some(400) })?;
-        let right_id_obj = csv_adapter_core::right::RightId::new(right_id_bytes);
+        let right_id_obj = csv_core::right::RightId::new(right_id_bytes);
 
         // Get key ID for signing
         let key_id = signer.key_id().map_err(|e| BlockchainError {
@@ -398,7 +398,7 @@ impl BlockchainService {
                     code: Some(400),
                 })?;
 
-            match csv_client.chain_facade().generate_proof(source_chain, &csv_adapter_core::RightId::from_bytes(&right_id_bytes)).await {
+            match csv_client.chain_facade().generate_proof(source_chain, &csv_core::RightId::from_bytes(&right_id_bytes)).await {
                 Ok(proof_bundle) => {
                     web_sys::console::log_1(&format!("Proof generated via facade: {:?}", proof_bundle).into());
                     
@@ -493,7 +493,7 @@ impl BlockchainService {
                     chain: Some(target_chain),
                     code: Some(400),
                 })?;
-            let right_id = csv_adapter_core::RightId::from_bytes(&right_id_bytes);
+            let right_id = csv_core::RightId::from_bytes(&right_id_bytes);
 
             // Build a ProofBundle from the CrossChainProof data
             let proof_bundle = self.build_proof_bundle_from_cross_chain_proof(proof, &right_id_bytes)?;
@@ -541,8 +541,8 @@ impl BlockchainService {
         &self,
         proof: &CrossChainProof,
         right_id_bytes: &[u8],
-    ) -> Result<csv_adapter_core::ProofBundle, BlockchainError> {
-        use csv_adapter_core::{
+    ) -> Result<csv_core::ProofBundle, BlockchainError> {
+        use csv_core::{
             dag::{DAGNode, DAGSegment},
             hash::Hash,
             proof::{FinalityProof, InclusionProof},
@@ -658,7 +658,7 @@ impl BlockchainService {
         })?;
 
         // Build the proof bundle
-        let proof_bundle = csv_adapter_core::ProofBundle::new(
+        let proof_bundle = csv_core::ProofBundle::new(
             dag_segment,
             vec![], // Signatures added separately
             seal_ref,
@@ -971,10 +971,10 @@ impl BlockchainService {
                         code: Some(400),
                     })?;
 
-                let right_id_core = csv_adapter_core::RightId::from_bytes(&right_id_bytes);
+                let right_id_core = csv_core::RightId::from_bytes(&right_id_bytes);
 
                 // Execute transfer via facade
-                let empty_proof = csv_adapter_core::proof::InclusionProof::new(vec![], csv_adapter_core::Hash::new([0u8; 32]), 0)
+                let empty_proof = csv_core::proof::InclusionProof::new(vec![], csv_core::Hash::new([0u8; 32]), 0)
                     .map_err(|e| BlockchainError {
                         message: format!("Failed to create empty proof: {}", e),
                         chain: Some(chain),

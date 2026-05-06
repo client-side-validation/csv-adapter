@@ -3,8 +3,8 @@
 //! Provides local storage and management of asset records using LocalStorage.
 
 use chrono::{DateTime, Utc};
-use csv_adapter_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
-use csv_adapter_core::Chain;
+use csv_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::Chain;
 use serde::{Deserialize, Serialize};
 
 use crate::storage::{asset_storage, LocalStorageManager};

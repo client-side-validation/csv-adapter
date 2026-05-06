@@ -144,7 +144,7 @@ pub fn verify_proof(
     validate_domain_separation(bundle)?;
 
     // Step 6: Validate seal reference (check for replay)
-    if seal_registry(bundle.seal_ref.seal_id.as_ref()) {
+    if seal_registry(bundle.seal_ref.id.as_ref()) {
         return Err(AdapterError::SealReplay(format!(
             "Seal {:?} has already been used",
             bundle.seal_ref
@@ -192,7 +192,7 @@ fn validate_proof_bundle_size(bundle: &ProofBundle) -> Result<()> {
     }
     
     // Seal and anchor references
-    total_size += bundle.seal_ref.seal_id.len();
+    total_size += bundle.seal_ref.id.len();
     total_size += bundle.anchor_ref.anchor_id.len();
     total_size += bundle.anchor_ref.metadata.len();
     
@@ -240,7 +240,7 @@ fn validate_proof_timestamp(bundle: &ProofBundle) -> Result<()> {
 /// - Prevents cross-chain replay attacks
 fn validate_domain_separation(bundle: &ProofBundle) -> Result<()> {
     // Check that the seal reference has a valid seal ID
-    if bundle.seal_ref.seal_id.is_empty() {
+    if bundle.seal_ref.id.is_empty() {
         return Err(AdapterError::Generic(
             "Invalid seal reference: empty seal ID".to_string()
         ));
@@ -248,7 +248,7 @@ fn validate_domain_separation(bundle: &ProofBundle) -> Result<()> {
     
     // Verify that seal_id and anchor anchor_id match (consistency check)
     // The seal_id should be consistent with the anchor's anchor_id
-    if bundle.seal_ref.seal_id != bundle.anchor_ref.anchor_id {
+    if bundle.seal_ref.id != bundle.anchor_ref.anchor_id {
         return Err(AdapterError::Generic(
             "Seal reference mismatch: seal ID and anchor ID must match".to_string()
         ));
@@ -344,7 +344,7 @@ fn validate_anchor_reference(bundle: &ProofBundle) -> Result<()> {
     }
     
     // Verify anchor_id matches the seal_id (ensures seal is properly anchored)
-    if bundle.anchor_ref.anchor_id != bundle.seal_ref.seal_id {
+    if bundle.anchor_ref.anchor_id != bundle.seal_ref.id {
         return Err(AdapterError::Generic(
             "Invalid anchor: anchor_id does not match seal_id".to_string()
         ));
@@ -455,7 +455,7 @@ mod tests {
     use crate::dag::{DAGNode, DAGSegment};
     use crate::hash::Hash;
     use crate::proof::{FinalityProof, InclusionProof};
-    use crate::seal::{AnchorRef, SealRef};
+    use crate::seal::{CommitAnchor, SealPoint};
     use crate::signature::SignatureScheme;
 
     fn make_secp256k1_signature_bytes(message: &[u8; 32]) -> Vec<u8> {
@@ -505,9 +505,9 @@ mod tests {
                 Hash::zero(),
             ),
             vec![signature],
-            SealRef::new(vec![1, 2, 3], Some(42))
+            SealPoint::new(vec![1, 2, 3], Some(42))
                 .map_err(|e| AdapterError::Generic(e.to_string()))?,
-            AnchorRef::new(vec![4, 5, 6], 100, vec![])
+            CommitAnchor::new(vec![4, 5, 6], 100, vec![])
                 .map_err(|e| AdapterError::Generic(e.to_string()))?,
             InclusionProof::new(vec![0xCD; 32], Hash::new([2u8; 32]), 0)
                 .map_err(|e| AdapterError::Generic(e.to_string()))?,

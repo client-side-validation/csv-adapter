@@ -102,7 +102,7 @@ pub trait AnchorLayer {
     /// * `seal` - The seal reference authorizing this commitment
     ///
     /// # Returns
-    /// * `Ok(AnchorRef)` - The anchor reference for inclusion/finality proofs
+    /// * `Ok(CommitAnchor)` - The anchor reference for inclusion/finality proofs
     /// * `Err` - If publication fails or seal already consumed
     fn publish(&self, commitment: Hash, seal: Self::SealRef) -> Result<Self::AnchorRef>;
 

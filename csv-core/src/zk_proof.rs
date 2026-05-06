@@ -30,7 +30,7 @@ use sha2::{Digest, Sha256};
 
 use crate::hash::Hash;
 use crate::protocol_version::Chain;
-use crate::seal::SealRef;
+use crate::seal::SealPoint;
 
 /// Maximum ZK proof size (1MB)
 pub const MAX_ZK_PROOF_SIZE: usize = 1024 * 1024;
@@ -105,7 +105,7 @@ impl core::fmt::Display for ProofSystem {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZkPublicInputs {
     /// The seal reference being proven
-    pub seal_ref: SealRef,
+    pub seal_ref: SealPoint,
     /// Block hash where the seal was consumed
     pub block_hash: Hash,
     /// Commitment hash bound to the proof
@@ -162,7 +162,7 @@ impl ZkSealProof {
         !self.proof_bytes.is_empty()
             && self.proof_bytes.len() <= MAX_ZK_PROOF_SIZE
             && self.verifier_key.active
-            && !self.public_inputs.seal_ref.seal_id.is_empty()
+            && !self.public_inputs.seal_ref.id.is_empty()
             && self.public_inputs.block_hash.as_bytes() != &[0u8; 32]
     }
 
@@ -195,7 +195,7 @@ pub trait ZkProver {
     /// Returns an error if the witness data is invalid or proving fails
     fn prove_seal_consumption(
         &self,
-        seal: &SealRef,
+        seal: &SealPoint,
         witness: &ChainWitness,
     ) -> Result<ZkSealProof, ZkError>;
 
@@ -383,7 +383,7 @@ mod tests {
     #[test]
     fn test_zk_seal_proof_structure() {
         let verifier_key = VerifierKey::new(Chain::Bitcoin, vec![1u8; 32], ProofSystem::SP1, 1);
-        let seal_ref = SealRef::new(vec![0xAB; 32], Some(42)).unwrap();
+        let seal_ref = SealPoint::new(vec![0xAB; 32], Some(42)).unwrap();
         let public_inputs = ZkPublicInputs {
             seal_ref: seal_ref.clone(),
             block_hash: Hash::new([1u8; 32]),
@@ -400,7 +400,7 @@ mod tests {
     #[test]
     fn test_zk_seal_proof_too_large() {
         let verifier_key = VerifierKey::new(Chain::Bitcoin, vec![1u8; 32], ProofSystem::SP1, 1);
-        let seal_ref = SealRef::new(vec![0xAB; 32], Some(42)).unwrap();
+        let seal_ref = SealPoint::new(vec![0xAB; 32], Some(42)).unwrap();
         let public_inputs = ZkPublicInputs {
             seal_ref,
             block_hash: Hash::new([1u8; 32]),
@@ -417,7 +417,7 @@ mod tests {
     #[test]
     fn test_zk_seal_proof_invalid() {
         let verifier_key = VerifierKey::new(Chain::Bitcoin, vec![1u8; 32], ProofSystem::SP1, 1);
-        let seal_ref = SealRef::new(vec![0xAB; 32], Some(42)).unwrap();
+        let seal_ref = SealPoint::new(vec![0xAB; 32], Some(42)).unwrap();
         let public_inputs = ZkPublicInputs {
             seal_ref,
             block_hash: Hash::zero(), // Invalid: zero block hash
@@ -490,7 +490,7 @@ mod tests {
     #[test]
     fn test_zk_seal_proof_serialization() {
         let verifier_key = VerifierKey::new(Chain::Bitcoin, vec![1u8; 32], ProofSystem::SP1, 1);
-        let seal_ref = SealRef::new(vec![0xAB; 32], Some(42)).unwrap();
+        let seal_ref = SealPoint::new(vec![0xAB; 32], Some(42)).unwrap();
         let public_inputs = ZkPublicInputs {
             seal_ref,
             block_hash: Hash::new([1u8; 32]),

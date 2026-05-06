@@ -1,7 +1,7 @@
 //! Wallet state hook.
 
 use crate::wallet_core::{ChainAccount, WalletData as Wallet};
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use csv_adapter_keystore::{
     bip39::{Mnemonic, MnemonicType},
     bip44::derive_all_chain_keys,
@@ -20,7 +20,7 @@ pub struct WalletState {
     /// Current wallet
     pub wallet: Option<Wallet>,
     /// Wallet addresses
-    pub addresses: std::collections::HashMap<csv_adapter_core::Chain, String>,
+    pub addresses: std::collections::HashMap<csv_core::Chain, String>,
 }
 
 /// Wallet context.

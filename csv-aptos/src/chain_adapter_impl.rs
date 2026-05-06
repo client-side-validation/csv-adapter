@@ -5,11 +5,11 @@
 
 use async_trait::async_trait;
 use base64::Engine;
-use csv_adapter_core::chain_adapter::{
+use csv_core::chain_adapter::{
     AccountModel, ChainAdapter, ChainCapabilities, ChainError, ChainResult, RpcClient, Wallet,
 };
-use csv_adapter_core::chain_config::ChainConfig;
-use csv_adapter_core::Chain;
+use csv_core::chain_config::ChainConfig;
+use csv_core::Chain;
 
 use crate::adapter::AptosAnchorLayer;
 use crate::config::{AptosConfig, AptosNetwork};

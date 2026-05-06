@@ -81,19 +81,20 @@ pub mod transfers;
 pub mod wallet;
 
 // Re-export core types from csv-adapter-core (🔒 STABLE API only by default)
-pub use csv_adapter_core::{
-    AnchorLayer, AnchorRef, Commitment, Consignment, CrossChainLockEvent, DAGNode, DAGSegment,
+pub use csv_core::{
+    AnchorLayer, CommitAnchor, Commitment, Consignment, CrossChainLockEvent, DAGNode, DAGSegment,
     FinalityProof, Genesis, Hash, InclusionProof, OwnedState, OwnershipProof, ProofBundle, Right,
-    RightId, Schema, SealRef, StateRef, Transition, CONSIGNMENT_VERSION, SCHEMA_VERSION,
+    RightId, Sanad, SanadId, Schema, SealPoint, StateRef, Transition, CONSIGNMENT_VERSION,
+    SCHEMA_VERSION,
 };
 
 // Re-export canonical protocol types (🔒 STABLE + 🟡 BETA)
-pub use csv_adapter_core::protocol_version::{
+pub use csv_core::protocol_version::{
     Capabilities, Chain, ErrorCode, ProtocolVersion, SyncStatus, TransferStatus, PROTOCOL_VERSION,
 };
 
 // Re-export error types (🔒 STABLE)
-pub use csv_adapter_core::{AdapterError, Result as CoreResult, StoreError};
+pub use csv_core::{AdapterError, Result as CoreResult, StoreError};
 
 // ===========================================================================
 // Experimental re-exports (feature-gated)
@@ -104,11 +105,11 @@ pub use csv_adapter_core::{AdapterError, Result as CoreResult, StoreError};
 /// These APIs may change or be removed without notice.
 #[cfg(feature = "experimental")]
 pub mod experimental {
-    pub use csv_adapter_core::mpc::{MpcLeaf, MpcProof, MpcTree};
-    pub use csv_adapter_core::rgb_compat::{
+    pub use csv_core::mpc::{MpcLeaf, MpcProof, MpcTree};
+    pub use csv_core::rgb_compat::{
         CrossChainError, RgbValidationError, RgbValidationResult,
     };
-    pub use csv_adapter_core::vm::{
+    pub use csv_core::vm::{
         execute_transition, DeterministicVM, VMError, VMInputs, VMOutputs,
     };
 }

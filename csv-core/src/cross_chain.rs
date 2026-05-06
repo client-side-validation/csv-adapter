@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::hash::Hash;
 use crate::protocol_version::Chain;
 use crate::right::{OwnershipProof, Right};
-use crate::seal::SealRef;
+use crate::seal::SealPoint;
 
 /// Chain identifier alias for cross-chain transfers.
 ///
@@ -36,7 +36,7 @@ pub struct CrossChainLockEvent {
     /// Destination owner (may differ from source owner)
     pub destination_owner: OwnershipProof,
     /// Source chain's seal reference (consumed during lock)
-    pub source_seal: SealRef,
+    pub source_seal: SealPoint,
     /// Source transaction hash
     pub source_tx_hash: Hash,
     /// Source block height
@@ -86,7 +86,7 @@ pub enum TransferState {
         /// Destination transaction hash
         dest_tx: String,
         /// Destination seal reference
-        dest_seal: SealRef,
+        dest_seal: SealPoint,
     },
     /// Transfer failed, reason recorded
     Failed {
@@ -232,7 +232,7 @@ pub struct VerifierKey {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZkPublicInputs {
     /// The seal reference being proven
-    pub seal_ref: SealRef,
+    pub seal_ref: SealPoint,
     /// Block hash where the seal was consumed
     pub block_hash: Hash,
     /// Commitment hash bound to the proof
@@ -281,11 +281,11 @@ pub struct CrossChainRegistryEntry {
     /// Source chain identifier
     pub source_chain: ChainId,
     /// Source chain's seal reference
-    pub source_seal: SealRef,
+    pub source_seal: SealPoint,
     /// Destination chain identifier
     pub destination_chain: ChainId,
     /// Destination chain's seal reference
-    pub destination_seal: SealRef,
+    pub destination_seal: SealPoint,
     /// Lock transaction hash on source chain
     pub lock_tx_hash: Hash,
     /// Mint transaction hash on destination chain
@@ -300,7 +300,7 @@ pub struct CrossChainTransferResult {
     /// The new Right created on the destination chain
     pub destination_right: Right,
     /// The destination chain's seal reference
-    pub destination_seal: SealRef,
+    pub destination_seal: SealPoint,
     /// Registry entry recording the transfer
     pub registry_entry: CrossChainRegistryEntry,
 }
@@ -507,7 +507,7 @@ impl CrossChainRegistry {
     }
 
     /// Check if a source seal has already been consumed.
-    pub fn is_seal_consumed(&self, seal: &SealRef) -> bool {
+    pub fn is_seal_consumed(&self, seal: &SealPoint) -> bool {
         self.entries.values().any(|e| &e.source_seal == seal)
     }
 
@@ -528,10 +528,10 @@ impl CrossChainRegistry {
 }
 
 // Re-export for convenience
-pub use crate::seal_registry::SealConsumption;
+pub use crate::nullifier::SealConsumption;
 
 /// Cross-chain seal registry for tracking transfers across all chains
-pub use crate::seal_registry::CrossChainSealRegistry;
+pub use crate::nullifier::SealNullifier;
 
 #[cfg(test)]
 mod tests {
@@ -562,9 +562,9 @@ mod tests {
         let entry = CrossChainRegistryEntry {
             right_id,
             source_chain: ChainId::Bitcoin,
-            source_seal: SealRef::new(vec![0x01], None).unwrap(),
+            source_seal: SealPoint::new(vec![0x01], None).unwrap(),
             destination_chain: ChainId::Sui,
-            destination_seal: SealRef::new(vec![0x02], None).unwrap(),
+            destination_seal: SealPoint::new(vec![0x02], None).unwrap(),
             lock_tx_hash: Hash::new([0x03; 32]),
             mint_tx_hash: Hash::new([0x04; 32]),
             timestamp: 1_000_000,
@@ -580,14 +580,14 @@ mod tests {
     #[test]
     fn test_registry_prevents_double_lock() {
         let mut registry = CrossChainRegistry::new();
-        let seal = SealRef::new(vec![0x01], None).unwrap();
+        let seal = SealPoint::new(vec![0x01], None).unwrap();
 
         let entry1 = CrossChainRegistryEntry {
             right_id: Hash::new([0xAB; 32]),
             source_chain: ChainId::Bitcoin,
             source_seal: seal.clone(),
             destination_chain: ChainId::Sui,
-            destination_seal: SealRef::new(vec![0x02], None).unwrap(),
+            destination_seal: SealPoint::new(vec![0x02], None).unwrap(),
             lock_tx_hash: Hash::new([0x03; 32]),
             mint_tx_hash: Hash::new([0x04; 32]),
             timestamp: 1_000_000,
@@ -601,7 +601,7 @@ mod tests {
             source_chain: ChainId::Bitcoin,
             source_seal: seal.clone(),
             destination_chain: ChainId::Aptos,
-            destination_seal: SealRef::new(vec![0x05], None).unwrap(),
+            destination_seal: SealPoint::new(vec![0x05], None).unwrap(),
             lock_tx_hash: Hash::new([0x06; 32]),
             mint_tx_hash: Hash::new([0x07; 32]),
             timestamp: 2_000_000,
@@ -619,9 +619,9 @@ mod tests {
         let entry = CrossChainRegistryEntry {
             right_id: Hash::new([0xAB; 32]),
             source_chain: ChainId::Bitcoin,
-            source_seal: SealRef::new(vec![0x01], None).unwrap(),
+            source_seal: SealPoint::new(vec![0x01], None).unwrap(),
             destination_chain: ChainId::Sui,
-            destination_seal: SealRef::new(vec![0x02], None).unwrap(),
+            destination_seal: SealPoint::new(vec![0x02], None).unwrap(),
             lock_tx_hash: Hash::new([0x03; 32]),
             mint_tx_hash: Hash::new([0x04; 32]),
             timestamp: 1_000_000,

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::dag::DAGSegment;
 use crate::hash::Hash;
-use crate::seal::{AnchorRef, SealRef};
+use crate::seal::{CommitAnchor, SealPoint};
 
 /// Maximum allowed size for proof bytes (64KB)
 pub const MAX_PROOF_BYTES: usize = 64 * 1024;
@@ -139,9 +139,9 @@ pub struct ProofBundle {
     /// Authorizing signatures
     pub signatures: Vec<Vec<u8>>,
     /// Seal reference
-    pub seal_ref: SealRef,
+    pub seal_ref: SealPoint,
     /// Anchor reference
-    pub anchor_ref: AnchorRef,
+    pub anchor_ref: CommitAnchor,
     /// Inclusion proof
     pub inclusion_proof: InclusionProof,
     /// Finality proof
@@ -164,8 +164,8 @@ impl ProofBundle {
     pub fn new(
         transition_dag: DAGSegment,
         signatures: Vec<Vec<u8>>,
-        seal_ref: SealRef,
-        anchor_ref: AnchorRef,
+        seal_ref: SealPoint,
+        anchor_ref: CommitAnchor,
         inclusion_proof: InclusionProof,
         finality_proof: FinalityProof,
     ) -> Result<Self, &'static str> {
@@ -191,8 +191,8 @@ impl ProofBundle {
     pub fn new_unchecked(
         transition_dag: DAGSegment,
         signatures: Vec<Vec<u8>>,
-        seal_ref: SealRef,
-        anchor_ref: AnchorRef,
+        seal_ref: SealPoint,
+        anchor_ref: CommitAnchor,
         inclusion_proof: InclusionProof,
         finality_proof: FinalityProof,
     ) -> Self {
@@ -248,8 +248,8 @@ mod tests {
         let bundle = ProofBundle::new(
             DAGSegment::new(vec![], Hash::zero()),
             vec![vec![0xAB; 64]],
-            SealRef::new(vec![1, 2, 3], Some(42)).unwrap(),
-            AnchorRef::new(vec![4, 5, 6], 100, vec![]).unwrap(),
+            SealPoint::new(vec![1, 2, 3], Some(42)).unwrap(),
+            CommitAnchor::new(vec![4, 5, 6], 100, vec![]).unwrap(),
             InclusionProof::new(vec![], Hash::zero(), 0).unwrap(),
             FinalityProof::new(vec![], 6, false).unwrap(),
         )
@@ -280,8 +280,8 @@ mod tests {
         let result = ProofBundle::new(
             DAGSegment::new(vec![], Hash::zero()),
             large_sigs,
-            SealRef::new(vec![1, 2, 3], Some(42)).unwrap(),
-            AnchorRef::new(vec![4, 5, 6], 100, vec![]).unwrap(),
+            SealPoint::new(vec![1, 2, 3], Some(42)).unwrap(),
+            CommitAnchor::new(vec![4, 5, 6], 100, vec![]).unwrap(),
             InclusionProof::new(vec![], Hash::zero(), 0).unwrap(),
             FinalityProof::new(vec![], 6, false).unwrap(),
         );

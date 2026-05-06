@@ -15,16 +15,16 @@ use bitcoin;
 use bitcoin_hashes::Hash as _;
 use std::sync::Mutex;
 
-use csv_adapter_core::commitment::Commitment;
-use csv_adapter_core::dag::DAGSegment;
-use csv_adapter_core::error::AdapterError;
-use csv_adapter_core::error::Result as CoreResult;
-use csv_adapter_core::proof::{FinalityProof, ProofBundle};
-use csv_adapter_core::right::RightId;
-use csv_adapter_core::seal::AnchorRef as CoreAnchorRef;
-use csv_adapter_core::seal::SealRef as CoreSealRef;
-use csv_adapter_core::AnchorLayer;
-use csv_adapter_core::Hash;
+use csv_core::commitment::Commitment;
+use csv_core::dag::DAGSegment;
+use csv_core::error::AdapterError;
+use csv_core::error::Result as CoreResult;
+use csv_core::proof::{FinalityProof, ProofBundle};
+use csv_core::right::RightId;
+use csv_core::seal::AnchorRef as CoreAnchorRef;
+use csv_core::seal::SealRef as CoreSealRef;
+use csv_core::AnchorLayer;
+use csv_core::Hash;
 
 use crate::config::BitcoinConfig;
 use crate::error::{BitcoinError, BitcoinResult};
@@ -550,7 +550,7 @@ impl AnchorLayer for BitcoinAnchorLayer {
         proof_bytes.extend_from_slice(&inclusion.block_hash);
         proof_bytes.extend_from_slice(&inclusion.tx_index.to_le_bytes());
 
-        let inclusion_proof = csv_adapter_core::InclusionProof::new(
+        let inclusion_proof = csv_core::InclusionProof::new(
             proof_bytes,
             Hash::new(inclusion.block_hash),
             inclusion.tx_index as u64,
@@ -602,8 +602,8 @@ impl AnchorLayer for BitcoinAnchorLayer {
         self.domain_separator
     }
 
-    fn signature_scheme(&self) -> csv_adapter_core::SignatureScheme {
-        csv_adapter_core::SignatureScheme::Secp256k1
+    fn signature_scheme(&self) -> csv_core::SignatureScheme {
+        csv_core::SignatureScheme::Secp256k1
     }
 }
 

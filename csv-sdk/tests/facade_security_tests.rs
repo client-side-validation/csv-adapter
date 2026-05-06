@@ -7,7 +7,7 @@
 //! 4. Validates all inputs before passing to chain adapters
 
 use csv_adapter::{AdapterConfig, AdapterFacade};
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Test that adapter facade creation validates configuration
 #[test]

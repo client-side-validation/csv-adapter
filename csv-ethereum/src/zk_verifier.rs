@@ -19,8 +19,8 @@
 //!
 //! For this reason, Groth16 is preferred for Ethereum verification.
 
-use csv_adapter_core::protocol_version::Chain;
-use csv_adapter_core::zk_proof::{ProofSystem, ZkError, ZkPublicInputs, ZkSealProof, ZkVerifier};
+use csv_core::protocol_version::Chain;
+use csv_core::zk_proof::{ProofSystem, ZkError, ZkPublicInputs, ZkSealProof, ZkVerifier};
 use sha2::{Digest, Sha256};
 
 /// Groth16 ZK Verifier for Ethereum
@@ -81,7 +81,7 @@ impl EthereumGroth16Verifier {
 
         // Compute public input hash (Fiat-Shamir)
         let mut hasher = Sha256::new();
-        hasher.update(&public_inputs.seal_ref.seal_id);
+        hasher.update(&public_inputs.seal_ref.id);
         hasher.update(public_inputs.block_hash.as_bytes());
         hasher.update(&public_inputs.block_height.to_le_bytes());
         hasher.update(&public_inputs.timestamp.to_le_bytes());
@@ -232,8 +232,8 @@ pub fn generate_verifier_contract_bytecode() -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use csv_adapter_core::seal::SealRef;
-    use csv_adapter_core::hash::Hash;
+    use csv_core::seal::SealRef;
+    use csv_core::hash::Hash;
 
     #[test]
     fn test_groth16_verifier_creation() {

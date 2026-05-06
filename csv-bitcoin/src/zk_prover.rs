@@ -18,10 +18,10 @@
 //! - Succinct: Proof size is constant regardless of block height
 //! - Verifiable: Anyone can verify without trusting Bitcoin RPC
 
-use csv_adapter_core::hash::Hash;
-use csv_adapter_core::protocol_version::Chain;
-use csv_adapter_core::seal::SealRef;
-use csv_adapter_core::zk_proof::{ChainWitness, ProofSystem, VerifierKey, ZkError, ZkProver, ZkPublicInputs, ZkSealProof};
+use csv_core::hash::Hash;
+use csv_core::protocol_version::Chain;
+use csv_core::seal::SealRef;
+use csv_core::zk_proof::{ChainWitness, ProofSystem, VerifierKey, ZkError, ZkProver, ZkPublicInputs, ZkSealProof};
 use bitcoin::hashes::Hash as BitcoinHash;
 use sha2::{Digest, Sha256};
 
@@ -73,7 +73,7 @@ impl BitcoinSpvProver {
     ) -> Result<ZkSealProof, ZkError> {
         // Create a deterministic mock proof based on witness hash
         let mut hasher = Sha256::new();
-        hasher.update(&seal.seal_id);
+        hasher.update(&seal.id);
         hasher.update(witness.block_hash.as_bytes());
         hasher.update(&witness.block_height.to_le_bytes());
         let mock_proof_hash: [u8; 32] = hasher.finalize().into();

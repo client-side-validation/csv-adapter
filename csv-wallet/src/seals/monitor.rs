@@ -3,7 +3,7 @@
 //! Monitors seals on-chain and updates their status.
 
 use super::manager::{SealRecord, SealStatus};
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Seal monitor for checking on-chain status.
 pub struct SealMonitor;

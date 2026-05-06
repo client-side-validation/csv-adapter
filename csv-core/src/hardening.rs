@@ -10,7 +10,7 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 /// Maximum number of items in bounded queues
-pub const MAX_SEAL_REGISTRY_SIZE: usize = 1000;
+pub const MAX_SEAL_NULLIFIER_SIZE: usize = 1000;
 
 /// Maximum number of entries in caches
 pub const MAX_CACHE_SIZE: usize = 1000;
@@ -83,7 +83,7 @@ impl<T> BoundedQueue<T> {
 
 impl<T> Default for BoundedQueue<T> {
     fn default() -> Self {
-        Self::new(MAX_SEAL_REGISTRY_SIZE)
+        Self::new(MAX_SEAL_NULLIFIER_SIZE)
     }
 }
 

@@ -1,6 +1,6 @@
 //! Chain-specific integrations.
 
-use csv_adapter_core::{AdapterFactory, Chain};
+use csv_core::{AdapterFactory, Chain};
 
 pub mod aptos;
 pub mod bitcoin;

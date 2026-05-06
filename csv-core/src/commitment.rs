@@ -16,7 +16,7 @@ use sha2::{Digest, Sha256};
 
 use crate::hash::Hash;
 use crate::mpc::MpcTree;
-use crate::seal::SealRef;
+use crate::seal::SealPoint;
 use crate::tagged_hash::csv_tagged_hash;
 
 /// Current commitment format version.
@@ -124,7 +124,7 @@ impl Commitment {
         contract_id: Hash,
         previous_commitment: Hash,
         transition_payload_hash: Hash,
-        seal_ref: &SealRef,
+        seal_ref: &SealPoint,
         domain_separator: [u8; 32],
     ) -> Self {
         let seal_hash = {
@@ -158,7 +158,7 @@ impl Commitment {
         contract_id: Hash,
         previous_commitment: Hash,
         transition_payload_hash: Hash,
-        seal_ref: &SealRef,
+        seal_ref: &SealPoint,
         domain_separator: [u8; 32],
     ) -> Self {
         let seal_hash = {
@@ -205,7 +205,7 @@ impl Commitment {
         contract_id: Hash,
         previous_commitment: Hash,
         transition_payload_hash: Hash,
-        seal_ref: &SealRef,
+        seal_ref: &SealPoint,
         domain_separator: [u8; 32],
     ) -> Self {
         Self::simple(
@@ -343,7 +343,7 @@ mod tests {
             Hash::new([1u8; 32]),
             Hash::new([2u8; 32]),
             Hash::new([3u8; 32]),
-            &SealRef::new(vec![4u8; 16], Some(42)).unwrap(),
+            &SealPoint::new(vec![4u8; 16], Some(42)).unwrap(),
             [5u8; 32],
         )
     }
@@ -360,7 +360,7 @@ mod tests {
             Hash::new([1u8; 32]),
             Hash::new([2u8; 32]),
             Hash::new([3u8; 32]),
-            &SealRef::new(vec![4u8; 16], Some(42)).unwrap(),
+            &SealPoint::new(vec![4u8; 16], Some(42)).unwrap(),
             [5u8; 32],
         )
     }
@@ -424,7 +424,7 @@ mod tests {
         ]);
         let _expected_root = mpc_tree.root();
 
-        let seal = SealRef::new(vec![4u8; 16], Some(42)).unwrap();
+        let seal = SealPoint::new(vec![4u8; 16], Some(42)).unwrap();
         let c = Commitment::new(
             protocol_id,
             &mpc_tree,
@@ -453,7 +453,7 @@ mod tests {
     #[test]
     fn test_mpc_differs_by_protocol_id() {
         let mpc_tree = MpcTree::from_pairs(&[([10u8; 32], Hash::new([20u8; 32]))]);
-        let seal = SealRef::new(vec![4u8; 16], Some(42)).unwrap();
+        let seal = SealPoint::new(vec![4u8; 16], Some(42)).unwrap();
 
         let c1 = Commitment::new(
             [10u8; 32],
@@ -558,7 +558,7 @@ mod tests {
         ]);
 
         // Protocol A's commitment
-        let seal = SealRef::new(vec![0xDD; 16], Some(1)).unwrap();
+        let seal = SealPoint::new(vec![0xDD; 16], Some(1)).unwrap();
         let commitment_a = Commitment::new(
             proto_a,
             &mpc_tree,

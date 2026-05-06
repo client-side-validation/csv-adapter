@@ -3,7 +3,7 @@
 //! Provides fee estimation for transactions across different chains.
 
 use crate::services::blockchain::types::BlockchainError;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Fee estimator for transactions.
 pub struct FeeEstimator {

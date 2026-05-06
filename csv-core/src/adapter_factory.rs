@@ -168,8 +168,8 @@ impl AdapterFactory {
     /// # Example
     ///
     /// ```rust
-    /// use csv_adapter_core::adapter_factory::AdapterFactory;
-    /// use csv_adapter_core::adapters::ScalableSolanaAdapter;
+    /// use csv_core::adapter_factory::AdapterFactory;
+    /// use csv_core::adapters::ScalableSolanaAdapter;
     ///
     /// let mut factory = AdapterFactory::new();
     /// factory.register("solana", || {
@@ -214,7 +214,7 @@ impl AdapterFactory {
     /// # Example
     ///
     /// ```rust
-    /// use csv_adapter_core::adapter_factory::AdapterFactory;
+    /// use csv_core::adapter_factory::AdapterFactory;
     ///
     /// let factory = AdapterFactory::new();
     /// let adapter = factory.create_adapter("bitcoin");

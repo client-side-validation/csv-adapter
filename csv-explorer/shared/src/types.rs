@@ -8,10 +8,10 @@
 /// Explorer types MUST reuse canonical protocol types from `csv-adapter-core::protocol_version`
 /// where applicable. The following types are re-exported from the protocol contract:
 ///
-/// - [`csv_adapter_core::Chain`] — Canonical chain identifiers
-/// - [`csv_adapter_core::TransferStatus`] — Canonical transfer lifecycle
-/// - [`csv_adapter_core::SyncStatus`] — Indexer sync status
-/// - [`csv_adapter_core::ErrorCode`] — Machine-readable error codes
+/// - [`csv_core::Chain`] — Canonical chain identifiers
+/// - [`csv_core::TransferStatus`] — Canonical transfer lifecycle
+/// - [`csv_core::SyncStatus`] — Indexer sync status
+/// - [`csv_core::ErrorCode`] — Machine-readable error codes
 ///
 /// Explorer-specific types (RightRecord, SealRecord, etc.) wrap these
 /// protocol types with additional metadata for display purposes.
@@ -24,7 +24,7 @@ use serde_json::Value as JsonValue;
 // ===========================================================================
 
 // Chain IDs, transfer status, sync status, error codes from protocol contract
-pub use csv_adapter_core::protocol_version::{
+pub use csv_core::protocol_version::{
     Chain, ErrorCode, SyncStatus, TransferStatus, PROTOCOL_VERSION,
 };
 
@@ -504,7 +504,7 @@ pub struct IndexingActivity {
 // ===========================================================================
 
 /// Re-export canonical event types from csv-adapter-core
-pub use csv_adapter_core::events::{
+pub use csv_core::events::{
     CsvEvent, EventData, EventFilter as CsvEventFilter, EventFinalityStatus,
     event_names, metadata_fields,
 };
@@ -530,9 +530,9 @@ pub struct BlockInfo {
 impl RightRecord {
     /// Convert RightRecord to CsvEvent::RightCreated
     pub fn to_right_created_event(&self, block_info: BlockInfo) -> CsvEvent {
-        use csv_adapter_core::events::event_names;
-        use csv_adapter_core::hash::Hash;
-        use csv_adapter_core::right::RightId;
+        use csv_core::events::event_names;
+        use csv_core::hash::Hash;
+        use csv_core::right::RightId;
 
         // Parse the right ID from hex string
         let id_bytes = hex::decode(&self.id).unwrap_or_default();
@@ -563,9 +563,9 @@ impl RightRecord {
 impl TransferRecord {
     /// Convert TransferRecord to CsvEvent::RightTransferred or CrossChainLock/Mint
     pub fn to_transfer_event(&self, block_info: BlockInfo, is_cross_chain: bool) -> CsvEvent {
-        use csv_adapter_core::events::event_names;
-        use csv_adapter_core::hash::Hash;
-        use csv_adapter_core::right::RightId;
+        use csv_core::events::event_names;
+        use csv_core::hash::Hash;
+        use csv_core::right::RightId;
 
         let event_name = if is_cross_chain {
             if self.from_chain == self.to_chain {

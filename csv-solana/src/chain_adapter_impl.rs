@@ -4,11 +4,11 @@
 //! enabling Solana to be used through the unified chain adapter interface.
 
 use async_trait::async_trait;
-use csv_adapter_core::chain_adapter::{
+use csv_core::chain_adapter::{
     AccountModel, ChainAdapter, ChainCapabilities, ChainError, ChainResult, RpcClient, Wallet,
 };
-use csv_adapter_core::chain_config::ChainConfig;
-use csv_adapter_core::Chain;
+use csv_core::chain_config::ChainConfig;
+use csv_core::Chain;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::{Signature, Signer};
 use std::str::FromStr;
@@ -335,10 +335,10 @@ mod tests {
             program_id: None,
             block_explorer_urls: vec![],
             start_block: 0,
-            capabilities: csv_adapter_core::chain_config::ChainCapabilities {
+            capabilities: csv_core::chain_config::ChainCapabilities {
                 supports_nfts: true,
                 supports_smart_contracts: true,
-                account_model: csv_adapter_core::chain_adapter::AccountModel::Account,
+                account_model: csv_core::chain_adapter::AccountModel::Account,
                 confirmation_blocks: 32,
                 max_batch_size: 100,
                 supported_networks: vec![

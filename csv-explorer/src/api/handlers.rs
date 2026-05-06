@@ -7,7 +7,7 @@ use crate::api::{
 };
 use crate::indexing::{IndexingManager, RightsQuery, TransferQuery};
 use chrono::{DateTime, Utc};
-use csv_adapter_core::Hash;
+use csv_core::Hash;
 use futures::SinkExt;
 use std::sync::Arc;
 use warp::{Rejection, Reply};

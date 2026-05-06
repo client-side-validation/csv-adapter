@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 
 use crate::dag::DAGNode;
 use crate::hash::Hash;
-use crate::seal::SealRef;
+use crate::seal::SealPoint;
 use crate::state::{GlobalState, Metadata, StateAssignment, StateRef};
 
 /// A contract transition
@@ -111,8 +111,8 @@ impl Transition {
     }
 
     /// Get all seals consumed by this transition (from owned inputs)
-    pub fn consumed_seals(&self) -> Vec<SealRef> {
-        // StateRef doesn't contain SealRef directly — seals are resolved
+    pub fn consumed_seals(&self) -> Vec<SealPoint> {
+        // StateRef doesn't contain SealPoint directly — seals are resolved
         // from the parent transition that created each output.
         // This method is a basic implementation; actual resolution requires
         // walking the transition chain.
@@ -120,7 +120,7 @@ impl Transition {
     }
 
     /// Get all seals that receive new state from this transition
-    pub fn assigned_seals(&self) -> Vec<SealRef> {
+    pub fn assigned_seals(&self) -> Vec<SealPoint> {
         self.owned_outputs.iter().map(|o| o.seal.clone()).collect()
     }
 
@@ -165,12 +165,12 @@ mod tests {
             vec![
                 StateAssignment::new(
                     10,
-                    SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                    SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                     600u64.to_le_bytes().to_vec(),
                 ), // 600 to seal A
                 StateAssignment::new(
                     10,
-                    SealRef::new(vec![0xBB; 16], Some(2)).unwrap(),
+                    SealPoint::new(vec![0xBB; 16], Some(2)).unwrap(),
                     400u64.to_le_bytes().to_vec(),
                 ), // 400 to seal B (change)
             ],
@@ -222,7 +222,7 @@ mod tests {
         let t2 = test_transition();
         t1.owned_outputs.push(StateAssignment::new(
             10,
-            SealRef::new(vec![0xCC; 16], Some(3)).unwrap(),
+            SealPoint::new(vec![0xCC; 16], Some(3)).unwrap(),
             vec![100],
         ));
         assert_ne!(t1.hash(), t2.hash());
@@ -283,7 +283,7 @@ mod tests {
             vec![], // no inputs
             vec![StateAssignment::new(
                 10,
-                SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                 1000u64.to_le_bytes().to_vec(),
             )],
             vec![],

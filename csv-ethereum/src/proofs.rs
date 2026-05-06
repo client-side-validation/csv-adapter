@@ -5,7 +5,7 @@
 //! 2. Verify MPT proof traverses from receipt root to the receipt
 //! 3. Decode LOG events and match expected SealUsed event
 
-use csv_adapter_core::Hash;
+use csv_core::Hash;
 use sha2::{Digest, Sha256};
 
 use crate::mpt;
@@ -420,7 +420,7 @@ fn check_for_seal_used_event(
 }
 
 /// Convert Ethereum inclusion proof to core type
-pub fn to_core_inclusion_proof(proof: &EthereumInclusionProof) -> csv_adapter_core::InclusionProof {
+pub fn to_core_inclusion_proof(proof: &EthereumInclusionProof) -> csv_core::InclusionProof {
     let mut proof_bytes = Vec::new();
     proof_bytes.extend_from_slice(&proof.receipt_rlp);
     proof_bytes.extend_from_slice(&proof.merkle_proof);
@@ -428,7 +428,7 @@ pub fn to_core_inclusion_proof(proof: &EthereumInclusionProof) -> csv_adapter_co
     proof_bytes.extend_from_slice(&proof.block_number.to_le_bytes());
     proof_bytes.extend_from_slice(&proof.log_index.to_le_bytes());
 
-    csv_adapter_core::InclusionProof::new(proof_bytes, Hash::new(proof.block_hash), proof.log_index)
+    csv_core::InclusionProof::new(proof_bytes, Hash::new(proof.block_hash), proof.log_index)
         .expect("valid inclusion proof")
 }
 

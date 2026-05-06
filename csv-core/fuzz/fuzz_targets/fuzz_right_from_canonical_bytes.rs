@@ -5,7 +5,7 @@
 
 #![no_main]
 
-use csv_adapter_core::right::Right;
+use csv_core::right::Right;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {

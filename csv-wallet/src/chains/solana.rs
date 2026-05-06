@@ -2,7 +2,7 @@
 //!
 //! Handles Solana wallet operations and address derivation.
 
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Format Solana address.
 pub fn format_address(pubkey_bytes: &[u8]) -> String {

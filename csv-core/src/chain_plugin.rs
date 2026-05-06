@@ -97,10 +97,10 @@ impl ChainPluginRegistry {
     /// ```rust
     /// use std::collections::HashMap;
     /// use std::sync::Arc;
-    /// use csv_adapter_core::chain_plugin::{ChainPluginRegistry, ChainPlugin, ChainPluginMetadata};
-    /// use csv_adapter_core::adapters::ScalableBitcoinAdapter;
-    /// use csv_adapter_core::chain_config::ChainConfig;
-    /// use csv_adapter_core::chain_adapter::{ChainAdapter, ChainCapabilities, AccountModel};
+    /// use csv_core::chain_plugin::{ChainPluginRegistry, ChainPlugin, ChainPluginMetadata};
+    /// use csv_core::adapters::ScalableBitcoinAdapter;
+    /// use csv_core::chain_config::ChainConfig;
+    /// use csv_core::chain_adapter::{ChainAdapter, ChainCapabilities, AccountModel};
     ///
     /// struct BitcoinPlugin;
     /// impl ChainPlugin for BitcoinPlugin {

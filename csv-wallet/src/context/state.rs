@@ -2,7 +2,7 @@
 
 use crate::context::types::*;
 use crate::wallet_core::WalletData;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Application state.
 #[derive(Clone)]

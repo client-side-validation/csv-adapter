@@ -9,16 +9,16 @@
 //! - ChainRightOps: Right management operations
 
 use async_trait::async_trait;
-use csv_adapter_core::chain_operations::{
+use csv_core::chain_operations::{
     BalanceInfo, ChainBroadcaster, ChainDeployer, ChainOpError, ChainOpResult, ChainProofProvider,
     ChainQuery, ChainRightOps, ChainSigner, ContractStatus, DeploymentStatus, FinalityStatus,
     RightOperationResult, TransactionInfo,
     TransactionStatus,
 };
-use csv_adapter_core::hash::Hash;
-use csv_adapter_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
-use csv_adapter_core::right::RightId;
-use csv_adapter_core::signature::SignatureScheme;
+use csv_core::hash::Hash;
+use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
+use csv_core::right::RightId;
+use csv_core::signature::SignatureScheme;
 use sha3::{Digest, Sha3_256};
 
 use crate::adapter::AptosAnchorLayer;
@@ -263,7 +263,7 @@ impl ChainQuery for AptosChainOperations {
         let addr = self.parse_address(address)?;
 
         self.rpc
-            .get_account_sequence_number(&addr)
+            .get_account_sequence_number(addr)
             .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get sequence number: {}", e)))
     }

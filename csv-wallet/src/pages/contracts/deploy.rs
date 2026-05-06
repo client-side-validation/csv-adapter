@@ -10,7 +10,7 @@
 use crate::context::{generate_id, use_wallet_context, DeployedContract, Network};
 use crate::pages::common::*;
 use crate::routes::Route;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use dioxus::prelude::*;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;

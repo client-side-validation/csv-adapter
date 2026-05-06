@@ -1,6 +1,6 @@
 //! Ethereum adapter error types
 
-use csv_adapter_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::agent_types::{error_codes, FixAction, HasErrorSuggestion};
 use thiserror::Error;
 
 /// Ethereum adapter specific errors
@@ -40,7 +40,7 @@ pub enum EthereumError {
 
     /// Wrapper for core adapter errors
     #[error(transparent)]
-    CoreError(#[from] csv_adapter_core::AdapterError),
+    CoreError(#[from] csv_core::AdapterError),
 }
 
 impl EthereumError {
@@ -167,33 +167,33 @@ impl HasErrorSuggestion for EthereumError {
     }
 }
 
-impl From<EthereumError> for csv_adapter_core::AdapterError {
+impl From<EthereumError> for csv_core::AdapterError {
     fn from(err: EthereumError) -> Self {
         match err {
             EthereumError::CoreError(e) => e,
-            EthereumError::RpcError(msg) => csv_adapter_core::AdapterError::NetworkError(msg),
-            EthereumError::SlotUsed(msg) => csv_adapter_core::AdapterError::InvalidSeal(msg),
+            EthereumError::RpcError(msg) => csv_core::AdapterError::NetworkError(msg),
+            EthereumError::SlotUsed(msg) => csv_core::AdapterError::InvalidSeal(msg),
             EthereumError::InvalidReceiptProof(msg) => {
-                csv_adapter_core::AdapterError::InclusionProofFailed(msg)
+                csv_core::AdapterError::InclusionProofFailed(msg)
             }
             EthereumError::ReorgDetected { block, depth } => {
-                csv_adapter_core::AdapterError::ReorgInvalid(format!(
+                csv_core::AdapterError::ReorgInvalid(format!(
                     "Reorg at block {}, depth {}",
                     block, depth
                 ))
             }
             EthereumError::InsufficientConfirmations { got, need } => {
-                csv_adapter_core::AdapterError::FinalityNotReached(format!(
+                csv_core::AdapterError::FinalityNotReached(format!(
                     "Got {} confirmations, need {}",
                     got, need
                 ))
             }
             EthereumError::WalletError(msg) => {
-                csv_adapter_core::AdapterError::Generic(format!("Wallet error: {}", msg))
+                csv_core::AdapterError::Generic(format!("Wallet error: {}", msg))
             }
-            EthereumError::ConfigError(msg) => csv_adapter_core::AdapterError::InvalidConfig(msg),
+            EthereumError::ConfigError(msg) => csv_core::AdapterError::InvalidConfig(msg),
             EthereumError::DeploymentError(msg) => {
-                csv_adapter_core::AdapterError::PublishFailed(msg)
+                csv_core::AdapterError::PublishFailed(msg)
             }
         }
     }

@@ -7,8 +7,8 @@
 use crate::context::{use_wallet_context, ProofRecord, ProofStatus};
 use crate::pages::common::*;
 use crate::routes::Route;
-use csv_adapter_core::zk_proof::ZkSealProof;
-use csv_adapter_core::Chain;
+use csv_core::zk_proof::ZkSealProof;
+use csv_core::Chain;
 use dioxus::prelude::*;
 
 /// Generate ZK proof page
@@ -247,9 +247,9 @@ struct ZkResult {
 #[cfg(feature = "csv-adapter-bitcoin")]
 fn generate_bitcoin_zk_proof(seal_ref: &str, right_id: &str) -> Result<ZkSealProof, String> {
     use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
-    use csv_adapter_core::hash::Hash;
-    use csv_adapter_core::seal::SealRef;
-    use csv_adapter_core::zk_proof::{ChainWitness, ZkProver};
+    use csv_core::hash::Hash;
+    use csv_core::seal::SealRef;
+    use csv_core::zk_proof::{ChainWitness, ZkProver};
 
     let prover = BitcoinSpvProver::new();
 
@@ -288,9 +288,9 @@ fn generate_ethereum_zk_proof(_seal_ref: &str, _right_id: &str) -> Result<ZkSeal
     // but with the Ethereum adapter's zk_verifier module
 
     // For now, return a mock proof
-    use csv_adapter_core::hash::Hash;
-    use csv_adapter_core::seal::SealRef;
-    use csv_adapter_core::zk_proof::{VerifierKey, ZkPublicInputs, ProofSystem};
+    use csv_core::hash::Hash;
+    use csv_core::seal::SealRef;
+    use csv_core::zk_proof::{VerifierKey, ZkPublicInputs, ProofSystem};
 
     let seal = SealRef::new(vec![0xAB; 32], None)
         .map_err(|e| format!("Invalid seal: {}", e))?;

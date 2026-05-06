@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 
 use crate::genesis::Genesis;
 use crate::hash::Hash;
-use crate::seal::AnchorRef;
+use crate::seal::CommitAnchor;
 use crate::state::{Metadata, StateAssignment};
 use crate::transition::Transition;
 
@@ -24,7 +24,7 @@ pub const CONSIGNMENT_VERSION: u8 = 1;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Anchor {
     /// Anchor reference (on-chain location of the commitment)
-    pub anchor_ref: AnchorRef,
+    pub anchor_ref: CommitAnchor,
     /// Commitment hash that was anchored
     pub commitment: Hash,
     /// Inclusion proof bytes (chain-specific)
@@ -36,7 +36,7 @@ pub struct Anchor {
 impl Anchor {
     /// Create a new anchor from its components
     pub fn new(
-        anchor_ref: AnchorRef,
+        anchor_ref: CommitAnchor,
         commitment: Hash,
         inclusion_proof: Vec<u8>,
         finality_proof: Vec<u8>,
@@ -56,7 +56,7 @@ impl Anchor {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SealAssignment {
     /// Seal being assigned to
-    pub seal_ref: crate::seal::SealRef,
+    pub seal_ref: crate::seal::SealPoint,
     /// State being assigned to this seal
     pub assignment: StateAssignment,
     /// Metadata for this assignment
@@ -66,7 +66,7 @@ pub struct SealAssignment {
 impl SealAssignment {
     /// Create a new seal assignment
     pub fn new(
-        seal_ref: crate::seal::SealRef,
+        seal_ref: crate::seal::SealPoint,
         assignment: StateAssignment,
         metadata: Vec<Metadata>,
     ) -> Self {
@@ -182,7 +182,7 @@ impl Consignment {
     ///
     /// Walks transitions in order to find the most recent assignment
     /// to the given seal.
-    pub fn latest_state_for_seal(&self, seal: &crate::seal::SealRef) -> Option<&StateAssignment> {
+    pub fn latest_state_for_seal(&self, seal: &crate::seal::SealPoint) -> Option<&StateAssignment> {
         // Walk assignments in reverse to find the latest for this seal
         self.seal_assignments
             .iter()
@@ -212,7 +212,7 @@ impl Consignment {
         }
 
         // Note: determining which seals are actually consumed requires
-        // resolving StateRef -> SealRef mapping through the transition chain.
+        // resolving StateRef -> SealPoint mapping through the transition chain.
         // This is a simplified view; full resolution needs VM execution.
         active
     }
@@ -347,7 +347,7 @@ impl core::fmt::Display for ConsignmentError {
 mod tests {
     use super::*;
     use crate::genesis::Genesis;
-    use crate::seal::SealRef;
+    use crate::seal::SealPoint;
     use crate::state::{GlobalState, Metadata, OwnedState};
     use crate::state::{StateAssignment, StateRef};
 
@@ -360,7 +360,7 @@ mod tests {
             ],
             vec![OwnedState::new(
                 10,
-                SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                 1000u64.to_le_bytes().to_vec(),
             )],
             vec![Metadata::from_string("issuer", "test")],
@@ -372,12 +372,12 @@ mod tests {
             vec![
                 StateAssignment::new(
                     10,
-                    SealRef::new(vec![0xBB; 16], Some(2)).unwrap(),
+                    SealPoint::new(vec![0xBB; 16], Some(2)).unwrap(),
                     600u64.to_le_bytes().to_vec(),
                 ),
                 StateAssignment::new(
                     10,
-                    SealRef::new(vec![0xAA; 16], Some(1)).unwrap(),
+                    SealPoint::new(vec![0xAA; 16], Some(1)).unwrap(),
                     400u64.to_le_bytes().to_vec(),
                 ),
             ],
@@ -388,17 +388,17 @@ mod tests {
         );
 
         let seal_assignment = SealAssignment::new(
-            SealRef::new(vec![0xBB; 16], Some(2)).unwrap(),
+            SealPoint::new(vec![0xBB; 16], Some(2)).unwrap(),
             StateAssignment::new(
                 10,
-                SealRef::new(vec![0xBB; 16], Some(2)).unwrap(),
+                SealPoint::new(vec![0xBB; 16], Some(2)).unwrap(),
                 600u64.to_le_bytes().to_vec(),
             ),
             vec![],
         );
 
         let anchor = Anchor::new(
-            AnchorRef::new(vec![0xCC; 32], 100, vec![]).unwrap(),
+            CommitAnchor::new(vec![0xCC; 32], 100, vec![]).unwrap(),
             transition.hash(),
             vec![0xDD; 64], // inclusion proof
             vec![0xEE; 32], // finality proof
@@ -454,7 +454,7 @@ mod tests {
     #[test]
     fn test_latest_state_for_seal() {
         let c = test_consignment();
-        let seal = SealRef::new(vec![0xBB; 16], Some(2)).unwrap();
+        let seal = SealPoint::new(vec![0xBB; 16], Some(2)).unwrap();
         let state = c.latest_state_for_seal(&seal);
         assert!(state.is_some());
         assert_eq!(state.unwrap().data, 600u64.to_le_bytes().to_vec());
@@ -463,7 +463,7 @@ mod tests {
     #[test]
     fn test_latest_state_for_seal_not_found() {
         let c = test_consignment();
-        let seal = SealRef::new(vec![0xFF; 16], Some(99)).unwrap();
+        let seal = SealPoint::new(vec![0xFF; 16], Some(99)).unwrap();
         let state = c.latest_state_for_seal(&seal);
         assert!(state.is_none());
     }
@@ -492,7 +492,7 @@ mod tests {
     fn test_validate_structure_anchor_count_mismatch() {
         let mut c = test_consignment();
         c.anchors.push(Anchor::new(
-            AnchorRef::new(vec![0xFF; 32], 200, vec![]).unwrap(),
+            CommitAnchor::new(vec![0xFF; 32], 200, vec![]).unwrap(),
             Hash::zero(),
             vec![],
             vec![],

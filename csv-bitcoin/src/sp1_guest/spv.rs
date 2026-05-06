@@ -4,10 +4,10 @@
 //! that can run inside the SP1 zkVM. It verifies that a transaction was
 //! included in a Bitcoin block without requiring a full node.
 
-use csv_adapter_core::hash::Hash;
-use csv_adapter_core::protocol_version::Chain;
-use csv_adapter_core::seal::SealRef;
-use csv_adapter_core::zk_proof::{ZkPublicInputs, ZkSealProof, ProofSystem, VerifierKey};
+use csv_core::hash::Hash;
+use csv_core::protocol_version::Chain;
+use csv_core::seal::SealRef;
+use csv_core::zk_proof::{ZkPublicInputs, ZkSealProof, ProofSystem, VerifierKey};
 use bitcoin::hashes::{Hash as BitcoinHash, sha256d};
 
 /// Input to the SP1 Bitcoin SPV guest program
@@ -172,7 +172,7 @@ pub fn verify_bitcoin_spv(input: &Sp1BtcSpvInput) -> bool {
     // The seal_ref should contain the OutPoint (txid + vout) being spent
     // This is a simplified check - in production, you'd parse the transaction
     // and verify the specific input spends the claimed UTXO
-    if input.seal_ref.seal_id.len() < 32 {
+    if input.seal_ref.id.len() < 32 {
         return false;
     }
     

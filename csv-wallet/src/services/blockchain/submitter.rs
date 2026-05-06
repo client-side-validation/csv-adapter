@@ -4,7 +4,7 @@
 
 use crate::services::blockchain::types::{BlockchainError, SignedTransaction, TransactionReceipt, TransactionStatus};
 use base64::Engine;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Transaction submitter for broadcasting to chains.
 pub struct TransactionSubmitter {

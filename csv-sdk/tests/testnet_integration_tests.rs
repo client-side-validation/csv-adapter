@@ -14,7 +14,7 @@
 //! - SOL_RPC_URL (defaults to devnet public endpoint)
 
 use csv_adapter::{AdapterConfig, AdapterFacade, ChainFacade};
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use std::collections::HashMap;
 
 /// Default testnet RPC endpoints for each chain
@@ -315,8 +315,8 @@ async fn test_fail_closed_with_invalid_rpc() {
 #[cfg(feature = "bitcoin")]
 fn test_bitcoin_zk_proof_generation() {
     use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
-    use csv_adapter_core::zk_proof::{ZkProver, ChainWitness};
-    use csv_adapter_core::{Chain, hash::Hash, seal::SealRef};
+    use csv_core::zk_proof::{ZkProver, ChainWitness};
+    use csv_core::{Chain, hash::Hash, seal::SealRef};
 
     // Create a mock prover
     let prover = BitcoinSpvProver::new();
@@ -353,8 +353,8 @@ fn test_bitcoin_zk_proof_generation() {
 #[cfg(feature = "bitcoin")]
 fn test_bitcoin_zk_proof_verification() {
     use csv_adapter_bitcoin::zk_prover::BitcoinSpvProver;
-    use csv_adapter_core::zk_proof::{ZkProver, ZkVerifier, ChainWitness};
-    use csv_adapter_core::{Chain, hash::Hash, seal::SealRef};
+    use csv_core::zk_proof::{ZkProver, ZkVerifier, ChainWitness};
+    use csv_core::{Chain, hash::Hash, seal::SealRef};
 
     // Create prover/verifier
     let prover = BitcoinSpvProver::new();
@@ -397,8 +397,8 @@ fn test_bitcoin_zk_proof_verification() {
 #[cfg(feature = "ethereum")]
 fn test_ethereum_groth16_verifier() {
     use csv_adapter_ethereum::zk_verifier::EthereumGroth16Verifier;
-    use csv_adapter_core::zk_proof::{ZkVerifier, ZkSealProof, VerifierKey, ZkPublicInputs, ProofSystem};
-    use csv_adapter_core::{Chain, hash::Hash, seal::SealRef};
+    use csv_core::zk_proof::{ZkVerifier, ZkSealProof, VerifierKey, ZkPublicInputs, ProofSystem};
+    use csv_core::{Chain, hash::Hash, seal::SealRef};
 
     // Create verifier
     let verifier = EthereumGroth16Verifier::new();
@@ -440,7 +440,7 @@ fn test_ethereum_groth16_verifier() {
 #[cfg(feature = "bitcoin")]
 fn test_sp1_guest_spv_verification() {
     use csv_adapter_bitcoin::sp1_guest::{Sp1BtcSpvInput, verify_bitcoin_spv};
-    use csv_adapter_core::{seal::SealRef, hash::Hash};
+    use csv_core::{seal::SealRef, hash::Hash};
 
     // Create test input
     let seal = SealRef::new(vec![0xAB; 32], Some(0)).expect("Failed to create seal");

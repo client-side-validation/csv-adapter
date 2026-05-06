@@ -169,8 +169,8 @@ fn validation_steps_list(steps: Vec<ValidationStepUI>) -> Element {
 
 /// Validate consignment JSON using csv-adapter-core validator.
 fn validate_consignment_json(json: &str) -> Result<Vec<ValidationStepUI>, String> {
-    use csv_adapter_core::consignment::Consignment;
-    use csv_adapter_core::validator::ConsignmentValidator;
+    use csv_core::consignment::Consignment;
+    use csv_core::validator::ConsignmentValidator;
 
     // Parse the consignment
     let consignment: Consignment = serde_json::from_str(json)
@@ -178,7 +178,7 @@ fn validate_consignment_json(json: &str) -> Result<Vec<ValidationStepUI>, String
 
     // Run validation
     let validator = ConsignmentValidator::new();
-    let report = validator.validate_consignment(&consignment, csv_adapter_core::seal_registry::ChainId::Bitcoin);
+    let report = validator.validate_consignment(&consignment, csv_core::seal_registry::ChainId::Bitcoin);
 
     // Convert report to UI format
     let steps: Vec<ValidationStepUI> = report

@@ -67,9 +67,9 @@ fn cmd_generate(
     _state: &UnifiedStateManager,
 ) -> Result<()> {
     use csv_adapter::prelude::CsvClient;
-    use csv_adapter_core::Chain as AdapterChain;
+    use csv_core::Chain as AdapterChain;
     
-    use csv_adapter_core::right::RightId;
+    use csv_core::right::RightId;
 
     output::header(&format!("Generating Proof on {}", chain));
 
@@ -159,8 +159,8 @@ fn cmd_verify(
     _state: &UnifiedStateManager,
 ) -> Result<()> {
     use csv_adapter::prelude::CsvClient;
-    use csv_adapter_core::Chain as AdapterChain;
-    use csv_adapter_core::{right::RightId, proof::ProofBundle};
+    use csv_core::Chain as AdapterChain;
+    use csv_core::{right::RightId, proof::ProofBundle};
 
     output::header(&format!("Verifying Proof on {}", chain));
 
@@ -234,7 +234,7 @@ fn cmd_verify(
 
     // Reconstruct the proof bundle
     let proof_bundle = {
-        use csv_adapter_core::{
+        use csv_core::{
             dag::{DAGNode, DAGSegment},
             hash::Hash,
             proof::{FinalityProof, InclusionProof},

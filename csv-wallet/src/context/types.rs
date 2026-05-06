@@ -1,6 +1,6 @@
 //! Context types - data structures for wallet state management.
 
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 
 /// Network type.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -299,7 +299,7 @@ impl ProofRecord {
     pub fn from_zk_proof(
         right_id: String,
         seal_ref: String,
-        zk_proof: &csv_adapter_core::zk_proof::ZkSealProof,
+        zk_proof: &csv_core::zk_proof::ZkSealProof,
     ) -> Self {
         use base64::{Engine as _, engine::general_purpose::STANDARD};
 

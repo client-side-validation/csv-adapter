@@ -32,7 +32,7 @@
 //! let seed = mnemonic.to_seed(None);
 //!
 //! // Derive Ethereum key
-//! let eth_key = derive_key(seed.as_bytes(), csv_adapter_core::Chain::Ethereum, 0, 0).unwrap();
+//! let eth_key = derive_key(seed.as_bytes(), csv_core::Chain::Ethereum, 0, 0).unwrap();
 //!
 //! // Encrypt and save
 //! let passphrase = Passphrase::new("secure password");
@@ -95,8 +95,8 @@ pub enum KeystoreError {
 /// Tuple of (mnemonic phrase, vector of (chain, keystore_file))
 pub fn create_full_wallet(
     encryption_passphrase: &Passphrase,
-) -> Result<(String, Vec<(csv_adapter_core::Chain, KeystoreFile)>), KeystoreError> {
-    use csv_adapter_core::Chain;
+) -> Result<(String, Vec<(csv_core::Chain, KeystoreFile)>), KeystoreError> {
+    use csv_core::Chain;
 
     // Generate mnemonic
     let mnemonic = Mnemonic::generate(MnemonicType::Words24);

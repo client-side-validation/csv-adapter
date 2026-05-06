@@ -124,11 +124,11 @@ fn generate_wallet_for_chain(
 ) -> Result<String> {
     // Phase 5: Use keystore's BIP-44 derivation for all chains
     let core_chain = match chain {
-        Chain::Bitcoin => csv_adapter_core::Chain::Bitcoin,
-        Chain::Ethereum => csv_adapter_core::Chain::Ethereum,
-        Chain::Sui => csv_adapter_core::Chain::Sui,
-        Chain::Aptos => csv_adapter_core::Chain::Aptos,
-        Chain::Solana => csv_adapter_core::Chain::Solana,
+        Chain::Bitcoin => csv_core::Chain::Bitcoin,
+        Chain::Ethereum => csv_core::Chain::Ethereum,
+        Chain::Sui => csv_core::Chain::Sui,
+        Chain::Aptos => csv_core::Chain::Aptos,
+        Chain::Solana => csv_core::Chain::Solana,
     };
 
     // Convert mnemonic to seed

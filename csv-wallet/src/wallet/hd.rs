@@ -4,7 +4,7 @@
 //! for multiple chains from a single seed.
 
 use crate::wallet::metadata::{BitcoinNetwork, WalletMetadata};
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use bip32::Mnemonic;
 use serde::{Serialize, Deserialize};
 use rand::RngCore;

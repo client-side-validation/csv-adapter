@@ -2,7 +2,7 @@
 
 use crate::services::blockchain::types::{BlockchainError, SignedTransaction, UnsignedTransaction};
 use crate::wallet_core::ChainAccount;
-use csv_adapter_core::Chain;
+use csv_core::Chain;
 use csv_adapter_keystore::browser_keystore::BrowserKeystore;
 use csv_adapter_keystore::memory::Passphrase;
 

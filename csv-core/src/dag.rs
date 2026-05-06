@@ -591,7 +591,7 @@ mod tests {
         use super::*;
         use crate::commitment::Commitment;
         use crate::proof::ProofBundle;
-        use crate::seal::SealRef;
+        use crate::seal::SealPoint;
 
         #[test]
         fn test_dag_hash_used_in_commitment() {
@@ -605,7 +605,7 @@ mod tests {
             let dag_hash = node.hash();
 
             // DAG hash can serve as transition payload hash in commitment
-            let seal = SealRef::new(vec![0xAA; 16], Some(42)).unwrap();
+            let seal = SealPoint::new(vec![0xAA; 16], Some(42)).unwrap();
             let domain = [0xBB; 32];
             let commitment =
                 Commitment::simple(Hash::new([2u8; 32]), Hash::zero(), dag_hash, &seal, domain);
@@ -628,8 +628,8 @@ mod tests {
             let bundle = ProofBundle::new(
                 segment.clone(),
                 vec![vec![0xCC; 64]],
-                SealRef::new(vec![1, 2, 3], Some(42)).unwrap(),
-                crate::seal::AnchorRef::new(vec![4, 5, 6], 100, vec![]).unwrap(),
+                SealPoint::new(vec![1, 2, 3], Some(42)).unwrap(),
+                crate::seal::CommitAnchor::new(vec![4, 5, 6], 100, vec![]).unwrap(),
                 crate::proof::InclusionProof::new(vec![], Hash::zero(), 0).unwrap(),
                 crate::proof::FinalityProof::new(vec![], 6, false).unwrap(),
             )
@@ -671,8 +671,8 @@ mod tests {
             let bundle = ProofBundle::new(
                 segment,
                 vec![signature],
-                SealRef::new(vec![1, 2, 3], Some(42)).unwrap(),
-                crate::seal::AnchorRef::new(vec![4, 5, 6], 100, vec![]).unwrap(),
+                SealPoint::new(vec![1, 2, 3], Some(42)).unwrap(),
+                crate::seal::CommitAnchor::new(vec![4, 5, 6], 100, vec![]).unwrap(),
                 crate::proof::InclusionProof::new(vec![0xDD; 32], Hash::new([10u8; 32]), 0)
                     .unwrap(),
                 crate::proof::FinalityProof::new(vec![], 6, false).unwrap(),
@@ -718,8 +718,8 @@ mod tests {
             let bundle = ProofBundle::new(
                 segment,
                 vec![signature],
-                SealRef::new(vec![1, 2, 3], Some(42)).unwrap(),
-                crate::seal::AnchorRef::new(vec![4, 5, 6], 100, vec![]).unwrap(),
+                SealPoint::new(vec![1, 2, 3], Some(42)).unwrap(),
+                crate::seal::CommitAnchor::new(vec![4, 5, 6], 100, vec![]).unwrap(),
                 crate::proof::InclusionProof::new(vec![0xDD; 32], Hash::new([10u8; 32]), 0)
                     .unwrap(),
                 crate::proof::FinalityProof::new(vec![], 6, false).unwrap(),
@@ -760,7 +760,7 @@ mod tests {
             let dag_b = build_dag();
 
             // Use root commitment hashes as payload inputs
-            let seal = SealRef::new(vec![0xFF; 16], Some(1)).unwrap();
+            let seal = SealPoint::new(vec![0xFF; 16], Some(1)).unwrap();
             let domain = [0xEE; 32];
 
             let commitment_a = Commitment::simple(
