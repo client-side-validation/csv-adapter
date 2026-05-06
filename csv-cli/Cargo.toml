@@ -5,9 +5,9 @@ edition = "2021"
 description = "CLI tool for CSV Adapter — cross-chain Rights, proofs, wallets, and end-to-end testing"
 license = "MIT OR Apache-2.0"
 authors = ["Amin Razavi"]
-repository = "https://github.com/client-side-validation/csv-adapter"
-homepage = "https://github.com/client-side-validation/csv-adapter"
-documentation = "https://github.com/client-side-validation/csv-adapter/blob/main/csv-cli/README.md"
+repository = "https://github.com/client-side-validation/csv-protocol"
+homepage = "https://github.com/client-side-validation/csv-protocol"
+documentation = "https://github.com/client-side-validation/csv-protocol/blob/main/csv-cli/README.md"
 readme = "README.md"
 keywords = ["cli", "blockchain", "cryptography", "csv-validation", "cross-chain"]
 categories = ["command-line-utilities", "cryptography::cryptocurrencies"]
@@ -21,10 +21,10 @@ path = "src/main.rs"
 [dependencies]
 # Phase 5 Compliant: Use only facade and core types
 # No direct chain adapter dependencies - all operations go through csv-adapter
-csv-adapter = { version = "0.4.0", path = "../csv-adapter", features = ["all-chains"] }
-csv-adapter-core = { version = "0.4.0", path = "../csv-adapter-core" }
-csv-adapter-store = { version = "0.4.0", path = "../csv-adapter-store", features = ["clap"] }
-csv-adapter-keystore = { version = "0.4.0", path = "../csv-adapter-keystore" }
+csv-sdk = { version = "0.4.0", path = "../csv-sdk", features = ["all-chains"] }
+csv-core = { version = "0.4.0", path = "../csv-core" }
+csv-store = { version = "0.4.0", path = "../csv-store", features = ["clap"] }
+csv-keys = { version = "0.4.0", path = "../csv-keys" }
 
 # CLI framework and utilities (no chain-specific crypto)
 clap = { version = "4", features = ["derive"] }

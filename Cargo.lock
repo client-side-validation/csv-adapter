@@ -3137,38 +3137,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "csv-adapter"
-version = "0.4.0"
-dependencies = [
- "async-std",
- "bip32",
- "bitcoin 0.32.8",
- "bs58",
- "csv-adapter-aptos",
- "csv-adapter-bitcoin",
- "csv-adapter-core",
- "csv-adapter-ethereum",
- "csv-adapter-solana",
- "csv-adapter-store",
- "csv-adapter-sui",
- "dirs",
- "ed25519-dalek",
- "hex",
- "log",
- "rand 0.8.6",
- "serde",
- "serde_json",
- "sha2",
- "sha3",
- "solana-sdk",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "csv-adapter-aptos"
+name = "csv-aptos"
 version = "0.4.0"
 dependencies = [
  "aptos-bcs",
@@ -3176,7 +3145,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chrono",
- "csv-adapter-core",
+ "csv-core",
  "ed25519-dalek",
  "hex",
  "log",
@@ -3193,7 +3162,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "csv-adapter-bitcoin"
+name = "csv-bitcoin"
 version = "0.4.0"
 dependencies = [
  "async-trait",
@@ -3203,8 +3172,8 @@ dependencies = [
  "bitcoin_hashes 0.12.0",
  "bitcoin_hashes 0.14.1",
  "bitcoincore-rpc",
- "csv-adapter-core",
- "csv-adapter-store",
+ "csv-core",
+ "csv-store",
  "hex",
  "log",
  "rand 0.8.6",
@@ -3213,165 +3182,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "csv-adapter-core"
-version = "0.4.0"
-dependencies = [
- "async-trait",
- "bincode",
- "bitcoin 0.30.3",
- "bloomfilter",
- "ed25519-dalek",
- "hex",
- "proptest",
- "rand 0.8.6",
- "secp256k1 0.28.2",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "thiserror 1.0.69",
- "toml",
-]
-
-[[package]]
-name = "csv-adapter-ethereum"
-version = "0.4.0"
-dependencies = [
- "alloy",
- "alloy-contract",
- "alloy-primitives 0.8.26",
- "alloy-rlp",
- "alloy-sol-types",
- "alloy-trie 0.7.9",
- "async-trait",
- "csv-adapter-core",
- "csv-adapter-store",
- "hex",
- "log",
- "rand 0.8.6",
- "reqwest 0.12.28",
- "secp256k1 0.28.2",
- "serde",
- "serde_json",
- "sha2",
- "sha3",
- "thiserror 1.0.69",
- "tiny-keccak",
- "tokio",
- "url",
-]
-
-[[package]]
-name = "csv-adapter-keystore"
-version = "0.4.0"
-dependencies = [
- "aes",
- "aes-gcm",
- "argon2",
- "base64 0.22.1",
- "bip32",
- "bip39",
- "bitcoin 0.31.3",
- "blake2",
- "bs58",
- "cipher",
- "csv-adapter-core",
- "ctr",
- "ed25519-dalek",
- "getrandom 0.2.17",
- "hex",
- "hmac",
- "js-sys",
- "pbkdf2 0.12.2",
- "rand 0.8.6",
- "scrypt",
- "secp256k1 0.28.2",
- "serde",
- "serde_json",
- "sha2",
- "sha3",
- "tempfile",
- "thiserror 1.0.69",
- "uuid",
- "web-sys",
- "zeroize",
-]
-
-[[package]]
-name = "csv-adapter-solana"
-version = "0.4.0"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "bincode",
- "bs58",
- "csv-adapter-core",
- "csv-adapter-store",
- "ed25519-dalek",
- "futures-util",
- "hex",
- "log",
- "rand 0.8.6",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha2",
- "solana-commitment-config",
- "solana-loader-v3-interface 3.0.0",
- "solana-program",
- "solana-rpc-client",
- "solana-sdk",
- "solana-system-interface 3.2.0",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "tracing",
-]
-
-[[package]]
-name = "csv-adapter-store"
-version = "0.4.0"
-dependencies = [
- "base64 0.22.1",
- "clap",
- "csv-adapter-core",
- "dirs",
- "rusqlite",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "csv-adapter-sui"
-version = "0.4.0"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "bcs",
- "chrono",
- "csv-adapter-core",
- "ed25519-dalek",
- "hex",
- "log",
- "rand 0.8.6",
- "reqwest 0.12.28",
- "serde",
- "serde_bytes",
- "serde_json",
- "sha2",
- "sui-crypto",
- "sui-rpc",
- "sui-sdk-types",
- "sui-transaction-builder",
- "tempfile",
  "thiserror 1.0.69",
  "tokio",
 ]
@@ -3386,10 +3196,10 @@ dependencies = [
  "chrono",
  "clap",
  "colored",
- "csv-adapter",
- "csv-adapter-core",
- "csv-adapter-keystore",
- "csv-adapter-store",
+ "csv-core",
+ "csv-keys",
+ "csv-sdk",
+ "csv-store",
  "dirs",
  "ed25519-dalek",
  "env_logger",
@@ -3410,6 +3220,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "csv-core"
+version = "0.4.0"
+dependencies = [
+ "async-trait",
+ "bincode",
+ "bitcoin 0.30.3",
+ "bloomfilter",
+ "ed25519-dalek",
+ "hex",
+ "proptest",
+ "rand 0.8.6",
+ "secp256k1 0.28.2",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 1.0.69",
+ "toml",
+]
+
+[[package]]
+name = "csv-ethereum"
+version = "0.4.0"
+dependencies = [
+ "alloy",
+ "alloy-contract",
+ "alloy-primitives 0.8.26",
+ "alloy-rlp",
+ "alloy-sol-types",
+ "alloy-trie 0.7.9",
+ "async-trait",
+ "csv-core",
+ "csv-store",
+ "hex",
+ "log",
+ "rand 0.8.6",
+ "reqwest 0.12.28",
+ "secp256k1 0.28.2",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sha3",
+ "thiserror 1.0.69",
+ "tiny-keccak",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "csv-explorer"
 version = "0.4.0"
 dependencies = [
@@ -3421,7 +3280,7 @@ dependencies = [
  "chrono",
  "clap",
  "config",
- "csv-adapter-core",
+ "csv-core",
  "csv-explorer-indexer",
  "csv-explorer-shared",
  "csv-explorer-storage",
@@ -3457,7 +3316,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
- "csv-adapter-core",
+ "csv-core",
  "csv-explorer-shared",
  "csv-explorer-storage",
  "futures",
@@ -3481,7 +3340,7 @@ version = "0.4.0"
 dependencies = [
  "chrono",
  "config",
- "csv-adapter-core",
+ "csv-core",
  "getrandom 0.2.17",
  "hex",
  "reqwest 0.11.27",
@@ -3508,6 +3367,147 @@ dependencies = [
 ]
 
 [[package]]
+name = "csv-keys"
+version = "0.4.0"
+dependencies = [
+ "aes",
+ "aes-gcm",
+ "argon2",
+ "base64 0.22.1",
+ "bip32",
+ "bip39",
+ "bitcoin 0.31.3",
+ "blake2",
+ "bs58",
+ "cipher",
+ "csv-core",
+ "ctr",
+ "ed25519-dalek",
+ "getrandom 0.2.17",
+ "hex",
+ "hmac",
+ "js-sys",
+ "pbkdf2 0.12.2",
+ "rand 0.8.6",
+ "scrypt",
+ "secp256k1 0.28.2",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sha3",
+ "tempfile",
+ "thiserror 1.0.69",
+ "uuid",
+ "web-sys",
+ "zeroize",
+]
+
+[[package]]
+name = "csv-sdk"
+version = "0.4.0"
+dependencies = [
+ "async-std",
+ "bip32",
+ "bitcoin 0.32.8",
+ "bs58",
+ "csv-aptos",
+ "csv-bitcoin",
+ "csv-core",
+ "csv-ethereum",
+ "csv-solana",
+ "csv-store",
+ "csv-sui",
+ "dirs",
+ "ed25519-dalek",
+ "hex",
+ "log",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sha3",
+ "solana-sdk",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "csv-solana"
+version = "0.4.0"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "bincode",
+ "bs58",
+ "csv-core",
+ "csv-store",
+ "ed25519-dalek",
+ "futures-util",
+ "hex",
+ "log",
+ "rand 0.8.6",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2",
+ "solana-commitment-config",
+ "solana-loader-v3-interface 3.0.0",
+ "solana-program",
+ "solana-rpc-client",
+ "solana-sdk",
+ "solana-system-interface 3.2.0",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
+]
+
+[[package]]
+name = "csv-store"
+version = "0.4.0"
+dependencies = [
+ "base64 0.22.1",
+ "clap",
+ "csv-core",
+ "dirs",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
+name = "csv-sui"
+version = "0.4.0"
+dependencies = [
+ "async-trait",
+ "base64 0.22.1",
+ "bcs",
+ "chrono",
+ "csv-core",
+ "ed25519-dalek",
+ "hex",
+ "log",
+ "rand 0.8.6",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "sha2",
+ "sui-crypto",
+ "sui-rpc",
+ "sui-sdk-types",
+ "sui-transaction-builder",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "csv-wallet"
 version = "0.4.0"
 dependencies = [
@@ -3520,13 +3520,13 @@ dependencies = [
  "bs58",
  "chrono",
  "console_error_panic_hook",
- "csv-adapter",
- "csv-adapter-bitcoin",
- "csv-adapter-core",
- "csv-adapter-ethereum",
- "csv-adapter-keystore",
- "csv-adapter-solana",
- "csv-adapter-store",
+ "csv-bitcoin",
+ "csv-core",
+ "csv-ethereum",
+ "csv-keys",
+ "csv-sdk",
+ "csv-solana",
+ "csv-store",
  "dioxus 0.7.6",
  "dioxus-router",
  "ed25519-dalek",

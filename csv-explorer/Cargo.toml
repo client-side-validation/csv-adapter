@@ -5,14 +5,14 @@ version = "0.4.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 authors = ["Amin Razavi, ALL FREE LLMs"]
-repository = "https://github.com/client-side-validation/csv-adapter"
-homepage = "https://github.com/client-side-validation/csv-adapter"
+repository = "https://github.com/client-side-validation/csv-protocol"
+homepage = "https://github.com/client-side-validation/csv-protocol"
 readme = "README.md"
 publish = false
 
 [dependencies]
 # Protocol types (sibling workspace)
-csv-adapter-core = { path = "../csv-adapter-core" }
+csv-core = { path = "../csv-core" }
 csv-explorer-shared = { path = "./shared" }
 csv-explorer-storage = { path = "./storage" }
 csv-explorer-indexer = { path = "./indexer" }

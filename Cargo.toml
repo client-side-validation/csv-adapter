@@ -1,14 +1,14 @@
 [workspace]
 members = [
-    "csv-adapter-core",
-    "csv-adapter-bitcoin",
-    "csv-adapter-ethereum",
-    "csv-adapter-sui",
-    "csv-adapter-aptos",
-    "csv-adapter-solana",
-    "csv-adapter-store",
-    "csv-adapter-keystore",
-    "csv-adapter",
+    "csv-core",
+    "csv-bitcoin",
+    "csv-ethereum",
+    "csv-sui",
+    "csv-aptos",
+    "csv-solana",
+    "csv-store",
+    "csv-keys",
+    "csv-sdk",
     "csv-cli",
     "csv-wallet",
     "csv-explorer"
@@ -18,8 +18,8 @@ resolver = "2"
 [workspace.package]
 version = "0.4.0"
 authors = ["Amin Razavi, ALL FREE LLMs"]
-repository = "https://github.com/client-side-validation/csv-adapter"
-homepage = "https://github.com/client-side-validation/csv-adapter"
+repository = "https://github.com/client-side-validation/csv-protocol"
+homepage = "https://github.com/client-side-validation/csv-protocol"
 license = "MIT OR Apache-2.0"
 edition = "2021"
 rust-version = "1.75"
@@ -32,9 +32,9 @@ toml = { version = "0.8", features = ["parse"] }
 # Force aws-lc-sys >= 0.39 to fix RUSTSEC-2026-0044 and RUSTSEC-2026-0048
 aws-lc-sys = "0.39"
 
-csv-adapter-core = { path = "csv-adapter-core" }
-csv-adapter-keystore = { path = "csv-adapter-keystore" }
-csv-adapter-store = { path = "csv-adapter-store" }
+csv-core = { path = "csv-core" }
+csv-keys = { path = "csv-keys" }
+csv-store = { path = "csv-store" }
 
 # csv-explorer dependencies
 tokio = { version = "1", features = ["full"] }
@@ -88,6 +88,3 @@ unused_mut = "deny"
 
 [workspace.lints.clippy]
 needless_borrows_for_generic_args = "allow"
-
-
-
