@@ -1,6 +1,6 @@
-//! Sui AnchorLayer implementation with production-grade features
+//! Sui SealProtocol implementation with production-grade features
 //!
-//! This adapter implements the AnchorLayer trait for Sui,
+//! This adapter implements the SealProtocol trait for Sui,
 //! using owned objects with one_time attributes as seals.
 //!
 //! ## Architecture
@@ -61,8 +61,8 @@ where
     rt.block_on(future).map_err(|e| SuiError::RpcError(e.to_string()))
 }
 
-/// Sui implementation of the AnchorLayer trait
-pub struct SuiAnchorLayer {
+/// Sui implementation of the SealProtocol trait
+pub struct SuiSealProtocol {
     /// Configuration for this Sui adapter instance
     pub config: SuiConfig,
     /// Registry of used seals for replay prevention
@@ -219,7 +219,7 @@ fn build_sui_transaction_data(
     tx
 }
 
-impl SuiAnchorLayer {
+impl SuiSealProtocol {
     /// Run an async operation that borrows from self, by cloning the RPC client.
     fn run_with_rpc<F, T, E>(&self, op: impl FnOnce(Box<dyn SuiRpc>) -> F) -> Result<T, SuiError>
     where
@@ -317,7 +317,7 @@ impl SuiAnchorLayer {
         _csv_seal_package_id: [u8; 32],
         signing_key: ed25519_dalek::SigningKey,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        use crate::real_rpc::SuiRpcClient;
+        use crate::node::SuiRpcClient;
 
         let rpc: Box<dyn SuiRpc> = Box::new(SuiRpcClient::new(&config.rpc_url));
         let mut adapter = Self::from_config(config, rpc)
@@ -500,7 +500,7 @@ impl SuiAnchorLayer {
     }
 }
 
-impl AnchorLayer for SuiAnchorLayer {
+impl AnchorLayer for SuiSealProtocol {
     type SealRef = SuiSealRef;
     type AnchorRef = SuiAnchorRef;
     type InclusionProof = SuiInclusionProof;
@@ -784,7 +784,7 @@ impl AnchorLayer for SuiAnchorLayer {
     }
 }
 
-impl SuiAnchorLayer {
+impl SuiSealProtocol {
     /// Get RPC client reference for chain_operations (crate-visible)
     pub(crate) fn get_rpc(&self) -> &dyn SuiRpc {
         self.rpc.as_ref()
@@ -805,8 +805,8 @@ impl SuiAnchorLayer {
 mod tests {
     use super::*;
 
-    fn test_adapter() -> SuiAnchorLayer {
-        SuiAnchorLayer::with_test().unwrap()
+    fn test_adapter() -> SuiSealProtocol {
+        SuiSealProtocol::with_test().unwrap()
     }
 
     #[test]

@@ -19,7 +19,7 @@ use csv_core::right::RightId;
 use csv_core::signature::SignatureScheme;
 use ed25519_dalek::{VerifyingKey, Verifier};
 
-use crate::adapter::SuiAnchorLayer;
+use crate::seal_protocol::SuiSealProtocol;
 use crate::config::SuiConfig;
 use crate::deploy::{PackageDeployer, PackageDeployment};
 use crate::error::SuiError;
@@ -54,7 +54,7 @@ where
 ///
 /// This struct provides complete implementations of all chain operation traits
 /// for the Sui blockchain, enabling production use of the CSV protocol.
-pub struct SuiChainOperations {
+pub struct SuiBackend {
     /// Inner RPC client for chain communication
     rpc: Box<dyn SuiRpc>,
     /// Chain configuration
@@ -65,7 +65,7 @@ pub struct SuiChainOperations {
     event_builder: CommitmentEventBuilder,
 }
 
-impl SuiChainOperations {
+impl SuiBackend {
     /// Create new Sui chain operations from RPC client and config
     pub fn new(rpc: Box<dyn SuiRpc>, config: SuiConfig) -> Self {
         let mut domain = [0u8; 32];
@@ -86,8 +86,8 @@ impl SuiChainOperations {
         }
     }
 
-    /// Create from SuiAnchorLayer
-    pub fn from_anchor_layer(anchor: &SuiAnchorLayer) -> ChainOpResult<Self> {
+    /// Create from SuiSealProtocol
+    pub fn from_anchor_layer(anchor: &SuiSealProtocol) -> ChainOpResult<Self> {
         let (module_addr, event_type) = anchor.event_builder_config();
         Ok(Self {
             rpc: anchor.get_rpc().clone_boxed(),
@@ -153,7 +153,7 @@ impl SuiChainOperations {
 }
 
 #[async_trait]
-impl ChainQuery for SuiChainOperations {
+impl ChainQuery for SuiBackend {
     async fn get_balance(&self, address: &str) -> ChainOpResult<BalanceInfo> {
         let addr = self.parse_address(address)?;
 
@@ -308,7 +308,7 @@ impl ChainQuery for SuiChainOperations {
 }
 
 #[async_trait]
-impl ChainSigner for SuiChainOperations {
+impl ChainSigner for SuiBackend {
     fn derive_address(&self, public_key: &[u8]) -> ChainOpResult<String> {
         if public_key.len() != 32 {
             return Err(ChainOpError::InvalidInput(
@@ -392,7 +392,7 @@ impl ChainSigner for SuiChainOperations {
 }
 
 #[async_trait]
-impl ChainBroadcaster for SuiChainOperations {
+impl ChainBroadcaster for SuiBackend {
     async fn submit_transaction(&self, signed_tx: &[u8]) -> ChainOpResult<String> {
         // Sui transactions are BCS-encoded TransactionData with signatures
         // The signed_tx format: [tx_bytes_len:4][tx_bytes][signature:64][public_key:32]
@@ -527,7 +527,7 @@ impl ChainBroadcaster for SuiChainOperations {
 }
 
 #[async_trait]
-impl ChainDeployer for SuiChainOperations {
+impl ChainDeployer for SuiBackend {
     async fn deploy_lock_contract(
         &self,
         admin_address: &str,
@@ -624,7 +624,7 @@ impl ChainDeployer for SuiChainOperations {
 }
 
 #[async_trait]
-impl ChainProofProvider for SuiChainOperations {
+impl ChainProofProvider for SuiBackend {
     async fn build_inclusion_proof(
         &self,
         commitment: &Hash,
@@ -785,7 +785,7 @@ impl ChainProofProvider for SuiChainOperations {
 }
 
 #[async_trait]
-impl ChainRightOps for SuiChainOperations {
+impl ChainRightOps for SuiBackend {
     async fn create_right(
         &self,
         owner: &str,
@@ -998,7 +998,7 @@ mod tests {
     fn test_sui_chain_operations_creation() {
         let rpc = Box::new(MockSuiRpc::new(1));
         let config = SuiConfig::new(SuiNetwork::Testnet);
-        let ops = SuiChainOperations::new(rpc, config);
+        let ops = SuiBackend::new(rpc, config);
         assert_eq!(ops.config.network, SuiNetwork::Testnet);
     }
 
@@ -1006,7 +1006,7 @@ mod tests {
     fn test_address_validation() {
         let rpc = Box::new(MockSuiRpc::new(1));
         let config = SuiConfig::new(SuiNetwork::Testnet);
-        let ops = SuiChainOperations::new(rpc, config);
+        let ops = SuiBackend::new(rpc, config);
 
         // Valid address
         assert!(ops.validate_address(
@@ -1024,7 +1024,7 @@ mod tests {
     fn test_signature_verification() {
         let rpc = Box::new(MockSuiRpc::new(1));
         let config = SuiConfig::new(SuiNetwork::Testnet);
-        let ops = SuiChainOperations::new(rpc, config);
+        let ops = SuiBackend::new(rpc, config);
 
           // Generate a keypair
         use ed25519_dalek::{SigningKey, Signer};

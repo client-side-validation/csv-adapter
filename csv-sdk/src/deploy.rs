@@ -38,22 +38,22 @@ pub enum DeploymentError {
     /// Ethereum deployment error.
     #[cfg(feature = "ethereum")]
     #[error("Ethereum deployment error: {0}")]
-    Ethereum(#[from] csv_adapter_ethereum::EthereumError),
+    Ethereum(#[from] csv_ethereum::EthereumError),
 
     /// Sui deployment error.
     #[cfg(feature = "sui")]
     #[error("Sui deployment error: {0}")]
-    Sui(#[from] csv_adapter_sui::SuiError),
+    Sui(#[from] csv_sui::SuiError),
 
     /// Aptos deployment error.
     #[cfg(feature = "aptos")]
     #[error("Aptos deployment error: {0}")]
-    Aptos(#[from] csv_adapter_aptos::AptosError),
+    Aptos(#[from] csv_aptos::AptosError),
 
     /// Solana deployment error.
     #[cfg(feature = "solana")]
     #[error("Solana deployment error: {0}")]
-    Solana(#[from] csv_adapter_solana::SolanaError),
+    Solana(#[from] csv_solana::SolanaError),
 
     /// Unsupported chain.
     #[error("Unsupported chain: {0}")]
@@ -138,7 +138,7 @@ impl DeploymentManager {
         private_key_hex: &str,
         bytecode: &[u8],
     ) -> DeploymentResult<ContractDeployment> {
-        use csv_adapter_ethereum::deploy::deploy_csv_lock as eth_deploy;
+        use csv_ethereum::deploy::deploy_csv_lock as eth_deploy;
 
         let result = eth_deploy(rpc_url, private_key_hex, bytecode).await?;
 
@@ -159,12 +159,12 @@ impl DeploymentManager {
         rpc_url: &str,
         private_key_hex: &str,
     ) -> DeploymentResult<ContractDeployment> {
-        use csv_adapter_ethereum::deploy::deploy_csv_lock as eth_deploy;
+        use csv_ethereum::deploy::deploy_csv_lock as eth_deploy;
 
         let result = eth_deploy(
             rpc_url,
             private_key_hex,
-            csv_adapter_ethereum::CSVLOCK_BYTECODE,
+            csv_ethereum::CSVLOCK_BYTECODE,
         )
         .await?;
 
@@ -221,7 +221,7 @@ impl DeploymentManager {
         signer_address: &str,
         signer_keypair: &ed25519_dalek::SigningKey,
     ) -> DeploymentResult<ContractDeployment> {
-        use csv_adapter_sui::deploy::publish_csv_package as sui_publish;
+        use csv_sui::deploy::publish_csv_package as sui_publish;
 
         let result = sui_publish(rpc_url, compiled_modules, signer_address, signer_keypair).await?;
 
@@ -239,12 +239,12 @@ impl DeploymentManager {
     #[cfg(feature = "sui")]
     pub async fn deploy_csv_seal_package(
         &self,
-        config: &csv_adapter_sui::config::SuiConfig,
-        rpc: Box<dyn csv_adapter_sui::rpc::SuiRpc>,
+        config: &csv_sui::config::SuiConfig,
+        rpc: Box<dyn csv_sui::rpc::SuiRpc>,
         package_bytes: &[u8],
         gas_budget: u64,
     ) -> DeploymentResult<ContractDeployment> {
-        use csv_adapter_sui::deploy::deploy_csv_seal_package as sui_deploy;
+        use csv_sui::deploy::deploy_csv_seal_package as sui_deploy;
 
         let result = sui_deploy(config, rpc, package_bytes, gas_budget).await?;
 
@@ -292,7 +292,7 @@ impl DeploymentManager {
         signer: &[u8],
         module_name: &str,
     ) -> DeploymentResult<ContractDeployment> {
-        use csv_adapter_aptos::deploy::publish_csv_module as aptos_publish;
+        use csv_aptos::deploy::publish_csv_module as aptos_publish;
 
         let result = aptos_publish(rpc_url, module_bytes, signer, module_name).await?;
 
@@ -310,12 +310,12 @@ impl DeploymentManager {
     #[cfg(feature = "deploy-aptos")]
     pub async fn deploy_csv_seal_module(
         &self,
-        config: &csv_adapter_aptos::config::AptosConfig,
+        config: &csv_aptos::config::AptosConfig,
         signing_key: ed25519_dalek::SigningKey,
-        rpc: Box<dyn csv_adapter_aptos::rpc::AptosRpc>,
+        rpc: Box<dyn csv_aptos::rpc::AptosRpc>,
         module_bytes: &[u8],
     ) -> DeploymentResult<ContractDeployment> {
-        use csv_adapter_aptos::deploy::deploy_csv_seal_module as aptos_deploy;
+        use csv_aptos::deploy::deploy_csv_seal_module as aptos_deploy;
 
         let result = aptos_deploy(config, signing_key, rpc, module_bytes).await?;
 
@@ -363,7 +363,7 @@ impl DeploymentManager {
         program_data: &[u8],
         payer: &solana_sdk::signature::Keypair,
     ) -> DeploymentResult<ContractDeployment> {
-        use csv_adapter_solana::deploy::deploy_csv_program as solana_deploy;
+        use csv_solana::deploy::deploy_csv_program as solana_deploy;
 
         let result = solana_deploy(rpc_url, program_keypair, program_data, payer).await?;
 
@@ -381,12 +381,12 @@ impl DeploymentManager {
     #[cfg(feature = "solana")]
     pub async fn deploy_csv_seal_program(
         &self,
-        config: &csv_adapter_solana::config::SolanaConfig,
-        wallet: csv_adapter_solana::wallet::ProgramWallet,
-        rpc: Box<dyn csv_adapter_solana::rpc::SolanaRpc>,
+        config: &csv_solana::config::SolanaConfig,
+        wallet: csv_solana::wallet::ProgramWallet,
+        rpc: Box<dyn csv_solana::rpc::SolanaRpc>,
         program_data: &[u8],
     ) -> DeploymentResult<ContractDeployment> {
-        use csv_adapter_solana::deploy::deploy_csv_seal_program as solana_deploy;
+        use csv_solana::deploy::deploy_csv_seal_program as solana_deploy;
 
         let result = solana_deploy(config, wallet, rpc, program_data).await?;
 

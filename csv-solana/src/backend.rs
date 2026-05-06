@@ -1,4 +1,4 @@
-//! ChainAdapter implementation for SolanaAnchorLayer
+//! ChainAdapter implementation for SolanaSealProtocol
 //!
 //! This module implements the `ChainAdapter` trait from `csv-adapter-core`,
 //! enabling Solana to be used through the unified chain adapter interface.
@@ -13,7 +13,7 @@ use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::{Signature, Signer};
 use std::str::FromStr;
 
-use crate::adapter::SolanaAnchorLayer;
+use crate::seal_protocol::SolanaSealProtocol;
 use crate::config::{Network, SolanaConfig};
 use crate::rpc::SolanaRpc;
 use crate::wallet::ProgramWallet;
@@ -230,7 +230,7 @@ fn solana_capabilities() -> ChainCapabilities {
 }
 
 #[async_trait]
-impl ChainAdapter for SolanaAnchorLayer {
+impl ChainAdapter for SolanaSealProtocol {
     fn chain_id(&self) -> &'static str {
         "solana"
     }
@@ -279,7 +279,7 @@ impl ChainAdapter for SolanaAnchorLayer {
 }
 
 /// Create a new Solana adapter from chain configuration
-pub fn create_solana_adapter(config: &ChainConfig) -> ChainResult<SolanaAnchorLayer> {
+pub fn create_solana_adapter(config: &ChainConfig) -> ChainResult<SolanaSealProtocol> {
     // Parse network from config
     let network = match config.default_network.as_str() {
         "mainnet" => Network::Mainnet,
@@ -300,7 +300,7 @@ pub fn create_solana_adapter(config: &ChainConfig) -> ChainResult<SolanaAnchorLa
         ..Default::default()
     };
 
-    let adapter = SolanaAnchorLayer::new(sol_config);
+    let adapter = SolanaSealProtocol::new(sol_config);
 
     Ok(adapter)
 }
@@ -312,7 +312,7 @@ mod tests {
     #[test]
     fn test_solana_adapter_chain_id() {
         let config = SolanaConfig::default();
-        let adapter = SolanaAnchorLayer::new(config);
+        let adapter = SolanaSealProtocol::new(config);
         assert_eq!(adapter.chain_id(), "solana");
         assert_eq!(adapter.chain_name(), "Solana");
     }

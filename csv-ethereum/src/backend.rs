@@ -1,4 +1,4 @@
-//! ChainAdapter implementation for EthereumAnchorLayer
+//! ChainAdapter implementation for EthereumSealProtocol
 //!
 //! This module implements the `ChainAdapter` trait from `csv-adapter-core`,
 //! enabling Ethereum to be used through the unified chain adapter interface.
@@ -10,7 +10,7 @@ use csv_core::chain_adapter::{
 use csv_core::chain_config::ChainConfig;
 use csv_core::Chain;
 
-use crate::adapter::EthereumAnchorLayer;
+use crate::seal_protocol::EthereumSealProtocol;
 use crate::config::{EthereumConfig, Network};
 use crate::rpc::EthereumRpc;
 
@@ -272,7 +272,7 @@ fn ethereum_capabilities() -> ChainCapabilities {
 }
 
 #[async_trait]
-impl ChainAdapter for EthereumAnchorLayer {
+impl ChainAdapter for EthereumSealProtocol {
     fn chain_id(&self) -> &'static str {
         "ethereum"
     }
@@ -293,8 +293,8 @@ impl ChainAdapter for EthereumAnchorLayer {
         // Create the RPC client based on configuration
         #[cfg(feature = "rpc")]
         {
-            use crate::real_rpc::RealEthereumRpc;
-            use crate::chain_adapter_impl::EthereumRpcClient;
+            use crate::node::RealEthereumRpc;
+            use crate::backend::EthereumRpcClient;
             let csv_seal_address = self.csv_seal_address;
             let rpc = RealEthereumRpc::new(rpc_url, csv_seal_address)
                 .await
@@ -332,7 +332,7 @@ impl ChainAdapter for EthereumAnchorLayer {
 }
 
 /// Create a new Ethereum adapter from chain configuration
-pub async fn create_ethereum_adapter(config: &ChainConfig) -> ChainResult<EthereumAnchorLayer> {
+pub async fn create_ethereum_adapter(config: &ChainConfig) -> ChainResult<EthereumSealProtocol> {
     // Parse network from config (use default_network field)
     let network = match config.default_network.as_str() {
         "mainnet" => Network::Mainnet,
@@ -354,7 +354,7 @@ pub async fn create_ethereum_adapter(config: &ChainConfig) -> ChainResult<Ethere
         use crate::rpc::MockEthereumRpc;
         let rpc: Box<dyn EthereumRpc> = Box::new(MockEthereumRpc::new(1000));
         let csv_seal_address = [0u8; 20];
-        EthereumAnchorLayer::from_config(eth_config, rpc, csv_seal_address)
+        EthereumSealProtocol::from_config(eth_config, rpc, csv_seal_address)
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))
     }
 
@@ -370,7 +370,7 @@ pub async fn create_ethereum_adapter(config: &ChainConfig) -> ChainResult<Ethere
                 .await
                 .map_err(|e| ChainError::RpcError(format!("{:?}", e)))?
         );
-        EthereumAnchorLayer::from_config(eth_config, rpc, csv_seal_address)
+        EthereumSealProtocol::from_config(eth_config, rpc, csv_seal_address)
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))
     }
 
@@ -389,7 +389,7 @@ mod tests {
 
     #[test]
     fn test_ethereum_adapter_chain_id() {
-        let adapter = EthereumAnchorLayer::with_test().unwrap();
+        let adapter = EthereumSealProtocol::with_test().unwrap();
         assert_eq!(adapter.chain_id(), "ethereum");
         assert_eq!(adapter.chain_name(), "Ethereum");
     }

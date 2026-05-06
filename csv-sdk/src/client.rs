@@ -56,7 +56,7 @@ pub enum StoreHandle {
     InMemory(csv_core::InMemorySealStore),
     /// SQLite-backed store (requires `sqlite` feature).
     #[cfg(feature = "sqlite")]
-    Sqlite(csv_adapter_store::SqliteSealStore),
+    Sqlite(csv_store::SqliteSealStore),
 }
 
 impl StoreHandle {
@@ -417,19 +417,19 @@ impl CsvClient {
                     .map(|c| c.rpc.url.clone())
                     .filter(|url| !url.is_empty())
                     .unwrap_or_else(|| {
-                        if is_testnet {
+                        if _is_testnet {
                             "https://mempool.space/signet/api".to_string()
                         } else {
                             "https://mempool.space/api".to_string()
                         }
                     });
-                let btc_network = if is_testnet {
-                    csv_adapter_bitcoin::Network::Signet
+                let btc_network = if _is_testnet {
+                    csv_bitcoin::Network::Signet
                 } else {
-                    csv_adapter_bitcoin::Network::Mainnet
+                    csv_bitcoin::Network::Mainnet
                 };
                 log::info!("Building Bitcoin adapter with RPC URL: {}", rpc_url);
-                let btc_config = csv_adapter_bitcoin::config::BitcoinConfig {
+                let btc_config = csv_bitcoin::config::BitcoinConfig {
                     network: btc_network,
                     finality_depth: 6,
                     publication_timeout_seconds: 3600,
@@ -439,7 +439,7 @@ impl CsvClient {
                 // Create RPC client - this uses reqwest::blocking which needs its own runtime
                 // We must create it outside any async context to avoid runtime conflicts
                 let rpc = std::thread::spawn(move || {
-                    Box::new(csv_adapter_bitcoin::mempool_rpc::MempoolSignetRpc::with_url(rpc_url)) as Box<dyn csv_adapter_bitcoin::rpc::BitcoinRpc + Send + Sync>
+                    Box::new(csv_bitcoin::mempool_rpc::MempoolSignetRpc::with_url(rpc_url)) as Box<dyn csv_bitcoin::rpc::BitcoinRpc + Send + Sync>
                 }).join()
                 .map_err(|e| CsvError::AdapterError { chain, message: format!("Thread panic: {:?}", e) })?;
                 _builder.bitcoin_from_config(btc_config, rpc).await.map(Some)
@@ -452,28 +452,28 @@ impl CsvClient {
                     .map(|c| c.rpc.url.clone())
                     .filter(|url| !url.is_empty())
                     .unwrap_or_else(|| {
-                        if is_testnet {
+                        if _is_testnet {
                             "https://ethereum-sepolia-rpc.publicnode.com".to_string()
                         } else {
                             "https://ethereum-rpc.publicnode.com".to_string()
                         }
                     });
-                let eth_network = if is_testnet {
-                    csv_adapter_ethereum::config::Network::Sepolia
+                let eth_network = if _is_testnet {
+                    csv_ethereum::config::Network::Sepolia
                 } else {
-                    csv_adapter_ethereum::config::Network::Mainnet
+                    csv_ethereum::config::Network::Mainnet
                 };
-                let eth_config = csv_adapter_ethereum::config::EthereumConfig {
+                let eth_config = csv_ethereum::config::EthereumConfig {
                     network: eth_network,
-                    finality_depth: if is_testnet { 15 } else { 12 },
+                    finality_depth: if _is_testnet { 15 } else { 12 },
                     use_checkpoint_finality: !is_testnet,
                     rpc_url: rpc_url.clone(),
                 };
                 let csv_seal_address = [0u8; 20]; // Default, should be configured
-                let rpc = csv_adapter_ethereum::real_rpc::RealEthereumRpc::new(&rpc_url, csv_seal_address)
+                let rpc = csv_ethereum::real_rpc::RealEthereumRpc::new(&rpc_url, csv_seal_address)
                     .await
                     .map_err(|e| CsvError::AdapterError { chain: Chain::Ethereum, message: format!("Failed to create Ethereum RPC client: {}", e) })?;
-                _builder.ethereum_from_config(eth_config, Box::new(rpc) as Box<dyn csv_adapter_ethereum::rpc::EthereumRpc>, csv_seal_address).await.map(Some)
+                _builder.ethereum_from_config(eth_config, Box::new(rpc) as Box<dyn csv_ethereum::rpc::EthereumRpc>, csv_seal_address).await.map(Some)
             }
             #[cfg(feature = "sui")]
             Chain::Sui => {
@@ -483,23 +483,23 @@ impl CsvClient {
                     .map(|c| c.rpc.url.clone())
                     .filter(|url| !url.is_empty())
                     .unwrap_or_else(|| {
-                        if is_testnet {
+                        if _is_testnet {
                             "https://fullnode.testnet.sui.io:443".to_string()
                         } else {
                             "https://fullnode.mainnet.sui.io:443".to_string()
                         }
                     });
-                let sui_network = if is_testnet {
-                    csv_adapter_sui::config::SuiNetwork::Testnet
+                let sui_network = if _is_testnet {
+                    csv_sui::config::SuiNetwork::Testnet
                 } else {
-                    csv_adapter_sui::config::SuiNetwork::Mainnet
+                    csv_sui::config::SuiNetwork::Mainnet
                 };
-                let mut sui_config = csv_adapter_sui::config::SuiConfig::new(sui_network);
+                let mut sui_config = csv_sui::config::SuiConfig::new(sui_network);
                 sui_config.rpc_url = rpc_url.clone();
                 // Seal contract package ID is required but not available - using placeholder
                 sui_config.seal_contract.package_id = Some("0x0000000000000000000000000000000000000000000000000000000000000000".to_string());
-                let rpc = csv_adapter_sui::real_rpc::SuiRpcClient::new(&rpc_url);
-                _builder.sui_from_config(sui_config, Box::new(rpc) as Box<dyn csv_adapter_sui::rpc::SuiRpc>).await.map(Some)
+                let rpc = csv_sui::real_rpc::SuiRpcClient::new(&rpc_url);
+                _builder.sui_from_config(sui_config, Box::new(rpc) as Box<dyn csv_sui::rpc::SuiRpc>).await.map(Some)
             }
             #[cfg(feature = "aptos")]
             Chain::Aptos => {
@@ -509,21 +509,21 @@ impl CsvClient {
                     .map(|c| c.rpc.url.clone())
                     .filter(|url| !url.is_empty())
                     .unwrap_or_else(|| {
-                        if is_testnet {
+                        if _is_testnet {
                             "https://fullnode.testnet.aptoslabs.com/v1".to_string()
                         } else {
                             "https://fullnode.mainnet.aptoslabs.com/v1".to_string()
                         }
                     });
-                let mut aptos_config = csv_adapter_aptos::config::AptosConfig::default();
-                aptos_config.network = if is_testnet {
-                    csv_adapter_aptos::config::AptosNetwork::Testnet
+                let mut aptos_config = csv_aptos::config::AptosConfig::default();
+                aptos_config.network = if _is_testnet {
+                    csv_aptos::config::AptosNetwork::Testnet
                 } else {
-                    csv_adapter_aptos::config::AptosNetwork::Mainnet
+                    csv_aptos::config::AptosNetwork::Mainnet
                 };
                 aptos_config.rpc_url = rpc_url.clone();
-                let rpc = csv_adapter_aptos::real_rpc::AptosRpcClient::new(&rpc_url);
-                _builder.aptos_from_config(aptos_config, Box::new(rpc) as Box<dyn csv_adapter_aptos::rpc::AptosRpc>).await.map(Some)
+                let rpc = csv_aptos::real_rpc::AptosRpcClient::new(&rpc_url);
+                _builder.aptos_from_config(aptos_config, Box::new(rpc) as Box<dyn csv_aptos::rpc::AptosRpc>).await.map(Some)
             }
             #[cfg(feature = "solana")]
             Chain::Solana => {
@@ -533,18 +533,18 @@ impl CsvClient {
                     .map(|c| c.rpc.url.clone())
                     .filter(|url| !url.is_empty())
                     .unwrap_or_else(|| {
-                        if is_testnet {
+                        if _is_testnet {
                             "https://api.devnet.solana.com".to_string()
                         } else {
                             "https://api.mainnet-beta.solana.com".to_string()
                         }
                     });
-                let sol_network = if is_testnet {
-                    csv_adapter_solana::config::Network::Devnet
+                let sol_network = if _is_testnet {
+                    csv_solana::config::Network::Devnet
                 } else {
-                    csv_adapter_solana::config::Network::Mainnet
+                    csv_solana::config::Network::Mainnet
                 };
-                let sol_config = csv_adapter_solana::config::SolanaConfig {
+                let sol_config = csv_solana::config::SolanaConfig {
                     network: sol_network,
                     rpc_url: rpc_url.clone(),
                     csv_program_id: "CsvProgram11111111111111111111111111111111111".to_string(),
@@ -553,7 +553,7 @@ impl CsvClient {
                     max_retries: 3,
                     timeout_seconds: 30,
                 };
-                let rpc = Box::new(csv_adapter_solana::rpc::RealSolanaRpc::new(&rpc_url));
+                let rpc = Box::new(csv_solana::rpc::RealSolanaRpc::new(&rpc_url));
                 _builder.solana_from_config(sol_config, rpc).await.map(Some)
             }
             _ => Ok(None), // Skip unsupported chains

@@ -229,7 +229,7 @@ impl Wallet {
         // Path: m/86'/0'/account'/0/index
         #[cfg(feature = "bitcoin")]
         {
-            use csv_adapter_bitcoin::wallet::{Bip86Path, SealWallet};
+            use csv_bitcoin::wallet::{Bip86Path, SealWallet};
 
             // Create wallet from seed (using regtest network for derivation)
             let wallet = SealWallet::from_seed(&self.seed, bitcoin::Network::Regtest)

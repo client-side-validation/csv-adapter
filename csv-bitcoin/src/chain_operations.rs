@@ -16,7 +16,7 @@ use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
 use csv_core::right::RightId;
 use csv_core::signature::SignatureScheme;
 
-use crate::adapter::BitcoinAnchorLayer;
+use crate::seal_protocol::BitcoinSealProtocol;
 use crate::rpc::BitcoinRpc;
 use crate::types::BitcoinSealRef;
 use csv_core::AnchorLayer;
@@ -57,7 +57,7 @@ impl BitcoinChainQuery {
 
     /// Create from a real Bitcoin RPC client
     #[cfg(feature = "rpc")]
-    pub fn from_real_rpc(rpc: crate::real_rpc::real_rpc::RealBitcoinRpc, network: Network) -> Self {
+    pub fn from_real_rpc(rpc: crate::node::real_rpc::RealBitcoinRpc, network: Network) -> Self {
         // RealBitcoinRpc implements BitcoinRpc, so we can box it
         Self::new(Box::new(rpc), network)
     }
@@ -759,12 +759,12 @@ impl ChainDeployer for BitcoinChainDeployer {
 
 /// Bitcoin implementation of ChainRightOps trait
 pub struct BitcoinChainRightOps {
-    adapter: BitcoinAnchorLayer,
+    adapter: BitcoinSealProtocol,
 }
 
 impl BitcoinChainRightOps {
     /// Create a new Bitcoin chain right ops instance
-    pub fn new(adapter: BitcoinAnchorLayer) -> Self {
+    pub fn new(adapter: BitcoinSealProtocol) -> Self {
         Self { adapter }
     }
 
@@ -1155,13 +1155,13 @@ impl ChainRightOps for BitcoinChainRightOps {
 /// Unified Bitcoin chain operations implementing FullChainAdapter.
 ///
 /// This is the standard facade pattern implementation that combines all chain operation
-/// traits into a single type. Created from BitcoinAnchorLayer via `from_anchor_layer()`.
+/// traits into a single type. Created from BitcoinSealProtocol via `from_anchor_layer()`.
 ///
 /// # Security
 /// - Preserves BIP-86 HD wallet derivation from the anchor layer
 /// - Maintains domain-separated hashing for all proof operations
 /// - Uses RPC client attached to anchor layer for all chain queries
-pub struct BitcoinChainOperations {
+pub struct BitcoinBackend {
     /// RPC client for chain communication (extracted from anchor layer)
     rpc: Box<dyn BitcoinRpc + Send + Sync>,
     /// Network type (preserved from anchor layer config)
@@ -1173,9 +1173,9 @@ pub struct BitcoinChainOperations {
     // Note: Right operations require the anchor layer which is created on-demand
 }
 
-impl std::fmt::Debug for BitcoinChainOperations {
+impl std::fmt::Debug for BitcoinBackend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BitcoinChainOperations")
+        f.debug_struct("BitcoinBackend")
             .field("network", &self.network)
             .field("domain_separator", &hex::encode(self.domain_separator))
             .field("config", &self.config)
@@ -1183,8 +1183,8 @@ impl std::fmt::Debug for BitcoinChainOperations {
     }
 }
 
-impl BitcoinChainOperations {
-    /// Create from BitcoinAnchorLayer (standard facade pattern).
+impl BitcoinBackend {
+    /// Create from BitcoinSealProtocol (standard facade pattern).
     ///
     /// # Arguments
     /// * `anchor` - The Bitcoin anchor layer with attached RPC and wallet
@@ -1193,7 +1193,7 @@ impl BitcoinChainOperations {
     /// - Preserves all BIP-86 derivation settings from the anchor layer
     /// - Maintains domain separator for cross-chain replay protection
     /// - Clones RPC client reference for chain operations
-    pub fn from_anchor_layer(anchor: &BitcoinAnchorLayer) -> ChainOpResult<Self> {
+    pub fn from_anchor_layer(anchor: &BitcoinSealProtocol) -> ChainOpResult<Self> {
         // Extract RPC from anchor layer (must be present for real operations)
         let rpc = anchor
             .rpc
@@ -1239,7 +1239,7 @@ impl BitcoinChainOperations {
 }
 
 #[async_trait]
-impl ChainQuery for BitcoinChainOperations {
+impl ChainQuery for BitcoinBackend {
     async fn get_balance(&self, address: &str) -> ChainOpResult<BalanceInfo> {
         let query = BitcoinChainQuery::new(self.rpc.clone_boxed(), self.network);
         query.get_balance(address).await
@@ -1282,7 +1282,7 @@ impl ChainQuery for BitcoinChainOperations {
 }
 
 #[async_trait]
-impl ChainSigner for BitcoinChainOperations {
+impl ChainSigner for BitcoinBackend {
     fn derive_address(&self, public_key: &[u8]) -> ChainOpResult<String> {
         let signer = BitcoinChainSigner::new(self.network);
         signer.derive_address(public_key)
@@ -1315,7 +1315,7 @@ impl ChainSigner for BitcoinChainOperations {
 }
 
 #[async_trait]
-impl ChainBroadcaster for BitcoinChainOperations {
+impl ChainBroadcaster for BitcoinBackend {
     async fn submit_transaction(&self, signed_tx: &[u8]) -> ChainOpResult<String> {
         let broadcaster = BitcoinChainBroadcaster::new(self.rpc.clone_boxed());
         broadcaster.submit_transaction(signed_tx).await
@@ -1343,7 +1343,7 @@ impl ChainBroadcaster for BitcoinChainOperations {
 }
 
 #[async_trait]
-impl ChainDeployer for BitcoinChainOperations {
+impl ChainDeployer for BitcoinBackend {
     async fn deploy_lock_contract(
         &self,
         admin_address: &str,
@@ -1383,7 +1383,7 @@ impl ChainDeployer for BitcoinChainOperations {
 }
 
 #[async_trait]
-impl ChainProofProvider for BitcoinChainOperations {
+impl ChainProofProvider for BitcoinBackend {
     async fn build_inclusion_proof(
         &self,
         commitment: &Hash,
@@ -1433,7 +1433,7 @@ impl ChainProofProvider for BitcoinChainOperations {
 }
 
 #[async_trait]
-impl ChainRightOps for BitcoinChainOperations {
+impl ChainRightOps for BitcoinBackend {
     async fn create_right(
         &self,
         owner: &str,
@@ -1446,7 +1446,7 @@ impl ChainRightOps for BitcoinChainOperations {
         // For facade operations, we return capability unavailable
         let _ = (owner, asset_class, asset_id, metadata);
         Err(ChainOpError::CapabilityUnavailable(
-            "Right creation requires HD wallet. Use BitcoinAnchorLayer directly for seal operations.".to_string()
+            "Right creation requires HD wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
 
@@ -1456,7 +1456,7 @@ impl ChainRightOps for BitcoinChainOperations {
         _owner_key_id: &str,
     ) -> ChainOpResult<RightOperationResult> {
         Err(ChainOpError::CapabilityUnavailable(
-            "Right consumption requires wallet. Use BitcoinAnchorLayer directly for seal operations.".to_string()
+            "Right consumption requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
 
@@ -1467,7 +1467,7 @@ impl ChainRightOps for BitcoinChainOperations {
         _owner_key_id: &str,
     ) -> ChainOpResult<RightOperationResult> {
         Err(ChainOpError::CapabilityUnavailable(
-            "Right locking requires wallet. Use BitcoinAnchorLayer directly for seal operations.".to_string()
+            "Right locking requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
 
@@ -1489,7 +1489,7 @@ impl ChainRightOps for BitcoinChainOperations {
         _owner_key_id: &str,
     ) -> ChainOpResult<RightOperationResult> {
         Err(ChainOpError::CapabilityUnavailable(
-            "Refund requires wallet. Use BitcoinAnchorLayer directly for seal operations.".to_string()
+            "Refund requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
 
@@ -1500,7 +1500,7 @@ impl ChainRightOps for BitcoinChainOperations {
         _owner_key_id: &str,
     ) -> ChainOpResult<RightOperationResult> {
         Err(ChainOpError::CapabilityUnavailable(
-            "Metadata recording requires wallet. Use BitcoinAnchorLayer directly for seal operations.".to_string()
+            "Metadata recording requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
 
@@ -1510,7 +1510,7 @@ impl ChainRightOps for BitcoinChainOperations {
         _expected_state: &str,
     ) -> ChainOpResult<bool> {
         Err(ChainOpError::CapabilityUnavailable(
-            "Right state verification requires wallet. Use BitcoinAnchorLayer directly for seal operations.".to_string()
+            "Right state verification requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
 }

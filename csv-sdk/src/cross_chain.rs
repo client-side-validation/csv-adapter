@@ -75,7 +75,7 @@ pub async fn mint_right_on_chain(
     match chain {
         #[cfg(all(feature = "sui", feature = "rpc"))]
         Chain::Sui => {
-            use csv_adapter_sui::mint::mint_right;
+            use csv_sui::mint::mint_right;
             
             mint_right(
                 rpc_url,
@@ -101,7 +101,7 @@ pub async fn mint_right_on_chain(
         
         #[cfg(feature = "solana")]
         Chain::Solana => {
-            use csv_adapter_solana::mint::mint_right_from_hex_key;
+            use csv_solana::mint::mint_right_from_hex_key;
             // Solana requires state_root parameter - use zero hash as default
             let state_root = Hash::new([0u8; 32]);
             

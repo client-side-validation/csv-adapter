@@ -1,6 +1,6 @@
 //! Sui Adapter for CSV (Client-Side Validation)
 //!
-//! This adapter implements the AnchorLayer trait for Sui,
+//! This adapter implements the SealProtocol trait for Sui,
 //! using owned objects with one_time attributes as seals.
 //!
 //! ## Architecture
@@ -12,15 +12,15 @@
 //! ## Usage
 //!
 //! ```no_run
-//! use csv_adapter_sui::{SuiAnchorLayer, SuiConfig, SuiNetwork};
+//! use csv_adapter_sui::{SuiSealProtocol, SuiConfig, SuiNetwork};
 //!
 //! // Create adapter with test RPC for testing
-//! let adapter = SuiAnchorLayer::with_test().unwrap();
+//! let adapter = SuiSealProtocol::with_test().unwrap();
 //!
 //! // Or with configuration
 //! let config = SuiConfig::new(SuiNetwork::Testnet);
 //! // let rpc = ...;
-//! // let adapter = SuiAnchorLayer::from_config(config, rpc).unwrap();
+//! // let adapter = SuiSealProtocol::from_config(config, rpc).unwrap();
 //! ```
 //!
 //! ## Production
@@ -35,8 +35,8 @@
 #![allow(missing_docs)]
 #![allow(dead_code)]
 
-pub mod adapter;
-pub mod chain_adapter_impl;
+pub mod seal_protocol;
+pub mod backend;
 pub mod chain_operations;
 pub mod checkpoint;
 pub mod config;
@@ -50,10 +50,10 @@ pub mod signatures;
 pub mod types;
 
 #[cfg(feature = "rpc")]
-pub mod real_rpc;
+pub mod node;
 
-pub use adapter::SuiAnchorLayer;
-pub use chain_adapter_impl::{create_sui_adapter, SuiWallet};
+pub use seal_protocol::SuiSealProtocol;
+pub use backend::{create_sui_adapter, SuiWallet};
 pub use deploy::deploy_csv_seal_package;
 pub use deploy::{PackageDeployer, PackageDeployment};
 
@@ -69,7 +69,7 @@ pub use proofs::{
     TransactionProof,
 };
 #[cfg(feature = "rpc")]
-pub use real_rpc::SuiRpcClient;
+pub use node::SuiRpcClient;
 #[cfg(test)]
 pub use rpc::MockSuiRpc;
 pub use rpc::{SuiCheckpoint, SuiEvent, SuiLedgerInfo, SuiObject, SuiRpc, SuiTransactionBlock};
@@ -77,4 +77,4 @@ pub use seal::{SealRecord, SealRegistry, SealStore};
 pub use types::{SuiAnchorRef, SuiFinalityProof, SuiInclusionProof, SuiSealRef};
 
 // Chain operations exports
-pub use chain_operations::SuiChainOperations;
+pub use chain_operations::SuiBackend;

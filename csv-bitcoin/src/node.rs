@@ -206,8 +206,8 @@ pub mod real_rpc {
             // This method requires adapter-level integration with tx_builder and wallet.
             // The full flow is demonstrated in the signet_real_tx_demo example
             // which wires tx_builder + wallet + RPC broadcasting together.
-            // For production use, call BitcoinAnchorLayer.publish() instead.
-            Err("publish_commitment requires adapter-level integration — use the full BitcoinAnchorLayer.publish() method instead".into())
+            // For production use, call BitcoinSealProtocol.publish() instead.
+            Err("publish_commitment requires adapter-level integration — use the full BitcoinSealProtocol.publish() method instead".into())
         }
     }
 

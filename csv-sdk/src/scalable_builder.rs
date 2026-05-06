@@ -239,7 +239,7 @@ impl ScalableClientBuilder {
             }
             #[cfg(feature = "sqlite")]
             StoreBackend::Sqlite { ref path } => crate::client::StoreHandle::Sqlite(
-                csv_adapter_store::SqliteSealStore::open(path)
+                csv_store::SqliteSealStore::open(path)
                     .map_err(|e| CsvError::StoreError(e.to_string()))?,
             ),
         };

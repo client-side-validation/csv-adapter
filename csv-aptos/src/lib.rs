@@ -1,6 +1,6 @@
 //! Aptos Adapter for CSV (Client-Side Validation)
 //!
-//! This adapter implements the AnchorLayer trait for Aptos,
+//! This adapter implements the SealProtocol trait for Aptos,
 //! using resources with key + delete as seals.
 //!
 //! ## Architecture
@@ -12,15 +12,15 @@
 //! ## Usage
 //!
 //! ```no_run
-//! use csv_adapter_aptos::{AptosAnchorLayer, AptosConfig, AptosNetwork};
+//! use csv_adapter_aptos::{AptosSealProtocol, AptosConfig, AptosNetwork};
 //!
 //! // Create adapter with test RPC for testing
-//! let adapter = AptosAnchorLayer::with_test().unwrap();
+//! let adapter = AptosSealProtocol::with_test().unwrap();
 //!
 //! // Or with configuration
 //! let config = AptosConfig::new(AptosNetwork::Devnet);
 //! // let rpc = ...;
-//! // let adapter = AptosAnchorLayer::from_config(config, rpc).unwrap();
+//! // let adapter = AptosSealProtocol::from_config(config, rpc).unwrap();
 //! ```
 //!
 //! ## Production
@@ -35,8 +35,8 @@
 #![allow(missing_docs)]
 #![allow(dead_code)]
 
-pub mod adapter;
-pub mod chain_adapter_impl;
+pub mod seal_protocol;
+pub mod backend;
 pub mod chain_operations;
 pub mod checkpoint;
 pub mod config;
@@ -50,10 +50,10 @@ pub mod signatures;
 pub mod types;
 
 #[cfg(feature = "rpc")]
-pub mod real_rpc;
+pub mod node;
 
-pub use adapter::AptosAnchorLayer;
-pub use chain_adapter_impl::{create_aptos_adapter, AptosWallet};
+pub use seal_protocol::AptosSealProtocol;
+pub use backend::{create_aptos_adapter, AptosWallet};
 pub use deploy::deploy_csv_seal_module;
 pub use deploy::{ModuleDeployer, ModuleDeployment};
 
@@ -67,7 +67,7 @@ pub use proofs::{
     TransactionProof,
 };
 #[cfg(feature = "rpc")]
-pub use real_rpc::AptosRpcClient;
+pub use node::AptosRpcClient;
 #[cfg(test)]
 pub use rpc::MockAptosRpc;
 pub use rpc::{
@@ -77,4 +77,4 @@ pub use seal::{SealRecord, SealRegistry, SealStore};
 pub use types::{AptosAnchorRef, AptosFinalityProof, AptosInclusionProof, AptosSealRef};
 
 // Chain operations exports
-pub use chain_operations::AptosChainOperations;
+pub use chain_operations::AptosBackend;

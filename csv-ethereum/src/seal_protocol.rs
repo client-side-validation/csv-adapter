@@ -1,6 +1,6 @@
-//! Ethereum AnchorLayer implementation with real RPC integration
+//! Ethereum SealProtocol implementation with real RPC integration
 //!
-//! This adapter implements the AnchorLayer trait for Ethereum,
+//! This adapter implements the SealProtocol trait for Ethereum,
 //! using storage slots as single-use seals and LOG events for commitment publication.
 //! When the `rpc` feature is enabled, real Alloy-based RPC is used.
 
@@ -27,8 +27,8 @@ use crate::types::{
     EthereumAnchorRef, EthereumFinalityProof, EthereumInclusionProof, EthereumSealRef,
 };
 
-/// Ethereum implementation of the AnchorLayer trait
-pub struct EthereumAnchorLayer {
+/// Ethereum implementation of the SealProtocol trait
+pub struct EthereumSealProtocol {
     config: EthereumConfig,
     seal_registry: Mutex<SealRegistry>,
     domain_separator: [u8; 32],
@@ -38,7 +38,7 @@ pub struct EthereumAnchorLayer {
     pub(crate) csv_seal_address: [u8; 20],
 }
 
-impl EthereumAnchorLayer {
+impl EthereumSealProtocol {
     pub fn from_config(
         config: EthereumConfig,
         rpc: Box<dyn EthereumRpc>,
@@ -78,7 +78,7 @@ impl EthereumAnchorLayer {
         config: EthereumConfig,
         csv_seal_address: [u8; 20],
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        use crate::real_rpc::RealEthereumRpc;
+        use crate::node::RealEthereumRpc;
 
         let rpc: Box<dyn EthereumRpc> =
             Box::new(RealEthereumRpc::new(&config.rpc_url, csv_seal_address).await?);
@@ -120,7 +120,7 @@ impl EthereumAnchorLayer {
         seal: EthereumSealRef,
         signed_tx_bytes: Vec<u8>,
     ) -> Result<EthereumAnchorRef, AdapterError> {
-        use crate::real_rpc::verify_seal_consumption_in_receipt;
+        use crate::node::verify_seal_consumption_in_receipt;
 
         // Step 1: Verify slot is available
         self.verify_slot_available(&seal)
@@ -167,7 +167,7 @@ impl EthereumAnchorLayer {
     }
 }
 
-impl AnchorLayer for EthereumAnchorLayer {
+impl AnchorLayer for EthereumSealProtocol {
     type SealRef = EthereumSealRef;
     type AnchorRef = EthereumAnchorRef;
     type InclusionProof = EthereumInclusionProof;
@@ -179,7 +179,7 @@ impl AnchorLayer for EthereumAnchorLayer {
 
         #[cfg(feature = "rpc")]
         {
-            use crate::real_rpc::{publish, verify_seal_consumption_in_receipt, RealEthereumRpc};
+            use crate::node::{publish, verify_seal_consumption_in_receipt, RealEthereumRpc};
             use tokio::runtime::Handle;
 
             // Downcast to RealEthereumRpc for the publish flow
@@ -245,7 +245,7 @@ impl AnchorLayer for EthereumAnchorLayer {
         #[cfg(feature = "rpc")]
         {
             // Try to get real proof data from RPC
-            use crate::real_rpc::RealEthereumRpc;
+            use crate::node::RealEthereumRpc;
             use tokio::runtime::Handle;
 
             if let Some(_real_rpc) = self
@@ -467,7 +467,7 @@ impl AnchorLayer for EthereumAnchorLayer {
     }
 }
 
-impl EthereumAnchorLayer {
+impl EthereumSealProtocol {
     /// Get RPC client reference (crate-visible for chain_operations)
     pub(crate) fn rpc(&self) -> &dyn EthereumRpc {
         self.rpc.as_ref()
@@ -493,8 +493,8 @@ impl EthereumAnchorLayer {
 mod tests {
     use super::*;
 
-    fn test_adapter() -> EthereumAnchorLayer {
-        EthereumAnchorLayer::with_test().unwrap()
+    fn test_adapter() -> EthereumSealProtocol {
+        EthereumSealProtocol::with_test().unwrap()
     }
 
     #[test]

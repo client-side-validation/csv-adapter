@@ -28,6 +28,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+#[cfg(feature = "tokio")]
 use tokio::sync::Mutex;
 
 // Imports for contract call encoding
@@ -754,12 +755,12 @@ impl AdapterBuilder {
     #[cfg(feature = "ethereum")]
     pub async fn ethereum_from_config(
         &self,
-        config: csv_adapter_ethereum::config::EthereumConfig,
-        rpc: Box<dyn csv_adapter_ethereum::rpc::EthereumRpc>,
+        config: csv_ethereum::config::EthereumConfig,
+        rpc: Box<dyn csv_ethereum::rpc::EthereumRpc>,
         csv_seal_address: [u8; 20],
     ) -> Result<Arc<dyn ChainBackend>, CsvError> {
-        use csv_adapter_ethereum::chain_operations::EthereumChainOperations;
-        use csv_adapter_ethereum::adapter::EthereumAnchorLayer;
+        use csv_ethereum::chain_operations::EthereumChainOperations;
+        use csv_ethereum::adapter::EthereumAnchorLayer;
 
         // Create the AnchorLayer first (this is the protocol primitive)
         let anchor_layer = EthereumAnchorLayer::from_config(config, rpc, csv_seal_address)
@@ -782,11 +783,11 @@ impl AdapterBuilder {
     #[cfg(feature = "sui")]
     pub async fn sui_from_config(
         &self,
-        config: csv_adapter_sui::config::SuiConfig,
-        rpc: Box<dyn csv_adapter_sui::rpc::SuiRpc>,
+        config: csv_sui::config::SuiConfig,
+        rpc: Box<dyn csv_sui::rpc::SuiRpc>,
     ) -> Result<Arc<dyn ChainBackend>, CsvError> {
-        use csv_adapter_sui::chain_operations::SuiChainOperations;
-        use csv_adapter_sui::adapter::SuiAnchorLayer;
+        use csv_sui::chain_operations::SuiChainOperations;
+        use csv_sui::adapter::SuiAnchorLayer;
 
         let anchor_layer = SuiAnchorLayer::from_config(config, rpc)
             .map_err(|e| CsvError::AdapterError {
@@ -807,11 +808,11 @@ impl AdapterBuilder {
     #[cfg(feature = "aptos")]
     pub async fn aptos_from_config(
         &self,
-        config: csv_adapter_aptos::config::AptosConfig,
-        rpc: Box<dyn csv_adapter_aptos::rpc::AptosRpc>,
+        config: csv_aptos::config::AptosConfig,
+        rpc: Box<dyn csv_aptos::rpc::AptosRpc>,
     ) -> Result<Arc<dyn ChainBackend>, CsvError> {
-        use csv_adapter_aptos::chain_operations::AptosChainOperations;
-        use csv_adapter_aptos::adapter::AptosAnchorLayer;
+        use csv_aptos::chain_operations::AptosChainOperations;
+        use csv_aptos::adapter::AptosAnchorLayer;
 
         let anchor_layer = AptosAnchorLayer::from_config(config, rpc)
             .map_err(|e| CsvError::AdapterError {
@@ -832,11 +833,11 @@ impl AdapterBuilder {
     #[cfg(feature = "solana")]
     pub async fn solana_from_config(
         &self,
-        config: csv_adapter_solana::config::SolanaConfig,
-        rpc: Box<dyn csv_adapter_solana::rpc::SolanaRpc>,
+        config: csv_solana::config::SolanaConfig,
+        rpc: Box<dyn csv_solana::rpc::SolanaRpc>,
     ) -> Result<Arc<dyn ChainBackend>, CsvError> {
-        use csv_adapter_solana::chain_operations::SolanaChainOperations;
-        use csv_adapter_solana::adapter::SolanaAnchorLayer;
+        use csv_solana::chain_operations::SolanaChainOperations;
+        use csv_solana::adapter::SolanaAnchorLayer;
 
         // Solana now uses from_config() following the standard facade pattern
         let anchor_layer = SolanaAnchorLayer::from_config(config, rpc)
@@ -858,20 +859,20 @@ impl AdapterBuilder {
     #[cfg(feature = "bitcoin")]
     pub async fn bitcoin_from_config(
         &self,
-        config: csv_adapter_bitcoin::config::BitcoinConfig,
-        rpc: Box<dyn csv_adapter_bitcoin::rpc::BitcoinRpc + Send + Sync>,
+        config: csv_bitcoin::config::BitcoinConfig,
+        rpc: Box<dyn csv_bitcoin::rpc::BitcoinRpc + Send + Sync>,
     ) -> Result<Arc<dyn ChainBackend>, CsvError> {
-        use csv_adapter_bitcoin::chain_operations::BitcoinChainOperations;
-        use csv_adapter_bitcoin::adapter::BitcoinAnchorLayer;
+        use csv_bitcoin::chain_operations::BitcoinBackend;
+        use csv_bitcoin::seal_protocol::BitcoinSealProtocol;
 
         // Bitcoin uses from_config() following the standard facade pattern
-        let anchor_layer = BitcoinAnchorLayer::from_config(config, rpc)
+        let anchor_layer = BitcoinSealProtocol::from_config(config, rpc)
             .map_err(|e| CsvError::AdapterError {
                 chain: Chain::Bitcoin,
                 message: format!("Failed to create Bitcoin anchor layer: {}", e),
             })?;
 
-        let operations = BitcoinChainOperations::from_anchor_layer(&anchor_layer)
+        let operations = BitcoinBackend::from_anchor_layer(&anchor_layer)
             .map_err(|e| CsvError::AdapterError {
                 chain: Chain::Bitcoin,
                 message: format!("Failed to create Bitcoin chain operations: {}", e),

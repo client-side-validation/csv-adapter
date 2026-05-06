@@ -18,7 +18,7 @@ use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
 use csv_core::right::RightId;
 use csv_core::signature::SignatureScheme;
 
-use crate::adapter::EthereumAnchorLayer;
+use crate::seal_protocol::EthereumSealProtocol;
 use crate::config::EthereumConfig;
 use crate::finality::FinalityChecker;
 use crate::proofs::{CommitmentEventBuilder, EventProofVerifier};
@@ -26,7 +26,7 @@ use crate::rpc::{EthereumRpc, RpcBlock, RpcTransaction};
 use crate::seal_contract::CsvSealAbi;
 
 /// Ethereum chain operations implementation
-pub struct EthereumChainOperations {
+pub struct EthereumBackend {
     /// Inner RPC client for chain communication
     rpc: Box<dyn EthereumRpc>,
     /// Chain configuration
@@ -43,7 +43,7 @@ pub struct EthereumChainOperations {
     event_builder: CommitmentEventBuilder,
 }
 
-impl EthereumChainOperations {
+impl EthereumBackend {
     /// Create new Ethereum chain operations from RPC client
     pub fn new(rpc: Box<dyn EthereumRpc>, config: EthereumConfig) -> Self {
         let mut domain = [0u8; 32];
@@ -67,8 +67,8 @@ impl EthereumChainOperations {
         }
     }
 
-    /// Create from EthereumAnchorLayer
-    pub fn from_anchor_layer(anchor: &EthereumAnchorLayer) -> ChainOpResult<Self> {
+    /// Create from EthereumSealProtocol
+    pub fn from_anchor_layer(anchor: &EthereumSealProtocol) -> ChainOpResult<Self> {
         Ok(Self {
             rpc: anchor.rpc().clone_boxed(),
             config: anchor.config_clone(),
@@ -152,7 +152,7 @@ impl EthereumChainOperations {
 }
 
 #[async_trait]
-impl ChainQuery for EthereumChainOperations {
+impl ChainQuery for EthereumBackend {
     async fn get_balance(&self, address: &str) -> ChainOpResult<BalanceInfo> {
         let addr = self.parse_address(address)?;
 
@@ -303,7 +303,7 @@ impl ChainQuery for EthereumChainOperations {
 }
 
 #[async_trait]
-impl ChainSigner for EthereumChainOperations {
+impl ChainSigner for EthereumBackend {
     fn derive_address(&self, public_key: &[u8]) -> ChainOpResult<String> {
         if public_key.len() != 33 && public_key.len() != 65 {
             return Err(ChainOpError::InvalidInput(
@@ -430,7 +430,7 @@ impl ChainSigner for EthereumChainOperations {
 }
 
 #[async_trait]
-impl ChainBroadcaster for EthereumChainOperations {
+impl ChainBroadcaster for EthereumBackend {
     async fn submit_transaction(&self, signed_tx: &[u8]) -> ChainOpResult<String> {
         // signed_tx is RLP-encoded signed transaction
         let tx_hash = self
@@ -550,7 +550,7 @@ impl ChainBroadcaster for EthereumChainOperations {
 }
 
 #[async_trait]
-impl ChainDeployer for EthereumChainOperations {
+impl ChainDeployer for EthereumBackend {
     async fn deploy_lock_contract(
         &self,
         admin_address: &str,
@@ -628,7 +628,7 @@ impl ChainDeployer for EthereumChainOperations {
 }
 
 #[async_trait]
-impl ChainProofProvider for EthereumChainOperations {
+impl ChainProofProvider for EthereumBackend {
     async fn build_inclusion_proof(
         &self,
         commitment: &Hash,
@@ -800,7 +800,7 @@ impl ChainProofProvider for EthereumChainOperations {
 }
 
 #[async_trait]
-impl ChainRightOps for EthereumChainOperations {
+impl ChainRightOps for EthereumBackend {
     async fn create_right(
         &self,
         owner: &str,
@@ -981,7 +981,7 @@ mod tests {
     async fn test_ethereum_chain_operations_creation() {
         let rpc = Box::new(MockEthereumRpc::new(1000));
         let config = EthereumConfig::new(EthereumNetwork::Mainnet);
-        let ops = EthereumChainOperations::new(rpc, config);
+        let ops = EthereumBackend::new(rpc, config);
         assert_eq!(ops.config.network.chain_id(), 1);
     }
 
@@ -989,7 +989,7 @@ mod tests {
     fn test_address_validation() {
         let rpc = Box::new(MockEthereumRpc::new(1000));
         let config = EthereumConfig::new(EthereumNetwork::Mainnet);
-        let ops = EthereumChainOperations::new(rpc, config);
+        let ops = EthereumBackend::new(rpc, config);
 
         // Valid address
         assert!(ops.validate_address("0x0000000000000000000000000000000000000000"));

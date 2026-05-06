@@ -3,7 +3,7 @@
 //! Provides pre-configured testnet setups for Signet and Testnet3,
 //! including RPC endpoints, contract deployments, and validation tools.
 
-use crate::adapter::BitcoinAnchorLayer;
+use crate::seal_protocol::BitcoinSealProtocol;
 use crate::config::{BitcoinConfig, Network};
 use crate::wallet::SealWallet;
 
@@ -56,7 +56,7 @@ impl TestnetDeployConfig {
 /// Create a testnet-ready adapter with a random wallet
 pub fn create_testnet_adapter(
     network: Network,
-) -> Result<BitcoinAnchorLayer, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<BitcoinSealProtocol, Box<dyn std::error::Error + Send + Sync>> {
     let config = match network {
         Network::Signet => TestnetDeployConfig::signet().to_config(),
         Network::Testnet => TestnetDeployConfig::testnet3().to_config(),
@@ -64,13 +64,13 @@ pub fn create_testnet_adapter(
     };
 
     let wallet = SealWallet::generate_random(network.to_bitcoin_network());
-    BitcoinAnchorLayer::with_wallet(config, wallet)
+    BitcoinSealProtocol::with_wallet(config, wallet)
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
 }
 
 /// Validate testnet connectivity
 pub fn validate_testnet_connectivity(
-    adapter: &BitcoinAnchorLayer,
+    adapter: &BitcoinSealProtocol,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Try to get current block height
     let height = adapter.get_current_height_for_test();

@@ -101,7 +101,7 @@ impl RightsManager {
         // actual SealRef types and publishing logic.
         //
         // Example for Bitcoin:
-        //   let btc_adapter = csv_adapter_bitcoin::BitcoinAnchorLayer::signet()?;
+        //   let btc_adapter = csv_bitcoin::BitcoinAnchorLayer::signet()?;
         //   let seal = btc_adapter.create_seal(None)?;
         //   let right = Right::new(commitment.hash(), owner_proof, salt);
 

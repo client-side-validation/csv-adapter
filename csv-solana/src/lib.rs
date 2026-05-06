@@ -1,14 +1,14 @@
 //! Solana Adapter for CSV (Client-Side Validation)
 //!
-//! This adapter implements the AnchorLayer trait for Solana,
+//! This adapter implements the SealProtocol trait for Solana,
 //! using program accounts as single-use seals and program instructions for commitment publication.
 
 #![warn(missing_docs)]
 #![allow(missing_docs)]
 #![allow(dead_code)]
 
-pub mod adapter;
-pub mod chain_adapter_impl;
+pub mod seal_protocol;
+pub mod backend;
 pub mod chain_operations;
 pub mod config;
 pub mod deploy;
@@ -21,8 +21,8 @@ pub mod seal;
 pub mod types;
 pub mod wallet;
 
-pub use adapter::SolanaAnchorLayer;
-pub use chain_adapter_impl::{create_solana_adapter, SolanaRpcClient, SolanaWallet};
+pub use seal_protocol::SolanaSealProtocol;
+pub use backend::{create_solana_adapter, SolanaRpcClient, SolanaWallet};
 pub use config::{Network, SolanaConfig};
 pub use deploy::{deploy_csv_program, deploy_csv_seal_program, ProgramDeployer, ProgramDeployment};
 pub use error::{SolanaError, SolanaResult};
@@ -32,7 +32,7 @@ pub use types::{SolanaAnchorRef, SolanaFinalityProof, SolanaInclusionProof, Sola
 pub use wallet::{ProgramWallet, WalletError};
 
 // Chain operations exports
-pub use chain_operations::SolanaChainOperations;
+pub use chain_operations::SolanaBackend;
 
 #[cfg(feature = "rpc")]
 pub use rpc::RealSolanaRpc;

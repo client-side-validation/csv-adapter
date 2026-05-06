@@ -1,4 +1,4 @@
-//! ChainAdapter implementation for BitcoinAnchorLayer
+//! ChainAdapter implementation for BitcoinSealProtocol
 //!
 //! This module implements the `ChainAdapter` trait from `csv-adapter-core`,
 //! enabling Bitcoin to be used through the unified chain adapter interface.
@@ -10,7 +10,7 @@ use csv_core::chain_adapter::{
 use csv_core::chain_config::ChainConfig;
 use csv_core::Chain;
 
-use crate::adapter::BitcoinAnchorLayer;
+use crate::seal_protocol::BitcoinSealProtocol;
 use crate::config::{BitcoinConfig, Network};
 use crate::rpc::BitcoinRpc;
 use crate::wallet::SealWallet;
@@ -124,7 +124,7 @@ impl Wallet for BitcoinWallet {
     }
 
     async fn sign_transaction(&self, _data: &[u8]) -> ChainResult<Vec<u8>> {
-        // The BitcoinAnchorLayer handles transaction building and signing internally
+        // The BitcoinSealProtocol handles transaction building and signing internally
         // via the SealWallet which manages UTXOs and proper Taproot signing.
         // External raw data signing is not supported for security - transactions
         // must be constructed through the wallet's UTXO-aware interface.
@@ -182,7 +182,7 @@ fn bitcoin_capabilities() -> ChainCapabilities {
 }
 
 #[async_trait]
-impl ChainAdapter for BitcoinAnchorLayer {
+impl ChainAdapter for BitcoinSealProtocol {
     fn chain_id(&self) -> &'static str {
         "bitcoin"
     }
@@ -240,7 +240,7 @@ impl ChainAdapter for BitcoinAnchorLayer {
 }
 
 /// Create a new Bitcoin adapter from chain configuration
-pub fn create_bitcoin_adapter(config: &ChainConfig) -> ChainResult<BitcoinAnchorLayer> {
+pub fn create_bitcoin_adapter(config: &ChainConfig) -> ChainResult<BitcoinSealProtocol> {
     // Parse network from config
     let network = match config.default_network.as_str() {
         "mainnet" => Network::Mainnet,
@@ -260,7 +260,7 @@ pub fn create_bitcoin_adapter(config: &ChainConfig) -> ChainResult<BitcoinAnchor
     // In production, this would load from config or derive from master key
     let wallet = SealWallet::generate_random(network.to_bitcoin_network());
 
-    BitcoinAnchorLayer::with_wallet(btc_config, wallet)
+    BitcoinSealProtocol::with_wallet(btc_config, wallet)
         .map_err(|e| ChainError::WalletError(format!("Failed to create wallet: {}", e)))
 }
 
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_bitcoin_adapter_chain_id() {
-        let adapter = BitcoinAnchorLayer::signet().unwrap();
+        let adapter = BitcoinSealProtocol::signet().unwrap();
         assert_eq!(adapter.chain_id(), "bitcoin");
         assert_eq!(adapter.chain_name(), "Bitcoin");
     }

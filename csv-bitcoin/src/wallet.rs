@@ -453,10 +453,13 @@ pub enum WalletError {
     ScriptError(String),
 }
 
+#[cfg(test)]
 pub struct MockSealWallet {
     pub utxos: Vec<(OutPoint, u64)>,
     pub used_seals: Mutex<HashSet<Vec<u8>>>,
 }
+
+#[cfg(test)]
 impl MockSealWallet {
     pub fn new() -> Self {
         Self {
@@ -469,6 +472,8 @@ impl MockSealWallet {
         self.utxos.push((OutPoint::new(txid, vout), amount_sat));
     }
 }
+
+#[cfg(test)]
 impl Default for MockSealWallet {
     fn default() -> Self {
         Self::new()

@@ -1,6 +1,6 @@
-//! Bitcoin AnchorLayer implementation with HD wallet support
+//! Bitcoin SealProtocol implementation with HD wallet support
 //!
-//! This adapter implements the AnchorLayer trait for Bitcoin,
+//! This adapter implements the SealProtocol trait for Bitcoin,
 //! using UTXOs as single-use seals and Tapret commitments for anchoring.
 //!
 //! ## Architecture
@@ -34,8 +34,8 @@ use crate::tx_builder::CommitmentTxBuilder;
 use crate::types::{BitcoinAnchorRef, BitcoinFinalityProof, BitcoinInclusionProof, BitcoinSealRef};
 use crate::wallet::SealWallet;
 
-/// Bitcoin implementation of the AnchorLayer trait with HD wallet support
-pub struct BitcoinAnchorLayer {
+/// Bitcoin implementation of the SealProtocol trait with HD wallet support
+pub struct BitcoinSealProtocol {
     config: BitcoinConfig,
     /// HD wallet for seal management
     pub wallet: SealWallet,
@@ -47,7 +47,7 @@ pub struct BitcoinAnchorLayer {
     next_seal_index: Mutex<u32>,
 }
 
-impl BitcoinAnchorLayer {
+impl BitcoinSealProtocol {
     /// Create from configuration and RPC client (standard facade pattern).
     ///
     /// # Arguments
@@ -386,7 +386,7 @@ fn get_address_utxos(
     Err("get_address_utxos not implemented for this RPC backend".to_string())
 }
 
-impl AnchorLayer for BitcoinAnchorLayer {
+impl AnchorLayer for BitcoinSealProtocol {
     type SealRef = BitcoinSealRef;
     type AnchorRef = BitcoinAnchorRef;
     type InclusionProof = BitcoinInclusionProof;
@@ -611,8 +611,8 @@ impl AnchorLayer for BitcoinAnchorLayer {
 mod tests {
     use super::*;
 
-    fn test_adapter() -> BitcoinAnchorLayer {
-        BitcoinAnchorLayer::signet().unwrap()
+    fn test_adapter() -> BitcoinSealProtocol {
+        BitcoinSealProtocol::signet().unwrap()
     }
 
     #[test]
@@ -658,7 +658,7 @@ mod tests {
     fn test_hd_wallet_seal_derivation_deterministic() {
         let wallet = SealWallet::generate_random(bitcoin::Network::Signet);
         let config = BitcoinConfig::default();
-        let adapter = BitcoinAnchorLayer::with_wallet(config, wallet).unwrap();
+        let adapter = BitcoinSealProtocol::with_wallet(config, wallet).unwrap();
         let seal1 = adapter.create_seal(Some(100_000)).unwrap();
         assert_eq!(seal1.nonce, Some(100_000));
     }

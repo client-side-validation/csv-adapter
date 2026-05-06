@@ -21,13 +21,13 @@ use csv_core::right::RightId;
 use csv_core::signature::SignatureScheme;
 use sha3::{Digest, Sha3_256};
 
-use crate::adapter::AptosAnchorLayer;
+use crate::seal_protocol::AptosSealProtocol;
 use crate::config::AptosNetwork;
 use crate::proofs::CommitmentEventBuilder;
 use crate::rpc::{AptosLedgerInfo, AptosRpc, AptosTransaction};
 
 /// Aptos chain operations implementation
-pub struct AptosChainOperations {
+pub struct AptosBackend {
     /// Inner RPC client for chain communication
     rpc: Box<dyn AptosRpc>,
     /// Chain configuration
@@ -38,7 +38,7 @@ pub struct AptosChainOperations {
     event_builder: CommitmentEventBuilder,
 }
 
-impl AptosChainOperations {
+impl AptosBackend {
     /// Create new Aptos chain operations from RPC client
     pub fn new(rpc: Box<dyn AptosRpc>, network: AptosNetwork) -> Self {
         let mut domain = [0u8; 32];
@@ -58,8 +58,8 @@ impl AptosChainOperations {
         }
     }
 
-    /// Create from AptosAnchorLayer
-    pub fn from_anchor_layer(anchor: &AptosAnchorLayer) -> ChainOpResult<Self> {
+    /// Create from AptosSealProtocol
+    pub fn from_anchor_layer(anchor: &AptosSealProtocol) -> ChainOpResult<Self> {
         let (module_addr, event_type) = anchor.event_builder_config();
         Ok(Self {
             rpc: anchor.rpc().clone_boxed(),
@@ -131,7 +131,7 @@ impl AptosChainOperations {
 }
 
 #[async_trait]
-impl ChainQuery for AptosChainOperations {
+impl ChainQuery for AptosBackend {
     async fn get_balance(&self, address: &str) -> ChainOpResult<BalanceInfo> {
         let addr = self.parse_address(address)?;
 
@@ -278,7 +278,7 @@ impl ChainQuery for AptosChainOperations {
 }
 
 #[async_trait]
-impl ChainSigner for AptosChainOperations {
+impl ChainSigner for AptosBackend {
     fn derive_address(&self, public_key: &[u8]) -> ChainOpResult<String> {
         if public_key.len() != 32 {
             return Err(ChainOpError::InvalidInput(
@@ -360,7 +360,7 @@ impl ChainSigner for AptosChainOperations {
 }
 
 #[async_trait]
-impl ChainBroadcaster for AptosChainOperations {
+impl ChainBroadcaster for AptosBackend {
     async fn submit_transaction(&self, signed_tx: &[u8]) -> ChainOpResult<String> {
         // Aptos signed transaction is BCS-encoded
         // Submit via submit_signed_transaction
@@ -442,7 +442,7 @@ impl ChainBroadcaster for AptosChainOperations {
 }
 
 #[async_trait]
-impl ChainDeployer for AptosChainOperations {
+impl ChainDeployer for AptosBackend {
     async fn deploy_lock_contract(
         &self,
         admin_address: &str,
@@ -502,7 +502,7 @@ impl ChainDeployer for AptosChainOperations {
 }
 
 #[async_trait]
-impl ChainProofProvider for AptosChainOperations {
+impl ChainProofProvider for AptosBackend {
     async fn build_inclusion_proof(
         &self,
         commitment: &Hash,
@@ -661,7 +661,7 @@ impl ChainProofProvider for AptosChainOperations {
 }
 
 #[async_trait]
-impl ChainRightOps for AptosChainOperations {
+impl ChainRightOps for AptosBackend {
     async fn create_right(
         &self,
         owner: &str,
@@ -814,14 +814,14 @@ mod tests {
     #[test]
     fn test_aptos_chain_operations_creation() {
         let rpc = Box::new(MockAptosRpc::new(1));
-        let ops = AptosChainOperations::new(rpc, AptosNetwork::Devnet);
+        let ops = AptosBackend::new(rpc, AptosNetwork::Devnet);
         assert_eq!(ops.network, AptosNetwork::Devnet);
     }
 
     #[test]
     fn test_address_validation() {
         let rpc = Box::new(MockAptosRpc::new(1));
-        let ops = AptosChainOperations::new(rpc, AptosNetwork::Devnet);
+        let ops = AptosBackend::new(rpc, AptosNetwork::Devnet);
 
         // Valid address
         assert!(ops.validate_address(

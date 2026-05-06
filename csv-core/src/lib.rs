@@ -92,7 +92,7 @@ pub mod signature;
 
 // Error handling and traits - 🔒 STABLE
 pub mod error;
-pub mod traits;
+pub mod seal_protocol;
 
 // Chain operation traits (Production Guarantee Plan Phase 2) - 🔒 STABLE
 pub mod chain_operations;
@@ -160,7 +160,7 @@ pub use proof_verify::verify_proof;
 
 // Errors and traits
 pub use error::{AdapterError, Result};
-pub use traits::AnchorLayer;
+pub use seal_protocol::AnchorLayer;
 
 // Chain operations (Production Guarantee Plan Phase 2)
 pub use chain_operations::{

@@ -1,4 +1,4 @@
-//! ChainAdapter implementation for SuiAnchorLayer
+//! ChainAdapter implementation for SuiSealProtocol
 //!
 //! This module implements the `ChainAdapter` trait from `csv-adapter-core`,
 //! enabling Sui to be used through the unified chain adapter interface.
@@ -11,7 +11,7 @@ use ed25519_dalek::Verifier;
 use csv_core::chain_config::ChainConfig;
 use csv_core::Chain;
 
-use crate::adapter::SuiAnchorLayer;
+use crate::seal_protocol::SuiSealProtocol;
 use crate::config::{SuiConfig, SuiNetwork};
 use crate::rpc::SuiRpc;
 
@@ -359,7 +359,7 @@ fn sui_capabilities() -> ChainCapabilities {
 }
 
 #[async_trait]
-impl ChainAdapter for SuiAnchorLayer {
+impl ChainAdapter for SuiSealProtocol {
     fn chain_id(&self) -> &'static str {
         "sui"
     }
@@ -380,7 +380,7 @@ impl ChainAdapter for SuiAnchorLayer {
         // Create the RPC client based on configuration
         #[cfg(feature = "rpc")]
         {
-            use crate::real_rpc::SuiRpcClient as RealSuiRpcClient;
+            use crate::node::SuiRpcClient as RealSuiRpcClient;
             let rpc = RealSuiRpcClient::new(rpc_url);
             Ok(Box::new(SuiRpcClient::new(Box::new(rpc))))
         }
@@ -467,7 +467,7 @@ impl ChainAdapter for SuiAnchorLayer {
 }
 
 /// Create a new Sui adapter from chain configuration
-pub fn create_sui_adapter(config: &ChainConfig) -> ChainResult<SuiAnchorLayer> {
+pub fn create_sui_adapter(config: &ChainConfig) -> ChainResult<SuiSealProtocol> {
     // Parse network from config
     let network = match config.default_network.as_str() {
         "mainnet" => SuiNetwork::Mainnet,
@@ -483,18 +483,18 @@ pub fn create_sui_adapter(config: &ChainConfig) -> ChainResult<SuiAnchorLayer> {
     {
         use crate::rpc::MockSuiRpc;
         let rpc = Box::new(MockSuiRpc::new(1)); // Use checkpoint sequence number
-        SuiAnchorLayer::from_config(sui_config, rpc)
+        SuiSealProtocol::from_config(sui_config, rpc)
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))
     }
 
     // When rpc feature is enabled, use real RPC
     #[cfg(all(not(test), feature = "rpc"))]
     {
-        use crate::real_rpc::SuiRpcClient;
+        use crate::node::SuiRpcClient;
         let rpc_url = config.rpc_endpoints.first()
             .ok_or_else(|| ChainError::InvalidInput("RPC endpoint required".to_string()))?;
         let rpc = Box::new(SuiRpcClient::new(rpc_url));
-        SuiAnchorLayer::from_config(sui_config, rpc)
+        SuiSealProtocol::from_config(sui_config, rpc)
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))
     }
 
@@ -513,7 +513,7 @@ mod tests {
 
     #[test]
     fn test_sui_adapter_chain_id() {
-        let adapter = SuiAnchorLayer::with_test().unwrap();
+        let adapter = SuiSealProtocol::with_test().unwrap();
         assert_eq!(adapter.chain_id(), "sui");
         assert_eq!(adapter.chain_name(), "Sui");
     }

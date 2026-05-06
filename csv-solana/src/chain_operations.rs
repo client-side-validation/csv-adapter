@@ -21,13 +21,13 @@ use csv_core::signature::SignatureScheme;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Signature;
 
-use crate::adapter::SolanaAnchorLayer;
+use crate::seal_protocol::SolanaSealProtocol;
 use crate::config::Network;
 use crate::rpc::SolanaRpc;
 use crate::types::ConfirmationStatus;
 
 /// Solana chain operations implementation
-pub struct SolanaChainOperations {
+pub struct SolanaBackend {
     /// Inner RPC client for chain communication
     rpc: Box<dyn SolanaRpc>,
     /// Chain configuration
@@ -36,7 +36,7 @@ pub struct SolanaChainOperations {
     domain_separator: [u8; 32],
 }
 
-impl SolanaChainOperations {
+impl SolanaBackend {
     /// Create new Solana chain operations from RPC client
     pub fn new(rpc: Box<dyn SolanaRpc>, network: Network) -> Self {
         let mut domain = [0u8; 32];
@@ -49,8 +49,8 @@ impl SolanaChainOperations {
         }
     }
 
-    /// Create from SolanaAnchorLayer
-    pub fn from_anchor_layer(anchor: &SolanaAnchorLayer) -> ChainOpResult<Self> {
+    /// Create from SolanaSealProtocol
+    pub fn from_anchor_layer(anchor: &SolanaSealProtocol) -> ChainOpResult<Self> {
         let rpc = anchor.get_rpc()
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get RPC: {}", e)))?;
         Ok(Self {
@@ -96,7 +96,7 @@ impl SolanaChainOperations {
 }
 
 #[async_trait]
-impl ChainQuery for SolanaChainOperations {
+impl ChainQuery for SolanaBackend {
     async fn get_balance(&self, address: &str) -> ChainOpResult<BalanceInfo> {
         let pubkey = self.parse_address(address)?;
 
@@ -237,7 +237,7 @@ impl ChainQuery for SolanaChainOperations {
 }
 
 #[async_trait]
-impl ChainSigner for SolanaChainOperations {
+impl ChainSigner for SolanaBackend {
     fn derive_address(&self, public_key: &[u8]) -> ChainOpResult<String> {
         if public_key.len() != 32 {
             return Err(ChainOpError::InvalidInput(
@@ -310,7 +310,7 @@ impl ChainSigner for SolanaChainOperations {
 }
 
 #[async_trait]
-impl ChainBroadcaster for SolanaChainOperations {
+impl ChainBroadcaster for SolanaBackend {
     async fn submit_transaction(&self, signed_tx: &[u8]) -> ChainOpResult<String> {
         // signed_tx is a serialized Solana transaction
         // Deserialize and send via RPC
@@ -399,7 +399,7 @@ impl ChainBroadcaster for SolanaChainOperations {
 }
 
 #[async_trait]
-impl ChainDeployer for SolanaChainOperations {
+impl ChainDeployer for SolanaBackend {
     async fn deploy_lock_contract(
         &self,
         admin_address: &str,
@@ -463,7 +463,7 @@ impl ChainDeployer for SolanaChainOperations {
 }
 
 #[async_trait]
-impl ChainProofProvider for SolanaChainOperations {
+impl ChainProofProvider for SolanaBackend {
     async fn build_inclusion_proof(
         &self,
         _commitment: &Hash,
@@ -602,7 +602,7 @@ impl ChainProofProvider for SolanaChainOperations {
 }
 
 #[async_trait]
-impl ChainRightOps for SolanaChainOperations {
+impl ChainRightOps for SolanaBackend {
     async fn create_right(
         &self,
         owner: &str,

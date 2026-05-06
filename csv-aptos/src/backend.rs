@@ -1,4 +1,4 @@
-//! ChainAdapter implementation for AptosAnchorLayer
+//! ChainAdapter implementation for AptosSealProtocol
 //!
 //! This module implements the `ChainAdapter` trait from `csv-adapter-core`,
 //! enabling Aptos to be used through the unified chain adapter interface.
@@ -11,7 +11,7 @@ use csv_core::chain_adapter::{
 use csv_core::chain_config::ChainConfig;
 use csv_core::Chain;
 
-use crate::adapter::AptosAnchorLayer;
+use crate::seal_protocol::AptosSealProtocol;
 use crate::config::{AptosConfig, AptosNetwork};
 use crate::rpc::AptosRpc;
 
@@ -325,7 +325,7 @@ fn aptos_capabilities() -> ChainCapabilities {
 }
 
 #[async_trait]
-impl ChainAdapter for AptosAnchorLayer {
+impl ChainAdapter for AptosSealProtocol {
     fn chain_id(&self) -> &'static str {
         "aptos"
     }
@@ -345,7 +345,7 @@ impl ChainAdapter for AptosAnchorLayer {
 
         #[cfg(feature = "rpc")]
         {
-            use crate::real_rpc::AptosRpcClient as RealAptosRpcClient;
+            use crate::node::AptosRpcClient as RealAptosRpcClient;
             let rpc = RealAptosRpcClient::new(rpc_url);
             Ok(Box::new(AptosRpcClient::new(Box::new(rpc))))
         }
@@ -397,7 +397,7 @@ impl ChainAdapter for AptosAnchorLayer {
 }
 
 /// Create a new Aptos adapter from chain configuration
-pub fn create_aptos_adapter(config: &ChainConfig) -> ChainResult<AptosAnchorLayer> {
+pub fn create_aptos_adapter(config: &ChainConfig) -> ChainResult<AptosSealProtocol> {
     // Parse network from config (use default_network field)
     let network = match config.default_network.as_str() {
         "mainnet" => AptosNetwork::Mainnet,
@@ -413,18 +413,18 @@ pub fn create_aptos_adapter(config: &ChainConfig) -> ChainResult<AptosAnchorLaye
     {
         use crate::rpc::MockAptosRpc;
         let rpc = Box::new(MockAptosRpc::new(aptos_config.chain_id() as u64));
-        AptosAnchorLayer::from_config(aptos_config, rpc)
+        AptosSealProtocol::from_config(aptos_config, rpc)
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))
     }
 
     // When rpc feature is enabled, use real RPC
     #[cfg(all(not(test), feature = "rpc"))]
     {
-        use crate::real_rpc::AptosRpcClient;
+        use crate::node::AptosRpcClient;
         let rpc_url = config.rpc_endpoints.first()
             .ok_or_else(|| ChainError::InvalidInput("RPC endpoint required".to_string()))?;
         let rpc = Box::new(AptosRpcClient::new(rpc_url));
-        AptosAnchorLayer::from_config(aptos_config, rpc)
+        AptosSealProtocol::from_config(aptos_config, rpc)
             .map_err(|e| ChainError::RpcError(format!("{:?}", e)))
     }
 
@@ -443,7 +443,7 @@ mod tests {
 
     #[test]
     fn test_aptos_adapter_chain_id() {
-        let adapter = AptosAnchorLayer::with_test().unwrap();
+        let adapter = AptosSealProtocol::with_test().unwrap();
         assert_eq!(adapter.chain_id(), "aptos");
         assert_eq!(adapter.chain_name(), "Aptos");
     }

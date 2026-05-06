@@ -1,10 +1,10 @@
 //! Solana adapter implementation for CSV
 //!
-//! Implements the AnchorLayer trait for Solana using Program Derived Addresses (PDAs)
+//! Implements the SealProtocol trait for Solana using Program Derived Addresses (PDAs)
 //! as single-use seals. When a seal is consumed, the PDA account is closed, transferring
 //! lamports to the destination, making the seal cryptographically unspendable.
 
-use csv_core::traits::AnchorLayer;
+use csv_core::seal_protocol::SealProtocol;
 use csv_core::{
     dag::DAGSegment, proof::ProofBundle, signature::SignatureScheme, AdapterError, Hash, Result,
 };
@@ -33,7 +33,7 @@ const INSTRUCTION_CONSUME_SEAL: u8 = 0x02;
 const INSTRUCTION_PUBLISH_COMMITMENT: u8 = 0x03;
 
 /// Solana adapter for CSV (Client-Side Validation)
-pub struct SolanaAnchorLayer {
+pub struct SolanaSealProtocol {
     /// Configuration
     pub config: SolanaConfig,
     /// RPC client
@@ -44,7 +44,7 @@ pub struct SolanaAnchorLayer {
     active_seals: std::sync::Mutex<Vec<SolanaSealRef>>,
 }
 
-impl SolanaAnchorLayer {
+impl SolanaSealProtocol {
     /// Create new Solana adapter
     pub fn new(config: SolanaConfig) -> Self {
         Self {
@@ -173,7 +173,7 @@ impl SolanaAnchorLayer {
     }
 }
 
-impl AnchorLayer for SolanaAnchorLayer {
+impl AnchorLayer for SolanaSealProtocol {
     type SealRef = SolanaSealRef;
     type AnchorRef = SolanaAnchorRef;
     type InclusionProof = SolanaInclusionProof;
@@ -552,7 +552,7 @@ impl AnchorLayer for SolanaAnchorLayer {
     }
 }
 
-impl SolanaAnchorLayer {
+impl SolanaSealProtocol {
     /// Get RPC client reference for chain_operations (crate-visible)
     pub(crate) fn get_rpc(&self) -> SolanaResult<&dyn SolanaRpc> {
         self.check_rpc()
@@ -577,7 +577,7 @@ struct SolanaProofData {
     confirmation_status: String,
 }
 
-impl SolanaAnchorLayer {
+impl SolanaSealProtocol {
     /// Generate a unique right ID
     fn generate_right_id() -> [u8; 32] {
         let mut bytes = [0u8; 32];
@@ -586,7 +586,7 @@ impl SolanaAnchorLayer {
     }
 }
 
-impl Default for SolanaAnchorLayer {
+impl Default for SolanaSealProtocol {
     fn default() -> Self {
         Self::new(SolanaConfig::default())
     }
@@ -599,7 +599,7 @@ mod tests {
     #[test]
     fn test_derive_seal_pda() {
         let config = SolanaConfig::default();
-        let adapter = SolanaAnchorLayer::new(config);
+        let adapter = SolanaSealProtocol::new(config);
         let right_id = Hash::new([1u8; 32]);
         let owner = Pubkey::new_unique();
 
@@ -612,7 +612,7 @@ mod tests {
     #[test]
     fn test_domain_separator() {
         let config = SolanaConfig::default();
-        let adapter = SolanaAnchorLayer::new(config);
+        let adapter = SolanaSealProtocol::new(config);
 
         let sep = adapter.domain_separator();
         assert_eq!(&sep[0..9], b"SOLanaCSV");
@@ -621,7 +621,7 @@ mod tests {
     #[test]
     fn test_signature_scheme() {
         let config = SolanaConfig::default();
-        let adapter = SolanaAnchorLayer::new(config);
+        let adapter = SolanaSealProtocol::new(config);
 
         assert_eq!(adapter.signature_scheme(), SignatureScheme::Ed25519);
     }

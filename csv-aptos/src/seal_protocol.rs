@@ -1,6 +1,6 @@
-//! Aptos AnchorLayer implementation with production-grade features
+//! Aptos SealProtocol implementation with production-grade features
 //!
-//! This adapter implements the AnchorLayer trait for Aptos,
+//! This adapter implements the SealProtocol trait for Aptos,
 //! using resources with consumed flag tracking as seals.
 //!
 //! ## Architecture
@@ -34,8 +34,8 @@ use crate::rpc::{AptosLedgerInfo, AptosRpc, AptosTransaction};
 use crate::seal::SealRegistry;
 use crate::types::{AptosAnchorRef, AptosFinalityProof, AptosInclusionProof, AptosSealRef};
 
-/// Aptos implementation of the AnchorLayer trait
-pub struct AptosAnchorLayer {
+/// Aptos implementation of the SealProtocol trait
+pub struct AptosSealProtocol {
     config: AptosConfig,
     /// Registry of used seals for replay prevention
     seal_registry: Mutex<SealRegistry>,
@@ -50,7 +50,7 @@ pub struct AptosAnchorLayer {
     pub signing_key: Option<ed25519_dalek::SigningKey>,
 }
 
-impl AptosAnchorLayer {
+impl AptosSealProtocol {
     /// Create a new adapter from configuration and RPC client.
     ///
     /// # Arguments
@@ -123,7 +123,7 @@ impl AptosAnchorLayer {
         csv_seal_address: [u8; 32],
         signing_key: ed25519_dalek::SigningKey,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        use crate::real_rpc::AptosRpcClient;
+        use crate::node::AptosRpcClient;
 
         let rpc: Box<dyn AptosRpc> = Box::new(AptosRpcClient::new(&config.rpc_url));
         let mut adapter = Self::from_config(config, rpc)
@@ -410,7 +410,7 @@ fn parse_aptos_address(s: &str) -> Result<[u8; 32], String> {
     Ok(addr)
 }
 
-impl AnchorLayer for AptosAnchorLayer {
+impl AnchorLayer for AptosSealProtocol {
     type SealRef = AptosSealRef;
     type AnchorRef = AptosAnchorRef;
     type InclusionProof = AptosInclusionProof;
@@ -754,7 +754,7 @@ impl AnchorLayer for AptosAnchorLayer {
     }
 }
 
-impl AptosAnchorLayer {
+impl AptosSealProtocol {
     /// Get RPC client reference (crate-visible for chain_operations)
     pub(crate) fn rpc(&self) -> &dyn AptosRpc {
         self.rpc.as_ref()
@@ -780,8 +780,8 @@ impl AptosAnchorLayer {
 mod tests {
     use super::*;
 
-    fn test_adapter() -> AptosAnchorLayer {
-        AptosAnchorLayer::with_test().unwrap()
+    fn test_adapter() -> AptosSealProtocol {
+        AptosSealProtocol::with_test().unwrap()
     }
 
     #[test]
@@ -835,7 +835,7 @@ mod tests {
 
         let rpc = Box::new(test_rpc);
         let signing_key = SigningKey::from_bytes(&[1u8; 32]);
-        let adapter = AptosAnchorLayer::from_config(config.clone(), rpc)
+        let adapter = AptosSealProtocol::from_config(config.clone(), rpc)
             .unwrap()
             .with_signing_key(signing_key);
 
@@ -867,7 +867,7 @@ mod tests {
 
         let rpc = Box::new(test_rpc);
         let signing_key = SigningKey::from_bytes(&[1u8; 32]);
-        let adapter = AptosAnchorLayer::from_config(config.clone(), rpc)
+        let adapter = AptosSealProtocol::from_config(config.clone(), rpc)
             .unwrap()
             .with_signing_key(signing_key);
 

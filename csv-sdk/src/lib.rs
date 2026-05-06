@@ -141,13 +141,13 @@ pub type Result<T> = core::result::Result<T, CsvError>;
 // ===========================================================================
 
 #[cfg(feature = "deploy-ethereum")]
-pub use csv_adapter_ethereum::deploy::deploy_csv_lock;
+pub use csv_ethereum::deploy::deploy_csv_lock;
 
 #[cfg(feature = "deploy-sui")]
-pub use csv_adapter_sui::deploy::publish_csv_package;
+pub use csv_sui::deploy::publish_csv_package;
 
 #[cfg(feature = "deploy-aptos")]
-pub use csv_adapter_aptos::deploy::publish_csv_module;
+pub use csv_aptos::deploy::publish_csv_module;
 
 #[cfg(feature = "deploy-solana")]
-pub use csv_adapter_solana::deploy::deploy_csv_program;
+pub use csv_solana::deploy::deploy_csv_program;
