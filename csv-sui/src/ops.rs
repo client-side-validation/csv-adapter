@@ -676,6 +676,7 @@ impl ChainProofProvider for SuiBackend {
         &self,
         commitment: &Hash,
         block_height: u64,
+        anchor_id: &[u8],
     ) -> ChainOpResult<CoreInclusionProof> {
         // Get the checkpoint for the given height
         let checkpoint = self
@@ -691,9 +692,28 @@ impl ChainProofProvider for SuiBackend {
             .event_builder
             .build(*commitment.as_bytes(), seal_object_id);
 
+        // Convert ledger version to 32-byte hash
+        let mut block_hash_bytes = [0u8; 32];
+        block_hash_bytes.copy_from_slice(&checkpoint.digest);
+
+        // In a real implementation, we would use the anchor_id (which should be the transaction digest)
+        // to fetch the transaction and construct a proper proof.
+        // The anchor_id is expected to be the 32-byte transaction digest.
+        let _tx_digest = {
+            if anchor_id.len() != 32 {
+                return Err(ChainOpError::InvalidInput(format!(
+                    "Invalid anchor_id length for Sui: expected 32 bytes, got {}",
+                    anchor_id.len()
+                )));
+            }
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(anchor_id);
+            arr
+        };
+
         Ok(CoreInclusionProof {
             proof_bytes: event_data,
-            block_hash: Hash::new(checkpoint.digest),
+            block_hash: Hash::new(block_hash_bytes),
             position: block_height,
             block_number: block_height,
         })

@@ -389,10 +389,13 @@ pub trait ChainProofProvider: Send + Sync {
     /// Build an inclusion proof for a commitment
     ///
     /// Proves that a commitment was included in a specific block.
+    /// The `anchor_id` provides additional transaction or anchor context
+    /// necessary to construct a real inclusion proof (e.g., transaction signature).
     async fn build_inclusion_proof(
         &self,
         commitment: &Hash,
         block_height: u64,
+        anchor_id: &[u8],
     ) -> ChainOpResult<InclusionProof>;
 
     /// Verify an inclusion proof

@@ -479,6 +479,7 @@ impl ChainProofProvider for BitcoinChainProofProvider {
         &self,
         commitment: &Hash,
         block_height: u64,
+        anchor_id: &[u8],
     ) -> ChainOpResult<CoreInclusionProof> {
         // Build a Merkle proof for a transaction inclusion
         use bitcoin_hashes::{sha256d, Hash as BitcoinHash};
@@ -489,15 +490,26 @@ impl ChainProofProvider for BitcoinChainProofProvider {
             .get_block_hash(block_height)
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get block hash: {}", e)))?;
 
-        // Build a simulated Merkle proof
-        // In a real implementation, we would:
-        // 1. Get all transactions in the block
-        // 2. Build the Merkle tree
-        // 3. Find the path from the commitment (txid) to the root
-        // 4. Return the sibling hashes at each level
+        // In a real implementation, we would use the anchor_id (which should be the transaction ID/txid)
+        // to fetch the full transaction from the RPC and construct a proper Merkle proof.
+        // The anchor_id is expected to be the 32-byte transaction hash (txid).
+        let txid = {
+            if anchor_id.len() != 32 {
+                return Err(ChainOpError::InvalidInput(format!(
+                    "Invalid anchor_id length for Bitcoin: expected 32 bytes, got {}",
+                    anchor_id.len()
+                )));
+            }
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(anchor_id);
+            arr
+        };
 
-        // For now, we create a minimal proof structure
-        // Format: [direction (1 byte) + sibling_hash (32 bytes)] * levels
+        // For now, we still create a minimal proof structure (placeholder)
+        // This should be replaced with a real implementation that:
+        // 1. Fetches the block's transaction list via RPC
+        // 2. Finds the transaction with txid
+        // 3. Computes the Merkle path from the transaction hash to the block Merkle root
         let mut proof_bytes = Vec::new();
 
         // Add leaf hash (the commitment itself)

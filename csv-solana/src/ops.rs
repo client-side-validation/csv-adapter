@@ -501,6 +501,7 @@ impl ChainProofProvider for SolanaBackend {
         &self,
         _commitment: &Hash,
         block_height: u64,
+        anchor_id: &[u8],
     ) -> ChainOpResult<CoreInclusionProof> {
         // Get block at slot
         // get_block is not available in SolanaRpc trait, use slot-based approach
@@ -512,6 +513,21 @@ impl ChainProofProvider for SolanaBackend {
 
         // Use slot as position and create placeholder block hash
         let block_hash = Hash::new([0u8; 32]);
+
+        // In a real implementation, we would use the anchor_id (which should be the transaction signature)
+        // to fetch the transaction from the RPC and construct a proper Merkle proof.
+        // The anchor_id is expected to be the 64-byte transaction signature.
+        let _tx_signature = {
+            if anchor_id.len() != 64 {
+                return Err(ChainOpError::InvalidInput(format!(
+                    "Invalid anchor_id length for Solana: expected 64 bytes, got {}",
+                    anchor_id.len()
+                )));
+            }
+            let mut arr = [0u8; 64];
+            arr.copy_from_slice(anchor_id);
+            arr
+        };
 
         Ok(
             CoreInclusionProof::new(proof_bytes, block_hash, block_height, block_height)

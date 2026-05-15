@@ -874,6 +874,7 @@ impl ChainProofProvider for EthereumBackend {
         &self,
         commitment: &Hash,
         block_height: u64,
+        anchor_id: &[u8],
     ) -> ChainOpResult<CoreInclusionProof> {
         // Get the block
         let block = self
@@ -893,6 +894,21 @@ impl ChainProofProvider for EthereumBackend {
         // This would require finding the transaction that emitted the event
         let _proof_data = serde_json::to_vec(&block)
             .map_err(|e| ChainOpError::Unknown(format!("Serialization failed: {}", e)))?;
+
+        // In a real implementation, we would use the anchor_id (which should be the transaction hash)
+        // to fetch the specific transaction and construct a proper inclusion proof.
+        // The anchor_id is expected to be the 32-byte transaction hash.
+        let _tx_hash = {
+            if anchor_id.len() != 32 {
+                return Err(ChainOpError::InvalidInput(format!(
+                    "Invalid anchor_id length for Ethereum: expected 32 bytes, got {}",
+                    anchor_id.len()
+                )));
+            }
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(anchor_id);
+            arr
+        };
 
         Ok(CoreInclusionProof {
             proof_bytes: event_data,
