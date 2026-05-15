@@ -682,8 +682,6 @@ pub mod pedersen {
 
 #[cfg(test)]
 mod pedersen_tests {
-    use super::*;
-
     #[cfg(feature = "zk")]
     mod zk_tests {
         use super::pedersen::*;

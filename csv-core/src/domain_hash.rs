@@ -148,7 +148,8 @@ mod tests {
 
     #[test]
     fn test_hash_multiple() {
-        let h1 = DomainSeparatedHash::<TestDomain1>::hash_multiple(&[b"a", b"b", b"c"]);
+        let payloads: [&[u8]; 3] = [b"a".as_slice(), b"b".as_slice(), b"c".as_slice()];
+        let h1 = DomainSeparatedHash::<TestDomain1>::hash_multiple(payloads);
         let h2 = DomainSeparatedHash::<TestDomain1>::hash(b"abc");
         assert_ne!(h1, h2); // Different because hash_multiple concatenates without separators
     }

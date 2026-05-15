@@ -699,42 +699,71 @@ mod tests {
         in_flight: alloc::sync::Arc<std::sync::Mutex<Vec<Hash>>>,
     }
 
-    #[async_trait::async_trait]
     impl RecoveryStorageBackend for MockBackend {
-        async fn load_last_known_heights(&self) -> Result<Vec<(String, u64)>> {
-            Ok(self.last_known_heights.lock().unwrap().clone())
+        fn load_last_known_heights(
+            &self,
+        ) -> impl core::future::Future<Output = Result<Vec<(String, u64)>>> + Send {
+            let heights = self.last_known_heights.lock().unwrap().clone();
+            async move { Ok(heights) }
         }
 
-        async fn find_in_flight_transfers(&self) -> Result<Vec<Hash>> {
-            Ok(self.in_flight.lock().unwrap().clone())
+        fn find_in_flight_transfers(
+            &self,
+        ) -> impl core::future::Future<Output = Result<Vec<Hash>>> + Send {
+            let in_flight = self.in_flight.lock().unwrap().clone();
+            async move { Ok(in_flight) }
         }
 
-        async fn get_transfer_state(&self, _transfer_id: &Hash) -> Result<Option<TransferRecoveryState>> {
-            Ok(None)
+        fn get_transfer_state(
+            &self,
+            _transfer_id: &Hash,
+        ) -> impl core::future::Future<Output = Result<Option<TransferRecoveryState>>> + Send {
+            async { Ok(None) }
         }
 
-        async fn update_transfer_state(&self, _transfer_id: &Hash, _state: &TransferRecoveryState) -> Result<()> {
-            Ok(())
+        fn update_transfer_state(
+            &self,
+            _transfer_id: &Hash,
+            _state: &TransferRecoveryState,
+        ) -> impl core::future::Future<Output = Result<()>> + Send {
+            async { Ok(()) }
         }
 
-        async fn record_reorg(&self, _chain: &str, _old_height: u64, _new_height: u64) -> Result<()> {
-            Ok(())
+        fn record_reorg(
+            &self,
+            _chain: &str,
+            _old_height: u64,
+            _new_height: u64,
+        ) -> impl core::future::Future<Output = Result<()>> + Send {
+            async { Ok(()) }
         }
 
-        async fn get_recent_reorgs(&self, _limit: usize) -> Result<Vec<(String, u64, u64)>> {
-            Ok(Vec::new())
+        fn get_recent_reorgs(
+            &self,
+            _limit: usize,
+        ) -> impl core::future::Future<Output = Result<Vec<(String, u64, u64)>>> + Send {
+            async { Ok(Vec::new()) }
         }
 
-        async fn get_transfers_at_height(&self, _chain: &str, _height: u64) -> Result<Vec<Hash>> {
-            Ok(Vec::new())
+        fn get_transfers_at_height(
+            &self,
+            _chain: &str,
+            _height: u64,
+        ) -> impl core::future::Future<Output = Result<Vec<Hash>>> + Send {
+            async { Ok(Vec::new()) }
         }
 
-        async fn persist_checkpoint(&self, _checkpoint: &RecoveryCheckpoint) -> Result<()> {
-            Ok(())
+        fn persist_checkpoint(
+            &self,
+            _checkpoint: &RecoveryCheckpoint,
+        ) -> impl core::future::Future<Output = Result<()>> + Send {
+            async { Ok(()) }
         }
 
-        async fn load_checkpoint(&self) -> Result<Option<RecoveryCheckpoint>> {
-            Ok(None)
+        fn load_checkpoint(
+            &self,
+        ) -> impl core::future::Future<Output = Result<Option<RecoveryCheckpoint>>> + Send {
+            async { Ok(None) }
         }
     }
 

@@ -621,11 +621,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_validate_proof_bundle_success() {
+        use crate::dag::DAGSegment;
+        use crate::seal::{CommitAnchor, SealPoint};
+
         let bundle = ProofBundle {
-            inclusion_proof: InclusionProof::new(vec![1, 2, 3], Hash::new([1u8; 32]), 0),
-            finality_proof: FinalityProof::new(vec![4, 5, 6]),
-            zk_proof: vec![],
-            block_hash: Hash::new([2u8; 32]),
+            transition_dag: DAGSegment::new(vec![], Hash::new([9u8; 32])),
+            signatures: vec![vec![1, 2, 3]],
+            seal_ref: SealPoint::new(vec![0xAA], Some(1)).unwrap(),
+            anchor_ref: CommitAnchor::new(vec![0xBB; 32], 1, vec![0xCC]).unwrap(),
+            inclusion_proof: InclusionProof::new(vec![1, 2, 3], Hash::new([1u8; 32]), 1, 0)
+                .unwrap(),
+            finality_proof: FinalityProof::new(vec![4, 5, 6], 6, true).unwrap(),
         };
 
         let verifier = MockVerifier;
@@ -634,6 +640,7 @@ mod tests {
             &verifier,
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
+            None,
         )
         .await;
 

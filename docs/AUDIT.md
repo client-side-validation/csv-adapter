@@ -135,6 +135,7 @@ All Anchor accounts require 8 bytes for the discriminator. Every `SIZE` constant
 **Deployment gap**: `deploy.sh` runs `anchor build` and `anchor deploy` then calls `anchor run initialize` to set up the `LockRegistry`. However, the Rust code never calls `initialize_registry` — it treats the account as always present. A deployment without running `initialize_registry` will cause `lock_sanad` to fail on-chain with account-not-found.
 
 **Action items for Solana**:
+
 1. Fix `SIZE` constants (add 8 bytes each).
 2. Make `SolanaSealProtocol::create_seal` call the Anchor program's `create_seal` instruction (build proper Anchor instruction discriminator: `sha256("global:create_seal")[..8]`).
 3. Align Merkle hash algorithm: use `keccak256` everywhere, or switch the Anchor program to SHA-256.
@@ -156,6 +157,7 @@ All Anchor accounts require 8 bytes for the discriminator. Every `SIZE` constant
 **Compatibility with Ethereum seal model**: The Ethereum model uses a single contract address + storage slot as the seal. The Aptos model uses one resource per address (only one seal per account). For multi-seal workflows, a `Table<u64, Seal>` or vector-based collection is needed — similar to what the code comment calls "collection-based variant."
 
 **Action items for Aptos**:
+
 1. Add `lock_sanad`, `mint_sanad`, `refund_sanad` entry functions to the Move module.
 2. Guard `transfer_seal` with `abort EDeprecated` or remove it.
 3. Fix `create_seal` error code.
@@ -171,6 +173,7 @@ All Anchor accounts require 8 bytes for the discriminator. Every `SIZE` constant
 **Transaction building**: `build_and_sign_move_call` in `seal_protocol.rs` manually constructs BCS-encoded `TransactionData` without the `sui-sdk`. The comment acknowledges this is fragile. The implementation uses hardcoded version `1` for the seal object and zeroed digest — this will be rejected by a real Sui node (`ObjectArg::ImmOrOwnedObject` requires the actual object version and digest from the chain).
 
 **Action items for Sui**:
+
 1. Add the Move source package to `csv-contracts/sui/`.
 2. Add `deploy.sh` equivalent to Ethereum/Solana.
 3. Fix `build_and_sign_move_call`: fetch real object version and digest before building `TransactionData`.
@@ -199,14 +202,17 @@ All Anchor accounts require 8 bytes for the discriminator. Every `SIZE` constant
 
 **BUG-BTC-01 — `sign_transaction` returns empty bytes**
 `csv-bitcoin/src/backend.rs`, `BitcoinWallet::sign_transaction`:
+
 ```rust
 async fn sign_transaction(&self, _data: &[u8]) -> ChainResult<Vec<u8>> {
     Ok(vec![])  // ← critical: always returns empty signature
 }
 ```
+
 Any code path that calls `wallet.sign_transaction()` will receive an empty vec and silently fail to produce a valid transaction. Fix: implement actual Taproot/SegWit signing via `secp256k1` using the wallet's private key.
 
 **BUG-BTC-02 — `verify_signature` always returns false**
+
 ```rust
 fn verify_signature(&self, data: &[u8], signature: &[u8]) -> bool {
     // Note: This would need the actual public key from the wallet
@@ -214,6 +220,7 @@ fn verify_signature(&self, data: &[u8], signature: &[u8]) -> bool {
     false
 }
 ```
+
 Fix: store the verifying key alongside the address in `BitcoinWallet`, then use `secp256k1::Secp256k1::verify_ecdsa`.
 
 **BUG-BTC-03 — Simulated Merkle proof in `build_inclusion_proof`**
@@ -221,70 +228,85 @@ Fix: store the verifying key alongside the address in `BitcoinWallet`, then use 
 The proof is constructed by hashing `commitment.as_bytes()` with a fake sibling — not from actual block transaction data. Fix: use `MempoolSignetRpc::extract_merkle_proof` which already correctly fetches block txids and computes the path.
 
 **BUG-BTC-04 — `compute_sighash` uses first 20 pubkey bytes as hash160 placeholder**
+
 ```rust
 if pubkey.len() >= 20 {
     script_code.extend_from_slice(&pubkey[..20]);
 // In real implementation, we'd hash160 the pubkey here
 ```
+
 This produces an invalid scriptCode for P2WPKH. Fix: compute HASH160 (`SHA256` then `RIPEMD160`) of the pubkey.
 
 **BUG-BTC-05 — `build_mpc_publication_transaction` uses null UTXO**
+
 ```rust
 input: vec![TxIn {
     previous_output: OutPoint::null(), // ← placeholder
 ```
+
 This transaction will be rejected by any node. Fix: select a real UTXO from the wallet's UTXO set.
 
 **STUB-BTC-06 — Fee estimation is hardcoded**
 `get_fee_estimate_rpc` returns 20 or 5 sat/vbyte based on a simple modulo check on block height. A real implementation should call `estimatesmartfee` or parse mempool fee data from `mempool.space`.
 
 **STUB-BTC-07 — `create_bitcoin_adapter` generates a random wallet**
+
 ```rust
 let wallet = SealWallet::generate_random(network.to_bitcoin_network());
 ```
+
 Every call creates a throwaway wallet. Fix: derive from the CLI's master HD seed.
 
 **STUB-BTC-08 — `ChainDriver::create_client` returns error unconditionally**
+
 ```rust
 async fn create_client(&self, _config: &ChainConfig) -> ChainResult<Box<dyn RpcClient>> {
     Err(ChainError::FeatureNotEnabled("Bitcoin RPC client creation from config requires 'rpc' feature"))
 }
 ```
+
 This blocks the runtime pattern from working without a special-case workaround.
 
 ### 3.2 Solana
 
 **BUG-SOL-01 — Hardcoded slot in `verify_finality`**
 `csv-solana/src/seal_protocol.rs`:
+
 ```rust
 let current_slot = 1100u64; // Would fetch from RPC
 ```
+
 This will never reflect real chain state. Finality checks on Solana devnet (slot > 100k) will always claim the transaction is unfinalized. Fix: call `self.check_rpc()?.get_latest_slot()`.
 
 **BUG-SOL-02 — `sign_transaction` and `sign_message` return `CapabilityUnavailable`**
 Both methods in `SolanaBackend` return an error rather than signing. This means the `ChainSigner` trait is effectively broken for Solana. Fix: implement Ed25519 signing using the wallet's keypair stored in `SolanaSealProtocol::wallet`.
 
 **STUB-SOL-03 — Inclusion proof returns empty bytes**
+
 ```rust
 let proof_bytes = vec![]; // Would fetch and serialize block data
 ```
+
 `verify_inclusion_proof` then returns `Ok(false)` for any proof where `proof_bytes.is_empty()`. Fix: use `rpc.get_transaction(&sig)` to fetch the confirmed slot, then build the proof from slot data.
 
 **STUB-SOL-04 — `verify_finality_proof` returns `FeatureNotEnabled`**
 The verification always fails in non-rpc builds. For testnet, the `rpc` feature should be enabled and the actual slot comparison implemented.
 
 **BUG-SOL-05 — Mint transaction uses a deterministic seed as keypair**
+
 ```rust
 let copy_len = sanad_bytes.len().min(32);
 seed[..copy_len].copy_from_slice(&sanad_bytes[..copy_len]);
 // derives keypair from sanad_id seed — not a real signing key
 ```
+
 The resulting "keypair" is not the owner's actual key. The transaction will be signed by the wrong key and rejected.
 
 ### 3.3 Aptos
 
 **BUG-APTOS-01 — `verify_seal_available` always returns `Ok(true)` — CRITICAL**
 `csv-aptos/src/seal_protocol.rs`:
+
 ```rust
 // Check on-chain resource
 let exists = Ok(true);  // ← always true!
@@ -293,12 +315,15 @@ if !exists {
     return Err(AptosError::StateProofFailed(...));
 }
 ```
+
 The on-chain resource check never queries the RPC. Every seal appears available regardless of its actual on-chain state. This completely defeats replay prevention for Aptos. Fix: replace with the actual `StateProofVerifier::verify_resource_exists_async` call (the scaffolding is already there, just uncommented).
 
 **BUG-APTOS-02 — `send_transaction` in backend uses hardcoded mainnet URL**
+
 ```rust
 .post("https://fullnode.mainnet.aptoslabs.com/v1/transactions")
 ```
+
 This is inside the `#[cfg(feature = "rpc")]` block. Testnet transactions are silently sent to mainnet. Fix: use `self.config.network.node_url()`.
 
 **STUB-APTOS-03 — `sign_transaction` and `sign_message` return `CapabilityUnavailable`**
@@ -313,71 +338,87 @@ The proof is never verified. Any finality proof is accepted without cryptographi
 ### 3.4 Sui
 
 **BUG-SUI-01 — `lock_sanad` uses placeholder zero signature**
+
 ```rust
 let signature = vec![0u8; 64]; // Placeholder signature
 ```
+
 A 64-byte zero vector is not a valid Ed25519 signature. The RPC will reject it. Fix: sign `tx_bytes` with the wallet's Ed25519 key.
 
 **BUG-SUI-02 — `mint_sanad` also uses placeholder zero signature**
 Same issue. Both cross-chain operations are non-functional.
 
 **BUG-SUI-03 — Object version hardcoded to `1` in `build_and_sign_move_call`**
+
 ```rust
 tx.extend_from_slice(&1u64.to_le_bytes()); // version 1
 tx.extend_from_slice(&[0u8; 32]);           // digest (zeroed for owned objects)
 ```
+
 A real Sui node will reject `ObjectArg::ImmOrOwnedObject` with an incorrect version or zero digest. Fix: call `rpc.get_object(seal_object_id)` to fetch current version and digest before building the transaction.
 
 **STUB-SUI-04 — `csv_program_id` returns placeholder**
+
 ```rust
 fn csv_program_id(&self) -> Option<&'static str> {
     Some("0xcsvsui")  // ← not a real package ID
 }
 ```
+
 Fix: return the value from `config.seal_contract.package_id`.
 
 **STUB-SUI-05 — `verify_inclusion` returns zero object_proof**
+
 ```rust
 Ok(SuiInclusionProof::new(
     vec![0u8; 32], // object_proof would come from tx effects
 ```
+
 The proof will fail any non-trivial verification.
 
 ### 3.5 Core Verifier
 
 **BUG-CORE-01 — `validate_domain_separation` requires `seal_id == anchor_id`**
 `csv-core/src/verifier.rs`:
+
 ```rust
 if bundle.seal_ref.id != bundle.anchor_ref.anchor_id {
     return Err(ProtocolError::Generic("Seal reference mismatch: seal ID and anchor ID must match"));
 }
 ```
+
 For Ethereum the seal ID is `[contract_address(20) + slot(8)]` (28 bytes) and the anchor ID is `tx_hash` (32 bytes) — they can never be equal. For Bitcoin the seal is an `OutPoint` and the anchor is a `txid`. This check is architecturally wrong and will reject all valid proofs from every chain. Fix: remove this equality check; the association between seal and anchor is established by the proof bundle's `transition_dag`, not by byte equality.
 
 **BUG-CORE-02 — `validate_anchor_reference` also checks `anchor_id == seal_id`**
 Same incorrect equality constraint appears a second time:
+
 ```rust
 if bundle.anchor_ref.anchor_id != bundle.seal_ref.id {
     return Err(...);
 }
 ```
+
 Must be removed.
 
 **STUB-CORE-03 — `validate_proof_timestamp` checks only for zero**
+
 ```rust
 if bundle.anchor_ref.block_height == 0 {
     return Err(ProtocolError::Generic("Invalid proof timestamp: anchor timestamp is 0"));
 }
 ```
+
 This is checking block height, not a timestamp. The comment says "compare against actual current timestamp" but no timestamp exists in `ProofBundle`. Either add a `created_at: u64` field or remove the timestamp validation entirely until it can be implemented properly.
 
 ### 3.6 Shared Placeholders Across All Chains
 
 Every chain's `ChainBackend::publish_seal` uses the same dummy commitment:
+
 ```rust
 commitment_bytes[..8].copy_from_slice(b"csv-seal");
 // Rest is zeroes
 ```
+
 This is called from `publish_seal`, which is the bridge between the generic `ChainBackend` trait and the chain-specific `SealProtocol::publish`. The caller must supply a real commitment hash. Fix: remove the dummy generation; require `commitment` as a parameter to `publish_seal`, or compute it from `seal.id` using the chain's `hash_commitment` method.
 
 ---
@@ -433,6 +474,7 @@ Same duplication exists for `format_address` (hex encode with `0x` prefix). Fix:
 ### 4.4 `verify_seal_available` vs `enforce_seal` — Double-Spend Check Duplicated
 
 Every `SealProtocol` implementation has:
+
 1. `enforce_seal(seal)` — checks registry + on-chain, marks used. Called from `seal_protocol.rs`.
 2. `verify_seal_available(seal)` — also checks registry + on-chain. Called from `publish()` before `enforce_seal`.
 
@@ -441,6 +483,7 @@ So for every `publish()` call, both functions query the same local registry and 
 ### 4.5 Domain Separator Computed in Two Places Per Chain
 
 For each chain, the domain separator `[u8; 32]` is computed:
+
 1. In `SealProtocol::from_config()` (the authoritative source)
 2. Again in `ChainBackend::new()` (re-derives from scratch using the same algorithm)
 
@@ -451,6 +494,7 @@ Fix: remove the domain separator computation from `ChainBackend::new()`. Require
 ### 4.6 `chain_id()` / `chain_name()` in Both `ChainDriver` and `ChainBackend`
 
 Every chain implements:
+
 ```rust
 // In backend.rs (ChainDriver)
 fn chain_id(&self) -> &'static str { "bitcoin" }
@@ -466,6 +510,7 @@ If one is updated and the other is not, the two layers will disagree. Fix: defin
 ### 4.7 `create_seal` / `publish_seal` in `ChainBackend` Call Through to `SealProtocol`
 
 In every chain's `ops.rs`:
+
 ```rust
 fn create_seal(&self, value: Option<u64>) -> ChainOpResult<SealPoint> {
     let chain_seal = self.seal_protocol.create_seal(value)...;
@@ -486,6 +531,7 @@ These are type-conversion wrappers that add boilerplate without logic. The conve
 ### 4.8 `ChainSanadOps` Stubs Copy-Pasted Across All Chains
 
 Every chain's `ops.rs` has nearly identical stub bodies for `create_sanad` and `consume_sanad`:
+
 ```rust
 async fn create_sanad(...) -> ChainOpResult<SanadOperationResult> {
     // In Ethereum/Bitcoin/Aptos/Sui, creating a sanad involves:

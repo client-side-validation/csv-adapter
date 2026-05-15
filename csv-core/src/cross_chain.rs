@@ -8,11 +8,74 @@
 
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest as Sha2Digest, Sha256};
+use sha3::{Keccak256, Sha3_256};
 
 use crate::hash::Hash;
 use crate::mcp::ChainId;
 use crate::sanad::{OwnershipProof as SanadOwnershipProof, Sanad};
 use crate::seal::SealPoint;
+use crate::signature::Signature;
+
+/// Hash algorithm used by the source chain's proof model.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CrossChainHashAlgorithm {
+    /// SHA-256
+    Sha256,
+    /// Bitcoin-style double SHA-256
+    DoubleSha256,
+    /// Keccak-256
+    Keccak256,
+    /// SHA3-256
+    Sha3_256,
+}
+
+impl CrossChainHashAlgorithm {
+    /// Return the canonical hash algorithm for a given source chain.
+    pub fn for_chain(chain: &ChainId) -> Result<Self, CrossChainError> {
+        match chain.to_string().as_str() {
+            "bitcoin" => Ok(Self::DoubleSha256),
+            "ethereum" => Ok(Self::Keccak256),
+            "solana" => Ok(Self::Keccak256),
+            "aptos" => Ok(Self::Sha3_256),
+            "sui" => Ok(Self::Sha256),
+            _ => Err(CrossChainError::UnsupportedChainPair(
+                chain.clone(),
+                chain.clone(),
+            )),
+        }
+    }
+
+    /// Hash raw bytes using this algorithm.
+    pub fn hash_bytes(self, bytes: &[u8]) -> Hash {
+        match self {
+            Self::Sha256 => {
+                let mut hasher = Sha256::new();
+                hasher.update(bytes);
+                Hash::new(hasher.finalize().into())
+            }
+            Self::DoubleSha256 => {
+                let mut first = Sha256::new();
+                first.update(bytes);
+                let digest = first.finalize();
+
+                let mut second = Sha256::new();
+                second.update(digest);
+                Hash::new(second.finalize().into())
+            }
+            Self::Keccak256 => {
+                let mut hasher = Keccak256::new();
+                hasher.update(bytes);
+                Hash::new(hasher.finalize().into())
+            }
+            Self::Sha3_256 => {
+                let mut hasher = Sha3_256::new();
+                hasher.update(bytes);
+                Hash::new(hasher.finalize().into())
+            }
+        }
+    }
+}
 
 /// Event emitted when a Sanad is locked on the source chain for cross-chain transfer.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,6 +169,45 @@ pub enum InclusionProof {
     Solana(SolanaSlotProof),
     /// ZK proof: chain-agnostic zero-knowledge seal proof
     ZkSeal(ZkSealProof),
+}
+
+impl InclusionProof {
+    /// Returns true when the proof variant is compatible with the given chain.
+    pub fn matches_chain(&self, chain: &ChainId) -> bool {
+        match (chain.to_string().as_str(), self) {
+            ("bitcoin", InclusionProof::Bitcoin(_))
+            | ("ethereum", InclusionProof::Ethereum(_))
+            | ("sui", InclusionProof::Sui(_))
+            | ("aptos", InclusionProof::Aptos(_))
+            | ("solana", InclusionProof::Solana(_)) => true,
+            (_, InclusionProof::ZkSeal(proof)) => &proof.verifier_key.chain == chain,
+            _ => false,
+        }
+    }
+
+    /// Expected hash algorithm for this inclusion proof family.
+    pub fn expected_hash_algorithm(&self) -> CrossChainHashAlgorithm {
+        match self {
+            InclusionProof::Bitcoin(_) => CrossChainHashAlgorithm::DoubleSha256,
+            InclusionProof::Ethereum(_) => CrossChainHashAlgorithm::Keccak256,
+            InclusionProof::Sui(_) => CrossChainHashAlgorithm::Sha256,
+            InclusionProof::Aptos(_) => CrossChainHashAlgorithm::Sha3_256,
+            InclusionProof::Solana(_) => CrossChainHashAlgorithm::Keccak256,
+            InclusionProof::ZkSeal(proof) => proof.verifier_key.hash_algorithm,
+        }
+    }
+
+    /// Derive a canonical attestation root/hash from the proof payload.
+    pub fn attested_root_hash(&self, algorithm: CrossChainHashAlgorithm) -> Hash {
+        match self {
+            InclusionProof::Bitcoin(proof) => algorithm.hash_bytes(&proof.block_header),
+            InclusionProof::Ethereum(proof) => algorithm.hash_bytes(&proof.block_header),
+            InclusionProof::Sui(proof) => Hash::new(proof.checkpoint_contents_hash),
+            InclusionProof::Aptos(proof) => algorithm.hash_bytes(&proof.ledger_info),
+            InclusionProof::Solana(proof) => Hash::new(proof.block_hash),
+            InclusionProof::ZkSeal(proof) => proof.public_inputs.block_hash,
+        }
+    }
 }
 
 /// Bitcoin Merkle proof of transaction inclusion in a block.
@@ -214,6 +316,8 @@ pub struct ZkSealProof {
 pub struct VerifierKey {
     /// Chain this verifier is for
     pub chain: ChainId,
+    /// Hash algorithm encoded into the proof system's public inputs
+    pub hash_algorithm: CrossChainHashAlgorithm,
     /// Verifier key bytes
     pub key_bytes: Vec<u8>,
     /// Proof system type
@@ -263,6 +367,8 @@ pub struct CrossChainTransferProof {
     pub inclusion_proof: InclusionProof,
     /// Finality proof confirming source transaction
     pub finality_proof: CrossChainFinalityProof,
+    /// Hash algorithm used by the source chain's proof system
+    pub hash_algorithm: CrossChainHashAlgorithm,
     /// Source chain's state root at the lock block
     pub source_state_root: Hash,
 }
@@ -371,6 +477,120 @@ pub trait MintProvider {
     ) -> Result<CrossChainTransferResult, CrossChainError>;
 }
 
+/// Default verifier implementation for cross-chain transfer proofs.
+pub struct StandardTransferVerifier<'a> {
+    registry: &'a CrossChainRegistry,
+}
+
+impl<'a> StandardTransferVerifier<'a> {
+    /// Create a verifier backed by the shared transfer registry.
+    pub fn new(registry: &'a CrossChainRegistry) -> Self {
+        Self { registry }
+    }
+
+    fn verify_ownership(
+        &self,
+        proof: &SanadOwnershipProof,
+        commitment: Hash,
+    ) -> Result<(), CrossChainError> {
+        if proof.proof.is_empty() {
+            return Err(CrossChainError::InvalidOwnership);
+        }
+
+        if let Some(scheme) = proof.scheme {
+            Signature::new(
+                proof.proof.clone(),
+                proof.owner.clone(),
+                commitment.as_bytes().to_vec(),
+            )
+            .verify(scheme)
+            .map_err(|_| CrossChainError::InvalidOwnership)?;
+        }
+
+        Ok(())
+    }
+
+    fn verify_compatibility(&self, proof: &CrossChainTransferProof) -> Result<(), CrossChainError> {
+        if proof.lock_event.source_chain == proof.lock_event.destination_chain {
+            return Err(CrossChainError::UnsupportedChainPair(
+                proof.lock_event.source_chain.clone(),
+                proof.lock_event.destination_chain.clone(),
+            ));
+        }
+
+        if !proof.inclusion_proof.matches_chain(&proof.lock_event.source_chain) {
+            return Err(CrossChainError::InvalidInclusionProof);
+        }
+
+        let expected_hash_algorithm =
+            CrossChainHashAlgorithm::for_chain(&proof.lock_event.source_chain)?;
+        if proof.hash_algorithm != expected_hash_algorithm
+            || proof.inclusion_proof.expected_hash_algorithm() != expected_hash_algorithm
+        {
+            return Err(CrossChainError::InvalidInclusionProof);
+        }
+
+        let attested_root = proof.inclusion_proof.attested_root_hash(proof.hash_algorithm);
+        if attested_root == Hash::zero()
+            || proof.source_state_root == Hash::zero()
+            || proof.source_state_root != attested_root
+        {
+            return Err(CrossChainError::InvalidInclusionProof);
+        }
+
+        if proof.finality_proof.source_chain != proof.lock_event.source_chain
+            || proof.finality_proof.height != proof.lock_event.source_block_height
+        {
+            return Err(CrossChainError::LockEventMismatch);
+        }
+
+        let finalized_by_depth = proof.finality_proof.current_height
+            >= proof.finality_proof.height.saturating_add(proof.finality_proof.depth);
+        if !proof.finality_proof.is_finalized || !finalized_by_depth {
+            return Err(CrossChainError::InsufficientFinality(
+                proof.finality_proof
+                    .current_height
+                    .saturating_sub(proof.finality_proof.height),
+                proof.finality_proof.depth,
+            ));
+        }
+
+        if proof.lock_event.commitment == Hash::zero()
+            || proof.lock_event.sanad_id == Hash::zero()
+            || proof.lock_event.source_tx_hash == Hash::zero()
+        {
+            return Err(CrossChainError::LockEventMismatch);
+        }
+
+        self.verify_ownership(&proof.lock_event.owner, proof.lock_event.commitment)?;
+        self.verify_ownership(
+            &proof.lock_event.destination_owner,
+            proof.lock_event.commitment,
+        )?;
+
+        Ok(())
+    }
+}
+
+impl TransferVerifier for StandardTransferVerifier<'_> {
+    fn verify_transfer_proof(
+        &self,
+        proof: &CrossChainTransferProof,
+    ) -> Result<(), CrossChainError> {
+        self.verify_compatibility(proof)?;
+
+        if self.registry.is_sanad_transferred(&proof.lock_event.sanad_id) {
+            return Err(CrossChainError::AlreadyMinted);
+        }
+
+        if self.registry.is_seal_consumed(&proof.lock_event.source_seal) {
+            return Err(CrossChainError::AlreadyLocked);
+        }
+
+        Ok(())
+    }
+}
+
 /// Cross-chain transfer orchestrator.
 ///
 /// Coordinates lock → prove → verify → mint across chains.
@@ -421,6 +641,8 @@ impl CrossChainTransfer {
         let lock_timestamp = lock_event.timestamp;
 
         let is_finalized = current_block_height >= source_block_height + finality_depth;
+        let hash_algorithm = CrossChainHashAlgorithm::for_chain(&source_chain)?;
+        let source_state_root = inclusion_proof.attested_root_hash(hash_algorithm);
 
         let transfer_proof = CrossChainTransferProof {
             lock_event,
@@ -432,7 +654,8 @@ impl CrossChainTransfer {
                 is_finalized,
                 depth: finality_depth,
             },
-            source_state_root: Hash::new([0u8; 32]),
+            hash_algorithm,
+            source_state_root,
         };
 
         // Step 3: Verify on destination
@@ -532,6 +755,7 @@ mod tests {
     use super::*;
     use crate::hash::Hash;
     use crate::mcp::ChainId;
+    use crate::signature::SignatureScheme;
 
     #[test]
     fn test_chain_id_roundtrip() {
@@ -625,5 +849,94 @@ mod tests {
         registry.record_transfer(entry).unwrap();
         assert_eq!(registry.transfer_count(), 1);
         assert!(registry.is_sanad_transferred(&Hash::new([0xAB; 32])));
+    }
+
+    fn ownership_proof_for(commitment: Hash) -> SanadOwnershipProof {
+        use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
+
+        let secp = Secp256k1::new();
+        let secret_key = SecretKey::from_slice(&[7u8; 32]).unwrap();
+        let public_key = PublicKey::from_secret_key(&secp, &secret_key).serialize().to_vec();
+        let message = Message::from_digest_slice(commitment.as_bytes()).unwrap();
+        let signature = secp
+            .sign_ecdsa(&message, &secret_key)
+            .serialize_compact()
+            .to_vec();
+
+        SanadOwnershipProof {
+            proof: signature,
+            owner: public_key,
+            scheme: Some(SignatureScheme::Secp256k1),
+        }
+    }
+
+    fn sample_transfer_proof() -> CrossChainTransferProof {
+        let commitment = Hash::new([0x11; 32]);
+        let block_header = vec![0x42; 80];
+        let source_chain = ChainId::new("bitcoin");
+        let hash_algorithm = CrossChainHashAlgorithm::for_chain(&source_chain).unwrap();
+        let inclusion_proof = InclusionProof::Bitcoin(BitcoinMerkleProof {
+            txid: [0xAA; 32],
+            merkle_branch: vec![[0xBB; 32]],
+            block_header: block_header.clone(),
+            block_height: 100,
+            confirmations: 6,
+        });
+
+        CrossChainTransferProof {
+            lock_event: CrossChainLockEvent {
+                sanad_id: Hash::new([0x01; 32]),
+                commitment,
+                owner: ownership_proof_for(commitment),
+                source_chain: source_chain.clone(),
+                destination_chain: ChainId::new("sui"),
+                destination_owner: ownership_proof_for(commitment),
+                source_seal: SealPoint::new(vec![0xAA, 0xBB], Some(42)).unwrap(),
+                source_tx_hash: Hash::new([0x02; 32]),
+                source_block_height: 100,
+                timestamp: 1_700_000_000,
+            },
+            inclusion_proof,
+            finality_proof: CrossChainFinalityProof {
+                source_chain,
+                height: 100,
+                current_height: 106,
+                is_finalized: true,
+                depth: 6,
+            },
+            hash_algorithm,
+            source_state_root: hash_algorithm.hash_bytes(&block_header),
+        }
+    }
+
+    #[test]
+    fn test_standard_verifier_accepts_matching_chain_and_hash_algorithm() {
+        let registry = CrossChainRegistry::new();
+        let verifier = StandardTransferVerifier::new(&registry);
+        assert!(verifier.verify_transfer_proof(&sample_transfer_proof()).is_ok());
+    }
+
+    #[test]
+    fn test_standard_verifier_rejects_hash_algorithm_mismatch() {
+        let registry = CrossChainRegistry::new();
+        let verifier = StandardTransferVerifier::new(&registry);
+        let mut proof = sample_transfer_proof();
+        proof.hash_algorithm = CrossChainHashAlgorithm::Sha256;
+        assert!(matches!(
+            verifier.verify_transfer_proof(&proof),
+            Err(CrossChainError::InvalidInclusionProof)
+        ));
+    }
+
+    #[test]
+    fn test_standard_verifier_rejects_chain_variant_mismatch() {
+        let registry = CrossChainRegistry::new();
+        let verifier = StandardTransferVerifier::new(&registry);
+        let mut proof = sample_transfer_proof();
+        proof.lock_event.source_chain = ChainId::new("ethereum");
+        assert!(matches!(
+            verifier.verify_transfer_proof(&proof),
+            Err(CrossChainError::InvalidInclusionProof)
+        ));
     }
 }

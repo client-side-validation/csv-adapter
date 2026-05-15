@@ -201,7 +201,10 @@ pub use events::{
 
 // Cross-chain transfer
 pub use client::{ValidationClient, ValidationResult};
-pub use cross_chain::{CrossChainLockEvent, CrossChainRegistry, CrossChainRegistryEntry};
+pub use cross_chain::{
+    CrossChainHashAlgorithm, CrossChainLockEvent, CrossChainRegistry, CrossChainRegistryEntry,
+    CrossChainTransferProof, StandardTransferVerifier,
+};
 pub use nullifier::{
     DoubleSpendError, OptimizedSealNullifier, SealConsumption, SealNullifier, SealStatus,
 };

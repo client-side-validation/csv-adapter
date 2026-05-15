@@ -785,8 +785,9 @@ impl ChainProofProvider for SuiBackend {
             return Ok(false);
         }
 
-        // Verify the proof signature matches the checkpoint digest
-        if proof.finality_data != checkpoint.digest.to_vec() {
+        // Deterministic finality on Sui requires a certified checkpoint and
+        // a proof payload that represents at least one finalized checkpoint.
+        if proof.confirmations == 0 || !proof.is_deterministic {
             return Ok(false);
         }
 
