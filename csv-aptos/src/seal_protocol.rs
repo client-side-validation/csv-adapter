@@ -14,7 +14,7 @@
 use std::sync::Mutex;
 
 #[cfg(feature = "rpc")]
-use tokio::runtime::Handle;
+use crate::proofs::StateProofVerifier;
 
 use csv_core::commitment::Commitment;
 use csv_core::dag::DAGSegment;
@@ -30,13 +30,29 @@ use crate::checkpoint::CheckpointVerifier;
 use crate::config::{AptosConfig, AptosNetwork};
 use crate::error::{AptosError, AptosResult};
 use crate::proofs::{CommitmentEventBuilder, EventProofVerifier};
-#[cfg(feature = "rpc")]
-use crate::proofs::StateProofVerifier;
 #[cfg(not(feature = "rpc"))]
 use crate::rpc::{AptosLedgerInfo, AptosTransaction};
 use crate::rpc::AptosRpc;
 use crate::seal::SealRegistry;
 use crate::types::{AptosCommitAnchor, AptosFinalityProof, AptosInclusionProof, AptosSealPoint};
+
+#[cfg(feature = "rpc")]
+fn spawn_blocking_async<F, T>(future: F) -> Result<T, AptosError>
+where
+    F: std::future::Future<Output = Result<T, AptosError>> + Send + 'static,
+    T: Send + 'static,
+{
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| AptosError::RpcError(format!("Failed to create runtime: {}", e)))?;
+        rt.block_on(future)
+    })
+    .join()
+    .map_err(|_| AptosError::RpcError("Thread panicked".to_string()))
+    .and_then(|r| r)
+}
 
 /// Aptos implementation of the SealProtocol trait
 pub struct AptosSealProtocol {
@@ -55,6 +71,10 @@ pub struct AptosSealProtocol {
 }
 
 impl AptosSealProtocol {
+    pub(crate) fn config(&self) -> &AptosConfig {
+        &self.config
+    }
+
     /// Create a new adapter from configuration and RPC client.
     ///
     /// # Arguments
@@ -165,8 +185,7 @@ impl AptosSealProtocol {
                 self.config.seal_contract.module_address, self.config.seal_contract.seal_resource
             );
             let rpc = self.rpc.clone_boxed();
-            let rt = Handle::current();
-            rt.block_on(async {
+            spawn_blocking_async(async move {
                 StateProofVerifier::verify_resource_exists_async(
                     seal.account_address,
                     &resource_type,

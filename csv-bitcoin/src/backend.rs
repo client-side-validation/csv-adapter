@@ -134,28 +134,44 @@ impl Wallet for BitcoinWallet {
     }
 
     async fn sign_transaction(&self, _data: &[u8]) -> ChainResult<Vec<u8>> {
-        // The BitcoinSealProtocol handles transaction building and signing internally
-        // via the SealWallet which manages UTXOs and proper Taproot signing.
-        // External raw data signing is not supported for security - transactions
-        // must be constructed through the wallet's UTXO-aware interface.
-        Ok(vec![])
+        use sha2::{Digest, Sha256};
+
+        let mut digest = [0u8; 32];
+        digest.copy_from_slice(&Sha256::digest(_data));
+
+        self.wallet
+            .sign_taproot_keypath(&crate::wallet::Bip86Path::external(0, 0), &digest)
+            .map_err(|e| ChainError::WalletError(format!("Failed to sign transaction: {}", e)))
     }
 
     fn verify_signature(&self, data: &[u8], signature: &[u8]) -> bool {
-        // Use secp256k1 for signature verification
-        use secp256k1::Secp256k1;
+        use secp256k1::{Message, Secp256k1, XOnlyPublicKey};
+        use sha2::{Digest, Sha256};
 
-        if signature.len() != 64 && signature.len() != 71 && signature.len() != 72 {
+        if signature.len() != 64 {
             return false;
         }
 
-        // Parse the public key from our address
         let secp = Secp256k1::new();
+        let derived = match self.wallet.get_funding_address(0, 0) {
+            Ok(derived) => derived,
+            Err(_) => return false,
+        };
+        let public_key = match XOnlyPublicKey::from_slice(&derived.internal_xonly.serialize()) {
+            Ok(public_key) => public_key,
+            Err(_) => return false,
+        };
+        let signature = match secp256k1::schnorr::Signature::from_slice(signature) {
+            Ok(signature) => signature,
+            Err(_) => return false,
+        };
+        let digest = Sha256::digest(data);
+        let message = match Message::from_digest_slice(&digest) {
+            Ok(message) => message,
+            Err(_) => return false,
+        };
 
-        // Note: This would need the actual public key from the wallet
-        // For now, return false as we need the pubkey to verify
-        let _ = (data, &secp);
-        false
+        secp.verify_schnorr(&signature, &message, &public_key).is_ok()
     }
 
     fn generate_address(&self) -> ChainResult<String> {
@@ -206,16 +222,13 @@ impl ChainDriver for BitcoinSealProtocol {
     }
 
     async fn create_client(&self, _config: &ChainConfig) -> ChainResult<Box<dyn RpcClient>> {
-        // If RPC is configured, use it
-        if let Some(_rpc) = self.rpc.as_ref() {
-            // We need to clone the RPC somehow - for now, indicate that
-            // a fresh RPC client should be created from config
-        }
+        let rpc = self.rpc.as_ref().ok_or_else(|| {
+            ChainError::FeatureNotEnabled(
+                "Bitcoin RPC client is not configured for this adapter".to_string(),
+            )
+        })?;
 
-        // Create new RPC client from config
-        Err(ChainError::FeatureNotEnabled(
-            "Bitcoin RPC client creation from config requires 'rpc' feature".to_string(),
-        ))
+        Ok(Box::new(BitcoinRpcClient::new(rpc.clone_boxed())))
     }
 
     async fn create_wallet(&self, _config: &ChainConfig) -> ChainResult<Box<dyn Wallet>> {

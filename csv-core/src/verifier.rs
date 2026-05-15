@@ -218,17 +218,9 @@ fn validate_proof_bundle_size(bundle: &ProofBundle) -> Result<()> {
 /// - Prevents replay attacks using old proofs
 /// - Ensures proofs are generated recently
 fn validate_proof_timestamp(bundle: &ProofBundle) -> Result<()> {
-    // Use anchor timestamp as proof generation time
-    let anchor_timestamp = bundle.anchor_ref.block_height;
-
-    // Get current time (in production, this would use the actual current time)
-    // For now, we use the anchor timestamp as a relative check
-    // In a real implementation, you'd compare against actual current timestamp
-
-    // If the anchor timestamp is 0, the proof is likely malformed
-    if anchor_timestamp == 0 {
+    if bundle.anchor_ref.block_height == 0 {
         return Err(ProtocolError::Generic(
-            "Invalid proof timestamp: anchor timestamp is 0".to_string(),
+            "Invalid anchor reference: block height is 0".to_string(),
         ));
     }
 
@@ -245,14 +237,6 @@ fn validate_domain_separation(bundle: &ProofBundle) -> Result<()> {
     if bundle.seal_ref.id.is_empty() {
         return Err(ProtocolError::Generic(
             "Invalid seal reference: empty seal ID".to_string(),
-        ));
-    }
-
-    // Verify that seal_id and anchor anchor_id match (consistency check)
-    // The seal_id should be consistent with the anchor's anchor_id
-    if bundle.seal_ref.id != bundle.anchor_ref.anchor_id {
-        return Err(ProtocolError::Generic(
-            "Seal reference mismatch: seal ID and anchor ID must match".to_string(),
         ));
     }
 
@@ -342,13 +326,6 @@ fn validate_anchor_reference(bundle: &ProofBundle) -> Result<()> {
     if bundle.anchor_ref.block_height == 0 {
         return Err(ProtocolError::Generic(
             "Invalid anchor: block height is 0".to_string(),
-        ));
-    }
-
-    // Verify anchor_id matches the seal_id (ensures seal is properly anchored)
-    if bundle.anchor_ref.anchor_id != bundle.seal_ref.id {
-        return Err(ProtocolError::Generic(
-            "Invalid anchor: anchor_id does not match seal_id".to_string(),
         ));
     }
 
@@ -512,7 +489,7 @@ mod tests {
                 .map_err(|e| ProtocolError::Generic(e.to_string()))?,
             CommitAnchor::new(seal_id, 100, vec![])
                 .map_err(|e| ProtocolError::Generic(e.to_string()))?,
-            InclusionProof::new(vec![0xCD; 32], Hash::new([2u8; 32]), 0)
+            InclusionProof::new(vec![0xCD; 32], Hash::new([2u8; 32]), 0, 0)
                 .map_err(|e| ProtocolError::Generic(e.to_string()))?,
             FinalityProof::new(vec![0xAB; 16], 6, false)
                 .map_err(|e| ProtocolError::Generic(e.to_string()))?,
@@ -524,6 +501,17 @@ mod tests {
     #[test]
     fn test_verify_proof_valid() {
         let bundle = test_bundle_with_signatures().unwrap();
+        let seal_registry = |_seal_id: &[u8]| false;
+        assert!(verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1).is_ok());
+    }
+
+    #[test]
+    fn test_verify_proof_accepts_distinct_seal_and_anchor_ids() {
+        let mut bundle = test_bundle_with_signatures().unwrap();
+        bundle.anchor_ref = CommitAnchor::new(vec![9u8; 32], 100, vec![0xAA, 0xBB])
+            .map_err(|e| ProtocolError::Generic(e.to_string()))
+            .unwrap();
+
         let seal_registry = |_seal_id: &[u8]| false;
         assert!(verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1).is_ok());
     }

@@ -40,7 +40,7 @@ impl SanadAccount {
     /// Account size for space calculation
     /// 8 (discriminator) + 32 (owner) + 32 (sanad_id) + 32 (commitment) + 
     /// 32 (state_root) + 32 (nullifier) + metadata/proof fields + flags + timestamp + bump
-    pub const SIZE: usize = 32 + 32 + 32 + 32 + 32 + 1 + 32 + 32 + 1 + 32 + 1 + 1 + 8 + 1;
+    pub const SIZE: usize = 8 + 32 + 32 + 32 + 32 + 32 + 1 + 32 + 32 + 1 + 32 + 1 + 1 + 8 + 1;
 }
 
 /// LockRecord stores information about a locked sanad for refund purposes
@@ -90,7 +90,7 @@ pub struct LockAccount {
 impl LockAccount {
     /// Space required for the LockAccount
     /// 8 (discriminator) + LockRecord::SIZE + 1 (bump)
-    pub const SIZE: usize = LockRecord::SIZE + 1;
+    pub const SIZE: usize = 8 + LockRecord::SIZE + 1;
 }
 
 /// LockRegistry tracks global lock settings (no longer stores Vec of locks)
@@ -110,5 +110,5 @@ pub struct LockRegistry {
 impl LockRegistry {
     /// Fixed size - no variable-length data
     /// 8 (discriminator) + 32 (authority) + 4 (refund_timeout) + 4 (lock_count) + 1 (bump)
-    pub const SIZE: usize = 32 + 4 + 4 + 1;
+    pub const SIZE: usize = 8 + 32 + 4 + 4 + 1;
 }

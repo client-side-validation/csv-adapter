@@ -373,9 +373,10 @@ impl ChainDriver for SuiSealProtocol {
         sui_capabilities()
     }
 
-    async fn create_client(&self, config: &ChainConfig) -> ChainResult<Box<dyn RpcClient>> {
+    async fn create_client(&self, _config: &ChainConfig) -> ChainResult<Box<dyn RpcClient>> {
         // Create a new RPC client from config
-        let rpc_endpoint = config
+        #[cfg(feature = "rpc")]
+        let rpc_endpoint = _config
             .rpc_endpoints
             .first()
             .ok_or_else(|| ChainError::InvalidInput("RPC endpoint required".to_string()))?
@@ -457,8 +458,11 @@ impl ChainDriver for SuiSealProtocol {
     }
 
     fn csv_program_id(&self) -> Option<&'static str> {
-        // CSV seal package ID on Sui
-        Some("0xcsvsui")
+        self.config
+            .seal_contract
+            .package_id
+            .clone()
+            .map(|package_id| Box::leak(package_id.into_boxed_str()) as &'static str)
     }
 
     fn to_core_chain(&self) -> ChainId {
@@ -480,6 +484,7 @@ pub fn create_sui_adapter(config: &ChainConfig) -> ChainResult<SuiSealProtocol> 
         _ => SuiNetwork::Testnet,
     };
 
+    #[allow(unused_variables)]
     let sui_config = SuiConfig {
         seal_contract: crate::SealContractConfig {
             package_id: Some(
@@ -505,7 +510,7 @@ pub fn create_sui_adapter(config: &ChainConfig) -> ChainResult<SuiSealProtocol> 
     #[cfg(all(not(test), feature = "rpc"))]
     {
         use crate::node::SuiNode;
-        let rpc_url = config
+        let rpc_url = _config
             .rpc_endpoints
             .first()
             .ok_or_else(|| ChainError::InvalidInput("RPC endpoint required".to_string()))?;

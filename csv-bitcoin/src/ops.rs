@@ -68,12 +68,18 @@ impl BitcoinChainQuery {
 #[async_trait]
 impl ChainQuery for BitcoinChainQuery {
     async fn get_balance(&self, address: &str) -> ChainOpResult<BalanceInfo> {
-        // Bitcoin balance query requires wallet support
-        // Return a zero balance structure as this requires external API
+        // Query UTXOs from RPC and sum the amounts
+        let utxos = self
+            .rpc
+            .get_utxos_for_address(address)
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to query UTXOs: {}", e)))?;
+
+        let total_balance: u64 = utxos.iter().map(|utxo| utxo.amount_sat).sum();
+
         Ok(BalanceInfo {
             address: address.to_string(),
-            total: 0,
-            available: 0,
+            total: total_balance,
+            available: total_balance,
             locked: 0,
             tokens: vec![],
         })

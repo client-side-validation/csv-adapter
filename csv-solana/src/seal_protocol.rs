@@ -380,7 +380,7 @@ impl SealProtocol for SolanaSealProtocol {
         // Solana has deterministic finality after ~32 slots (12-16 seconds)
         // For devnet/testnet, we use shorter confirmation
 
-        let current_slot = 1100u64; // Would fetch from RPC
+        let current_slot = self.check_rpc()?.get_latest_slot()?;
         let confirmation_depth = current_slot.saturating_sub(anchor_ref.slot);
 
         // Solana requires 32 slots for finality
@@ -571,7 +571,7 @@ impl SealProtocol for SolanaSealProtocol {
         // 3. Invalidate the commitment
 
         // For now, we just verify the slot is old enough to be finalized
-        let current_slot = 1100u64; // Would fetch from RPC
+        let current_slot = self.check_rpc()?.get_latest_slot()?;
         let age = current_slot.saturating_sub(anchor_ref.slot);
 
         if age < 32 {

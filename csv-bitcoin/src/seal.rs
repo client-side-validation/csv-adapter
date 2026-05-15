@@ -4,8 +4,9 @@ use crate::error::{BitcoinError, BitcoinResult};
 use crate::types::BitcoinSealPoint;
 use crate::wallet::Bip86Path;
 use csv_core::hardening::{BoundedQueue, MAX_SEAL_NULLIFIER_SIZE};
-use csv_core::SealStore;
 
+#[cfg(feature = "rpc")]
+use csv_core::SealStore;
 #[cfg(feature = "rpc")]
 use csv_store::SqliteSealStore;
 

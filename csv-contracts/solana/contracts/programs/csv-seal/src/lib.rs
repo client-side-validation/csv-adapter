@@ -449,7 +449,7 @@ pub struct InitializeRegistry<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + LockRegistry::SIZE,
+        space = LockRegistry::SIZE,
         seeds = [b"lock_registry"],
         bump
     )]
@@ -468,7 +468,7 @@ pub struct CreateSeal<'info> {
     #[account(
         init,
         payer = owner,
-        space = 8 + SanadAccount::SIZE,
+        space = SanadAccount::SIZE,
         seeds = [b"sanad", owner.key().as_ref(), &sanad_id],
         bump
     )]
@@ -517,7 +517,7 @@ pub struct LockSanad<'info> {
     #[account(
         init,
         payer = owner,
-        space = 8 + LockAccount::SIZE,
+        space = LockAccount::SIZE,
         seeds = [b"lock", sanad_account.sanad_id.as_ref()],
         bump
     )]
@@ -539,7 +539,7 @@ pub struct MintSanad<'info> {
     #[account(
         init,
         payer = owner,
-        space = 8 + SanadAccount::SIZE,
+        space = SanadAccount::SIZE,
         seeds = [b"sanad", owner.key().as_ref(), &sanad_id],
         bump
     )]
@@ -581,7 +581,7 @@ pub struct RefundSanad<'info> {
     #[account(
         init,
         payer = claimant,
-        space = 8 + SanadAccount::SIZE,
+        space = SanadAccount::SIZE,
         seeds = [b"sanad", claimant.key().as_ref(), &original_sanad.sanad_id, b"refund"],
         bump
     )]

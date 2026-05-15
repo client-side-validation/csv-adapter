@@ -117,7 +117,7 @@ async fn query_balance(chain: &Chain, address: &str, config: &Config) -> Result<
     .await;
 
     match balance_info {
-        Ok(balance_info) => Ok(balance_info.available as f64 / 1e8), // Convert from satoshis to BTC for Bitcoin, adjust for other chains as needed
+        Ok(balance_info) => Ok(balance_info.available as f64 / chain_decimals(chain)),
         Err(e) => {
             // Check if it's a configuration error
             if matches!(e, csv_sdk::CsvError::ChainNotEnabled(_)) {
@@ -142,5 +142,17 @@ fn chain_symbol(chain: &Chain) -> &'static str {
         "aptos" => "APT",
         "solana" => "SOL",
         _ => "???",
+    }
+}
+
+/// Get decimal places for chain (smallest unit to base unit conversion).
+fn chain_decimals(chain: &Chain) -> f64 {
+    match chain.as_str() {
+        "bitcoin" => 1e8,   // satoshis to BTC
+        "ethereum" => 1e18, // wei to ETH
+        "sui" => 1e9,       // MIST to SUI
+        "aptos" => 1e8,     // octas to APT
+        "solana" => 1e9,    // lamports to SOL
+        _ => 1e8,           // default to 8 decimals
     }
 }

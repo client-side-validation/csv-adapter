@@ -20,12 +20,26 @@ use crate::seal_protocol::AptosSealProtocol;
 pub struct AptosRpcClient {
     /// Inner RPC implementation
     inner: Box<dyn AptosRpc>,
+    #[cfg(feature = "rpc")]
+    rpc_url: String,
 }
 
 impl AptosRpcClient {
     /// Create new RPC client from an AptosRpc implementation
     pub fn new(rpc: Box<dyn AptosRpc>) -> Self {
-        Self { inner: rpc }
+        Self {
+            inner: rpc,
+            #[cfg(feature = "rpc")]
+            rpc_url: crate::config::AptosConfig::default().rpc_url,
+        }
+    }
+
+    #[cfg(feature = "rpc")]
+    pub fn with_rpc_url(rpc: Box<dyn AptosRpc>, rpc_url: impl Into<String>) -> Self {
+        Self {
+            inner: rpc,
+            rpc_url: rpc_url.into(),
+        }
     }
 }
 
@@ -43,7 +57,7 @@ impl RpcClient for AptosRpcClient {
 
         // Send the transaction to Aptos REST API
         let response = reqwest::Client::new()
-            .post("https://fullnode.mainnet.aptoslabs.com/v1/transactions")
+            .post(format!("{}/transactions", self.rpc_url.trim_end_matches('/')))
             .header("Content-Type", "application/json")
             .json(&request)
             .send()
@@ -355,7 +369,10 @@ impl ChainDriver for AptosSealProtocol {
         {
             use crate::node::AptosNode as RealAptosRpcClient;
             let rpc = RealAptosRpcClient::new(rpc_url);
-            Ok(Box::new(AptosRpcClient::new(Box::new(rpc))))
+            Ok(Box::new(AptosRpcClient::with_rpc_url(
+                Box::new(rpc),
+                rpc_url.clone(),
+            )))
         }
 
         #[cfg(not(feature = "rpc"))]
@@ -390,8 +407,14 @@ impl ChainDriver for AptosSealProtocol {
     }
 
     fn csv_program_id(&self) -> Option<&'static str> {
-        // CSV seal contract address on Aptos
-        Some("0x1::csv_seal")
+        Some(Box::leak(
+            format!(
+                "{}::{}",
+                self.config().seal_contract.module_address,
+                self.config().seal_contract.module_name
+            )
+            .into_boxed_str(),
+        ))
     }
 
     fn to_core_chain(&self) -> ChainId {

@@ -280,8 +280,7 @@ impl ChainDriver for SolanaSealProtocol {
     }
 
     fn csv_program_id(&self) -> Option<&'static str> {
-        // CSV program ID on Solana (would be the actual deployed program)
-        Some("CSVseaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        Some(Box::leak(self.config.csv_program_id.clone().into_boxed_str()))
     }
 
     fn to_core_chain(&self) -> ChainId {

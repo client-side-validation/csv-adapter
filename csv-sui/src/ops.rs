@@ -163,6 +163,36 @@ impl SuiBackend {
         self.rpc.as_ref()
     }
 
+    fn sign_transaction_bytes(&self, tx_bytes: &[u8]) -> ChainOpResult<(Vec<u8>, Vec<u8>)> {
+        #[cfg(feature = "rpc")]
+        {
+            use ed25519_dalek::Signer;
+
+            let signing_key = self
+                .seal_protocol
+                .signing_key
+                .as_ref()
+                .ok_or_else(|| {
+                    ChainOpError::CapabilityUnavailable(
+                        "Sui transaction signing requires a configured signing key".to_string(),
+                    )
+                })?;
+
+            return Ok((
+                signing_key.sign(tx_bytes).to_bytes().to_vec(),
+                signing_key.verifying_key().to_bytes().to_vec(),
+            ));
+        }
+
+        #[cfg(not(feature = "rpc"))]
+        {
+            let _ = tx_bytes;
+            Err(ChainOpError::CapabilityUnavailable(
+                "Sui transaction signing requires the 'rpc' feature".to_string(),
+            ))
+        }
+    }
+
     /// Build a lock transaction for Sui
     fn build_lock_transaction_bytes(
         &self,
@@ -357,28 +387,19 @@ impl ChainSigner for SuiBackend {
         Ok(format!("0x{}", hex::encode(addr)))
     }
 
-    async fn sign_transaction(&self, _tx_data: &[u8], _key_id: &str) -> ChainOpResult<Vec<u8>> {
-        // Note: Signing requires access to private keys which should be managed
-        // by a secure keystore, not stored in this operations struct.
-        //
-        // For production use, this should:
-        // 1. Call out to a keystore or HSM
-        // 2. Use the key_id to reference the stored key
-        // 3. Return the signature without exposing the private key
-        Err(ChainOpError::CapabilityUnavailable(
-            "Direct transaction signing not available. \
-             Use an external keystore with the key_id reference."
-                .to_string(),
-        ))
+    async fn sign_transaction(&self, tx_data: &[u8], _key_id: &str) -> ChainOpResult<Vec<u8>> {
+        let (signature, public_key) = self.sign_transaction_bytes(tx_data)?;
+        let mut signed = Vec::with_capacity(4 + tx_data.len() + signature.len() + public_key.len());
+        signed.extend_from_slice(&(tx_data.len() as u32).to_le_bytes());
+        signed.extend_from_slice(tx_data);
+        signed.extend_from_slice(&signature);
+        signed.extend_from_slice(&public_key);
+        Ok(signed)
     }
 
-    async fn sign_message(&self, _message: &[u8], _key_id: &str) -> ChainOpResult<Vec<u8>> {
-        // Same pattern as sign_transaction
-        Err(ChainOpError::CapabilityUnavailable(
-            "Direct message signing not available. \
-             Use an external keystore with the key_id reference."
-                .to_string(),
-        ))
+    async fn sign_message(&self, message: &[u8], _key_id: &str) -> ChainOpResult<Vec<u8>> {
+        let (signature, _) = self.sign_transaction_bytes(message)?;
+        Ok(signature)
     }
 
     fn verify_signature(
@@ -923,8 +944,7 @@ impl ChainSanadOps for SuiBackend {
 
         // Execute the signed transaction via RPC
         // Format: [tx_bytes_len:4][tx_bytes][signature:64][public_key:32]
-        let signature = vec![0u8; 64]; // Placeholder signature
-        let public_key: Vec<u8> = owner_address.to_vec();
+        let (signature, public_key) = self.sign_transaction_bytes(&tx_bytes)?;
 
         let digest = self
             .rpc
@@ -1034,8 +1054,7 @@ impl ChainSanadOps for SuiBackend {
         tx_bytes.extend_from_slice(&owner_address);
 
         // Execute the mint transaction via RPC
-        let signature = vec![0u8; 64]; // Transaction signature (would be generated from wallet)
-        let public_key: Vec<u8> = owner_address.to_vec();
+        let (signature, public_key) = self.sign_transaction_bytes(&tx_bytes)?;
 
         let digest = self
             .rpc
