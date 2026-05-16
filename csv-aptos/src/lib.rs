@@ -35,7 +35,6 @@
 #![allow(dead_code)]
 
 pub mod address_utils;
-pub mod backend;
 pub mod checkpoint;
 pub mod config;
 pub mod entry_function;
@@ -53,7 +52,6 @@ pub mod verifier;
 #[cfg(feature = "rpc")]
 pub mod node;
 
-pub use backend::{AptosWallet, create_aptos_adapter};
 pub use seal_protocol::AptosSealProtocol;
 
 pub use checkpoint::CheckpointVerifier;

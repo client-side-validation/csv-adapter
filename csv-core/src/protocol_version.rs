@@ -92,15 +92,14 @@ impl std::fmt::Display for ProtocolVersion {
 
 /// Open chain identifier — any string is valid.
 ///
-/// For the 100-chain goal, chain IDs are plain strings registered at runtime
-/// via `DriverRegistry`. This type is a thin newtype over `String` that
-/// provides ergonomic comparison, display, and serialization.
+/// For the 100-chain goal, chain IDs are plain strings. This type is a thin
+/// newtype over `String` that provides ergonomic comparison, display, and
+/// serialization.
 ///
 /// ### Adding a new chain
 ///
-/// 1. Create a new `csv-{chain}` crate implementing `ChainDriver`
-/// 2. Register it: `registry.register(NewChainDriver::new())`
-/// 3. The chain ID is whatever `driver.metadata().chain_id` returns
+/// 1. Create a new `csv-{chain}` crate implementing `ChainBackend`
+/// 2. The chain ID is specified in the chain's configuration file
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ChainId(pub String);
 

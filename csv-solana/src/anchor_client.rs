@@ -6,8 +6,6 @@
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
-    signature::Signature,
-    transaction::Transaction,
 };
 use std::str::FromStr;
 
@@ -141,7 +139,8 @@ impl InstructionBuilder {
             vec![
                 AccountMeta::new(registry, false),
                 AccountMeta::new_readonly(authority, true),
-                AccountMeta::new_readonly(solana_sdk::system_program::ID, false),
+                // AccountMeta::new_readonly(solana_sdk::system_program::ID, false),
+                AccountMeta::new_readonly(Pubkey::from([0u8; 32]), false),
             ],
         )
     }
@@ -167,7 +166,8 @@ impl InstructionBuilder {
             vec![
                 AccountMeta::new(sanad_account, false),
                 AccountMeta::new_readonly(owner, true),
-                AccountMeta::new_readonly(solana_sdk::system_program::ID, false),
+                // AccountMeta::new_readonly(solana_sdk::system_program::ID, false),
+                AccountMeta::new_readonly(Pubkey::from([0u8; 32]), false),
             ],
         )
     }
@@ -216,7 +216,8 @@ impl InstructionBuilder {
                 AccountMeta::new(lock_account, false),
                 AccountMeta::new(owner, true),
                 AccountMeta::new_readonly(recent_blockhashes, false),
-                AccountMeta::new_readonly(solana_sdk::system_program::ID, false),
+                // AccountMeta::new_readonly(solana_sdk::system_program::ID, false),
+                AccountMeta::new_readonly(Pubkey::from([0u8; 32]), false),
             ],
         )
     }
@@ -253,7 +254,8 @@ impl InstructionBuilder {
             vec![
                 AccountMeta::new(sanad_account, false),
                 AccountMeta::new_readonly(owner, true),
-                AccountMeta::new_readonly(solana_sdk::system_program::ID, false),
+                // AccountMeta::new_readonly(solana_sdk::system_program::ID, false),
+                AccountMeta::new_readonly(Pubkey::from([0u8; 32]), false),
             ],
         )
     }
@@ -281,7 +283,8 @@ impl InstructionBuilder {
                 AccountMeta::new(lock_account, false),
                 AccountMeta::new(new_sanad_account, false),
                 AccountMeta::new(claimant, true),
-                AccountMeta::new_readonly(solana_sdk::system_program::ID, false),
+                // AccountMeta::new_readonly(solana_sdk::system_program::ID, false),
+                AccountMeta::new_readonly(Pubkey::from([0u8; 32]), false),
             ],
         )
     }

@@ -134,10 +134,8 @@ pub mod nullifier;
 pub mod state_store;
 pub mod validator;
 
-// Chain driver system for dynamic chain support
+// Chain configuration system
 pub mod chain_config;
-pub mod driver;
-pub mod driver_registry;
 
 // RGB protocol compatibility (Sprint 5) - 🧪 EXPERIMENTAL
 #[cfg(feature = "experimental")]
@@ -253,16 +251,8 @@ pub use store::{
     AnchorRecord, InMemorySealStore, SanadRecord, SanadStore, SealRecord, SealStore, StoreError,
 };
 
-// Chain driver system (Beta API)
+// Chain configuration system (Beta API)
 pub use chain_config::{AccountModel, ChainCapabilities, ChainConfig, ChainConfigLoader};
-pub use driver::{ChainDriver, ChainDriverExt, ChainError, ChainResult, RpcClient, Wallet};
-
-// Unified driver registry (Phase 2)
-pub use driver_registry::{
-    BuiltDriverPlugin, DriverDiscovery, DriverMetadata, DriverPlugin, DriverPluginBuildError,
-    DriverPluginBuilder, DriverRegistry, create_driver, global_factory, init_global_factory,
-    is_chain_supported as is_driver_supported,
-};
 
 // ===========================================================================
 // Re-exports: Experimental API (feature-gated, may change)

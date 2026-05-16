@@ -39,7 +39,6 @@
 
 use clap::{Parser, Subcommand};
 
-mod chain_registry;
 mod commands;
 mod config;
 mod output;

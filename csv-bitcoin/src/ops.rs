@@ -24,12 +24,12 @@ use crate::types::BitcoinSealPoint;
 use csv_core::SealProtocol;
 
 /// Bitcoin-specific extension to ChainSigner that accepts prevout amounts
-/// 
+///
 /// HIGH-BTC-01: BIP-143 sighash requires the spent UTXO value.
 /// This trait provides a Bitcoin-specific signing method that accepts
 /// prevout amounts for proper sighash computation.
 #[async_trait]
-pub trait BitcoinChainSigner: Send + Sync {
+pub trait BitcoinChainSignerExt: Send + Sync {
     /// Sign a Bitcoin transaction with prevout amounts for BIP-143 sighash
     ///
     /// # Arguments
@@ -405,12 +405,13 @@ impl ChainSigner for BitcoinChainSigner {
     }
 
     fn signature_scheme(&self) -> SignatureScheme {
-        SignatureScheme::Schnorr
+        // SignatureScheme::Schnorr
+        SignatureScheme::Secp256k1
     }
 }
 
 #[async_trait]
-impl BitcoinChainSigner for BitcoinChainSigner {
+impl BitcoinChainSignerExt for BitcoinChainSigner {
     async fn sign_transaction_with_prevouts(
         &self,
         tx_data: &[u8],
@@ -1637,8 +1638,9 @@ impl ChainSigner for BitcoinBackend {
     }
 
     fn signature_scheme(&self) -> SignatureScheme {
-        let signer = BitcoinChainSigner::new(self.network);
-        signer.signature_scheme()
+        // let signer = BitcoinChainSigner::new(self.network);
+        // signer.signature_scheme()
+        SignatureScheme::Secp256k1
     }
 }
 

@@ -23,7 +23,6 @@ use csv_core::signature::SignatureScheme;
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
-use crate::address_utils::{format_address, parse_aptos_address};
 use crate::config::AptosNetwork;
 use crate::proofs::CommitmentEventBuilder;
 #[cfg(not(feature = "rpc"))]

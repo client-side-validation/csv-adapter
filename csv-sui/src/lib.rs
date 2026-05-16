@@ -32,7 +32,6 @@
 #![allow(missing_docs)]
 #![allow(dead_code)]
 
-pub mod backend;
 pub mod checkpoint;
 pub mod config;
 pub mod deploy;
@@ -49,7 +48,6 @@ pub mod types;
 #[cfg(feature = "rpc")]
 pub mod node;
 
-pub use backend::{SuiWallet, create_sui_adapter};
 pub use seal_protocol::SuiSealProtocol;
 
 pub use checkpoint::CheckpointVerifier;

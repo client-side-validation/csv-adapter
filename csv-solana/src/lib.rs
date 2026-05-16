@@ -8,7 +8,6 @@
 #![allow(dead_code)]
 
 pub mod anchor_client;
-pub mod backend;
 pub mod config;
 pub mod error;
 pub mod mint;
@@ -23,7 +22,6 @@ pub mod types;
 pub mod verifier;
 pub mod wallet;
 
-pub use backend::{SolanaRpcClient, SolanaWallet, create_solana_adapter};
 pub use config::{Network, SolanaConfig};
 pub use error::{SolanaError, SolanaResult};
 pub use mint::mint_sanad_from_hex_key;

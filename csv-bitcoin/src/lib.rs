@@ -7,7 +7,6 @@
 #![allow(missing_docs)]
 #![allow(dead_code)]
 
-pub mod backend;
 pub mod bip341;
 pub mod config;
 pub mod error;
@@ -31,7 +30,6 @@ pub mod zk_prover;
 #[cfg(feature = "signet-rest")]
 pub mod mempool_rpc;
 
-pub use backend::{BitcoinRpcClient, BitcoinWallet, create_bitcoin_adapter};
 pub use bip341::{Bip341Error, TaprootOutput, derive_output_key, generate_test_keypair};
 pub use config::{BitcoinConfig, Network};
 pub use rpc::BitcoinRpc;

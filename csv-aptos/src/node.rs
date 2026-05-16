@@ -185,7 +185,7 @@ impl AptosRpc for AptosNode {
         address: [u8; 32],
     ) -> BoxFuture<'_, Result<u64, Box<dyn std::error::Error + Send + Sync>>> {
         Box::pin(async move {
-            let addr_str = Self::format_address(address);
+            let addr_str = format_address(address);
             let result = self.get(&format!("/accounts/{}", addr_str)).await?;
             Ok(Self::parse_u64(&result["sequence_number"]))
         })
@@ -200,7 +200,7 @@ impl AptosRpc for AptosNode {
     {
         let resource_type = resource_type.to_string();
         Box::pin(async move {
-            let addr_str = Self::format_address(address);
+            let addr_str = format_address(address);
             let result = self
                 .get(&format!(
                     "/accounts/{}/resource/{}",
@@ -363,7 +363,7 @@ impl AptosRpc for AptosNode {
         limit: u32,
     ) -> BoxFuture<'_, Result<Vec<AptosEvent>, Box<dyn std::error::Error + Send + Sync>>> {
         Box::pin(async move {
-            let addr_str = Self::format_address(account);
+            let addr_str = format_address(account);
             let result = self
                 .get(&format!(
                     "/accounts/{}/events?start={}&limit={}",

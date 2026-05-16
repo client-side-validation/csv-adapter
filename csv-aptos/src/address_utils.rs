@@ -93,9 +93,13 @@ mod tests {
 
     #[test]
     fn test_format_parse_roundtrip() {
-        let original = [0xAB, 0xCD, 0xEF; 32];
-        let formatted = format_address(original);
+        let original = [0xAB, 0xCD, 0xEF];
+        let mut full_addr = [0u8; 32];
+        full_addr[0] = 0xAB;
+        full_addr[1] = 0xCD;
+        full_addr[2] = 0xEF;
+        let formatted = format_address(full_addr);
         let parsed = parse_aptos_address(&formatted).unwrap();
-        assert_eq!(original, parsed);
+        assert_eq!(full_addr, parsed);
     }
 }

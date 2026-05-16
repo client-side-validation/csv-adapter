@@ -6,7 +6,6 @@
 #![warn(missing_docs)]
 #![allow(missing_docs)]
 
-pub mod backend;
 #[cfg(feature = "rpc")]
 pub mod bindings;
 pub mod config;
@@ -35,7 +34,6 @@ pub use node::{
     verify_seal_consumption_in_receipt,
 };
 
-pub use backend::{EthereumRpcClient, EthereumWallet, create_ethereum_adapter};
 pub use config::EthereumConfig;
 pub use error::EthereumError;
 pub use finality::{FinalityChecker, FinalityConfig};
