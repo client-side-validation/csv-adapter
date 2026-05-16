@@ -4,11 +4,11 @@
 //! enabling Bitcoin to be used through the unified chain adapter interface.
 
 use async_trait::async_trait;
+use csv_core::ChainId;
 use csv_core::chain_config::ChainConfig;
 use csv_core::driver::{
     AccountModel, ChainCapabilities, ChainDriver, ChainError, ChainResult, RpcClient, Wallet,
 };
-use csv_core::ChainId;
 
 use crate::config::{BitcoinConfig, Network};
 use crate::rpc::BitcoinRpc;
@@ -171,7 +171,8 @@ impl Wallet for BitcoinWallet {
             Err(_) => return false,
         };
 
-        secp.verify_schnorr(&signature, &message, &public_key).is_ok()
+        secp.verify_schnorr(&signature, &message, &public_key)
+            .is_ok()
     }
 
     fn generate_address(&self) -> ChainResult<String> {

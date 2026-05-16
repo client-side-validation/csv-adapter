@@ -9,6 +9,7 @@
 //! - ChainSanadOps: Sanad management operations
 
 use async_trait::async_trait;
+use csv_core::SealProtocol;
 use csv_core::backend::{
     BalanceInfo, ChainBackend, ChainBroadcaster, ChainCapability, ChainDeployer, ChainOpError,
     ChainOpResult, ChainProofProvider, ChainQuery, ChainSanadOps, ChainSigner, ContractStatus,
@@ -19,7 +20,6 @@ use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
 use csv_core::sanad::SanadId;
 use csv_core::seal::{CommitAnchor, SealPoint};
 use csv_core::signature::SignatureScheme;
-use csv_core::SealProtocol;
 use ed25519_dalek::{Verifier, VerifyingKey};
 use std::sync::Arc;
 
@@ -84,11 +84,14 @@ impl SuiBackend {
 
         // Create a minimal seal protocol for backward compatibility
         let mock_rpc = Box::new(crate::rpc::MockSuiRpc::new(0));
-        let seal = SuiSealProtocol::from_config(config.clone(), mock_rpc)
-            .unwrap_or_else(|_| {
-                // Ultimate fallback
-                SuiSealProtocol::from_config(SuiConfig::default(), Box::new(crate::rpc::MockSuiRpc::new(0))).unwrap()
-            });
+        let seal = SuiSealProtocol::from_config(config.clone(), mock_rpc).unwrap_or_else(|_| {
+            // Ultimate fallback
+            SuiSealProtocol::from_config(
+                SuiConfig::default(),
+                Box::new(crate::rpc::MockSuiRpc::new(0)),
+            )
+            .unwrap()
+        });
 
         Self {
             rpc,
@@ -168,15 +171,11 @@ impl SuiBackend {
         {
             use ed25519_dalek::Signer;
 
-            let signing_key = self
-                .seal_protocol
-                .signing_key
-                .as_ref()
-                .ok_or_else(|| {
-                    ChainOpError::CapabilityUnavailable(
-                        "Sui transaction signing requires a configured signing key".to_string(),
-                    )
-                })?;
+            let signing_key = self.seal_protocol.signing_key.as_ref().ok_or_else(|| {
+                ChainOpError::CapabilityUnavailable(
+                    "Sui transaction signing requires a configured signing key".to_string(),
+                )
+            })?;
 
             return Ok((
                 signing_key.sign(tx_bytes).to_bytes().to_vec(),
@@ -748,9 +747,7 @@ impl ChainProofProvider for SuiBackend {
         // Verify checkpoint exists
         let rpc = self.rpc.clone_boxed();
         let position = proof.position;
-        let result = spawn_blocking_async(async move {
-            rpc.get_checkpoint(position).await
-        });
+        let result = spawn_blocking_async(async move { rpc.get_checkpoint(position).await });
         match result {
             Ok(Some(cp)) => Ok(cp.digest == digest),
             _ => Ok(false),
@@ -813,13 +810,15 @@ impl ChainProofProvider for SuiBackend {
 
         // Verify checkpoint is old enough for finality
         let rpc = self.rpc.clone_boxed();
-        let result = spawn_blocking_async(async move {
-            rpc.get_latest_checkpoint_sequence_number().await
-        });
+        let result =
+            spawn_blocking_async(async move { rpc.get_latest_checkpoint_sequence_number().await });
         let latest = match result {
             Ok(v) => v,
             Err(e) => {
-                return Err(ChainOpError::RpcError(format!("Failed to get latest checkpoint: {}", e)));
+                return Err(ChainOpError::RpcError(format!(
+                    "Failed to get latest checkpoint: {}",
+                    e
+                )));
             }
         };
 
@@ -946,11 +945,9 @@ impl ChainSanadOps for SuiBackend {
             .rpc
             .get_gas_objects(owner_address)
             .await
-            .map_err(|e| {
-                ChainOpError::RpcError(format!("Failed to get gas objects: {}", e))
-            })?;
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to get gas objects: {}", e)))?;
 
-      if gas_objects.is_empty() {
+        if gas_objects.is_empty() {
             return Err(ChainOpError::InvalidInput(
                 "Insufficient gas objects for transaction fees".to_string(),
             ));
@@ -988,11 +985,9 @@ impl ChainSanadOps for SuiBackend {
             .rpc
             .get_latest_checkpoint_sequence_number()
             .await
-            .map_err(|e| {
-                ChainOpError::RpcError(format!("Failed to get checkpoint: {}", e))
-            })?;
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to get checkpoint: {}", e)))?;
 
-       Ok(SanadOperationResult {
+        Ok(SanadOperationResult {
             sanad_id: sanad_id.clone(),
             operation: csv_core::backend::SanadOperation::Lock,
             transaction_hash: format!("0x{}", hex::encode(digest)),
@@ -1014,14 +1009,9 @@ impl ChainSanadOps for SuiBackend {
         new_owner: &str,
     ) -> ChainOpResult<SanadOperationResult> {
         // Parse the source chain to ensure it's valid
-        let _source = source_chain
-            .parse::<csv_core::ChainId>()
-            .map_err(|_| {
-                ChainOpError::InvalidInput(format!(
-                    "Invalid source chain: {}",
-                    source_chain
-                ))
-            })?;
+        let _source = source_chain.parse::<csv_core::ChainId>().map_err(|_| {
+            ChainOpError::InvalidInput(format!("Invalid source chain: {}", source_chain))
+        })?;
 
         // Parse new owner address (expecting hex-encoded 32-byte Sui address)
         let owner_bytes = hex::decode(new_owner)
@@ -1055,9 +1045,7 @@ impl ChainSanadOps for SuiBackend {
             .rpc
             .get_gas_objects(owner_address)
             .await
-            .map_err(|e| {
-                ChainOpError::RpcError(format!("Failed to get gas objects: {}", e))
-            })?;
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to get gas objects: {}", e)))?;
 
         if gas_objects.is_empty() {
             return Err(ChainOpError::InvalidInput(
@@ -1098,9 +1086,7 @@ impl ChainSanadOps for SuiBackend {
             .rpc
             .get_latest_checkpoint_sequence_number()
             .await
-            .map_err(|e| {
-                ChainOpError::RpcError(format!("Failed to get checkpoint: {}", e))
-            })?;
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to get checkpoint: {}", e)))?;
 
         Ok(SanadOperationResult {
             sanad_id: source_sanad_id.clone(),
@@ -1176,7 +1162,7 @@ impl ChainSanadOps for SuiBackend {
                 return Err(ChainOpError::RpcError(format!(
                     "Failed to query sanad state: {}",
                     e
-                )))
+                )));
             }
         };
 
@@ -1192,7 +1178,7 @@ impl ChainSanadOps for SuiBackend {
             }
         };
 
-    Ok(actual_state == expected_state)
+        Ok(actual_state == expected_state)
     }
 }
 
@@ -1235,7 +1221,7 @@ impl From<SuiError> for ChainOpError {
             )),
             SuiError::CoreError(e) => ChainOpError::Unknown(format!("Core error: {}", e)),
         }
-   }
+    }
 }
 
 impl ChainBackend for SuiBackend {
@@ -1252,7 +1238,9 @@ impl ChainBackend for SuiBackend {
     }
 
     fn create_seal(&self, value: Option<u64>) -> ChainOpResult<SealPoint> {
-        let sui_seal = self.seal_protocol.create_seal(value)
+        let sui_seal = self
+            .seal_protocol
+            .create_seal(value)
             .map_err(|e| ChainOpError::Unknown(format!("Seal creation failed: {}", e)))?;
 
         // Convert SuiSealPoint to core SealPoint
@@ -1283,7 +1271,9 @@ impl ChainBackend for SuiBackend {
         let commitment = Hash::new(commitment_bytes);
 
         // Call the seal protocol's publish method
-        let sui_anchor = self.seal_protocol.publish(commitment, sui_seal)
+        let sui_anchor = self
+            .seal_protocol
+            .publish(commitment, sui_seal)
             .map_err(|e| ChainOpError::Unknown(format!("Seal publishing failed: {}", e)))?;
 
         // Convert SuiCommitAnchor to core CommitAnchor
@@ -1298,8 +1288,8 @@ impl ChainBackend for SuiBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rpc::MockSuiRpc;
     use crate::SuiNetwork;
+    use crate::rpc::MockSuiRpc;
 
     #[test]
     fn test_sui_chain_operations_creation() {

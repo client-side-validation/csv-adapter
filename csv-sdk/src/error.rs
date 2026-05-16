@@ -6,7 +6,7 @@
 
 use thiserror::Error;
 
-use csv_core::mcp::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::mcp::{FixAction, HasErrorSuggestion, error_codes};
 
 use csv_core::ChainId;
 

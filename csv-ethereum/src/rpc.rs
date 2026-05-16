@@ -517,10 +517,7 @@ impl EthereumRpc for QuorumEthereumRpc {
             code_hash.copy_from_slice(&bytes[..32]);
         }
 
-        let nonce = result
-            .get("nonce")
-            .and_then(|v| v.as_str())
-            .unwrap_or("0");
+        let nonce = result.get("nonce").and_then(|v| v.as_str()).unwrap_or("0");
 
         let storage_hash_hex = result
             .get("storageHash")
@@ -556,11 +553,7 @@ impl EthereumRpc for QuorumEthereumRpc {
 
                         let value = Self::decode_hex(value_hex).unwrap_or_default();
 
-                        Some(SingleStorageProof {
-                            key,
-                            value,
-                            proof,
-                        })
+                        Some(SingleStorageProof { key, value, proof })
                     })
                     .collect()
             })
@@ -701,10 +694,7 @@ impl EthereumRpc for QuorumEthereumRpc {
     ) -> Result<[u8; 32], Box<dyn std::error::Error + Send + Sync>> {
         let hash_hex = format!("0x{}", hex::encode(block_hash));
 
-        let block = self
-            .client
-            .get_block_by_hash(&hash_hex)
-            .await?;
+        let block = self.client.get_block_by_hash(&hash_hex).await?;
 
         let state_root_hex = block
             .get("stateRoot")
@@ -808,7 +798,9 @@ impl EthereumRpc for QuorumEthereumRpc {
         // In production, providers would be cloned from the original configuration
         let provider_count = self.client.provider_count();
         let providers: Vec<_> = (0..provider_count.max(1))
-            .map(|_| csv_core::rpc::quorum_client::RpcProvider::new("http://localhost:8545".to_string()))
+            .map(|_| {
+                csv_core::rpc::quorum_client::RpcProvider::new("http://localhost:8545".to_string())
+            })
             .collect();
         Box::new(QuorumEthereumRpc {
             client: QuorumClient::with_defaults(providers),
@@ -971,7 +963,7 @@ mod tests {
     async fn test_ethereum_rpc_receipt() {
         let rpc = MockEthereumRpc::new(1000);
         let tx_hash = [3u8; 32];
-       let receipt = TransactionReceipt {
+        let receipt = TransactionReceipt {
             tx_hash,
             block_number: 500,
             block_hash: [4u8; 32],

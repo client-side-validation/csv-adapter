@@ -7,9 +7,9 @@
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
+use crate::dag::DAGNode;
 use crate::domain_hash::DomainSeparatedHash;
 use crate::domains::TransitionDomain;
-use crate::dag::DAGNode;
 use crate::hash::Hash;
 use crate::seal::SealPoint;
 use crate::state::{GlobalState, Metadata, StateAssignment, StateRef};

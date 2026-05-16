@@ -1037,8 +1037,8 @@ async fn discover_ethereum_contracts(
                             if let Some(tx_hash) = tx["hash"].as_str() {
                                 if let Some(contract_addr) = tx["contractAddress"].as_str() {
                                     // Use filter type or default to Registry
-                                    let contract_type = default_filter_type
-                                        .unwrap_or(ContractType::Registry);
+                                    let contract_type =
+                                        default_filter_type.unwrap_or(ContractType::Registry);
 
                                     deployments.push(ContractDeployment {
                                         address: contract_addr.to_string(),
@@ -1288,7 +1288,10 @@ mod tests {
             .expect("should build transaction");
 
         // Verify the type prefix
-        assert_eq!(tx_data[0], 0x02, "EIP-1559 transaction type prefix should be 0x02");
+        assert_eq!(
+            tx_data[0], 0x02,
+            "EIP-1559 transaction type prefix should be 0x02"
+        );
 
         // The RLP payload starts at index 1
         let rlp_payload = &tx_data[1..];
@@ -1324,8 +1327,9 @@ mod tests {
 
         // Build with mainnet chain ID
         std::env::set_var("ETH_CHAIN_ID", "1");
-        let tx_mainnet = build_eth_transaction_data(to, value, data.clone(), nonce, gas_price, gas_limit)
-            .expect("should build transaction");
+        let tx_mainnet =
+            build_eth_transaction_data(to, value, data.clone(), nonce, gas_price, gas_limit)
+                .expect("should build transaction");
 
         // Build with Sepolia chain ID
         std::env::set_var("ETH_CHAIN_ID", "11155111");
@@ -1354,8 +1358,9 @@ mod tests {
         let gas_price: u64 = 1_000_000_000;
         let gas_limit: u64 = 21000;
 
-        let tx_nonce_0 = build_eth_transaction_data(to, value, data.clone(), 0, gas_price, gas_limit)
-            .expect("should build transaction");
+        let tx_nonce_0 =
+            build_eth_transaction_data(to, value, data.clone(), 0, gas_price, gas_limit)
+                .expect("should build transaction");
 
         let tx_nonce_1 = build_eth_transaction_data(to, value, data, 1, gas_price, gas_limit)
             .expect("should build transaction");

@@ -20,11 +20,7 @@ pub struct AwaitingFinality {
 
 impl AwaitingFinality {
     /// Create a new awaiting finality state
-    pub fn new(
-        data: TransferData,
-        proof_height: u64,
-        required_confirmations: u32,
-    ) -> Self {
+    pub fn new(data: TransferData, proof_height: u64, required_confirmations: u32) -> Self {
         Self {
             data,
             proof_height,

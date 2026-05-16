@@ -4,7 +4,7 @@
 use csv_core::{AnchorRecord, Hash, SanadRecord, SanadStore, SealStore, StoreError};
 
 #[cfg(feature = "sqlite")]
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 #[cfg(feature = "sqlite")]
 use std::sync::Mutex;
 
@@ -25,26 +25,27 @@ pub mod replay_registry_store;
 // pub mod operations;
 
 // Re-exports from state module
+#[allow(deprecated)]
+pub use state::Chain;
 pub use state::{
     ChainConfig, ChainId, ContractRecord, FaucetConfig, GasAccount, Network, ProofRecord,
     SanadStatus, SealRecord, StateStorage, StorageBackend, StorageError, TransactionRecord,
-    TransactionStatus, TransactionType, TransferRecord, TransferStatus, WalletAccount, WalletConfig,
+    TransactionStatus, TransactionType, TransferRecord, TransferStatus, WalletAccount,
+    WalletConfig,
 };
-#[allow(deprecated)]
-pub use state::Chain;
 
 #[cfg(all(not(target_arch = "wasm32"), feature = "file-storage"))]
 pub use state::FileStorage;
 
 #[cfg(feature = "browser-storage")]
 pub use browser_storage::{
-    asset_storage, seal_storage, wallet_storage, BrowserStateStorage, BrowserStorageError,
-    LocalStorageManager, UNIFIED_STORAGE_KEY, WALLET_MNEMONIC_KEY,
+    BrowserStateStorage, BrowserStorageError, LocalStorageManager, UNIFIED_STORAGE_KEY,
+    WALLET_MNEMONIC_KEY, asset_storage, seal_storage, wallet_storage,
 };
 
 #[cfg(feature = "encrypted-storage")]
 pub use encrypted_storage::{
-    seal_nullifier_storage, EncryptedStorageError, EncryptedStorageManager,
+    EncryptedStorageError, EncryptedStorageManager, seal_nullifier_storage,
 };
 
 /// SQLite-backed seal and anchor store

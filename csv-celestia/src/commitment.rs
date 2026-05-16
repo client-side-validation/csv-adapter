@@ -522,14 +522,7 @@ mod tests {
         let ns = Namespace::bitcoin_stark();
         let commitment = BlobCommitment::new([0xABu8; 32]);
 
-        let proof = CommitmentProof::new(
-            12345,
-            ns,
-            commitment,
-            [1u8; 32],
-            [2u8; 32],
-            [3u8; 32],
-        );
+        let proof = CommitmentProof::new(12345, ns, commitment, [1u8; 32], [2u8; 32], [3u8; 32]);
 
         let proof_id = proof.proof_id();
         assert_eq!(proof_id.height, 12345);

@@ -3,9 +3,7 @@
 //! Type-safe bindings for the CSV Lock contract using Alloy.
 //! Generated from CSVLock.sol
 
-use alloy_primitives::{
-    Address, Bytes, FixedBytes,
-};
+use alloy_primitives::{Address, Bytes, FixedBytes};
 use alloy_sol_types::sol;
 
 // Solidity contract ABI
@@ -227,12 +225,12 @@ mod tests {
     fn test_lock_sanad_call() {
         let addr = address!("0000000000000000000000000000000000000001");
         let lock = CsvLockClient::new(addr);
-        
+
         let sanad_id = FixedBytes::<32>::ZERO;
         let commitment = FixedBytes::<32>::ZERO;
         let destination_chain = 1u8;
         let destination_owner = Bytes::default();
-        
+
         let call = lock.lock_sanad_call(sanad_id, commitment, destination_chain, destination_owner);
         assert_eq!(call.sanadId, sanad_id);
     }

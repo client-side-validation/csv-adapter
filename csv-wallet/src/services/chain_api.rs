@@ -19,8 +19,16 @@ pub enum ChainApiError {
 impl std::fmt::Display for ChainApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ChainApiError::BalanceUnavailable { chain, address, source } => {
-                write!(f, "Balance unavailable for {} on {}: {}", address, chain, source)
+            ChainApiError::BalanceUnavailable {
+                chain,
+                address,
+                source,
+            } => {
+                write!(
+                    f,
+                    "Balance unavailable for {} on {}: {}",
+                    address, chain, source
+                )
             }
         }
     }
@@ -100,7 +108,11 @@ impl ChainApi {
     }
 
     /// Get balance for an address.
-    pub async fn get_balance(&self, address: &str, chain: ChainId) -> Result<String, ChainApiError> {
+    pub async fn get_balance(
+        &self,
+        address: &str,
+        chain: ChainId,
+    ) -> Result<String, ChainApiError> {
         let chain_str = chain.as_str().to_string();
         // Use csv-sdk runtime to query balance
         match self.runtime.get_balance(chain, address).await {

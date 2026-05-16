@@ -6,8 +6,8 @@
 //! - SHA3-256 hashing
 //! - Cross-chain commitment building
 
-use rand::rngs::OsRng;
 use rand::RngCore;
+use rand::rngs::OsRng;
 use wasm_bindgen::prelude::*;
 
 // ── Seal Point Operations ──────────────────────────────────────
@@ -66,8 +66,8 @@ pub fn sha3_256_hex(data: &[u8]) -> String {
 /// Keccak-256 hash (Ethereum-compatible).
 #[wasm_bindgen]
 pub fn keccak_256(data: &[u8]) -> Vec<u8> {
-    use sha3::Keccak256;
     use sha3::Digest;
+    use sha3::Keccak256;
     let mut hasher = Keccak256::new();
     hasher.update(data);
     hasher.finalize().to_vec()
@@ -146,7 +146,11 @@ mod pq_impl {
 
     /// Verify an ML-DSA-65 signature.
     #[wasm_bindgen]
-    pub fn ml_dsa_65_verify(public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<bool, JsError> {
+    pub fn ml_dsa_65_verify(
+        public_key: &[u8],
+        message: &[u8],
+        signature: &[u8],
+    ) -> Result<bool, JsError> {
         let pk = PublicKey::from_bytes(public_key)
             .map_err(|e| JsError::new(&format!("Invalid public key: {}", e)))?;
         let sig = DetachedSignature::from_bytes(signature)
@@ -192,7 +196,11 @@ mod pq_impl {
 
     /// ML-DSA-65 verification — requires "pq" feature.
     #[wasm_bindgen]
-    pub fn ml_dsa_65_verify(_public_key: &[u8], _message: &[u8], _signature: &[u8]) -> Result<bool, JsError> {
+    pub fn ml_dsa_65_verify(
+        _public_key: &[u8],
+        _message: &[u8],
+        _signature: &[u8],
+    ) -> Result<bool, JsError> {
         Err(JsError::new("ML-DSA-65 requires the 'pq' feature flag"))
     }
 

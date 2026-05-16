@@ -4,7 +4,7 @@
 //! you're locking a Sanad's value for cross-chain transfer or secure storage.
 
 use crate::context::{
-    generate_id, use_wallet_context, SanadStatus, SealContent, SealRecord, SealStatus,
+    SanadStatus, SealContent, SealRecord, SealStatus, generate_id, use_wallet_context,
 };
 use crate::pages::common::*;
 use crate::routes::Route;

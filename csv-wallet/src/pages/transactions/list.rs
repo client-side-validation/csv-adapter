@@ -1,6 +1,6 @@
 //! Transactions list page.
 
-use crate::context::{use_wallet_context, TransactionRecord};
+use crate::context::{TransactionRecord, use_wallet_context};
 use crate::pages::common::*;
 use crate::pages::transactions::TransactionCard;
 use dioxus::prelude::*;

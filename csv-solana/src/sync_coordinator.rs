@@ -13,7 +13,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use tokio::time::{sleep, Instant};
+use tokio::time::{Instant, sleep};
 
 use crate::error::{SolanaError, SolanaResult};
 use crate::rpc::SolanaRpc;
@@ -41,9 +41,9 @@ impl Default for SyncCoordinatorConfig {
             // Solana produces slots every ~400ms, so poll at 500ms base
             base_poll_interval_ms: 500,
             max_poll_interval_ms: 5000, // 5 seconds during extreme congestion
-            min_poll_interval_ms: 200, // 200ms during low congestion
-            slot_gap_threshold: 10, // Trigger recovery after 10 missed slots
-            max_recovery_gap: 1000, // Attempt recovery for gaps up to 1000 slots
+            min_poll_interval_ms: 200,  // 200ms during low congestion
+            slot_gap_threshold: 10,     // Trigger recovery after 10 missed slots
+            max_recovery_gap: 1000,     // Attempt recovery for gaps up to 1000 slots
             enable_adaptive_polling: true,
         }
     }
@@ -137,7 +137,7 @@ impl SyncCoordinator {
 
                 if let Err(e) = Self::sync_slot(&rpc, &state, &config).await {
                     tracing::error!("Slot sync error: {}", e);
-                    
+
                     // Update status to stalled on repeated errors
                     let mut state_guard = state.write().await;
                     state_guard.status = SyncStatus::Stalled;
@@ -154,10 +154,10 @@ impl SyncCoordinator {
     pub async fn stop(&self) -> SolanaResult<()> {
         let mut running = self.running.write().await;
         *running = false;
-        
+
         let mut state = self.state.write().await;
         state.status = SyncStatus::Stopped;
-        
+
         Ok(())
     }
 
@@ -172,7 +172,7 @@ impl SyncCoordinator {
             let state = self.state.read().await;
             state.latest_synced_slot
         };
-        
+
         if target_slot <= current_synced {
             return Err(SolanaError::InvalidInput(format!(
                 "Target slot {} is not greater than current synced slot {}",
@@ -181,7 +181,7 @@ impl SyncCoordinator {
         }
 
         let gap = target_slot - current_synced;
-        
+
         if gap > self.config.max_recovery_gap {
             return Err(SolanaError::InvalidInput(format!(
                 "Slot gap {} exceeds maximum recovery gap {}",
@@ -203,20 +203,22 @@ impl SyncCoordinator {
         state.latest_synced_slot = target_slot;
         state.missed_slots = 0;
         state.status = SyncStatus::Healthy;
-        
+
         Ok(())
     }
 
     /// Initialize the sync state by querying the chain tip
     async fn initialize_state(&self) -> SolanaResult<()> {
-        let tip = self.rpc.get_latest_slot()
+        let tip = self
+            .rpc
+            .get_latest_slot()
             .map_err(|e| SolanaError::Rpc(format!("Failed to get chain tip: {}", e)))?;
 
         let mut state = self.state.write().await;
         state.chain_tip_slot = tip;
         state.status = SyncStatus::Healthy;
         state.last_sync_time = Some(Instant::now());
-        
+
         Ok(())
     }
 
@@ -230,7 +232,8 @@ impl SyncCoordinator {
         let next_slot = current_state.latest_synced_slot + 1;
 
         // Get the latest chain tip
-        let tip = rpc.get_latest_slot()
+        let tip = rpc
+            .get_latest_slot()
             .map_err(|e| SolanaError::Rpc(format!("Failed to get chain tip: {}", e)))?;
 
         // Check if we're already at the tip
@@ -245,9 +248,9 @@ impl SyncCoordinator {
 
         // Check for slot gap
         let gap = tip - next_slot;
-        
+
         let mut state_guard = state.write().await;
-        
+
         if gap > config.slot_gap_threshold {
             // Significant gap detected
             state_guard.missed_slots = gap;
@@ -263,7 +266,7 @@ impl SyncCoordinator {
             state_guard.status = SyncStatus::Healthy;
             state_guard.congestion_level = 0.0;
         }
-        
+
         state_guard.chain_tip_slot = tip;
         drop(state_guard);
 
@@ -274,7 +277,7 @@ impl SyncCoordinator {
         let mut state_guard = state.write().await;
         state_guard.latest_synced_slot = next_slot;
         state_guard.last_sync_time = Some(Instant::now());
-        
+
         // Update confirmed slot (Solana finality is ~32 slots)
         if next_slot >= 32 {
             state_guard.latest_confirmed_slot = next_slot - 32;
@@ -284,18 +287,16 @@ impl SyncCoordinator {
     }
 
     /// Process a single slot (placeholder for actual slot processing logic)
-    async fn process_slot(
-        rpc: &Arc<dyn SolanaRpc>,
-        slot: u64,
-    ) -> SolanaResult<()> {
+    async fn process_slot(rpc: &Arc<dyn SolanaRpc>, slot: u64) -> SolanaResult<()> {
         // In production, this would:
         // 1. Fetch the block at this slot
         // 2. Process transactions relevant to CSV
         // 3. Update storage with seal commitments, sanads, etc.
         // 4. Verify the slot's inclusion in the chain
-        
+
         // For now, just verify the slot exists by checking RPC connectivity
-        let _tip = rpc.get_latest_slot()
+        let _tip = rpc
+            .get_latest_slot()
             .map_err(|e| SolanaError::Rpc(format!("Failed to verify slot {}: {}", slot, e)))?;
 
         tracing::debug!("Processed slot {}", slot);
@@ -332,7 +333,7 @@ mod tests {
         let rpc = Arc::new(MockSolanaRpc::new());
         let config = SyncCoordinatorConfig::default();
         let coordinator = SyncCoordinator::new(rpc, config);
-        
+
         let state = coordinator.get_state().await;
         assert_eq!(state.latest_synced_slot, 0);
         assert_eq!(state.status, SyncStatus::Stopped);
@@ -343,29 +344,27 @@ mod tests {
         let rpc = Arc::new(MockSolanaRpc::new());
         let config = SyncCoordinatorConfig::default();
         let coordinator = SyncCoordinator::new(rpc, config);
-        
+
         // Test with no congestion
         let mut state = coordinator.state.write().await;
         state.congestion_level = 0.0;
         drop(state);
-        
-        let interval = SyncCoordinator::calculate_adaptive_interval(
-            &coordinator.state,
-            &coordinator.config,
-        ).await;
-        
+
+        let interval =
+            SyncCoordinator::calculate_adaptive_interval(&coordinator.state, &coordinator.config)
+                .await;
+
         assert_eq!(interval, coordinator.config.min_poll_interval_ms);
 
         // Test with high congestion
         let mut state = coordinator.state.write().await;
         state.congestion_level = 1.0;
         drop(state);
-        
-        let interval = SyncCoordinator::calculate_adaptive_interval(
-            &coordinator.state,
-            &coordinator.config,
-        ).await;
-        
+
+        let interval =
+            SyncCoordinator::calculate_adaptive_interval(&coordinator.state, &coordinator.config)
+                .await;
+
         assert_eq!(interval, coordinator.config.max_poll_interval_ms);
     }
 }

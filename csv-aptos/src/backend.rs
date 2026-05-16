@@ -6,11 +6,11 @@
 use async_trait::async_trait;
 #[cfg(feature = "rpc")]
 use base64::Engine;
+use csv_core::ChainId;
 use csv_core::chain_config::ChainConfig;
 use csv_core::driver::{
     AccountModel, ChainCapabilities, ChainDriver, ChainError, ChainResult, RpcClient, Wallet,
 };
-use csv_core::ChainId;
 
 use crate::config::{AptosConfig, AptosNetwork};
 use crate::rpc::AptosRpc;
@@ -57,7 +57,10 @@ impl RpcClient for AptosRpcClient {
 
         // Send the transaction to Aptos REST API
         let response = reqwest::Client::new()
-            .post(format!("{}/transactions", self.rpc_url.trim_end_matches('/')))
+            .post(format!(
+                "{}/transactions",
+                self.rpc_url.trim_end_matches('/')
+            ))
             .header("Content-Type", "application/json")
             .json(&request)
             .send()

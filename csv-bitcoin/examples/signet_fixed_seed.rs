@@ -33,5 +33,7 @@ fn main() {
     println!("    https://mempool.space/signet/address/{}", key.address);
     println!("\n→ Then export and run the test:");
     println!("    export CSV_SIGNET_SEED=\"{}\"", hex::encode(seed));
-    println!("    cargo test -p csv-adapter-bitcoin --test signet_real_tx --features signet-rest -- --ignored --nocapture");
+    println!(
+        "    cargo test -p csv-adapter-bitcoin --test signet_real_tx --features signet-rest -- --ignored --nocapture"
+    );
 }

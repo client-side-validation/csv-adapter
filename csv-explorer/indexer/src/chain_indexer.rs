@@ -6,8 +6,8 @@ use async_trait::async_trait;
 
 use csv_explorer_shared::{
     BlockInfo, CommitmentScheme, CsvContract, CsvEvent, EnhancedSanadRecord, EnhancedSealRecord,
-    EnhancedTransferRecord, ExplorerError, FinalityProofType,
-    InclusionProofType, Network, PriorityLevel, SanadRecord, SealRecord, TransferRecord,
+    EnhancedTransferRecord, ExplorerError, FinalityProofType, InclusionProofType, Network,
+    PriorityLevel, SanadRecord, SealRecord, TransferRecord,
 };
 
 /// Result type alias for chain indexer operations.

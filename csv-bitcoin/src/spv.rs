@@ -1,6 +1,6 @@
 //! SPV (Simplified Payment Verification) for Bitcoin
 
-use bitcoin::{hashes::Hash as BitcoinHash, Txid};
+use bitcoin::{Txid, hashes::Hash as BitcoinHash};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 

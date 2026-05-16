@@ -14,10 +14,10 @@ pub mod seal_view;
 pub mod sidebar;
 
 pub use card::Card;
-pub use chain_display::{all_chain_displays, all_network_displays, ChainDisplay, NetworkDisplay};
-pub use design_tokens::{inject_design_tokens, seal_state_class, SealState};
+pub use chain_display::{ChainDisplay, NetworkDisplay, all_chain_displays, all_network_displays};
+pub use design_tokens::{SealState, inject_design_tokens, seal_state_class};
 pub use dropdown::Dropdown;
-pub use hash_display::{shorten_hash, AddressDisplay, HashDisplay, TxHashDisplay};
+pub use hash_display::{AddressDisplay, HashDisplay, TxHashDisplay, shorten_hash};
 pub use header::Header;
 pub use onboarding::{OnboardingChecklist, OnboardingFlow, OnboardingStep};
 pub use proof_view::{CrossChainProof, ProofInspector, ProofStatus, ValidatorSignature};

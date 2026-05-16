@@ -23,7 +23,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::error::{CelestiaError, Result, MAX_BLOB_SIZE};
+use crate::error::{CelestiaError, MAX_BLOB_SIZE, Result};
 use crate::namespace::Namespace;
 
 /// A blob of data for Celestia DA layer

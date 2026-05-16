@@ -52,8 +52,8 @@ pub mod memory;
 
 // Re-export commonly used types
 pub use bip39::{Mnemonic, MnemonicType};
-pub use bip44::{derivation_path, derive_key, DerivationPath};
-pub use keystore::{create_keystore, KdfType, KeystoreFile};
+pub use bip44::{DerivationPath, derivation_path, derive_key};
+pub use keystore::{KdfType, KeystoreFile, create_keystore};
 pub use memory::{Iv, Nonce, Passphrase, SecretKey, Seed};
 
 /// Version of the csv-adapter-keystore crate.

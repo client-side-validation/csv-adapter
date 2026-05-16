@@ -49,7 +49,7 @@ pub mod types;
 #[cfg(feature = "rpc")]
 pub mod node;
 
-pub use backend::{create_sui_adapter, SuiWallet};
+pub use backend::{SuiWallet, create_sui_adapter};
 pub use seal_protocol::SuiSealProtocol;
 
 pub use checkpoint::CheckpointVerifier;

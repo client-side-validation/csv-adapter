@@ -140,8 +140,12 @@ pub fn cmd_retry(
             match &t.status {
                 TransferStatus::Failed => {
                     output::warning("Transfer failed");
-                    output::info("If lock was successful but mint failed, wait for timeout (24h) and the source chain seal will be recoverable via refund.");
-                    output::info("For timed-out locks: the refund function is available on the source chain contract.");
+                    output::info(
+                        "If lock was successful but mint failed, wait for timeout (24h) and the source chain seal will be recoverable via refund.",
+                    );
+                    output::info(
+                        "For timed-out locks: the refund function is available on the source chain contract.",
+                    );
                 }
                 TransferStatus::Locked | TransferStatus::Initiated => {
                     output::info(

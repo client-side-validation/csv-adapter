@@ -416,10 +416,7 @@ impl SyncContext {
 }
 
 /// Sync a single chain from its last synced position.
-async fn sync_chain(
-    indexer: &dyn ChainIndexer,
-    ctx: &SyncContext,
-) -> Result<(), ExplorerError> {
+async fn sync_chain(indexer: &dyn ChainIndexer, ctx: &SyncContext) -> Result<(), ExplorerError> {
     let chain_id = indexer.chain_id();
 
     // Get last synced block from database

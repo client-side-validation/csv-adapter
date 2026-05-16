@@ -9,5 +9,5 @@ pub use std::collections::{btree_map, btree_set, hash_map, hash_set, *};
 
 #[cfg(not(feature = "std"))]
 pub use alloc::collections::{
-    btree_map, btree_set, BTreeMap, BTreeSet, BTreeSet as HashSet, TryReserveError,
+    BTreeMap, BTreeSet, BTreeSet as HashSet, TryReserveError, btree_map, btree_set,
 };

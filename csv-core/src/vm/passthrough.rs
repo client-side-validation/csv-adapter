@@ -8,7 +8,7 @@
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
-use super::{decode_integer, VMError, VMInputs, VMOutputs};
+use super::{VMError, VMInputs, VMOutputs, decode_integer};
 use crate::state::{StateAssignment, StateTypeId};
 
 use super::DeterministicVM;
@@ -97,8 +97,8 @@ impl DeterministicVM for PassthroughVM {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{GlobalState, Metadata, OwnedState};
     use crate::Hash;
+    use crate::state::{GlobalState, Metadata, OwnedState};
 
     fn test_inputs() -> VMInputs {
         VMInputs::new(

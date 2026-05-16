@@ -6,11 +6,11 @@
 
 use crate::error::{EthereumError, EthereumResult};
 use crate::types::EthereumSealPoint;
-use csv_core::hardening::{BoundedQueue, MAX_SEAL_NULLIFIER_SIZE};
 #[cfg(feature = "rpc")]
 use csv_core::Hash;
 #[cfg(feature = "rpc")]
 use csv_core::SealStore;
+use csv_core::hardening::{BoundedQueue, MAX_SEAL_NULLIFIER_SIZE};
 #[cfg(feature = "rpc")]
 use csv_store::SqliteSealStore;
 use std::collections::HashSet;

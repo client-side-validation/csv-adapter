@@ -1,8 +1,8 @@
 //! Wallet Management page with per-chain account management, export/import JSON.
 
 use crate::chains::supported_wallet_chains;
-use crate::components::{all_chain_displays, Card, ChainDisplay};
-use crate::context::{use_wallet_context, WalletContext};
+use crate::components::{Card, ChainDisplay, all_chain_displays};
+use crate::context::{WalletContext, use_wallet_context};
 use crate::routes::Route;
 use crate::wallet_core::ChainAccount;
 use csv_store::state::ChainId;
@@ -503,8 +503,8 @@ fn trigger_download(filename: &str, content: &str) {
 /// Generate a random 32-byte private key for any chain.
 /// All supported chains (Bitcoin/Ethereum secp256k1, Sui/Aptos/Solana ed25519) use 32-byte keys.
 fn generate_key_for_chain(_chain: ChainId) -> String {
-    use rand::rngs::OsRng;
     use rand::RngCore;
+    use rand::rngs::OsRng;
 
     let mut key = [0u8; 32];
     OsRng.fill_bytes(&mut key);

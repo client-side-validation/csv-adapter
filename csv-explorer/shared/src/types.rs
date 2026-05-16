@@ -25,7 +25,7 @@ use serde_json::Value as JsonValue;
 
 // Chain IDs, transfer status, sync status, error codes from protocol contract
 pub use csv_core::protocol_version::{
-    ChainId, ErrorCode, SyncStatus, TransferStatus, PROTOCOL_VERSION,
+    ChainId, ErrorCode, PROTOCOL_VERSION, SyncStatus, TransferStatus,
 };
 
 // ===========================================================================
@@ -509,8 +509,8 @@ pub struct IndexingActivity {
 
 /// Re-export canonical event types from csv-adapter-core
 pub use csv_core::events::{
-    CsvEvent, EventData, EventFilter as CsvEventFilter, EventFinalityStatus,
-    event_names, metadata_fields,
+    CsvEvent, EventData, EventFilter as CsvEventFilter, EventFinalityStatus, event_names,
+    metadata_fields,
 };
 
 /// Bridge trait for converting explorer records to CsvEvent
@@ -550,7 +550,9 @@ impl SanadRecord {
             sanad_id: SanadId(id_hash),
             owner: self.owner.clone(),
             commitment: Hash::zero(), // Explorer records don't store commitment
-            asset_class: self.metadata.as_ref()
+            asset_class: self
+                .metadata
+                .as_ref()
                 .and_then(|m| m.get("asset_class"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown")
@@ -611,7 +613,7 @@ impl TransferRecord {
                         destination_owner: self.to_owner.clone(),
                         proof_hash: Hash::zero(),
                     },
-                    self.from_chain.clone()
+                    self.from_chain.clone(),
                 )
             } else {
                 // CrossChainMint
@@ -623,7 +625,7 @@ impl TransferRecord {
                         owner: self.to_owner.clone(),
                         proof_hash: Hash::zero(),
                     },
-                    self.to_chain.clone()
+                    self.to_chain.clone(),
                 )
             }
         } else {
@@ -635,7 +637,7 @@ impl TransferRecord {
                     to: self.to_owner.clone(),
                     metadata: None,
                 },
-                self.from_chain.clone()
+                self.from_chain.clone(),
             )
         };
 

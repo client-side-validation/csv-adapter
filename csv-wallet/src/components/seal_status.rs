@@ -134,10 +134,12 @@ pub struct StateTransition {
 /// Display seal lifecycle as a timeline.
 #[allow(non_snake_case)]
 pub fn SealLifecycle(props: SealLifecycleProps) -> Element {
-    let all_states = [SealState::Active,
+    let all_states = [
+        SealState::Active,
         SealState::Pending,
         SealState::Locked,
-        SealState::Consumed];
+        SealState::Consumed,
+    ];
 
     let current_index = all_states
         .iter()

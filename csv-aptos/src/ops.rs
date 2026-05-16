@@ -9,6 +9,7 @@
 //! - ChainSanadOps: Sanad management operations
 //!
 use async_trait::async_trait;
+use csv_core::SealProtocol;
 use csv_core::backend::{
     BalanceInfo, ChainBackend, ChainBroadcaster, ChainCapability, ChainDeployer, ChainOpError,
     ChainOpResult, ChainProofProvider, ChainQuery, ChainSanadOps, ChainSigner, ContractStatus,
@@ -19,7 +20,6 @@ use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
 use csv_core::sanad::SanadId;
 use csv_core::seal::{CommitAnchor, SealPoint};
 use csv_core::signature::SignatureScheme;
-use csv_core::SealProtocol;
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
@@ -63,7 +63,8 @@ impl AptosBackend {
                 ..Default::default()
             },
             mock_rpc,
-        ).unwrap_or_else(|_| {
+        )
+        .unwrap_or_else(|_| {
             // Ultimate fallback
             AptosSealProtocol::from_config(
                 crate::config::AptosConfig {
@@ -71,7 +72,8 @@ impl AptosBackend {
                     ..Default::default()
                 },
                 Box::new(crate::rpc::MockAptosRpc::new(0)),
-            ).unwrap()
+            )
+            .unwrap()
         });
 
         Self {
@@ -658,7 +660,9 @@ impl ChainProofProvider for AptosBackend {
                 let rt = tokio::runtime::Builder::new_current_thread()
                     .enable_all()
                     .build()
-                    .map_err(|e| ChainOpError::RpcError(format!("Failed to build runtime: {}", e)))?;
+                    .map_err(|e| {
+                        ChainOpError::RpcError(format!("Failed to build runtime: {}", e))
+                    })?;
                 rt.block_on(async { rpc.get_ledger_info().await })
                     .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger: {}", e)))?
             };
@@ -790,30 +794,21 @@ impl ChainSanadOps for AptosBackend {
         tx_bytes.extend_from_slice(resource_type_bytes);
 
         // Submit the transaction
-        let digest = self
-            .rpc
-            .submit_transaction(tx_bytes)
-            .await
-            .map_err(|e| {
-                ChainOpError::TransactionError(format!("Failed to submit lock tx: {}", e))
-            })?;
+        let digest = self.rpc.submit_transaction(tx_bytes).await.map_err(|e| {
+            ChainOpError::TransactionError(format!("Failed to submit lock tx: {}", e))
+        })?;
 
         // Wait for transaction confirmation
-        self.rpc
-            .wait_for_transaction(digest)
-            .await
-            .map_err(|e| {
-                ChainOpError::TransactionError(format!("Transaction confirmation failed: {}", e))
-            })?;
+        self.rpc.wait_for_transaction(digest).await.map_err(|e| {
+            ChainOpError::TransactionError(format!("Transaction confirmation failed: {}", e))
+        })?;
 
         // Get the ledger info as block height
         let ledger_info = self
             .rpc
             .get_ledger_info()
             .await
-            .map_err(|e| {
-                ChainOpError::RpcError(format!("Failed to get ledger info: {}", e))
-            })?;
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger info: {}", e)))?;
 
         Ok(SanadOperationResult {
             sanad_id: sanad_id.clone(),
@@ -838,14 +833,9 @@ impl ChainSanadOps for AptosBackend {
         new_owner: &str,
     ) -> ChainOpResult<SanadOperationResult> {
         // Parse the source chain to ensure it's valid
-        let _source = source_chain
-            .parse::<csv_core::ChainId>()
-            .map_err(|_| {
-                ChainOpError::InvalidInput(format!(
-                    "Invalid source chain: {}",
-                    source_chain
-                ))
-            })?;
+        let _source = source_chain.parse::<csv_core::ChainId>().map_err(|_| {
+            ChainOpError::InvalidInput(format!("Invalid source chain: {}", source_chain))
+        })?;
 
         // Parse new owner address (expecting hex-encoded 32-byte Aptos address)
         let owner_bytes = hex::decode(new_owner)
@@ -884,30 +874,21 @@ impl ChainSanadOps for AptosBackend {
         tx_bytes.extend_from_slice(&owner_address);
 
         // Submit the mint transaction via RPC
-        let digest = self
-            .rpc
-            .submit_transaction(tx_bytes)
-            .await
-            .map_err(|e| {
-                ChainOpError::TransactionError(format!("Failed to submit mint tx: {}", e))
-            })?;
+        let digest = self.rpc.submit_transaction(tx_bytes).await.map_err(|e| {
+            ChainOpError::TransactionError(format!("Failed to submit mint tx: {}", e))
+        })?;
 
         // Wait for transaction confirmation
-        self.rpc
-            .wait_for_transaction(digest)
-            .await
-            .map_err(|e| {
-                ChainOpError::TransactionError(format!("Mint tx confirmation failed: {}", e))
-            })?;
+        self.rpc.wait_for_transaction(digest).await.map_err(|e| {
+            ChainOpError::TransactionError(format!("Mint tx confirmation failed: {}", e))
+        })?;
 
         // Get the ledger info as block height
         let ledger_info = self
             .rpc
             .get_ledger_info()
             .await
-            .map_err(|e| {
-                ChainOpError::RpcError(format!("Failed to get ledger info: {}", e))
-            })?;
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger info: {}", e)))?;
 
         Ok(SanadOperationResult {
             sanad_id: source_sanad_id.clone(),
@@ -1000,7 +981,7 @@ impl ChainSanadOps for AptosBackend {
         // Simplified check: account exists means "active"
         let actual_state = if account_exists { "active" } else { "consumed" };
 
- Ok(actual_state == expected_state)
+        Ok(actual_state == expected_state)
     }
 }
 
@@ -1018,7 +999,9 @@ impl ChainBackend for AptosBackend {
     }
 
     fn create_seal(&self, value: Option<u64>) -> ChainOpResult<SealPoint> {
-        let aptos_seal = self.seal_protocol.create_seal(value)
+        let aptos_seal = self
+            .seal_protocol
+            .create_seal(value)
             .map_err(|e| ChainOpError::Unknown(format!("Seal creation failed: {}", e)))?;
 
         // Convert AptosSealPoint to core SealPoint
@@ -1041,7 +1024,8 @@ impl ChainBackend for AptosBackend {
         account_address.copy_from_slice(&seal.id[..32]);
 
         let nonce = seal.nonce.unwrap_or(0);
-        let aptos_seal = crate::types::AptosSealPoint::new(account_address, String::from("csv_seal"), nonce);
+        let aptos_seal =
+            crate::types::AptosSealPoint::new(account_address, String::from("csv_seal"), nonce);
 
         // Generate a random commitment for the publish call
         let mut commitment_bytes = [0u8; 32];
@@ -1049,7 +1033,9 @@ impl ChainBackend for AptosBackend {
         let commitment = Hash::new(commitment_bytes);
 
         // Call the seal protocol's publish method
-        let aptos_anchor = self.seal_protocol.publish(commitment, aptos_seal)
+        let aptos_anchor = self
+            .seal_protocol
+            .publish(commitment, aptos_seal)
             .map_err(|e| ChainOpError::Unknown(format!("Seal publishing failed: {}", e)))?;
 
         // Convert AptosCommitAnchor to core CommitAnchor

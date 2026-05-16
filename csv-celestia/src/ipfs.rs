@@ -26,7 +26,7 @@ use multihash::Multihash;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::error::{CelestiaError, Result, MAX_IPFS_DATA_SIZE};
+use crate::error::{CelestiaError, MAX_IPFS_DATA_SIZE, Result};
 
 /// IPFS Content Identifier wrapper
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

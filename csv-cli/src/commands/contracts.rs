@@ -33,7 +33,11 @@ pub enum ContractAction {
     },
 }
 
-pub fn execute(action: ContractAction, config: &crate::config::Config, state: &mut UnifiedStateManager) -> Result<()> {
+pub fn execute(
+    action: ContractAction,
+    config: &crate::config::Config,
+    state: &mut UnifiedStateManager,
+) -> Result<()> {
     match action {
         ContractAction::List => cmd_list(config, state),
         ContractAction::Status { chain } => cmd_status(&chain, config, state),
@@ -65,7 +69,9 @@ fn cmd_list(config: &crate::config::Config, state: &UnifiedStateManager) -> Resu
     }
 
     if rows.is_empty() {
-        output::warning("No contracts deployed. Deploy contracts manually using Foundry/forge and set the address with `csv contracts set`.");
+        output::warning(
+            "No contracts deployed. Deploy contracts manually using Foundry/forge and set the address with `csv contracts set`.",
+        );
     } else {
         output::table(&headers, &rows);
     }
@@ -73,7 +79,11 @@ fn cmd_list(config: &crate::config::Config, state: &UnifiedStateManager) -> Resu
     Ok(())
 }
 
-fn cmd_status(chain: &Chain, config: &crate::config::Config, state: &UnifiedStateManager) -> Result<()> {
+fn cmd_status(
+    chain: &Chain,
+    config: &crate::config::Config,
+    state: &UnifiedStateManager,
+) -> Result<()> {
     if let Some(contract) = state.get_contract(chain) {
         let chain_config = config.chain(chain)?;
 
@@ -93,13 +103,25 @@ fn cmd_status(chain: &Chain, config: &crate::config::Config, state: &UnifiedStat
     Ok(())
 }
 
-fn cmd_info(chain: &Chain, config: &crate::config::Config, state: &UnifiedStateManager) -> Result<()> {
+fn cmd_info(
+    chain: &Chain,
+    config: &crate::config::Config,
+    state: &UnifiedStateManager,
+) -> Result<()> {
     cmd_status(chain, config, state)
 }
 
-fn cmd_set(chain: &Chain, address: String, config: &crate::config::Config, state: &mut UnifiedStateManager) -> Result<()> {
+fn cmd_set(
+    chain: &Chain,
+    address: String,
+    config: &crate::config::Config,
+    state: &mut UnifiedStateManager,
+) -> Result<()> {
     if !config.chains.contains_key(chain) {
-        anyhow::bail!("Chain '{}' not found in config. Add it with `csv chain set-rpc` first.", chain);
+        anyhow::bail!(
+            "Chain '{}' not found in config. Add it with `csv chain set-rpc` first.",
+            chain
+        );
     }
 
     let chain_config = config.chain(chain)?;

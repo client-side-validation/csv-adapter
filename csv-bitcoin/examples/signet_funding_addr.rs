@@ -24,5 +24,7 @@ fn main() {
     println!("    export CSV_SIGNET_FUNDING_TXID=\"<txid>\"");
     println!("    export CSV_SIGNET_FUNDING_VOUT=0");
     println!("    export CSV_SIGNET_FUNDING_AMOUNT=<satoshis>");
-    println!("    cargo test -p csv-adapter-bitcoin --test signet_real_tx --features signet-rest -- --ignored --nocapture");
+    println!(
+        "    cargo test -p csv-adapter-bitcoin --test signet_real_tx --features signet-rest -- --ignored --nocapture"
+    );
 }

@@ -168,8 +168,8 @@ impl CelestiaAnchor {
         let metadata = serde_json::to_vec(&self.location).unwrap_or_default();
 
         csv_core::seal::CommitAnchor::new(anchor_id.clone(), self.height, metadata.clone())
-            .unwrap_or_else(|_| {
-                unsafe { csv_core::seal::CommitAnchor::new_unchecked(anchor_id, self.height, metadata) }
+            .unwrap_or_else(|_| unsafe {
+                csv_core::seal::CommitAnchor::new_unchecked(anchor_id, self.height, metadata)
             })
     }
 

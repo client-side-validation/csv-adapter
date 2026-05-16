@@ -15,6 +15,8 @@ use bitcoin;
 use bitcoin_hashes::Hash as _;
 use std::sync::{Arc, Mutex};
 
+use csv_core::Hash;
+use csv_core::SealProtocol;
 use csv_core::commitment::Commitment;
 use csv_core::dag::DAGSegment;
 use csv_core::error::ProtocolError;
@@ -23,8 +25,6 @@ use csv_core::proof::{FinalityProof, ProofBundle};
 use csv_core::sanad::SanadId;
 use csv_core::seal::CommitAnchor as CoreCommitAnchor;
 use csv_core::seal::SealPoint as CoreSealPoint;
-use csv_core::Hash;
-use csv_core::SealProtocol;
 
 use crate::config::BitcoinConfig;
 use crate::error::{BitcoinError, BitcoinResult};
@@ -587,14 +587,12 @@ impl SealProtocol for BitcoinSealProtocol {
         #[cfg(feature = "rpc")]
         {
             if let Some(ref rpc) = self.rpc {
-                let is_unspent = rpc
-                    .is_utxo_unspent(seal.txid, seal.vout)
-                    .map_err(|e| {
-                        ProtocolError::NetworkError(format!(
-                            "Failed to check UTXO status on-chain: {}",
-                            e
-                        ))
-                    })?;
+                let is_unspent = rpc.is_utxo_unspent(seal.txid, seal.vout).map_err(|e| {
+                    ProtocolError::NetworkError(format!(
+                        "Failed to check UTXO status on-chain: {}",
+                        e
+                    ))
+                })?;
 
                 if !is_unspent {
                     return Err(ProtocolError::SealReplay(format!(
@@ -608,7 +606,9 @@ impl SealProtocol for BitcoinSealProtocol {
         // Step 3: Mark seal as used in local registry
         // This is done after the on-chain check to ensure consistency
         let mut registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
-        registry.mark_seal_used(&seal).map_err(ProtocolError::from)?;
+        registry
+            .mark_seal_used(&seal)
+            .map_err(ProtocolError::from)?;
 
         Ok(())
     }

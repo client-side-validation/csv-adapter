@@ -51,7 +51,7 @@ pub mod verifier;
 #[cfg(feature = "rpc")]
 pub mod node;
 
-pub use backend::{create_aptos_adapter, AptosWallet};
+pub use backend::{AptosWallet, create_aptos_adapter};
 pub use seal_protocol::AptosSealProtocol;
 
 pub use checkpoint::CheckpointVerifier;

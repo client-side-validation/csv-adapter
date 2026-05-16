@@ -265,7 +265,7 @@ impl ProofRecord {
         proof_data: Vec<u8>,
         block_height: u64,
     ) -> Self {
-        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        use base64::{Engine as _, engine::general_purpose::STANDARD};
 
         Self {
             chain,
@@ -286,7 +286,7 @@ impl ProofRecord {
 
     /// Get the decoded proof data as bytes.
     pub fn decoded_proof_data(&self) -> Option<Vec<u8>> {
-        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        use base64::{Engine as _, engine::general_purpose::STANDARD};
 
         self.proof_data
             .as_ref()

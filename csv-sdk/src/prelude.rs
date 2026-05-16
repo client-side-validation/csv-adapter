@@ -10,7 +10,7 @@
 pub use crate::builder::{ClientBuilder, StoreBackend};
 pub use crate::client::{CsvClient, NetworkType};
 pub use crate::config::{Config, Network, RpcConfig};
-pub use crate::cross_chain::{is_mint_supported, mint_sanad_on_chain, CrossChainError};
+pub use crate::cross_chain::{CrossChainError, is_mint_supported, mint_sanad_on_chain};
 pub use crate::error::CsvError;
 pub use crate::events::Event;
 #[cfg(feature = "tokio")]

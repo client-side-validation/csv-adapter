@@ -7,5 +7,5 @@ pub mod logging;
 pub mod metrics;
 
 // Re-exports
-pub use logging::{LogLevel, LogEntry, StructuredLogger, TraceSpan, Tracer};
-pub use metrics::{RpcMetrics, ProviderMetrics};
+pub use logging::{LogEntry, LogLevel, StructuredLogger, TraceSpan, Tracer};
+pub use metrics::{ProviderMetrics, RpcMetrics};

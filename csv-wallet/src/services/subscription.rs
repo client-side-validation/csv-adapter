@@ -3,12 +3,12 @@
 //! Connects to the explorer's WebSocket subscription endpoint and receives
 //! real-time updates for wallet-owned addresses across all chains.
 
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::collections::HashMap;
-use std::time::Duration;
-use tokio::sync::{mpsc, RwLock};
 use futures::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::{RwLock, mpsc};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 /// WebSocket subscription manager for the wallet.
@@ -167,11 +167,7 @@ impl WalletSubscriptionManager {
 
     /// Unsubscribe from events for a specific address.
     #[cfg(not(target_arch = "wasm32"))]
-    pub async fn unsubscribe(
-        &self,
-        address: &str,
-        chain: Option<&str>,
-    ) -> Result<(), String> {
+    pub async fn unsubscribe(&self, address: &str, chain: Option<&str>) -> Result<(), String> {
         use reqwest::Client;
 
         let request = SubscriptionRequest {
@@ -294,12 +290,12 @@ impl WalletSubscriptionManager {
                     Err(e) => {
                         tracing::error!("Failed to connect to WebSocket: {}", e);
                         retry_count += 1;
-                        
+
                         // Adaptive retry with jitter
                         let base_delay = std::time::Duration::from_secs(2_u64.pow(retry_count));
                         let jitter = rand::random::<u64>() % 1000;
                         let delay = base_delay + std::time::Duration::from_millis(jitter);
-                        
+
                         tokio::time::sleep(delay).await;
                     }
                 }
@@ -323,7 +319,8 @@ impl WalletSubscriptionManager {
 
     /// Get adaptive polling interval with jitter for a specific chain.
     pub fn get_adaptive_interval(&self, chain: &str) -> u64 {
-        let base = self.chain_intervals
+        let base = self
+            .chain_intervals
             .read()
             .unwrap()
             .get(chain)
@@ -368,20 +365,25 @@ impl WalletSubscriptionManager {
         // Fallback to adaptive HTTP polling
         let chain_str = chain.unwrap_or("default");
         let poll_interval = self.get_adaptive_interval(chain_str);
-        
+
         let address = address.to_string();
         let chain = chain_str.to_string();
         let _on_event = Arc::new(on_event);
-        
+
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_millis(poll_interval));
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-            
+
             loop {
                 interval.tick().await;
                 // Here you would make HTTP requests to the explorer API
                 // and call on_event when new data is found
-                tracing::debug!("Polling {} for chain {} (interval: {}ms)", address, chain, poll_interval);
+                tracing::debug!(
+                    "Polling {} for chain {} (interval: {}ms)",
+                    address,
+                    chain,
+                    poll_interval
+                );
             }
         });
 

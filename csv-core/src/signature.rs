@@ -67,18 +67,10 @@ impl Signature {
     /// Returns a new `Signature` containing the signature bytes, public key,
     /// and the signed message. The caller must first generate a key pair
     /// using the appropriate key generation function for the scheme.
-    pub fn sign(
-        scheme: SignatureScheme,
-        secret_key: &[u8],
-        message: &[u8],
-    ) -> Result<Self> {
+    pub fn sign(scheme: SignatureScheme, secret_key: &[u8], message: &[u8]) -> Result<Self> {
         let signature = match scheme {
-            SignatureScheme::Secp256k1 => {
-                sign_secp256k1(message, secret_key)?
-            }
-            SignatureScheme::Ed25519 => {
-                sign_ed25519(message, secret_key)?
-            }
+            SignatureScheme::Secp256k1 => sign_secp256k1(message, secret_key)?,
+            SignatureScheme::Ed25519 => sign_ed25519(message, secret_key)?,
             SignatureScheme::MlDsa65 => {
                 #[cfg(feature = "pq")]
                 {
@@ -87,7 +79,7 @@ impl Signature {
                 #[cfg(not(feature = "pq"))]
                 {
                     return Err(ProtocolError::SignatureVerificationFailed(
-                        "ML-DSA-65 signing requires the 'pq' feature to be enabled".to_string()
+                        "ML-DSA-65 signing requires the 'pq' feature to be enabled".to_string(),
                     ));
                 }
             }
@@ -125,7 +117,7 @@ impl Signature {
 /// Public key format: 33 bytes (compressed) or 65 bytes (uncompressed)
 /// Message: 32 bytes (pre-hashed)
 fn verify_secp256k1(signature: &[u8], public_key: &[u8], message: &[u8]) -> Result<()> {
-    use secp256k1::{ecdsa, Message, PublicKey, Secp256k1};
+    use secp256k1::{Message, PublicKey, Secp256k1, ecdsa};
 
     // Validate input sizes
     if message.len() != 32 {
@@ -293,7 +285,9 @@ fn sign_ed25519(message: &[u8], secret_key: &[u8]) -> Result<Vec<u8>> {
     use ed25519_dalek::{Signature, Signer, SigningKey};
 
     let signing_key = SigningKey::from_bytes(secret_key.try_into().map_err(|_| {
-        ProtocolError::SignatureVerificationFailed("Invalid Ed25519 secret key (must be 32 bytes)".to_string())
+        ProtocolError::SignatureVerificationFailed(
+            "Invalid Ed25519 secret key (must be 32 bytes)".to_string(),
+        )
     })?);
     let sig: Signature = signing_key.sign(message);
 
@@ -377,7 +371,9 @@ fn verify_ml_dsa65(signature: &[u8], public_key: &[u8], _message: &[u8]) -> Resu
     // Perform actual cryptographic verification using open()
     // open() returns Ok(message) if verification succeeds, Err(()) if it fails
     open(&signed_msg, &pk).map_err(|_| {
-        ProtocolError::SignatureVerificationFailed("ML-DSA-65 signature verification failed".to_string())
+        ProtocolError::SignatureVerificationFailed(
+            "ML-DSA-65 signature verification failed".to_string(),
+        )
     })?;
 
     Ok(())
@@ -388,7 +384,7 @@ fn verify_ml_dsa65(signature: &[u8], public_key: &[u8], _message: &[u8]) -> Resu
 #[cfg(not(feature = "pq"))]
 fn verify_ml_dsa65(_signature: &[u8], _public_key: &[u8], _message: &[u8]) -> Result<()> {
     Err(ProtocolError::SignatureVerificationFailed(
-        "ML-DSA-65 verification requires the 'pq' feature to be enabled".to_string()
+        "ML-DSA-65 verification requires the 'pq' feature to be enabled".to_string(),
     ))
 }
 

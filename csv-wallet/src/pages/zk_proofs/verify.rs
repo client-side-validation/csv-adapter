@@ -3,7 +3,7 @@
 //! This page allows users to verify zero-knowledge proofs without requiring
 //! any blockchain RPC access. The verification is purely cryptographic.
 
-use crate::context::{use_wallet_context, ProofRecord, ProofStatus};
+use crate::context::{ProofRecord, ProofStatus, use_wallet_context};
 use crate::pages::common::*;
 use crate::routes::Route;
 use csv_core::zk_proof::ZkSealProof;

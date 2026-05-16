@@ -5,8 +5,8 @@
 
 use crate::memory::{Iv, Passphrase, SecretKey};
 use aes_gcm::{
-    aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit},
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -269,14 +269,14 @@ impl KeystoreFile {
     pub fn save_to(&self, path: impl AsRef<std::path::Path>) -> Result<(), KeystoreError> {
         let json = serde_json::to_string_pretty(self)?;
         std::fs::write(&path, json)?;
-        
+
         // Set restrictive permissions (0o600) for keystore files
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
         }
-        
+
         Ok(())
     }
 
@@ -294,8 +294,7 @@ impl KeystoreFile {
 }
 
 /// Key derivation function type.
-#[derive(Debug, Clone, Copy)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum KdfType {
     /// Scrypt KDF (memory-hard, recommended).
     #[default]
@@ -303,7 +302,6 @@ pub enum KdfType {
     /// PBKDF2 KDF (NIST standard, faster).
     Pbkdf2,
 }
-
 
 /// Derive an encryption key from passphrase and salt using the specified KDF.
 fn derive_key(

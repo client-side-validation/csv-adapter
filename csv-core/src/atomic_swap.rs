@@ -36,8 +36,8 @@
 
 use alloc::vec::Vec;
 use core::time::Duration;
-use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::collections::HashMap;
 use crate::hash::Hash;
@@ -414,7 +414,11 @@ impl AtomicSwapRegistry {
     /// Returns `AtomicSwapError` if:
     /// - Either seal is already locked in another active swap
     /// - Initiator has already reached the max active swap limit
-    pub fn register(&mut self, offer: &AtomicSwapOffer, state: AtomicSwapState) -> Result<(), AtomicSwapError> {
+    pub fn register(
+        &mut self,
+        offer: &AtomicSwapOffer,
+        state: AtomicSwapState,
+    ) -> Result<(), AtomicSwapError> {
         // Check if either seal is already in use
         if self.seals_in_use.contains_key(&offer.seal_a.id) {
             return Err(AtomicSwapError::SealAlreadyLocked(offer.seal_a.clone()));
@@ -428,9 +432,10 @@ impl AtomicSwapRegistry {
             .swaps_by_initiator
             .entry(offer.initiator.clone())
             .or_default();
-        let active_count = initiator_swaps.iter().filter(|sid| {
-            self.swaps.get(sid).is_some_and(|r| r.state.is_active())
-        }).count();
+        let active_count = initiator_swaps
+            .iter()
+            .filter(|sid| self.swaps.get(sid).is_some_and(|r| r.state.is_active()))
+            .count();
         if active_count >= MAX_ACTIVE_SWAPS {
             return Err(AtomicSwapError::RegistryFull);
         }
@@ -441,8 +446,10 @@ impl AtomicSwapRegistry {
             state,
         };
         self.swaps.insert(offer.swap_id, record);
-        self.seals_in_use.insert(offer.seal_a.id.clone(), offer.swap_id);
-        self.seals_in_use.insert(offer.seal_b.id.clone(), offer.swap_id);
+        self.seals_in_use
+            .insert(offer.seal_a.id.clone(), offer.swap_id);
+        self.seals_in_use
+            .insert(offer.seal_b.id.clone(), offer.swap_id);
         initiator_swaps.push(offer.swap_id);
 
         Ok(())
@@ -468,7 +475,10 @@ impl AtomicSwapRegistry {
         from: AtomicSwapState,
         to: AtomicSwapState,
     ) -> Result<(), AtomicSwapError> {
-        let record = self.swaps.get_mut(swap_id).ok_or(AtomicSwapError::SwapNotFound(*swap_id))?;
+        let record = self
+            .swaps
+            .get_mut(swap_id)
+            .ok_or(AtomicSwapError::SwapNotFound(*swap_id))?;
 
         if record.state != from {
             return Err(AtomicSwapError::InvalidStateTransition {
@@ -482,8 +492,14 @@ impl AtomicSwapRegistry {
             (AtomicSwapState::Created { .. }, AtomicSwapState::BothLocked { .. }) => {}
             (AtomicSwapState::BothLocked { .. }, AtomicSwapState::SecretRevealed { .. }) => {}
             (AtomicSwapState::SecretRevealed { .. }, AtomicSwapState::Complete { .. }) => {}
-            (AtomicSwapState::BothLocked { .. } | AtomicSwapState::SecretRevealed { .. }, AtomicSwapState::RefundedByInitiator { .. }) => {}
-            (AtomicSwapState::BothLocked { .. } | AtomicSwapState::SecretRevealed { .. }, AtomicSwapState::RefundedByResponder { .. }) => {}
+            (
+                AtomicSwapState::BothLocked { .. } | AtomicSwapState::SecretRevealed { .. },
+                AtomicSwapState::RefundedByInitiator { .. },
+            ) => {}
+            (
+                AtomicSwapState::BothLocked { .. } | AtomicSwapState::SecretRevealed { .. },
+                AtomicSwapState::RefundedByResponder { .. },
+            ) => {}
             _ => {
                 return Err(AtomicSwapError::InvalidStateTransition {
                     expected: from.phase_name(),
@@ -497,12 +513,23 @@ impl AtomicSwapRegistry {
     }
 
     /// Complete a swap — both parties have claimed their seals.
-    pub fn complete(&mut self, swap_id: &Hash, claim_tx_a: &str, claim_tx_b: &str) -> Result<(), AtomicSwapError> {
-        let record = self.swaps.get_mut(swap_id).ok_or(AtomicSwapError::SwapNotFound(*swap_id))?;
-        let current = core::mem::replace(&mut record.state, AtomicSwapState::Complete {
-            claim_tx_a: claim_tx_a.to_string(),
-            claim_tx_b: claim_tx_b.to_string(),
-        });
+    pub fn complete(
+        &mut self,
+        swap_id: &Hash,
+        claim_tx_a: &str,
+        claim_tx_b: &str,
+    ) -> Result<(), AtomicSwapError> {
+        let record = self
+            .swaps
+            .get_mut(swap_id)
+            .ok_or(AtomicSwapError::SwapNotFound(*swap_id))?;
+        let current = core::mem::replace(
+            &mut record.state,
+            AtomicSwapState::Complete {
+                claim_tx_a: claim_tx_a.to_string(),
+                claim_tx_b: claim_tx_b.to_string(),
+            },
+        );
 
         if !matches!(current, AtomicSwapState::SecretRevealed { .. }) {
             return Err(AtomicSwapError::InvalidStateTransition {
@@ -515,12 +542,23 @@ impl AtomicSwapRegistry {
     }
 
     /// Refund initiator's seal (timeout expired).
-    pub fn refund_initiator(&mut self, swap_id: &Hash, refund_tx_a: &str, refund_height: u64) -> Result<(), AtomicSwapError> {
-        let record = self.swaps.get_mut(swap_id).ok_or(AtomicSwapError::SwapNotFound(*swap_id))?;
-        let current = core::mem::replace(&mut record.state, AtomicSwapState::RefundedByInitiator {
-            refund_tx_a: refund_tx_a.to_string(),
-            refund_height,
-        });
+    pub fn refund_initiator(
+        &mut self,
+        swap_id: &Hash,
+        refund_tx_a: &str,
+        refund_height: u64,
+    ) -> Result<(), AtomicSwapError> {
+        let record = self
+            .swaps
+            .get_mut(swap_id)
+            .ok_or(AtomicSwapError::SwapNotFound(*swap_id))?;
+        let current = core::mem::replace(
+            &mut record.state,
+            AtomicSwapState::RefundedByInitiator {
+                refund_tx_a: refund_tx_a.to_string(),
+                refund_height,
+            },
+        );
 
         if !current.is_active() {
             return Err(AtomicSwapError::AlreadyTerminal(current.phase_name()));
@@ -530,12 +568,23 @@ impl AtomicSwapRegistry {
     }
 
     /// Refund responder's seal (timeout expired).
-    pub fn refund_responder(&mut self, swap_id: &Hash, refund_tx_b: &str, refund_height: u64) -> Result<(), AtomicSwapError> {
-        let record = self.swaps.get_mut(swap_id).ok_or(AtomicSwapError::SwapNotFound(*swap_id))?;
-        let current = core::mem::replace(&mut record.state, AtomicSwapState::RefundedByResponder {
-            refund_tx_b: refund_tx_b.to_string(),
-            refund_height,
-        });
+    pub fn refund_responder(
+        &mut self,
+        swap_id: &Hash,
+        refund_tx_b: &str,
+        refund_height: u64,
+    ) -> Result<(), AtomicSwapError> {
+        let record = self
+            .swaps
+            .get_mut(swap_id)
+            .ok_or(AtomicSwapError::SwapNotFound(*swap_id))?;
+        let current = core::mem::replace(
+            &mut record.state,
+            AtomicSwapState::RefundedByResponder {
+                refund_tx_b: refund_tx_b.to_string(),
+                refund_height,
+            },
+        );
 
         if !current.is_active() {
             return Err(AtomicSwapError::AlreadyTerminal(current.phase_name()));
@@ -551,7 +600,10 @@ impl AtomicSwapRegistry {
 
     /// Get all active swaps.
     pub fn active_swaps(&self) -> Vec<&SwapRecord> {
-        self.swaps.values().filter(|r| r.state.is_active()).collect()
+        self.swaps
+            .values()
+            .filter(|r| r.state.is_active())
+            .collect()
     }
 
     /// Get the number of active swaps.
@@ -902,10 +954,17 @@ mod tests {
             200,
             b"alice".to_vec(),
             1_000_000,
-        ).unwrap();
+        )
+        .unwrap();
 
-        assert_eq!(offer.direction_for(&make_seal(0x01, None)), Some(SwapDirection::Initiator));
-        assert_eq!(offer.direction_for(&make_seal(0x02, None)), Some(SwapDirection::Responder));
+        assert_eq!(
+            offer.direction_for(&make_seal(0x01, None)),
+            Some(SwapDirection::Initiator)
+        );
+        assert_eq!(
+            offer.direction_for(&make_seal(0x02, None)),
+            Some(SwapDirection::Responder)
+        );
         assert_eq!(offer.direction_for(&make_seal(0x03, None)), None);
     }
 
@@ -967,7 +1026,8 @@ mod tests {
             200,
             b"alice".to_vec(),
             1_000_000,
-        ).unwrap();
+        )
+        .unwrap();
 
         let state = AtomicSwapState::Created {
             block_height_a: 100,
@@ -997,7 +1057,8 @@ mod tests {
             200,
             b"alice".to_vec(),
             1_000_000,
-        ).unwrap();
+        )
+        .unwrap();
 
         let state1 = AtomicSwapState::Created {
             block_height_a: 100,
@@ -1018,14 +1079,18 @@ mod tests {
             200,
             b"bob".to_vec(),
             2_000_000,
-        ).unwrap();
+        )
+        .unwrap();
 
         let state2 = AtomicSwapState::Created {
             block_height_a: 100,
             block_height_b: 300,
         };
 
-        assert!(matches!(registry.register(&offer2, state2), Err(AtomicSwapError::SealAlreadyLocked(_))));
+        assert!(matches!(
+            registry.register(&offer2, state2),
+            Err(AtomicSwapError::SealAlreadyLocked(_))
+        ));
     }
 
     #[test]
@@ -1042,7 +1107,8 @@ mod tests {
             200,
             b"alice".to_vec(),
             1_000_000,
-        ).unwrap();
+        )
+        .unwrap();
 
         let created = AtomicSwapState::Created {
             block_height_a: 100,
@@ -1056,11 +1122,18 @@ mod tests {
             lock_height_a: 100,
             lock_height_b: 200,
         };
-        assert!(registry.transition(
-            &offer.swap_id,
-            AtomicSwapState::Created { block_height_a: 100, block_height_b: 200 },
-            both_locked.clone(),
-        ).is_ok());
+        assert!(
+            registry
+                .transition(
+                    &offer.swap_id,
+                    AtomicSwapState::Created {
+                        block_height_a: 100,
+                        block_height_b: 200
+                    },
+                    both_locked.clone(),
+                )
+                .is_ok()
+        );
 
         // Transition to SecretRevealed
         let revealed = AtomicSwapState::SecretRevealed {
@@ -1068,14 +1141,18 @@ mod tests {
             reveal_height: 300,
             remaining_timeout_a: 50,
         };
-        assert!(registry.transition(
-            &offer.swap_id,
-            both_locked.clone(),
-            revealed.clone(),
-        ).is_ok());
+        assert!(
+            registry
+                .transition(&offer.swap_id, both_locked.clone(), revealed.clone(),)
+                .is_ok()
+        );
 
         // Complete the swap
-        assert!(registry.complete(&offer.swap_id, "claim_tx_a", "claim_tx_b").is_ok());
+        assert!(
+            registry
+                .complete(&offer.swap_id, "claim_tx_a", "claim_tx_b")
+                .is_ok()
+        );
 
         let record = registry.get(&offer.swap_id).unwrap();
         assert!(record.state.is_terminal());
@@ -1095,7 +1172,8 @@ mod tests {
             200,
             b"alice".to_vec(),
             1_000_000,
-        ).unwrap();
+        )
+        .unwrap();
 
         let created = AtomicSwapState::Created {
             block_height_a: 100,
@@ -1129,7 +1207,8 @@ mod tests {
             200,
             b"alice".to_vec(),
             1_000_000,
-        ).unwrap();
+        )
+        .unwrap();
 
         let locked = AtomicSwapState::BothLocked {
             lock_height_a: 100,
@@ -1139,7 +1218,11 @@ mod tests {
         registry.register(&offer, locked).unwrap();
 
         // Refund initiator
-        assert!(registry.refund_initiator(&offer.swap_id, "refund_tx", 300).is_ok());
+        assert!(
+            registry
+                .refund_initiator(&offer.swap_id, "refund_tx", 300)
+                .is_ok()
+        );
 
         let record = registry.get(&offer.swap_id).unwrap();
         assert!(record.state.is_terminal());
@@ -1168,7 +1251,8 @@ mod tests {
                 200,
                 format!("initiator-{}", i).as_bytes().to_vec(),
                 1_000_000 + i as u64,
-            ).unwrap();
+            )
+            .unwrap();
 
             let state = AtomicSwapState::Created {
                 block_height_a: 100 + i as u64,
@@ -1180,7 +1264,7 @@ mod tests {
         assert_eq!(registry.active_count(), 2);
         assert_eq!(registry.total_count(), 2);
 
-          // Complete one swap
+        // Complete one swap
         let swap_id = registry.active_swaps()[0].offer.swap_id;
         let _ = registry.complete(&swap_id, "claim_a", "claim_b");
 
@@ -1198,14 +1282,18 @@ mod tests {
     #[test]
     fn test_default_timeouts() {
         assert_eq!(DefaultTimeouts::for_chain(&ChainId::new("bitcoin")), 504);
-        assert_eq!(DefaultTimeouts::for_chain(&ChainId::new("ethereum")), 21_600);
+        assert_eq!(
+            DefaultTimeouts::for_chain(&ChainId::new("ethereum")),
+            21_600
+        );
         assert_eq!(DefaultTimeouts::for_chain(&ChainId::new("solana")), 86_400);
         assert_eq!(DefaultTimeouts::for_chain(&ChainId::new("unknown")), 21_600); // defaults to ethereum
     }
 
     #[test]
     fn test_default_timeouts_for_pair() {
-        let (ta, tb) = DefaultTimeouts::for_chain_pair(&ChainId::new("bitcoin"), &ChainId::new("ethereum"));
+        let (ta, tb) =
+            DefaultTimeouts::for_chain_pair(&ChainId::new("bitcoin"), &ChainId::new("ethereum"));
         assert_eq!(ta, 504);
         assert_eq!(tb, 43_200); // ethereum * 2
     }

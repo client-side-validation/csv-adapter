@@ -18,6 +18,9 @@ mod tests {
 
     #[test]
     fn test_transfer_commitment_domain() {
-        assert_eq!(TransferCommitmentDomain::DOMAIN, b"csv.transfer.commitment.v1");
+        assert_eq!(
+            TransferCommitmentDomain::DOMAIN,
+            b"csv.transfer.commitment.v1"
+        );
     }
 }

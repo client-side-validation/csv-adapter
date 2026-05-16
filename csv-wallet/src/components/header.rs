@@ -1,7 +1,7 @@
 //! Header component with chain/network selectors and wallet info.
 
 use crate::components::{
-    all_chain_displays, all_network_displays, ChainDisplay, Dropdown, NetworkDisplay,
+    ChainDisplay, Dropdown, NetworkDisplay, all_chain_displays, all_network_displays,
 };
 use crate::context::use_wallet_context;
 use crate::pages::common::truncate_address;

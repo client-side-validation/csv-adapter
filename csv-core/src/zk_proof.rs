@@ -542,7 +542,7 @@ pub mod pedersen {
     use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
     use curve25519_dalek::scalar::Scalar;
     use serde::{Deserialize, Serialize};
-    use sha2::{Digest, Sha512, Sha256};
+    use sha2::{Digest, Sha256, Sha512};
 
     use crate::hash::Hash;
 
@@ -559,14 +559,22 @@ pub mod pedersen {
 
     impl PedersenCommitment {
         pub fn from_bytes(bytes: [u8; 32]) -> Self {
-            Self { commitment: bytes, domain: "CSV-PEDERSEN-GEN".to_string() }
+            Self {
+                commitment: bytes,
+                domain: "CSV-PEDERSEN-GEN".to_string(),
+            }
         }
-        pub fn as_bytes(&self) -> &[u8; 32] { &self.commitment }
+        pub fn as_bytes(&self) -> &[u8; 32] {
+            &self.commitment
+        }
         pub fn to_point(&self) -> Option<RistrettoPoint> {
             CompressedRistretto(self.commitment).decompress()
         }
         pub fn from_point(point: &RistrettoPoint) -> Self {
-            Self { commitment: point.compress().to_bytes(), domain: "CSV-PEDERSEN-GEN".to_string() }
+            Self {
+                commitment: point.compress().to_bytes(),
+                domain: "CSV-PEDERSEN-GEN".to_string(),
+            }
         }
         pub fn hash(&self) -> Hash {
             let mut hasher = Sha256::new();
@@ -606,10 +614,10 @@ pub mod pedersen {
         generators: PedersenGenerators,
     }
 
-    
-
     impl PedersenScheme {
-        pub fn new() -> Self { Self::default() }
+        pub fn new() -> Self {
+            Self::default()
+        }
 
         /// Commit to a value with a random blinding factor. Returns (commitment, blinding).
         pub fn commit(&self, value: u64) -> Result<(PedersenCommitment, Scalar), PedersenError> {
@@ -623,36 +631,58 @@ pub mod pedersen {
         }
 
         /// Verify a commitment opening: C' = g^value * h^blinding == commitment.
-        pub fn verify(&self, commitment: &PedersenCommitment, value: u64, blinding: &Scalar) -> Result<bool, PedersenError> {
+        pub fn verify(
+            &self,
+            commitment: &PedersenCommitment,
+            value: u64,
+            blinding: &Scalar,
+        ) -> Result<bool, PedersenError> {
             if value > MAX_COMMITTED_VALUE {
                 return Err(PedersenError::ValueTooLarge(value));
             }
             let expected = self.generators.g * Scalar::from(value) + self.generators.h * *blinding;
-            let actual = commitment.to_point().ok_or(PedersenError::InvalidCommitment)?;
+            let actual = commitment
+                .to_point()
+                .ok_or(PedersenError::InvalidCommitment)?;
             Ok(expected == actual)
         }
 
         /// Add two commitments homomorphically: C1 + C2 = C(v1+v2, r1+r2).
-        pub fn add_commitments(&self, c1: &PedersenCommitment, c2: &PedersenCommitment) -> Option<PedersenCommitment> {
+        pub fn add_commitments(
+            &self,
+            c1: &PedersenCommitment,
+            c2: &PedersenCommitment,
+        ) -> Option<PedersenCommitment> {
             let p1 = c1.to_point()?;
             let p2 = c2.to_point()?;
             Some(PedersenCommitment::from_point(&(p1 + p2)))
         }
 
         /// Scale a commitment by a scalar: k * C(v, r) = C(k*v, k*r).
-        pub fn scale_commitment(&self, commitment: &PedersenCommitment, scalar: &Scalar) -> Option<PedersenCommitment> {
+        pub fn scale_commitment(
+            &self,
+            commitment: &PedersenCommitment,
+            scalar: &Scalar,
+        ) -> Option<PedersenCommitment> {
             let p = commitment.to_point()?;
             Some(PedersenCommitment::from_point(&(p * scalar)))
         }
 
         /// Negate a commitment.
-        pub fn negate_commitment(&self, commitment: &PedersenCommitment) -> Option<PedersenCommitment> {
+        pub fn negate_commitment(
+            &self,
+            commitment: &PedersenCommitment,
+        ) -> Option<PedersenCommitment> {
             let p = commitment.to_point()?;
             Some(PedersenCommitment::from_point(&(-p)))
         }
 
         /// C1 - C2 = C(v1-v2, r1-r2).
-        pub fn subtract_commitments(&self, c1: &PedersenCommitment, c2: &PedersenCommitment) -> Option<PedersenCommitment> {
+        pub fn subtract_commitments(
+            &self,
+            c1: &PedersenCommitment,
+            c2: &PedersenCommitment,
+        ) -> Option<PedersenCommitment> {
             let p1 = c1.to_point()?;
             let p2 = c2.to_point()?;
             Some(PedersenCommitment::from_point(&(p1 - p2)))
@@ -664,7 +694,9 @@ pub mod pedersen {
             let mut hasher = Sha512::new();
             hasher.update(domain.as_bytes());
             let h = RistrettoPoint::hash_from_bytes::<Sha512>(&hasher.finalize());
-            Self { generators: PedersenGenerators { g, h } }
+            Self {
+                generators: PedersenGenerators { g, h },
+            }
         }
     }
 
@@ -718,7 +750,10 @@ mod pedersen_tests {
         #[test]
         fn test_commit_value_too_large() {
             let scheme = PedersenScheme::new();
-            assert!(matches!(scheme.commit(MAX_COMMITTED_VALUE + 1), Err(PedersenError::ValueTooLarge(_))));
+            assert!(matches!(
+                scheme.commit(MAX_COMMITTED_VALUE + 1),
+                Err(PedersenError::ValueTooLarge(_))
+            ));
         }
 
         #[test]
@@ -807,7 +842,15 @@ mod pedersen_tests {
         #[test]
         fn test_multiple_values() {
             let scheme = PedersenScheme::new();
-            for value in [0u64, 1, 42, 1000, 1_000_000, 1_000_000_000u64, MAX_COMMITTED_VALUE] {
+            for value in [
+                0u64,
+                1,
+                42,
+                1000,
+                1_000_000,
+                1_000_000_000u64,
+                MAX_COMMITTED_VALUE,
+            ] {
                 let (c, b) = scheme.commit(value).unwrap();
                 assert!(scheme.verify(&c, value, &b).unwrap());
                 if value > 0 {

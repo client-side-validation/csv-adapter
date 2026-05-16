@@ -3,7 +3,7 @@
 //! This module provides browser-specific localStorage persistence for the unified
 //! storage format, enabling csv-wallet to share data with csv-cli.
 
-use csv_core::mcp::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::mcp::{FixAction, HasErrorSuggestion, error_codes};
 use serde::{Deserialize, Serialize};
 
 use crate::state::{StateStorage, StorageError};
@@ -277,7 +277,10 @@ mod tests {
     fn test_transaction_type_display() {
         assert_eq!(TransactionType::Transfer.to_string(), "Transfer");
         assert_eq!(TransactionType::SealCreation.to_string(), "Seal Creation");
-        assert_eq!(TransactionType::SealConsumption.to_string(), "Seal Consumption");
+        assert_eq!(
+            TransactionType::SealConsumption.to_string(),
+            "Seal Consumption"
+        );
     }
 
     #[test]

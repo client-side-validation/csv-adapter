@@ -31,17 +31,17 @@ pub mod zk_prover;
 #[cfg(feature = "signet-rest")]
 pub mod mempool_rpc;
 
-pub use backend::{create_bitcoin_adapter, BitcoinRpcClient, BitcoinWallet};
-pub use bip341::{derive_output_key, generate_test_keypair, Bip341Error, TaprootOutput};
+pub use backend::{BitcoinRpcClient, BitcoinWallet, create_bitcoin_adapter};
+pub use bip341::{Bip341Error, TaprootOutput, derive_output_key, generate_test_keypair};
 pub use config::{BitcoinConfig, Network};
 pub use rpc::BitcoinRpc;
 pub use seal_protocol::BitcoinSealProtocol;
 pub use sp1_guest::{
-    verify_bitcoin_spv, Sp1BtcSpvInput as Sp1GuestInput, Sp1BtcSpvOutput as Sp1GuestOutput,
+    Sp1BtcSpvInput as Sp1GuestInput, Sp1BtcSpvOutput as Sp1GuestOutput, verify_bitcoin_spv,
 };
 pub use spv::SpvVerifier;
 pub use tapret::{
-    mine_tapret_nonce, OpretCommitment, TapretCommitment, TapretError, TAPRET_SCRIPT_SIZE,
+    OpretCommitment, TAPRET_SCRIPT_SIZE, TapretCommitment, TapretError, mine_tapret_nonce,
 };
 pub use tx_builder::{CommitmentData, CommitmentTxBuilder, TxBuilderError};
 pub use types::{
@@ -52,7 +52,7 @@ pub use zk_prover::{BitcoinSpvProver, Sp1BtcSpvInput};
 
 // MPC batching for cost optimization
 pub use mpc_batch::{
-    BatchedPublication, MpcBatcher, MpcTreeExt, PendingCommitment, CSV_BTC_PROTOCOL_ID,
+    BatchedPublication, CSV_BTC_PROTOCOL_ID, MpcBatcher, MpcTreeExt, PendingCommitment,
 };
 
 // Ops exports

@@ -6,4 +6,4 @@
 pub mod quorum_client;
 
 // Re-exports
-pub use quorum_client::{QuorumClient, RpcProvider, QuorumConfig};
+pub use quorum_client::{QuorumClient, QuorumConfig, RpcProvider};

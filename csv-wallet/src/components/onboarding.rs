@@ -37,12 +37,24 @@ impl OnboardingStep {
 
     fn description(&self) -> &'static str {
         match self {
-            OnboardingStep::Welcome => "CSV (Cross-Seal Validation) enables secure cross-chain asset transfers using cryptographic seals.",
-            OnboardingStep::WhatIsSeal => "A seal is a unique digital fingerprint that represents ownership of an asset on a specific blockchain.",
-            OnboardingStep::WalletSetup => "Connect or create a wallet to start managing your seals and sanads.",
-            OnboardingStep::CreateFirstSanad => "Create your first sanad to experience how seals work in practice.",
-            OnboardingStep::SecurityTips => "Follow these best practices to keep your seals and assets safe.",
-            OnboardingStep::Complete => "You now understand the basics. Start exploring the CSV ecosystem!",
+            OnboardingStep::Welcome => {
+                "CSV (Cross-Seal Validation) enables secure cross-chain asset transfers using cryptographic seals."
+            }
+            OnboardingStep::WhatIsSeal => {
+                "A seal is a unique digital fingerprint that represents ownership of an asset on a specific blockchain."
+            }
+            OnboardingStep::WalletSetup => {
+                "Connect or create a wallet to start managing your seals and sanads."
+            }
+            OnboardingStep::CreateFirstSanad => {
+                "Create your first sanad to experience how seals work in practice."
+            }
+            OnboardingStep::SecurityTips => {
+                "Follow these best practices to keep your seals and assets safe."
+            }
+            OnboardingStep::Complete => {
+                "You now understand the basics. Start exploring the CSV ecosystem!"
+            }
         }
     }
 

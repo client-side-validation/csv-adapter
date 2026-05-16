@@ -61,18 +61,14 @@ fn main() -> Result<()> {
     println!("✓ Transfer initiated: {}", transfer_id);
 
     // Check transfer status
-    let status = rt.block_on(async {
-        client.transfers().status(&transfer_id)
-    })?;
+    let status = rt.block_on(async { client.transfers().status(&transfer_id) })?;
     println!("  Status: {:?}\n", status);
 
     // List all player assets
     println!("Player Asset Inventory:");
     println!("------------------------");
 
-    let sanads = rt.block_on(async {
-        client.sanads().list(SanadFilters::default())
-    })?;
+    let sanads = rt.block_on(async { client.sanads().list(SanadFilters::default()) })?;
     for sanad in sanads {
         println!("  - {:?} (active)", sanad.id);
     }

@@ -11,13 +11,13 @@
 //! - Multi-device sync preparation
 //! - Hardware security module integration points
 
+use chrono::{DateTime, Utc};
 use csv_keys::{
     file_keystore::FileKeystore,
     memory::{Passphrase, SecretKey},
 };
-use std::path::PathBuf;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Default keystore directory (~/.csv/keystore).
 pub const KEYSTORE_DIR: &str = "~/.csv/keystore";
@@ -139,9 +139,9 @@ pub struct NativeKeystore {
 impl NativeKeystore {
     /// Create a new native keystore pointing to the default directory.
     pub fn new() -> Result<Self, NativeKeystoreError> {
-        let inner = FileKeystore::new(None)
-            .map_err(|e| NativeKeystoreError::Filesystem(e.to_string()))?;
-        Ok(Self { 
+        let inner =
+            FileKeystore::new(None).map_err(|e| NativeKeystoreError::Filesystem(e.to_string()))?;
+        Ok(Self {
             inner,
             security_policy: SecurityPolicy::default(),
             failed_attempts: 0,
@@ -151,9 +151,9 @@ impl NativeKeystore {
 
     /// Create a new native keystore with custom security policy.
     pub fn with_policy(security_policy: SecurityPolicy) -> Result<Self, NativeKeystoreError> {
-        let inner = FileKeystore::new(None)
-            .map_err(|e| NativeKeystoreError::Filesystem(e.to_string()))?;
-        Ok(Self { 
+        let inner =
+            FileKeystore::new(None).map_err(|e| NativeKeystoreError::Filesystem(e.to_string()))?;
+        Ok(Self {
             inner,
             security_policy,
             failed_attempts: 0,
@@ -165,7 +165,7 @@ impl NativeKeystore {
     pub fn with_dir(dir: &str) -> Result<Self, NativeKeystoreError> {
         let inner = FileKeystore::with_dir(dir)
             .map_err(|e| NativeKeystoreError::Filesystem(e.to_string()))?;
-        Ok(Self { 
+        Ok(Self {
             inner,
             security_policy: SecurityPolicy::default(),
             failed_attempts: 0,
@@ -174,10 +174,13 @@ impl NativeKeystore {
     }
 
     /// Create a new native keystore at a custom directory with custom security policy.
-    pub fn with_dir_and_policy(dir: &str, security_policy: SecurityPolicy) -> Result<Self, NativeKeystoreError> {
+    pub fn with_dir_and_policy(
+        dir: &str,
+        security_policy: SecurityPolicy,
+    ) -> Result<Self, NativeKeystoreError> {
         let inner = FileKeystore::with_dir(dir)
             .map_err(|e| NativeKeystoreError::Filesystem(e.to_string()))?;
-        Ok(Self { 
+        Ok(Self {
             inner,
             security_policy,
             failed_attempts: 0,
@@ -208,16 +211,17 @@ impl NativeKeystore {
     ) -> Result<(), NativeKeystoreError> {
         // Validate passphrase against security policy
         self.validate_passphrase(passphrase)?;
-        
+
         // Check if we're locked out due to failed attempts
         if self.failed_attempts >= self.security_policy.max_failed_attempts {
             return Err(NativeKeystoreError::SecurityPolicy(
-                "Too many failed attempts. Please wait before trying again.".to_string()
+                "Too many failed attempts. Please wait before trying again.".to_string(),
             ));
         }
-        
+
         // Store the key
-        let result = self.inner
+        let result = self
+            .inner
             .store_key(key_id, chain, label, secret_key, passphrase)
             .map_err(|e| match e {
                 csv_keys::file_keystore::FileKeystoreError::KeyNotFound(_) => {
@@ -228,28 +232,30 @@ impl NativeKeystore {
                 }
                 _ => NativeKeystoreError::Filesystem(e.to_string()),
             });
-        
+
         match result {
             Ok(()) => {
                 // Reset failed attempts on success
                 self.reset_failed_attempts();
                 self.update_activity();
-                
+
                 // Create automatic backup if enabled
                 if self.security_policy.enable_auto_backup {
-                    if let Err(e) = self.create_backup(Some(format!("Auto-backup after storing key: {}", key_id))) {
+                    if let Err(e) = self
+                        .create_backup(Some(format!("Auto-backup after storing key: {}", key_id)))
+                    {
                         // Log error but don't fail the operation
                         eprintln!("Warning: Failed to create auto-backup: {}", e);
                     }
                 }
-                
+
                 Ok(())
             }
             Err(e) => {
                 // Increment failed attempts
                 if self.increment_failed_attempts() {
                     return Err(NativeKeystoreError::SecurityPolicy(
-                        "Maximum failed attempts reached. Keystore temporarily locked.".to_string()
+                        "Maximum failed attempts reached. Keystore temporarily locked.".to_string(),
                     ));
                 }
                 Err(e)
@@ -270,19 +276,20 @@ impl NativeKeystore {
         // Check if we're locked out due to failed attempts
         if self.failed_attempts >= self.security_policy.max_failed_attempts {
             return Err(NativeKeystoreError::SecurityPolicy(
-                "Too many failed attempts. Please wait before trying again.".to_string()
+                "Too many failed attempts. Please wait before trying again.".to_string(),
             ));
         }
-        
+
         // Check if auto-lock should trigger
         if self.should_auto_lock() {
             return Err(NativeKeystoreError::SecurityPolicy(
-                "Keystore auto-locked due to inactivity. Please start a new session.".to_string()
+                "Keystore auto-locked due to inactivity. Please start a new session.".to_string(),
             ));
         }
-        
+
         // Retrieve the key
-        let result = self.inner
+        let result = self
+            .inner
             .retrieve_key(key_id, passphrase)
             .map_err(|e| match e {
                 csv_keys::file_keystore::FileKeystoreError::KeyNotFound(_) => {
@@ -296,7 +303,7 @@ impl NativeKeystore {
                 }
                 _ => NativeKeystoreError::Encryption(e.to_string()),
             });
-        
+
         match result {
             Ok(key) => {
                 // Reset failed attempts on success
@@ -308,7 +315,7 @@ impl NativeKeystore {
                 // Increment failed attempts
                 if self.increment_failed_attempts() {
                     return Err(NativeKeystoreError::SecurityPolicy(
-                        "Maximum failed attempts reached. Keystore temporarily locked.".to_string()
+                        "Maximum failed attempts reached. Keystore temporarily locked.".to_string(),
                     ));
                 }
                 Err(e)
@@ -323,25 +330,27 @@ impl NativeKeystore {
 
     /// Delete a stored key from the keystore.
     pub fn delete_key(&mut self, key_id: &str) -> Result<(), NativeKeystoreError> {
-        self.inner
-            .delete_key(key_id)
-            .map_err(|e| match e {
-                csv_keys::file_keystore::FileKeystoreError::KeyNotFound(_) => {
-                    NativeKeystoreError::KeyNotFound(key_id.to_string())
-                }
-                _ => NativeKeystoreError::Filesystem(e.to_string()),
-            })
+        self.inner.delete_key(key_id).map_err(|e| match e {
+            csv_keys::file_keystore::FileKeystoreError::KeyNotFound(_) => {
+                NativeKeystoreError::KeyNotFound(key_id.to_string())
+            }
+            _ => NativeKeystoreError::Filesystem(e.to_string()),
+        })
     }
 
     /// Verify that a passphrase can decrypt a stored key.
-    pub fn verify_passphrase(&self, key_id: &str, passphrase: &Passphrase) -> Result<bool, NativeKeystoreError> {
+    pub fn verify_passphrase(
+        &self,
+        key_id: &str,
+        passphrase: &Passphrase,
+    ) -> Result<bool, NativeKeystoreError> {
         match self.inner.verify_passphrase(key_id, passphrase) {
             Ok(_) => Ok(true),
             Err(csv_keys::file_keystore::FileKeystoreError::KeyNotFound(_)) => Ok(false),
-            Err(csv_keys::file_keystore::FileKeystoreError::InvalidPassphrase
-            | csv_keys::file_keystore::FileKeystoreError::SessionExpired) => {
-                Ok(false)
-            }
+            Err(
+                csv_keys::file_keystore::FileKeystoreError::InvalidPassphrase
+                | csv_keys::file_keystore::FileKeystoreError::SessionExpired,
+            ) => Ok(false),
             Err(e) => Err(NativeKeystoreError::Encryption(e.to_string())),
         }
     }
@@ -377,16 +386,19 @@ impl NativeKeystore {
     }
 
     /// Update the security policy.
-    pub fn update_security_policy(&mut self, policy: SecurityPolicy) -> Result<(), NativeKeystoreError> {
+    pub fn update_security_policy(
+        &mut self,
+        policy: SecurityPolicy,
+    ) -> Result<(), NativeKeystoreError> {
         // Validate new policy
         if policy.min_passphrase_length < 8 {
             return Err(NativeKeystoreError::SecurityPolicy(
-                "Minimum passphrase length must be at least 8 characters".to_string()
+                "Minimum passphrase length must be at least 8 characters".to_string(),
             ));
         }
         if policy.max_session_duration == 0 {
             return Err(NativeKeystoreError::SecurityPolicy(
-                "Maximum session duration must be greater than 0".to_string()
+                "Maximum session duration must be greater than 0".to_string(),
             ));
         }
         self.security_policy = policy;
@@ -395,22 +407,24 @@ impl NativeKeystore {
 
     /// Validate passphrase against security policy.
     pub fn validate_passphrase(&self, passphrase: &Passphrase) -> Result<(), NativeKeystoreError> {
-        let passphrase_str = std::str::from_utf8(passphrase.as_bytes())
-            .map_err(|_| NativeKeystoreError::SecurityPolicy("Invalid passphrase encoding".to_string()))?;
-        
+        let passphrase_str = std::str::from_utf8(passphrase.as_bytes()).map_err(|_| {
+            NativeKeystoreError::SecurityPolicy("Invalid passphrase encoding".to_string())
+        })?;
+
         if passphrase_str.len() < self.security_policy.min_passphrase_length {
-            return Err(NativeKeystoreError::SecurityPolicy(
-                format!("Passphrase must be at least {} characters long", self.security_policy.min_passphrase_length)
-            ));
+            return Err(NativeKeystoreError::SecurityPolicy(format!(
+                "Passphrase must be at least {} characters long",
+                self.security_policy.min_passphrase_length
+            )));
         }
-        
+
         // Check for common weak patterns
         if passphrase_str.chars().all(|c| c.is_ascii_digit()) {
             return Err(NativeKeystoreError::SecurityPolicy(
-                "Passphrase cannot be only numbers".to_string()
+                "Passphrase cannot be only numbers".to_string(),
             ));
         }
-        
+
         Ok(())
     }
 
@@ -430,20 +444,24 @@ impl NativeKeystore {
     }
 
     /// Create a backup of the keystore.
-    pub fn create_backup(&self, description: Option<String>) -> Result<BackupMetadata, NativeKeystoreError> {
+    pub fn create_backup(
+        &self,
+        description: Option<String>,
+    ) -> Result<BackupMetadata, NativeKeystoreError> {
         let backup_id = uuid::Uuid::new_v4().to_string();
         let backup_dir = self.inner.keystore_dir().join("backups");
-        
+
         // Create backup directory if it doesn't exist
-        std::fs::create_dir_all(&backup_dir)
-            .map_err(|e| NativeKeystoreError::Backup(format!("Failed to create backup directory: {}", e)))?;
-        
+        std::fs::create_dir_all(&backup_dir).map_err(|e| {
+            NativeKeystoreError::Backup(format!("Failed to create backup directory: {}", e))
+        })?;
+
         let _backup_file = backup_dir.join(format!("backup-{}.tar.gz", backup_id));
-        
+
         // Create tar.gz backup of keystore directory
         let keys = self.inner.list_key_entries();
         let key_count = keys.len();
-        
+
         // For now, create a simple metadata backup
         let metadata = BackupMetadata {
             id: backup_id.clone(),
@@ -453,14 +471,15 @@ impl NativeKeystore {
             version: 1,
             description,
         };
-        
+
         // Save backup metadata
         let metadata_file = backup_dir.join(format!("backup-{}.json", backup_id));
-        let metadata_json = serde_json::to_string_pretty(&metadata)
-            .map_err(|e| NativeKeystoreError::Backup(format!("Failed to serialize metadata: {}", e)))?;
+        let metadata_json = serde_json::to_string_pretty(&metadata).map_err(|e| {
+            NativeKeystoreError::Backup(format!("Failed to serialize metadata: {}", e))
+        })?;
         std::fs::write(&metadata_file, metadata_json)
             .map_err(|e| NativeKeystoreError::Backup(format!("Failed to write metadata: {}", e)))?;
-        
+
         Ok(metadata)
     }
 
@@ -470,25 +489,33 @@ impl NativeKeystore {
         if !backup_dir.exists() {
             return Ok(Vec::new());
         }
-        
+
         let mut backups = Vec::new();
-        for entry in std::fs::read_dir(&backup_dir)
-            .map_err(|e| NativeKeystoreError::Backup(format!("Failed to read backup directory: {}", e)))? {
-            let entry = entry
-                .map_err(|e| NativeKeystoreError::Backup(format!("Failed to read backup entry: {}", e)))?;
+        for entry in std::fs::read_dir(&backup_dir).map_err(|e| {
+            NativeKeystoreError::Backup(format!("Failed to read backup directory: {}", e))
+        })? {
+            let entry = entry.map_err(|e| {
+                NativeKeystoreError::Backup(format!("Failed to read backup entry: {}", e))
+            })?;
             let file_name = entry.file_name();
             let file_name_str = file_name.to_string_lossy();
-            
+
             if file_name_str.starts_with("backup-") && file_name_str.ends_with(".json") {
                 let metadata_path = entry.path();
-                let metadata_json = std::fs::read_to_string(&metadata_path)
-                    .map_err(|e| NativeKeystoreError::Backup(format!("Failed to read backup metadata: {}", e)))?;
-                let metadata: BackupMetadata = serde_json::from_str(&metadata_json)
-                    .map_err(|e| NativeKeystoreError::Backup(format!("Failed to parse backup metadata: {}", e)))?;
+                let metadata_json = std::fs::read_to_string(&metadata_path).map_err(|e| {
+                    NativeKeystoreError::Backup(format!("Failed to read backup metadata: {}", e))
+                })?;
+                let metadata: BackupMetadata =
+                    serde_json::from_str(&metadata_json).map_err(|e| {
+                        NativeKeystoreError::Backup(format!(
+                            "Failed to parse backup metadata: {}",
+                            e
+                        ))
+                    })?;
                 backups.push(metadata);
             }
         }
-        
+
         // Sort by creation time (newest first)
         backups.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         Ok(backups)
@@ -499,31 +526,37 @@ impl NativeKeystore {
         if !self.security_policy.enable_auto_backup {
             return Ok(0);
         }
-        
+
         let backups = self.list_backups()?;
-        let cutoff_date = Utc::now() - chrono::Duration::days(self.security_policy.backup_retention_days as i64);
+        let cutoff_date =
+            Utc::now() - chrono::Duration::days(self.security_policy.backup_retention_days as i64);
         let mut deleted_count = 0;
-        
+
         for backup in backups {
             if backup.created_at < cutoff_date {
                 let backup_dir = self.inner.keystore_dir().join("backups");
                 let metadata_file = backup_dir.join(format!("backup-{}.json", backup.id));
                 let backup_file = backup_dir.join(format!("backup-{}.tar.gz", backup.id));
-                
+
                 // Delete backup files
                 if metadata_file.exists() {
-                    std::fs::remove_file(&metadata_file)
-                        .map_err(|e| NativeKeystoreError::Backup(format!("Failed to delete backup metadata: {}", e)))?;
+                    std::fs::remove_file(&metadata_file).map_err(|e| {
+                        NativeKeystoreError::Backup(format!(
+                            "Failed to delete backup metadata: {}",
+                            e
+                        ))
+                    })?;
                 }
                 if backup_file.exists() {
-                    std::fs::remove_file(&backup_file)
-                        .map_err(|e| NativeKeystoreError::Backup(format!("Failed to delete backup file: {}", e)))?;
+                    std::fs::remove_file(&backup_file).map_err(|e| {
+                        NativeKeystoreError::Backup(format!("Failed to delete backup file: {}", e))
+                    })?;
                 }
-                
+
                 deleted_count += 1;
             }
         }
-        
+
         Ok(deleted_count)
     }
 
@@ -532,10 +565,11 @@ impl NativeKeystore {
         if self.security_policy.key_rotation_interval_days == 0 {
             return Vec::new();
         }
-        
+
         let keys = self.inner.list_key_entries();
-        let cutoff_date = Utc::now() - chrono::Duration::days(self.security_policy.key_rotation_interval_days as i64);
-        
+        let cutoff_date = Utc::now()
+            - chrono::Duration::days(self.security_policy.key_rotation_interval_days as i64);
+
         keys.iter()
             .filter(|key| {
                 let created_at = chrono::DateTime::from_timestamp(key.created_at as i64, 0)
@@ -590,7 +624,15 @@ mod tests {
         let secret_key = test_secret_key();
         let passphrase = test_passphrase();
 
-        keystore.store_key("main", "ethereum", Some("Main ETH Key"), &secret_key, &passphrase).unwrap();
+        keystore
+            .store_key(
+                "main",
+                "ethereum",
+                Some("Main ETH Key"),
+                &secret_key,
+                &passphrase,
+            )
+            .unwrap();
         let retrieved = keystore.retrieve_key("main", &passphrase).unwrap();
         assert_eq!(secret_key.as_bytes(), retrieved.as_bytes());
     }
@@ -603,9 +645,14 @@ mod tests {
         let good_passphrase = Passphrase::new("correct-password");
         let wrong_passphrase = Passphrase::new("wrong-password");
 
-        keystore.store_key("main", "solana", None, &secret_key, &good_passphrase).unwrap();
+        keystore
+            .store_key("main", "solana", None, &secret_key, &good_passphrase)
+            .unwrap();
         let result = keystore.retrieve_key("main", &wrong_passphrase);
-        assert!(matches!(result, Err(NativeKeystoreError::PassphraseMismatch)));
+        assert!(matches!(
+            result,
+            Err(NativeKeystoreError::PassphraseMismatch)
+        ));
     }
 
     #[test]
@@ -614,9 +661,12 @@ mod tests {
         let mut keystore = NativeKeystore::with_dir("/tmp/csv-test-keystore-security").unwrap();
         let secret_key = test_secret_key();
         let weak_passphrase = Passphrase::new("123"); // Too short
-        
+
         let result = keystore.store_key("test", "bitcoin", None, &secret_key, &weak_passphrase);
-        assert!(matches!(result, Err(NativeKeystoreError::SecurityPolicy(_))));
+        assert!(matches!(
+            result,
+            Err(NativeKeystoreError::SecurityPolicy(_))
+        ));
     }
 
     #[test]
@@ -627,15 +677,17 @@ mod tests {
         let good_passphrase = Passphrase::new("good-password");
         let wrong_passphrase = Passphrase::new("wrong-password");
 
-        keystore.store_key("test", "ethereum", None, &secret_key, &good_passphrase).unwrap();
-        
+        keystore
+            .store_key("test", "ethereum", None, &secret_key, &good_passphrase)
+            .unwrap();
+
         // Make several failed attempts
         for _ in 0..3 {
             let _ = keystore.retrieve_key("test", &wrong_passphrase);
         }
-        
+
         assert_eq!(keystore.failed_attempts(), 3);
-        
+
         // Successful attempt should reset counter
         let _ = keystore.retrieve_key("test", &good_passphrase).unwrap();
         assert_eq!(keystore.failed_attempts(), 0);
@@ -648,12 +700,16 @@ mod tests {
         let secret_key = test_secret_key();
         let passphrase = test_passphrase();
 
-        keystore.store_key("backup-test", "ethereum", None, &secret_key, &passphrase).unwrap();
-        
-        let backup = keystore.create_backup(Some("Test backup".to_string())).unwrap();
+        keystore
+            .store_key("backup-test", "ethereum", None, &secret_key, &passphrase)
+            .unwrap();
+
+        let backup = keystore
+            .create_backup(Some("Test backup".to_string()))
+            .unwrap();
         assert_eq!(backup.key_count, 1);
         assert_eq!(backup.description, Some("Test backup".to_string()));
-        
+
         let backups = keystore.list_backups().unwrap();
         assert_eq!(backups.len(), 1);
     }
@@ -671,9 +727,11 @@ mod tests {
             ..Default::default()
         };
         keystore.update_security_policy(policy).unwrap();
-        
-        keystore.store_key("old-key", "bitcoin", None, &secret_key, &passphrase).unwrap();
-        
+
+        keystore
+            .store_key("old-key", "bitcoin", None, &secret_key, &passphrase)
+            .unwrap();
+
         // Since we just created the key, it shouldn't need rotation yet
         let rotation_needed = keystore.check_key_rotation();
         assert!(rotation_needed.is_empty());
@@ -686,8 +744,24 @@ mod tests {
         let secret_key = test_secret_key();
         let passphrase = test_passphrase();
 
-        keystore.store_key("key1", "bitcoin", Some("BTC Key 1"), &secret_key, &passphrase).unwrap();
-        keystore.store_key("key2", "bitcoin", Some("BTC Key 2"), &secret_key, &passphrase).unwrap();
+        keystore
+            .store_key(
+                "key1",
+                "bitcoin",
+                Some("BTC Key 1"),
+                &secret_key,
+                &passphrase,
+            )
+            .unwrap();
+        keystore
+            .store_key(
+                "key2",
+                "bitcoin",
+                Some("BTC Key 2"),
+                &secret_key,
+                &passphrase,
+            )
+            .unwrap();
 
         let keys = keystore.list_keys();
         assert_eq!(keys.len(), 2);

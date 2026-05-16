@@ -191,7 +191,10 @@ impl SealsRepository {
     ///
     /// This enables cross-chain seal lookup — given a seal reference from any chain,
     /// you can find the corresponding seal record in the explorer.
-    pub async fn get_by_chain_native_id(&self, chain_native_id: &str) -> Result<Option<SealRecord>> {
+    pub async fn get_by_chain_native_id(
+        &self,
+        chain_native_id: &str,
+    ) -> Result<Option<SealRecord>> {
         let row = sqlx::query(
             "SELECT id, chain, seal_type, seal_ref, sanad_id, status, \
              consumed_at, consumed_tx, block_height \

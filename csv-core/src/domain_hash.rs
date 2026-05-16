@@ -73,7 +73,7 @@ impl<D: Domain> DomainSeparatedHash<D> {
         hasher.update(D::DOMAIN);
         hasher.update(payload);
         let result = hasher.finalize();
-        
+
         let mut array = [0u8; 32];
         array.copy_from_slice(&result);
         Hash::new(array)
@@ -103,7 +103,7 @@ impl<D: Domain> DomainSeparatedHash<D> {
             hasher.update(payload);
         }
         let result = hasher.finalize();
-        
+
         let mut array = [0u8; 32];
         array.copy_from_slice(&result);
         Hash::new(array)
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn test_domain_hash_not_raw_sha256() {
         let domain_hash = DomainSeparatedHash::<TestDomain1>::hash(b"test");
-        
+
         let raw_hash = {
             let mut hasher = Sha256::new();
             hasher.update(b"test");
@@ -166,7 +166,7 @@ mod tests {
             array.copy_from_slice(&result);
             Hash::new(array)
         };
-        
+
         assert_ne!(domain_hash, raw_hash);
     }
 
@@ -175,10 +175,10 @@ mod tests {
         // Simulate a proof that's valid in domain1
         let proof = b"valid_proof_data";
         let hash_domain1 = DomainSeparatedHash::<TestDomain1>::hash(proof);
-        
+
         // Same proof in domain2 produces different hash
         let hash_domain2 = DomainSeparatedHash::<TestDomain2>::hash(proof);
-        
+
         assert_ne!(hash_domain1, hash_domain2);
     }
 }

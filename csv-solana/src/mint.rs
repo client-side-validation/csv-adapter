@@ -28,7 +28,10 @@ pub fn mint_sanad_from_hex_key(
         transaction::Transaction,
     };
 
-    fn post_rpc_json(rpc_url: String, request: serde_json::Value) -> SolanaResult<serde_json::Value> {
+    fn post_rpc_json(
+        rpc_url: String,
+        request: serde_json::Value,
+    ) -> SolanaResult<serde_json::Value> {
         std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -151,7 +154,7 @@ pub fn mint_sanad_from_hex_key(
     // Serialize transaction
     let tx_bytes = bincode::serialize(&transaction)
         .map_err(|e| SolanaError::Serialization(format!("Failed to serialize: {}", e)))?;
-    use base64::engine::{general_purpose, Engine as _};
+    use base64::engine::{Engine as _, general_purpose};
     let tx_base64 = general_purpose::STANDARD.encode(&tx_bytes);
 
     // Send via JSON-RPC

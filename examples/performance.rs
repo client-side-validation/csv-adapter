@@ -28,9 +28,7 @@ fn main() -> Result<()> {
 
     for i in 0..iterations {
         let commitment = Hash::from([i as u8; 32]);
-        let _ = rt.block_on(async {
-            client.sanads().create(commitment, ChainId::new("bitcoin"))
-        });
+        let _ = rt.block_on(async { client.sanads().create(commitment, ChainId::new("bitcoin")) });
     }
 
     let duration = start.elapsed();
@@ -56,9 +54,7 @@ fn main() -> Result<()> {
     let start = Instant::now();
 
     for _ in 0..iterations {
-        let _ = rt.block_on(async {
-            client.sanads().get(&test_sanad.id)
-        });
+        let _ = rt.block_on(async { client.sanads().get(&test_sanad.id) });
     }
 
     let duration = start.elapsed();
@@ -99,9 +95,7 @@ fn main() -> Result<()> {
     println!("--------------------------");
 
     let start = Instant::now();
-    let sanads = rt.block_on(async {
-        client.sanads().list(SanadFilters::default())
-    })?;
+    let sanads = rt.block_on(async { client.sanads().list(SanadFilters::default()) })?;
     let list_duration = start.elapsed();
 
     println!(

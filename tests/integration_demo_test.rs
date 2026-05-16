@@ -12,15 +12,15 @@
 
 use csv_core::{
     ChainId,
-    proof::{ProofBundle, FinalityProof, InclusionProof},
-    seal::{SealPoint, CommitAnchor},
-    dag::{DAGSegment, DAGNode},
+    dag::{DAGNode, DAGSegment},
     hash::Hash,
+    proof::{FinalityProof, InclusionProof, ProofBundle},
+    seal::{CommitAnchor, SealPoint},
 };
 use csv_keys::{
     bip39::{Mnemonic, MnemonicType},
     bip44::derive_key,
-    keystore::{KeystoreFile, KdfType},
+    keystore::{KdfType, KeystoreFile},
     memory::{Passphrase, SecretKey},
 };
 
@@ -60,7 +60,9 @@ mod demo_scenario_tests {
         let keystore = KeystoreFile::encrypt(&secret_key, &passphrase, KdfType::Scrypt)
             .expect("Keystore encryption should succeed");
 
-        let decrypted = keystore.decrypt(&passphrase).expect("Keystore decryption should succeed");
+        let decrypted = keystore
+            .decrypt(&passphrase)
+            .expect("Keystore decryption should succeed");
         assert_eq!(decrypted.as_bytes(), key_bytes);
     }
 
@@ -68,11 +70,11 @@ mod demo_scenario_tests {
     fn test_demo_scenario_proof_bundle_creation() {
         // Test 4: Create a valid proof bundle
         let seal_id = vec![1u8, 2, 3];
-        let seal_point = SealPoint::new(seal_id.clone(), Some(42))
-            .expect("SealPoint creation should succeed");
+        let seal_point =
+            SealPoint::new(seal_id.clone(), Some(42)).expect("SealPoint creation should succeed");
 
-        let commit_anchor = CommitAnchor::new(seal_id, 100, vec![])
-            .expect("CommitAnchor creation should succeed");
+        let commit_anchor =
+            CommitAnchor::new(seal_id, 100, vec![]).expect("CommitAnchor creation should succeed");
 
         let dag_node = DAGNode::new(
             Hash::new([1u8; 32]),
@@ -96,7 +98,8 @@ mod demo_scenario_tests {
             commit_anchor,
             inclusion_proof,
             finality_proof,
-        ).expect("ProofBundle creation should succeed");
+        )
+        .expect("ProofBundle creation should succeed");
 
         // Verify the proof bundle structure
         assert_eq!(proof_bundle.signatures.len(), 0);
@@ -119,14 +122,22 @@ mod demo_scenario_tests {
         let mut seen = std::collections::HashSet::new();
         for chain in &chains {
             let chain_str = chain.as_str();
-            assert!(!seen.contains(chain_str), "Chain ID should be unique: {}", chain_str);
+            assert!(
+                !seen.contains(chain_str),
+                "Chain ID should be unique: {}",
+                chain_str
+            );
             seen.insert(chain_str.to_string());
         }
 
         // Chain IDs should be lowercase
         for chain in &chains {
             let chain_str = chain.as_str();
-            assert_eq!(chain_str, chain_str.to_lowercase(), "Chain ID should be lowercase");
+            assert_eq!(
+                chain_str,
+                chain_str.to_lowercase(),
+                "Chain ID should be lowercase"
+            );
         }
     }
 
@@ -136,11 +147,11 @@ mod demo_scenario_tests {
         let seal_id_1 = vec![1u8, 2, 3];
         let seal_id_2 = vec![4u8, 5, 6];
 
-        let seal_point_1 = SealPoint::new(seal_id_1, Some(42))
-            .expect("SealPoint creation should succeed");
+        let seal_point_1 =
+            SealPoint::new(seal_id_1, Some(42)).expect("SealPoint creation should succeed");
 
-        let seal_point_2 = SealPoint::new(seal_id_2, Some(43))
-            .expect("SealPoint creation should succeed");
+        let seal_point_2 =
+            SealPoint::new(seal_id_2, Some(43)).expect("SealPoint creation should succeed");
 
         assert_ne!(seal_point_1.id, seal_point_2.id);
     }
@@ -149,8 +160,8 @@ mod demo_scenario_tests {
     fn test_demo_scenario_proof_size_limits() {
         // Test 7: Verify proof bundles respect size limits
         let seal_id = vec![1u8; 32];
-        let seal_point = SealPoint::new(seal_id, Some(42))
-            .expect("SealPoint creation should succeed");
+        let seal_point =
+            SealPoint::new(seal_id, Some(42)).expect("SealPoint creation should succeed");
 
         let commit_anchor = CommitAnchor::new(vec![1u8; 32], 100, vec![0u8; 1024])
             .expect("CommitAnchor creation should succeed");
@@ -177,14 +188,18 @@ mod demo_scenario_tests {
             commit_anchor,
             inclusion_proof,
             finality_proof,
-        ).expect("ProofBundle creation should succeed");
+        )
+        .expect("ProofBundle creation should succeed");
 
         // Verify the proof bundle can be serialized
-        let serialized = serde_json::to_string(&proof_bundle)
-            .expect("Proof bundle should be serializable");
+        let serialized =
+            serde_json::to_string(&proof_bundle).expect("Proof bundle should be serializable");
 
         // Check that the serialized size is reasonable (< 1MB)
-        assert!(serialized.len() < 1_000_000, "Proof bundle should be less than 1MB");
+        assert!(
+            serialized.len() < 1_000_000,
+            "Proof bundle should be less than 1MB"
+        );
     }
 
     #[test]
@@ -198,7 +213,10 @@ mod demo_scenario_tests {
 
         // Test that zero confirmations is rejected
         let zero_confirmations = FinalityProof::new(vec![0xAB; 16], 0, false);
-        assert!(zero_confirmations.is_err(), "Zero confirmations should be rejected");
+        assert!(
+            zero_confirmations.is_err(),
+            "Zero confirmations should be rejected"
+        );
 
         // Test that deterministic finality is accepted
         let deterministic = FinalityProof::new(vec![0xAB; 16], 0, true)

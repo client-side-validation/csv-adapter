@@ -15,12 +15,21 @@ impl FinalityMonitor {
     /// Create a new finality monitor
     pub fn new() -> Self {
         let mut policies = alloc::collections::BTreeMap::new();
-        
+
         // Add default policies for known chains
-        policies.insert("bitcoin".to_string(), Box::new(super::policy::BitcoinFinalityPolicy::new()) as Box<dyn ChainFinalityPolicy>);
-        policies.insert("ethereum".to_string(), Box::new(super::policy::EthereumFinalityPolicy::new()) as Box<dyn ChainFinalityPolicy>);
-        policies.insert("aptos".to_string(), Box::new(super::policy::AptosFinalityPolicy::new()) as Box<dyn ChainFinalityPolicy>);
-        
+        policies.insert(
+            "bitcoin".to_string(),
+            Box::new(super::policy::BitcoinFinalityPolicy::new()) as Box<dyn ChainFinalityPolicy>,
+        );
+        policies.insert(
+            "ethereum".to_string(),
+            Box::new(super::policy::EthereumFinalityPolicy::new()) as Box<dyn ChainFinalityPolicy>,
+        );
+        policies.insert(
+            "aptos".to_string(),
+            Box::new(super::policy::AptosFinalityPolicy::new()) as Box<dyn ChainFinalityPolicy>,
+        );
+
         Self { policies }
     }
 
@@ -40,7 +49,7 @@ impl FinalityMonitor {
             .get_policy(chain)
             .map(|p| p.required_confirmations())
             .unwrap_or(6); // Default to 6 confirmations
-        
+
         FinalityState::new(included_at, required)
     }
 

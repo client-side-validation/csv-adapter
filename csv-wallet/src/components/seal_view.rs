@@ -282,10 +282,12 @@ struct SealDiagramViewProps {
 }
 
 fn SealDiagramView(props: SealDiagramViewProps) -> Element {
-    let states = [(SealState::Active, "Created", 0),
+    let states = [
+        (SealState::Active, "Created", 0),
         (SealState::Pending, "Pending", 1),
         (SealState::Locked, "Locked", 2),
-        (SealState::Consumed, "Consumed", 3)];
+        (SealState::Consumed, "Consumed", 3),
+    ];
 
     let current_idx = states
         .iter()

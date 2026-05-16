@@ -4,13 +4,13 @@
 //! Supports both in-memory seed-based keys and persistent native keystore storage.
 //! All sensitive data is zeroized on drop to prevent memory leaks.
 
+use blake2::Blake2b;
 use csv_core::ChainId;
-use csv_core::mcp::{HasErrorSuggestion, FixAction, error_codes};
+use csv_core::mcp::{FixAction, HasErrorSuggestion, error_codes};
+use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use secp256k1::{Keypair, Secp256k1, SecretKey, XOnlyPublicKey};
-use ed25519_dalek::{SigningKey, VerifyingKey, Signer};
 use sha2::Digest;
 use sha3::Keccak256;
-use blake2::Blake2b;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -47,23 +47,20 @@ impl HasErrorSuggestion for KeyError {
 
     fn suggested_fix(&self) -> String {
         match self {
-            KeyError::InvalidKeyFormat(_) => {
-                "Invalid key format. For seed phrases, ensure: \
+            KeyError::InvalidKeyFormat(_) => "Invalid key format. For seed phrases, ensure: \
                  1) 12 or 24 BIP-39 words, 2) Words from standard wordlist, \
                  3) Correct spelling. For private keys, ensure: \
-                 1) 64 hex characters, 2) Valid for the target chain.".to_string()
-            }
-            KeyError::DerivationError(_) => {
-                "Key derivation failed. Check: \
+                 1) 64 hex characters, 2) Valid for the target chain."
+                .to_string(),
+            KeyError::DerivationError(_) => "Key derivation failed. Check: \
                  1) The seed/mnemonic is valid, 2) The derivation path is correct, \
                  3) The target chain uses the correct curve (secp256k1 vs ed25519). \
-                 Common paths: m/44'/60'/0'/0/0 (Ethereum), m/86'/0'/0'/0/0 (Bitcoin Taproot).".to_string()
-            }
-            KeyError::SigningError(_) => {
-                "Signing operation failed. Ensure: \
+                 Common paths: m/44'/60'/0'/0/0 (Ethereum), m/86'/0'/0'/0/0 (Bitcoin Taproot)."
+                .to_string(),
+            KeyError::SigningError(_) => "Signing operation failed. Ensure: \
                  1) The key is valid and complete, 2) The message format is correct, \
-                 3) The signing algorithm matches the key type (ECDSA vs EdDSA).".to_string()
-            }
+                 3) The signing algorithm matches the key type (ECDSA vs EdDSA)."
+                .to_string(),
         }
     }
 
@@ -73,25 +70,20 @@ impl HasErrorSuggestion for KeyError {
 
     fn fix_action(&self) -> Option<FixAction> {
         match self {
-            KeyError::InvalidKeyFormat(_) => {
-                Some(FixAction::CheckState {
-                    url: "https://docs.csv.dev/wallet/key-formats".to_string(),
-                    what: "Verify key format matches BIP-39 or hex private key".to_string(),
-                })
-            }
-            KeyError::DerivationError(_) => {
-                Some(FixAction::CheckState {
-                    url: "https://docs.csv.dev/wallet/derivation-paths".to_string(),
-                    what: "Verify correct BIP-32 derivation path for target chain".to_string(),
-                })
-            }
-            KeyError::SigningError(_) => {
-                Some(FixAction::Retry {
-                    parameter_changes: std::collections::HashMap::from([
-                        ("verify_key_type".to_string(), "true".to_string()),
-                    ]),
-                })
-            }
+            KeyError::InvalidKeyFormat(_) => Some(FixAction::CheckState {
+                url: "https://docs.csv.dev/wallet/key-formats".to_string(),
+                what: "Verify key format matches BIP-39 or hex private key".to_string(),
+            }),
+            KeyError::DerivationError(_) => Some(FixAction::CheckState {
+                url: "https://docs.csv.dev/wallet/derivation-paths".to_string(),
+                what: "Verify correct BIP-32 derivation path for target chain".to_string(),
+            }),
+            KeyError::SigningError(_) => Some(FixAction::Retry {
+                parameter_changes: std::collections::HashMap::from([(
+                    "verify_key_type".to_string(),
+                    "true".to_string(),
+                )]),
+            }),
         }
     }
 }
@@ -126,7 +118,9 @@ impl KeyManager {
     pub fn new_with_keystore(seed: [u8; 64]) -> Result<Self, KeyError> {
         Ok(Self {
             seed,
-            keystore: Some(NativeKeystore::new().map_err(|e| KeyError::DerivationError(format!("Failed to initialize keystore: {}", e)))?),
+            keystore: Some(NativeKeystore::new().map_err(|e| {
+                KeyError::DerivationError(format!("Failed to initialize keystore: {}", e))
+            })?),
         })
     }
 
@@ -140,14 +134,20 @@ impl KeyManager {
         secret_key: &[u8; 32],
         passphrase: &Passphrase,
     ) -> Result<(), KeyError> {
-        let keystore = self.keystore.as_mut()
-            .ok_or_else(|| KeyError::DerivationError("Native keystore not available".to_string()))?;
+        let keystore = self.keystore.as_mut().ok_or_else(|| {
+            KeyError::DerivationError("Native keystore not available".to_string())
+        })?;
 
         let memory_key = MemorySecretKey::new(*secret_key);
-        keystore.store_key(key_id, chain, label, &memory_key, passphrase)
+        keystore
+            .store_key(key_id, chain, label, &memory_key, passphrase)
             .map_err(|e| match e {
-                NativeKeystoreError::Encryption(msg) => KeyError::DerivationError(format!("Encryption failed: {}", msg)),
-                NativeKeystoreError::Filesystem(msg) => KeyError::DerivationError(format!("Filesystem error: {}", msg)),
+                NativeKeystoreError::Encryption(msg) => {
+                    KeyError::DerivationError(format!("Encryption failed: {}", msg))
+                }
+                NativeKeystoreError::Filesystem(msg) => {
+                    KeyError::DerivationError(format!("Filesystem error: {}", msg))
+                }
                 NativeKeystoreError::KeyNotFound(id) => KeyError::InvalidKeyFormat(id),
                 _ => KeyError::DerivationError(format!("Keystore error: {}", e)),
             })
@@ -160,15 +160,23 @@ impl KeyManager {
         key_id: &str,
         passphrase: &Passphrase,
     ) -> Result<[u8; 32], KeyError> {
-        let keystore = self.keystore.as_mut()
-            .ok_or_else(|| KeyError::DerivationError("Native keystore not available".to_string()))?;
+        let keystore = self.keystore.as_mut().ok_or_else(|| {
+            KeyError::DerivationError("Native keystore not available".to_string())
+        })?;
 
-        let secret_key = keystore.retrieve_key(key_id, passphrase)
+        let secret_key = keystore
+            .retrieve_key(key_id, passphrase)
             .map_err(|e| match e {
                 NativeKeystoreError::KeyNotFound(id) => KeyError::InvalidKeyFormat(id),
-                NativeKeystoreError::PassphraseMismatch => KeyError::InvalidKeyFormat("Incorrect passphrase".to_string()),
-                NativeKeystoreError::Encryption(msg) => KeyError::DerivationError(format!("Encryption error: {}", msg)),
-                NativeKeystoreError::Filesystem(msg) => KeyError::DerivationError(format!("Filesystem error: {}", msg)),
+                NativeKeystoreError::PassphraseMismatch => {
+                    KeyError::InvalidKeyFormat("Incorrect passphrase".to_string())
+                }
+                NativeKeystoreError::Encryption(msg) => {
+                    KeyError::DerivationError(format!("Encryption error: {}", msg))
+                }
+                NativeKeystoreError::Filesystem(msg) => {
+                    KeyError::DerivationError(format!("Filesystem error: {}", msg))
+                }
                 _ => KeyError::DerivationError(format!("Keystore error: {}", e)),
             })?;
 
@@ -184,8 +192,9 @@ impl KeyManager {
     /// List all stored key IDs in the keystore.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn list_keystore_keys(&self) -> Result<Vec<String>, KeyError> {
-        let keystore = self.keystore.as_ref()
-            .ok_or_else(|| KeyError::DerivationError("Native keystore not available".to_string()))?;
+        let keystore = self.keystore.as_ref().ok_or_else(|| {
+            KeyError::DerivationError("Native keystore not available".to_string())
+        })?;
 
         Ok(keystore.list_keys())
     }
@@ -193,10 +202,12 @@ impl KeyManager {
     /// Delete a key from the keystore.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn delete_key_from_keystore(&mut self, key_id: &str) -> Result<(), KeyError> {
-        let keystore = self.keystore.as_mut()
-            .ok_or_else(|| KeyError::DerivationError("Native keystore not available".to_string()))?;
+        let keystore = self.keystore.as_mut().ok_or_else(|| {
+            KeyError::DerivationError("Native keystore not available".to_string())
+        })?;
 
-        keystore.delete_key(key_id)
+        keystore
+            .delete_key(key_id)
             .map_err(|e| KeyError::DerivationError(format!("Failed to delete key: {}", e)))
     }
 
@@ -211,7 +222,8 @@ impl KeyManager {
             .map_err(|e| KeyError::DerivationError(format!("Invalid secret key: {}", e)))?;
 
         let _public_key = secret_key.public_key(&secp);
-        let (x_only_pubkey, _) = XOnlyPublicKey::from_keypair(&Keypair::from_secret_key(&secp, &secret_key));
+        let (x_only_pubkey, _) =
+            XOnlyPublicKey::from_keypair(&Keypair::from_secret_key(&secp, &secret_key));
 
         Ok((secret_key, x_only_pubkey))
     }

@@ -321,12 +321,16 @@ mod tests {
         );
 
         let verifier = CheckpointVerifier::new();
-        assert!(verifier
-            .is_resource_present([1u8; 32], "CSV::Seal", &rpc)
-            .unwrap());
-        assert!(!verifier
-            .is_resource_present([99u8; 32], "CSV::Seal", &rpc)
-            .unwrap());
+        assert!(
+            verifier
+                .is_resource_present([1u8; 32], "CSV::Seal", &rpc)
+                .unwrap()
+        );
+        assert!(
+            !verifier
+                .is_resource_present([99u8; 32], "CSV::Seal", &rpc)
+                .unwrap()
+        );
     }
 
     #[test]
@@ -357,15 +361,21 @@ mod tests {
         );
 
         let verifier = CheckpointVerifier::new();
-        assert!(!verifier
-            .verify_event_in_transaction(1500, &[0xAB, 0xCD], &rpc)
-            .unwrap());
-        assert!(!verifier
-            .verify_event_in_transaction(1500, &[0xFF], &rpc)
-            .unwrap());
-        assert!(verifier
-            .verify_event_in_transaction(9999, &[0xAB], &rpc)
-            .is_err());
+        assert!(
+            !verifier
+                .verify_event_in_transaction(1500, &[0xAB, 0xCD], &rpc)
+                .unwrap()
+        );
+        assert!(
+            !verifier
+                .verify_event_in_transaction(1500, &[0xFF], &rpc)
+                .unwrap()
+        );
+        assert!(
+            verifier
+                .verify_event_in_transaction(9999, &[0xAB], &rpc)
+                .is_err()
+        );
     }
 
     #[test]
@@ -396,9 +406,11 @@ mod tests {
         );
 
         let verifier = CheckpointVerifier::new();
-        assert!(verifier
-            .verify_event_in_transaction(1500, &[0xAB, 0xCD], &rpc)
-            .unwrap());
+        assert!(
+            verifier
+                .verify_event_in_transaction(1500, &[0xAB, 0xCD], &rpc)
+                .unwrap()
+        );
     }
 
     #[test]

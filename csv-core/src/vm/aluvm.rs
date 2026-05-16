@@ -43,7 +43,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use sha2::{Digest, Sha256};
 
-use super::{decode_integer, VMError, VMInputs, VMOutputs};
+use super::{VMError, VMInputs, VMOutputs, decode_integer};
 use crate::hash::Hash;
 use crate::seal::SealPoint;
 use crate::state::{Metadata, StateAssignment, StateRef, StateTypeId};
@@ -502,7 +502,7 @@ mod tests {
             0x01, 0x01, 0x04, // PUSH_N 1, 0x04
             0x01, 0x01, 0x05, // PUSH_N 1, 0x05
             0x01, 0x01, 0x06, // PUSH_N 1, 0x06
-            0x00,             // STOP
+            0x00, // STOP
         ];
         let result = vm.execute(&bytecode, inputs, &[]);
         assert!(result.is_err());

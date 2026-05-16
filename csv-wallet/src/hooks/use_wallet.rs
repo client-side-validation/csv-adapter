@@ -1,9 +1,9 @@
 //! Wallet state hook.
 
 #[cfg(target_arch = "wasm32")]
-use crate::core::seal_storage::derive_key_from_passphrase;
-#[cfg(target_arch = "wasm32")]
 use crate::context::wallet::set_seal_encryption_key;
+#[cfg(target_arch = "wasm32")]
+use crate::core::seal_storage::derive_key_from_passphrase;
 use crate::wallet_core::{ChainAccount, WalletData as Wallet};
 use csv_keys::{
     bip39::{Mnemonic, MnemonicType},

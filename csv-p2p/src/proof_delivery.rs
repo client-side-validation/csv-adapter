@@ -65,14 +65,14 @@ impl ProofFilter {
     ///
     /// Matches if the proof's anchor chain matches and/or the author pubkey matches.
     pub fn matches_proof(&self, proof: &ProofBundle) -> bool {
-        let chain_matches = self.chain_ids.is_empty() 
+        let chain_matches = self.chain_ids.is_empty()
             || self.chain_ids.iter().any(|chain| {
                 // Try to match chain ID from anchor metadata
                 std::str::from_utf8(&proof.anchor_ref.metadata)
                     .map(|s| s.trim() == chain)
                     .unwrap_or(false)
             });
-        
+
         // For now, we don't have author info in the proof bundle itself,
         // so we only filter by chain. Author filtering is done at the Nostr event level.
         chain_matches
@@ -106,7 +106,7 @@ impl ProofCache {
         self.seen_event_ids.contains(&event_id.0)
     }
 
-   /// Record an event ID as seen.
+    /// Record an event ID as seen.
     pub fn record(&mut self, event_id: &EventId) {
         if self.seen_event_ids.len() < self.max_size {
             self.seen_event_ids.insert(event_id.0.clone());
@@ -265,7 +265,7 @@ impl ProofRouter {
         (success, errors)
     }
 
-/// Process an incoming delivered proof with deduplication.
+    /// Process an incoming delivered proof with deduplication.
     ///
     /// Returns true if the proof was new (not a duplicate).
     pub fn process_incoming(&mut self, delivered: DeliveredProof) -> bool {
@@ -358,7 +358,7 @@ mod tests {
         assert_eq!(cache.len(), 0);
     }
 
-   #[test]
+    #[test]
     fn test_proof_cache_record_and_duplicate() {
         let mut cache = ProofCache::new();
         let eid = EventId::new("abc123");

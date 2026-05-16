@@ -8,6 +8,8 @@
 
 use std::sync::Mutex;
 
+use csv_core::Hash;
+use csv_core::SealProtocol;
 use csv_core::commitment::Commitment;
 use csv_core::dag::DAGSegment;
 use csv_core::error::ProtocolError;
@@ -16,8 +18,6 @@ use csv_core::proof::{FinalityProof, ProofBundle};
 use csv_core::proof_pipeline::ChainVerifier;
 use csv_core::seal::CommitAnchor as CoreCommitAnchor;
 use csv_core::seal::SealPoint as CoreSealPoint;
-use csv_core::Hash;
-use csv_core::SealProtocol;
 
 use crate::config::EthereumConfig;
 use crate::error::{EthereumError, EthereumResult};
@@ -59,10 +59,7 @@ impl EthereumSealProtocol {
         });
 
         // Create verifier with CSVLock contract address for seal registry checks
-        let verifier = EthereumVerifier::new(
-            rpc.clone_boxed(),
-            csv_seal_address,
-        );
+        let verifier = EthereumVerifier::new(rpc.clone_boxed(), csv_seal_address);
 
         Ok(Self {
             config,
@@ -194,7 +191,7 @@ impl SealProtocol for EthereumSealProtocol {
 
         #[cfg(feature = "rpc")]
         {
-            use crate::node::{publish, verify_seal_consumption_in_receipt, EthereumNode};
+            use crate::node::{EthereumNode, publish, verify_seal_consumption_in_receipt};
             use tokio::runtime::Handle;
 
             // Downcast to EthereumNode for the publish flow
@@ -370,13 +367,11 @@ impl SealProtocol for EthereumSealProtocol {
                         is_finalized,
                     ))
                 }
-                Err(_) => {
-                    Ok(EthereumFinalityProof::new(
-                        self.config.finality_depth,
-                        self.config.finality_depth,
-                        true,
-                    ))
-                }
+                Err(_) => Ok(EthereumFinalityProof::new(
+                    self.config.finality_depth,
+                    self.config.finality_depth,
+                    true,
+                )),
             }
         }
         #[cfg(not(feature = "rpc"))]
@@ -443,7 +438,9 @@ impl SealProtocol for EthereumSealProtocol {
         // Step 3: Mark seal as used in local registry
         // This is done after the on-chain check to ensure consistency
         let registry = self.seal_registry.lock().unwrap_or_else(|e| e.into_inner());
-        registry.mark_seal_used(&seal).map_err(ProtocolError::from)?;
+        registry
+            .mark_seal_used(&seal)
+            .map_err(ProtocolError::from)?;
 
         Ok(())
     }

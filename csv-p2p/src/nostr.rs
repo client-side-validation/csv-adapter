@@ -23,7 +23,7 @@ use csv_core::proof::ProofBundle;
 use nostr_sdk::{Client, Keys, Kind, RelayPoolNotification};
 use tracing::{debug, info, warn};
 
-use crate::{DeliveredProof, EventId, ProofFilter, ProofTransport, TransportError, DEFAULT_RELAYS};
+use crate::{DEFAULT_RELAYS, DeliveredProof, EventId, ProofFilter, ProofTransport, TransportError};
 
 /// Default path for persistent Nostr secret key storage.
 const DEFAULT_NOSTR_KEY_PATH: &str = "~/.csv/nostr_secret_key.hex";
@@ -250,10 +250,10 @@ impl NostrTransport {
     pub async fn initialize(&mut self) -> Result<(), TransportError> {
         // Connect to all relays with retry logic
         let mut connected_count = 0;
-        
+
         for relay_url in &self.relays {
             let mut last_error = None;
-            
+
             for attempt in 0..self.max_relay_retries {
                 match self.client.add_relay(relay_url).await {
                     Ok(_) => {
@@ -276,20 +276,20 @@ impl NostrTransport {
                     }
                 }
             }
-            
+
             if last_error.is_some() {
                 warn!(relay = %relay_url, "Failed to connect to relay after all retries");
             }
         }
-        
+
         if connected_count == 0 {
             return Err(TransportError::Nostr(
                 "Failed to connect to any relay".to_string(),
             ));
         }
-        
+
         self.client.connect().await;
-        
+
         info!(
             relays = self.relays.len(),
             connected = connected_count,
@@ -297,7 +297,8 @@ impl NostrTransport {
             timeout_ms = self.timeout.as_millis(),
             "Nostr transport initialized and connected"
         );
-        self.initialized.store(true, std::sync::atomic::Ordering::Release);
+        self.initialized
+            .store(true, std::sync::atomic::Ordering::Release);
         Ok(())
     }
 
@@ -307,7 +308,7 @@ impl NostrTransport {
         // Create a temporary client to check relay health
         let temp_keys = Keys::generate();
         let temp_client = Client::new(temp_keys);
-        
+
         match temp_client.add_relay(relay_url).await {
             Ok(_) => {
                 let _ = temp_client.connect().await;
@@ -327,14 +328,14 @@ impl NostrTransport {
     pub fn start_health_monitor(&self) {
         let relays = self.relays.clone();
         let interval = self.health_check_interval;
-        
+
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(interval);
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-            
+
             loop {
                 interval.tick().await;
-                
+
                 for relay_url in &relays {
                     // Simple health check: just log that we're checking
                     debug!(relay = %relay_url, "Checking relay health");
@@ -357,9 +358,17 @@ impl NostrTransport {
     }
 
     /// Build a Nostr event content string with metadata.
-    pub fn build_event_content(&self, proof: &ProofBundle, metadata: serde_json::Value) -> Result<String, TransportError> {
+    pub fn build_event_content(
+        &self,
+        proof: &ProofBundle,
+        metadata: serde_json::Value,
+    ) -> Result<String, TransportError> {
         let mut content = serde_json::Map::new();
-        content.insert("proof".to_string(), serde_json::to_value(proof).map_err(|e| TransportError::Serialization(e.to_string()))?);
+        content.insert(
+            "proof".to_string(),
+            serde_json::to_value(proof)
+                .map_err(|e| TransportError::Serialization(e.to_string()))?,
+        );
         if let Some(meta) = metadata.as_object() {
             for (k, v) in meta {
                 content.insert(k.clone(), v.clone());
@@ -391,30 +400,33 @@ impl NostrTransport {
         }
 
         let _content = self.proof_to_content(proof)?;
-        
+
         // Parse recipient public key
         use std::str::FromStr;
         let _recipient_keys = nostr_sdk::Keys::from_str(recipient_pubkey)
             .map_err(|e| TransportError::Nostr(format!("Invalid recipient pubkey: {}", e)))?;
-        
+
         // Encrypt and send via NIP-04
         #[cfg(feature = "nip04")]
         #[allow(unexpected_cfgs)]
         {
-            let event_id = self.client
+            let event_id = self
+                .client
                 .send_direct_msg(recipient_keys.public_key(), content, None)
                 .await
-                .map_err(|e| TransportError::Nostr(format!("Failed to send encrypted DM: {}", e)))?;
-            
+                .map_err(|e| {
+                    TransportError::Nostr(format!("Failed to send encrypted DM: {}", e))
+                })?;
+
             info!(
                 recipient = %recipient_pubkey,
                 event_id = %event_id.to_hex(),
                 "Proof sent as encrypted DM (NIP-04)"
             );
-            
+
             return Ok(EventId::new(event_id.to_hex()));
         }
-        
+
         #[cfg(not(feature = "nip04"))]
         #[allow(unexpected_cfgs)]
         {
@@ -438,7 +450,7 @@ impl NostrTransport {
                 "Event is not an encrypted DM".to_string(),
             ));
         }
-        
+
         // Decrypt the message
         #[cfg(feature = "nip04")]
         #[allow(unexpected_cfgs)]
@@ -452,14 +464,15 @@ impl NostrTransport {
                 &event.content,
             )
             .map_err(|e| TransportError::Nostr(format!("Failed to decrypt DM: {}", e)))?;
-            
+
             // Parse the proof bundle from decrypted content
-            let proof = serde_json::from_str(&decrypted)
-                .map_err(|e| TransportError::Serialization(format!("Failed to parse proof: {}", e)))?;
-            
+            let proof = serde_json::from_str(&decrypted).map_err(|e| {
+                TransportError::Serialization(format!("Failed to parse proof: {}", e))
+            })?;
+
             Ok(proof)
         }
-        
+
         #[cfg(not(feature = "nip04"))]
         #[allow(unexpected_cfgs)]
         {
@@ -482,46 +495,52 @@ impl ProofTransport for NostrTransport {
         }
 
         // Validate proof size
-        let proof_bytes = serde_json::to_vec(proof).map_err(|e| TransportError::Serialization(e.to_string()))?;
+        let proof_bytes =
+            serde_json::to_vec(proof).map_err(|e| TransportError::Serialization(e.to_string()))?;
         if proof_bytes.len() > MAX_PROOF_SIZE {
-            warn!(size = proof_bytes.len(), "Proof exceeds recommended maximum size");
+            warn!(
+                size = proof_bytes.len(),
+                "Proof exceeds recommended maximum size"
+            );
         }
 
         #[cfg(feature = "nostr")]
         {
             use nostr_sdk::EventBuilder;
-            
+
             // Create event content
             let content = self.proof_to_content(proof)?;
-            
+
             // Extract chain IDs for tags
             let source_chain = extract_source_chain(proof);
             let dest_chain = extract_dest_chain(proof);
-            
+
             // Build event with chain_id tags
             let tags: Vec<nostr_sdk::Tag> = vec![
                 nostr_sdk::Tag::parse(&["chain_id".to_string(), source_chain.clone()]).unwrap(),
                 nostr_sdk::Tag::parse(&["chain_id".to_string(), dest_chain.clone()]).unwrap(),
                 nostr_sdk::Tag::parse(&["type".to_string(), "proof_bundle".to_string()]).unwrap(),
-                nostr_sdk::Tag::parse(&["pk".to_string(), self.keys.public_key().to_string()]).unwrap(),
+                nostr_sdk::Tag::parse(&["pk".to_string(), self.keys.public_key().to_string()])
+                    .unwrap(),
             ];
-            
+
             let event_builder = EventBuilder::new(
-                Kind::Custom(PROOF_EVENT_KIND.try_into().unwrap()), 
-                content, 
-                tags
+                Kind::Custom(PROOF_EVENT_KIND.try_into().unwrap()),
+                content,
+                tags,
             );
-            
+
             // Sign and send event with retry logic
-            let event = event_builder.to_event(&self.keys)
-                .map_err(|e| TransportError::Serialization(format!("Failed to sign event: {}", e)))?;
-            
+            let event = event_builder.to_event(&self.keys).map_err(|e| {
+                TransportError::Serialization(format!("Failed to sign event: {}", e))
+            })?;
+
             let event_id = event.id.to_hex();
-            
+
             // Retry sending to relays with exponential backoff
             let max_retries = 3;
             let mut last_error = None;
-            
+
             for attempt in 0..max_retries {
                 match self.client.send_event(event.clone()).await {
                     Ok(_) => {
@@ -549,14 +568,14 @@ impl ProofTransport for NostrTransport {
                     }
                 }
             }
-            
+
             Err(TransportError::Nostr(format!(
                 "Failed to broadcast proof after {} retries: {}",
                 max_retries,
                 last_error.unwrap()
             )))
         }
-        
+
         #[cfg(not(feature = "nostr"))]
         {
             // Fallback stub implementation
@@ -592,51 +611,55 @@ impl ProofTransport for NostrTransport {
             use nostr_sdk::{Filter, Kind};
             use std::str::FromStr;
             use tokio::sync::mpsc;
-            
+
             // Build Nostr filter with chain/authors from ProofFilter
             // Note: chain_id filtering is done in the subscription loop by parsing event tags
             // since "chain_id" is a custom tag not supported by the standard Filter API
             let mut nostr_filter = Filter::new()
                 .kind(Kind::Custom(PROOF_EVENT_KIND.try_into().unwrap()))
                 .limit(100);
-            
+
             // Add author filters if specified in ProofFilter
             for author in &filter.authors {
                 if let Ok(keys) = Keys::from_str(author) {
                     nostr_filter = nostr_filter.author(keys.public_key());
                 }
             }
-            
+
             // Create channel for delivered proofs
             let (tx, rx) = mpsc::channel(256);
             let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
             let client_clone = Arc::clone(&self.client);
             let filter_clone = filter.clone();
-            
+
             // Subscribe to events
-            let _subscription = client_clone.subscribe(vec![nostr_filter], None).await
-                .map_err(|e| TransportError::Nostr(format!("Failed to create subscription: {}", e)))?;
-            
+            let _subscription = client_clone
+                .subscribe(vec![nostr_filter], None)
+                .await
+                .map_err(|e| {
+                    TransportError::Nostr(format!("Failed to create subscription: {}", e))
+                })?;
+
             // Spawn task to handle incoming events
             tokio::spawn(async move {
                 // Use the client's notification system to receive events
                 let mut notifications = client_clone.notifications();
-                
+
                 while let Ok(notification) = notifications.recv().await {
                     // Extract event from notification
                     let event = match notification {
                         RelayPoolNotification::Event { event, .. } => event,
                         _ => continue,
                     };
-                    
+
                     // Extract chain IDs from event tags
                     let event_chain_ids = extract_chain_ids_from_tags(&event.tags);
-                    
+
                     // Filter by chain IDs if specified in filter
                     if !filter_clone.chain_ids.is_empty() {
-                        let chain_matches = event_chain_ids.iter().any(|chain| {
-                            filter_clone.matches_chain(chain)
-                        });
+                        let chain_matches = event_chain_ids
+                            .iter()
+                            .any(|chain| filter_clone.matches_chain(chain));
                         if !chain_matches {
                             debug!(
                                 event_id = %event.id,
@@ -646,7 +669,7 @@ impl ProofTransport for NostrTransport {
                             continue;
                         }
                     }
-                    
+
                     // Filter by author if specified
                     if !filter_clone.authors.is_empty() {
                         let author_matches = filter_clone.authors.contains(&event.pubkey.to_hex());
@@ -659,7 +682,7 @@ impl ProofTransport for NostrTransport {
                             continue;
                         }
                     }
-                    
+
                     // Parse the event content into a ProofBundle
                     let proof = match serde_json::from_str::<ProofBundle>(&event.content) {
                         Ok(p) => p,
@@ -668,7 +691,7 @@ impl ProofTransport for NostrTransport {
                             continue;
                         }
                     };
-                    
+
                     // Create DeliveredProof with real data from Nostr event
                     let delivered = DeliveredProof {
                         event_id: EventId::new(event.id.to_hex()),
@@ -676,23 +699,23 @@ impl ProofTransport for NostrTransport {
                         author_pubkey: event.pubkey.to_hex(),
                         timestamp: event.created_at.as_u64(),
                     };
-                    
+
                     if tx.send(delivered).await.is_err() {
                         debug!("Proof subscription channel closed, stopping event processing");
                         break;
                     }
                 }
             });
-            
+
             info!(
                 chains = ?filter.chain_ids,
                 authors = ?filter.authors,
                 "Nostr proof subscription created"
             );
-            
+
             Ok(stream)
         }
-        
+
         #[cfg(not(feature = "nostr"))]
         {
             info!(
@@ -700,7 +723,7 @@ impl ProofTransport for NostrTransport {
                 authors = ?filter.authors,
                 "Proof subscription channel created (stub - nostr feature disabled)"
             );
-            
+
             let (_tx, rx) = tokio::sync::mpsc::channel(256);
             let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
             Ok(stream)
@@ -709,8 +732,7 @@ impl ProofTransport for NostrTransport {
 
     /// Check if connected to at least one Nostr relay.
     async fn is_connected(&self) -> bool {
-        self.initialized.load(std::sync::atomic::Ordering::Acquire)
-            && !self.relays.is_empty()
+        self.initialized.load(std::sync::atomic::Ordering::Acquire) && !self.relays.is_empty()
     }
 
     /// Return the transport name.
@@ -720,7 +742,8 @@ impl ProofTransport for NostrTransport {
 
     /// Disconnect from all relays and clean up.
     async fn disconnect(&self) {
-        self.initialized.store(false, std::sync::atomic::Ordering::Release);
+        self.initialized
+            .store(false, std::sync::atomic::Ordering::Release);
         info!("Disconnected from Nostr relays");
     }
 }
@@ -763,7 +786,11 @@ mod tests {
     fn test_transport_with_timeout() {
         let transport = NostrTransport::new().with_timeout(Duration::from_secs(60));
         // Timeout is stored internally, verify via initialization
-        assert!(!transport.initialized.load(std::sync::atomic::Ordering::Acquire));
+        assert!(
+            !transport
+                .initialized
+                .load(std::sync::atomic::Ordering::Acquire)
+        );
     }
 
     #[test]
@@ -796,63 +823,59 @@ mod tests {
 
     #[test]
     fn test_extract_chain_ids_from_tags_with_values() {
-        let tag1 = nostr_sdk::Tag::parse(&["chain_id".to_string(), "ethereum".to_string()]).unwrap();
+        let tag1 =
+            nostr_sdk::Tag::parse(&["chain_id".to_string(), "ethereum".to_string()]).unwrap();
         let tag2 = nostr_sdk::Tag::parse(&["chain_id".to_string(), "bitcoin".to_string()]).unwrap();
-        let tag3 = nostr_sdk::Tag::parse(&["type".to_string(), "proof_bundle".to_string()]).unwrap();
+        let tag3 =
+            nostr_sdk::Tag::parse(&["type".to_string(), "proof_bundle".to_string()]).unwrap();
         let tags = vec![tag1, tag2, tag3];
-        
+
         let chain_ids = extract_chain_ids_from_tags(&tags);
         assert_eq!(chain_ids.len(), 2);
         assert!(chain_ids.contains(&"ethereum".to_string()));
         assert!(chain_ids.contains(&"bitcoin".to_string()));
     }
 
-  #[test]
+    #[test]
     fn test_extract_source_chain_from_proof() {
         // Create a proof with metadata containing chain ID
         let metadata = b"ethereum".to_vec();
-        
-        let anchor = csv_core::seal::CommitAnchor::new(
-            vec![1u8; 32],
-            1000,
-            metadata,
-        ).unwrap();
-        
+
+        let anchor = csv_core::seal::CommitAnchor::new(vec![1u8; 32], 1000, metadata).unwrap();
+
         let hash: csv_core::hash::Hash = [0u8; 32].into();
-        
+
         let proof = ProofBundle {
             transition_dag: csv_core::dag::DAGSegment::new(vec![], hash),
             signatures: vec![],
             seal_ref: csv_core::seal::SealPoint::new(vec![1u8; 32], None).unwrap(),
             anchor_ref: anchor,
-            inclusion_proof: csv_core::proof::InclusionProof::new(vec![1u8; 32], hash, 1000, 0).unwrap(),
+            inclusion_proof: csv_core::proof::InclusionProof::new(vec![1u8; 32], hash, 1000, 0)
+                .unwrap(),
             finality_proof: csv_core::proof::FinalityProof::new(vec![1u8; 32], 1, true).unwrap(),
         };
-        
+
         let source_chain = extract_source_chain(&proof);
         assert_eq!(source_chain, "ethereum");
     }
 
-   #[test]
+    #[test]
     fn test_extract_dest_chain_from_proof_unknown() {
         // Create a proof with empty bytecode
-        let anchor = csv_core::seal::CommitAnchor::new(
-            vec![1u8; 32],
-            1000,
-            vec![],
-        ).unwrap();
-        
+        let anchor = csv_core::seal::CommitAnchor::new(vec![1u8; 32], 1000, vec![]).unwrap();
+
         let hash: csv_core::hash::Hash = [0u8; 32].into();
-        
+
         let proof = ProofBundle {
             transition_dag: csv_core::dag::DAGSegment::new(vec![], hash),
             signatures: vec![],
             seal_ref: csv_core::seal::SealPoint::new(vec![1u8; 32], None).unwrap(),
             anchor_ref: anchor,
-            inclusion_proof: csv_core::proof::InclusionProof::new(vec![1u8; 32], hash, 1000, 0).unwrap(),
+            inclusion_proof: csv_core::proof::InclusionProof::new(vec![1u8; 32], hash, 1000, 0)
+                .unwrap(),
             finality_proof: csv_core::proof::FinalityProof::new(vec![1u8; 32], 1, true).unwrap(),
         };
-        
+
         let dest_chain = extract_dest_chain(&proof);
         assert_eq!(dest_chain, "unknown");
     }
@@ -860,55 +883,54 @@ mod tests {
     #[test]
     fn test_proof_bundle_serialization_roundtrip() {
         let metadata = b"ethereum".to_vec();
-        let anchor = csv_core::seal::CommitAnchor::new(
-            vec![1u8; 32],
-            1000,
-            metadata,
-        ).unwrap();
-        
+        let anchor = csv_core::seal::CommitAnchor::new(vec![1u8; 32], 1000, metadata).unwrap();
+
         let hash: csv_core::hash::Hash = [0u8; 32].into();
-        
+
         let proof = ProofBundle {
             transition_dag: csv_core::dag::DAGSegment::new(vec![], hash),
             signatures: vec![vec![1u8; 64]],
             seal_ref: csv_core::seal::SealPoint::new(vec![1u8; 32], None).unwrap(),
             anchor_ref: anchor,
-            inclusion_proof: csv_core::proof::InclusionProof::new(vec![1u8; 32], hash, 1000, 0).unwrap(),
+            inclusion_proof: csv_core::proof::InclusionProof::new(vec![1u8; 32], hash, 1000, 0)
+                .unwrap(),
             finality_proof: csv_core::proof::FinalityProof::new(vec![1u8; 32], 1, true).unwrap(),
         };
-        
+
         let transport = NostrTransport::new();
         let content = transport.proof_to_content(&proof).unwrap();
         let deserialized = transport.content_to_proof(&content).unwrap();
-        
+
         assert_eq!(proof.seal_ref.id, deserialized.seal_ref.id);
-        assert_eq!(proof.anchor_ref.block_height, deserialized.anchor_ref.block_height);
+        assert_eq!(
+            proof.anchor_ref.block_height,
+            deserialized.anchor_ref.block_height
+        );
     }
 
     #[test]
     fn test_event_content_with_metadata() {
         let metadata = b"ethereum".to_vec();
-        let anchor = csv_core::seal::CommitAnchor::new(
-            vec![1u8; 32],
-            1000,
-            metadata,
-        ).unwrap();
-        
+        let anchor = csv_core::seal::CommitAnchor::new(vec![1u8; 32], 1000, metadata).unwrap();
+
         let hash: csv_core::hash::Hash = [0u8; 32].into();
-        
+
         let proof = ProofBundle {
             transition_dag: csv_core::dag::DAGSegment::new(vec![], hash),
             signatures: vec![],
             seal_ref: csv_core::seal::SealPoint::new(vec![1u8; 32], None).unwrap(),
             anchor_ref: anchor,
-            inclusion_proof: csv_core::proof::InclusionProof::new(vec![1u8; 32], hash, 1000, 0).unwrap(),
+            inclusion_proof: csv_core::proof::InclusionProof::new(vec![1u8; 32], hash, 1000, 0)
+                .unwrap(),
             finality_proof: csv_core::proof::FinalityProof::new(vec![1u8; 32], 1, true).unwrap(),
         };
-        
+
         let transport = NostrTransport::new();
         let metadata_json = serde_json::json!({"source": "test"});
-        let content = transport.build_event_content(&proof, metadata_json).unwrap();
-        
+        let content = transport
+            .build_event_content(&proof, metadata_json)
+            .unwrap();
+
         // Verify content is valid JSON with proof field
         let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
         assert!(parsed.get("proof").is_some());
@@ -932,7 +954,7 @@ mod tests {
             .with_encrypted_dms(true)
             .with_max_relay_retries(5)
             .with_health_check_interval(Duration::from_secs(60));
-        
+
         assert_eq!(transport.timeout, Duration::from_secs(60));
         assert!(transport.is_encrypted());
         assert_eq!(transport.event_kind(), ENCRYPTED_DM_KIND);
@@ -943,8 +965,11 @@ mod tests {
     #[cfg(feature = "nostr")]
     #[tokio::test]
     async fn test_nostr_transport_health_check_does_not_panic() {
-        let transport = NostrTransport::with_relays(vec!["wss://nonexistent-relay.invalid".to_string()]);
+        let transport =
+            NostrTransport::with_relays(vec!["wss://nonexistent-relay.invalid".to_string()]);
         // Health check should not panic even for invalid relays
-        let _ = transport.check_relay_health("wss://nonexistent-relay.invalid").await;
+        let _ = transport
+            .check_relay_health("wss://nonexistent-relay.invalid")
+            .await;
     }
 }

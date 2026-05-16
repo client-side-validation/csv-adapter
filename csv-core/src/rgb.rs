@@ -546,10 +546,12 @@ mod tests {
 
         let result = RgbConsignmentValidator::validate(&consignment, None);
         assert!(!result.is_valid);
-        assert!(result
-            .errors
-            .iter()
-            .any(|e| matches!(e, RgbValidationError::SealDoubleSpend { .. })));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| matches!(e, RgbValidationError::SealDoubleSpend { .. }))
+        );
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! CLI state management — persistent state using unified storage
 
-use std::path::Path;
 use std::io::{self, Write};
+use std::path::Path;
 
 #[path = "encrypt.rs"]
 mod encrypt;

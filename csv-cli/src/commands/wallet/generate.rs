@@ -10,10 +10,10 @@ use anyhow::Result;
 use std::collections::HashMap;
 
 use csv_keys::{
+    Mnemonic, MnemonicType,
     bip44::{derive_address_from_key, derive_all_chain_keys},
     file_keystore::FileKeystore,
     memory::Passphrase,
-    Mnemonic, MnemonicType,
 };
 
 /// Initialize wallet with one-command setup.

@@ -1,7 +1,7 @@
 //! Sanad lifecycle commands
 
 use anyhow::Result;
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use clap::Subcommand;
 use sha2::Digest;
 
@@ -99,12 +99,14 @@ async fn cmd_create(
 
     // Step 1: Create a seal on the chain
     let runtime = client.chain_runtime();
-    let seal = runtime.create_seal(core_chain.clone(), value)
+    let seal = runtime
+        .create_seal(core_chain.clone(), value)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to create seal: {}", e))?;
 
     // Step 2: Publish the commitment under the seal
-    let anchor = runtime.publish_seal(core_chain.clone(), seal.clone())
+    let anchor = runtime
+        .publish_seal(core_chain.clone(), seal.clone())
         .await
         .map_err(|e| anyhow::anyhow!("Failed to publish seal: {}", e))?;
 
@@ -150,7 +152,9 @@ async fn cmd_create(
 
             // UnifiedStateManager is automatically saved after command execution
             println!();
-            output::info("Sanad created and published successfully. Use 'csv sanad show <sanad_id>' to view details");
+            output::info(
+                "Sanad created and published successfully. Use 'csv sanad show <sanad_id>' to view details",
+            );
         }
         Err(e) => {
             output::error(&format!("Failed to create sanad via runtime: {}", e));

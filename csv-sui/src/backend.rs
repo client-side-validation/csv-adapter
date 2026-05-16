@@ -4,11 +4,11 @@
 //! enabling Sui to be used through the unified chain adapter interface.
 
 use async_trait::async_trait;
+use csv_core::ChainId;
 use csv_core::chain_config::ChainConfig;
 use csv_core::driver::{
     AccountModel, ChainCapabilities, ChainDriver, ChainError, ChainResult, RpcClient, Wallet,
 };
-use csv_core::ChainId;
 use ed25519_dalek::Verifier;
 
 use crate::config::{SuiConfig, SuiNetwork};
@@ -99,7 +99,7 @@ impl RpcClient for SuiRpcClient {
     #[cfg(feature = "rpc")]
     async fn get_balance(&self, address: &str) -> ChainResult<u64> {
         use reqwest::Client;
-        use serde_json::{json, Value};
+        use serde_json::{Value, json};
 
         // Parse Sui address
         let addr_bytes = hex::decode(address.trim_start_matches("0x"))
@@ -442,10 +442,10 @@ impl ChainDriver for SuiSealProtocol {
                 let verifying_key = signing_key.verifying_key();
                 let derived_address = format!("0x{}", hex::encode(verifying_key.to_bytes()));
                 if derived_address != address {
-                    return Err(ChainError::InvalidInput(
-                        format!("Address mismatch: configured address {} does not match derived address {} from signing key",
-                            address, derived_address)
-                    ));
+                    return Err(ChainError::InvalidInput(format!(
+                        "Address mismatch: configured address {} does not match derived address {} from signing key",
+                        address, derived_address
+                    )));
                 }
                 return Ok(Box::new(SuiWallet::with_signing_key(
                     address,
@@ -488,8 +488,7 @@ pub fn create_sui_adapter(config: &ChainConfig) -> ChainResult<SuiSealProtocol> 
     let sui_config = SuiConfig {
         seal_contract: crate::SealContractConfig {
             package_id: Some(
-                "0x0000000000000000000000000000000000000000000000000000000000000002"
-                    .to_string(),
+                "0x0000000000000000000000000000000000000000000000000000000000000002".to_string(),
             ),
             ..Default::default()
         },

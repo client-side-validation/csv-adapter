@@ -8,7 +8,7 @@ use std::process::Command;
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    
+
     if args.is_empty() {
         print_help();
         std::process::exit(1);
@@ -73,7 +73,7 @@ fn verify_bindings() -> anyhow::Result<()> {
 
 fn verify_ethereum_bindings() -> anyhow::Result<()> {
     let contracts_dir = Path::new("csv-contracts/ethereum/contracts");
-    
+
     if !contracts_dir.exists() {
         println!("  ⚠ Ethereum contracts directory not found, skipping");
         return Ok(());
@@ -109,7 +109,7 @@ fn verify_ethereum_bindings() -> anyhow::Result<()> {
 
 fn verify_solana_bindings() -> anyhow::Result<()> {
     let contracts_dir = Path::new("csv-contracts/solana/contracts");
-    
+
     if !contracts_dir.exists() {
         println!("  ⚠ Solana contracts directory not found, skipping");
         return Ok(());
@@ -146,7 +146,7 @@ fn verify_solana_bindings() -> anyhow::Result<()> {
 
 fn verify_sui_bindings() -> anyhow::Result<()> {
     let contracts_dir = Path::new("csv-contracts/sui/contracts");
-    
+
     if !contracts_dir.exists() {
         println!("  ⚠ Sui contracts directory not found, skipping");
         return Ok(());
@@ -182,7 +182,7 @@ fn verify_sui_bindings() -> anyhow::Result<()> {
 
 fn verify_aptos_bindings() -> anyhow::Result<()> {
     let contracts_dir = Path::new("csv-contracts/aptos/contracts");
-    
+
     if !contracts_dir.exists() {
         println!("  ⚠ Aptos contracts directory not found, skipping");
         return Ok(());

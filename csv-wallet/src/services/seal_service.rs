@@ -3,14 +3,14 @@
 //! Provides local storage and management of seal records using LocalStorage.
 
 use chrono::{DateTime, Utc};
-use csv_core::mcp::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::mcp::{FixAction, HasErrorSuggestion, error_codes};
 use csv_store::state::ChainId;
 use serde::{Deserialize, Serialize};
 
-use crate::storage::{seal_storage, LocalStorageManager};
+use crate::storage::{LocalStorageManager, seal_storage};
 
 #[cfg(target_arch = "wasm32")]
-use csv_store::{seal_nullifier_storage, EncryptedStorageError, EncryptedStorageManager};
+use csv_store::{EncryptedStorageError, EncryptedStorageManager, seal_nullifier_storage};
 
 /// Seal status.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -226,8 +226,7 @@ impl EncryptedSealManager {
 
     /// Derive the storage key from a passphrase and salt.
     pub async fn from_passphrase(passphrase: &str, salt: &[u8]) -> Result<Self, SealError> {
-        let key =
-            EncryptedStorageManager::derive_key_from_password(passphrase, salt).await?;
+        let key = EncryptedStorageManager::derive_key_from_password(passphrase, salt).await?;
         Ok(Self::new(key))
     }
 

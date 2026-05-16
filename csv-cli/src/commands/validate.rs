@@ -169,50 +169,54 @@ fn cmd_commitment_chain(
 
 fn cmd_offline(file: String, _config: &Config, state: &UnifiedStateManager) -> Result<()> {
     output::header("Offline Proof Verification");
-    
+
     // Read and parse proof bundle from file
     let content = std::fs::read_to_string(&file)
         .map_err(|e| anyhow::anyhow!("Failed to read proof file: {}", e))?;
-    
+
     let proof_bundle: csv_core::proof::ProofBundle = serde_json::from_str(&content)
         .map_err(|e| anyhow::anyhow!("Invalid proof bundle JSON: {}", e))?;
-    
+
     output::progress(1, 5, "Parsing proof bundle...");
-    output::kv("Seal Ref", &format!("0x{}", hex::encode(&proof_bundle.seal_ref.id)));
+    output::kv(
+        "Seal Ref",
+        &format!("0x{}", hex::encode(&proof_bundle.seal_ref.id)),
+    );
     let source_chain = std::str::from_utf8(&proof_bundle.anchor_ref.metadata).unwrap_or("unknown");
     output::kv("Source Chain", source_chain);
-    let dest_chain = proof_bundle.transition_dag.nodes.first()
+    let dest_chain = proof_bundle
+        .transition_dag
+        .nodes
+        .first()
         .and_then(|n| std::str::from_utf8(&n.bytecode).ok())
         .unwrap_or("unknown");
     output::kv("Destination Chain", dest_chain);
-    
+
     output::progress(2, 5, "Verifying proof structure...");
-    
+
     // Basic structural validation
     if proof_bundle.seal_ref.id == [0u8; 32] {
         output::error("✗ Invalid seal reference (all zeros)");
         return Err(anyhow::anyhow!("Invalid seal reference"));
     }
-    
+
     if proof_bundle.anchor_ref.anchor_id == [0u8; 32] {
         output::error("✗ Invalid anchor ID (all zeros)");
         return Err(anyhow::anyhow!("Invalid anchor ID"));
     }
-    
+
     if proof_bundle.transition_dag.nodes.is_empty() {
         output::error("✗ Empty transition DAG");
         return Err(anyhow::anyhow!("Empty transition DAG"));
     }
-    
+
     output::progress(3, 5, "Performing cryptographic verification...");
-    
+
     // Full cryptographic verification using csv_core verifier
     // Use state to check if seal has been consumed
     let _seal_ref_hex = hex::encode(&proof_bundle.seal_ref.id);
-    let seal_registry = |seal_id: &[u8]| -> bool {
-        state.is_seal_consumed(&hex::encode(seal_id))
-    };
-    
+    let seal_registry = |seal_id: &[u8]| -> bool { state.is_seal_consumed(&hex::encode(seal_id)) };
+
     // Determine signature scheme based on source chain
     let signature_scheme = match source_chain {
         "bitcoin" => csv_core::signature::SignatureScheme::Secp256k1,
@@ -222,7 +226,7 @@ fn cmd_offline(file: String, _config: &Config, state: &UnifiedStateManager) -> R
         "solana" => csv_core::signature::SignatureScheme::Ed25519,
         _ => csv_core::signature::SignatureScheme::Secp256k1,
     };
-    
+
     match csv_core::verifier::verify_proof(&proof_bundle, seal_registry, signature_scheme) {
         Ok(_) => {
             output::success("✓ Proof bundle is cryptographically valid");
@@ -232,19 +236,19 @@ fn cmd_offline(file: String, _config: &Config, state: &UnifiedStateManager) -> R
             return Err(anyhow::anyhow!("Proof verification failed: {}", e));
         }
     }
-    
+
     output::progress(4, 5, "Generating explorer links...");
-    
+
     // Generate explorer links based on chain
     let explorer_links = generate_explorer_links(&proof_bundle, source_chain, dest_chain);
     output::info("Explorer Links:");
     for (label, url) in &explorer_links {
         output::kv(label, url);
     }
-    
+
     output::progress(5, 5, "Verification complete");
     output::success("✓ Offline verification successful");
-    
+
     Ok(())
 }
 
@@ -255,7 +259,7 @@ fn generate_explorer_links(
     dest_chain: &str,
 ) -> Vec<(&'static str, String)> {
     let mut links = Vec::new();
-    
+
     // Source chain explorer
     let source_explorer = match source_chain {
         "bitcoin" => "https://blockstream.info/testnet",
@@ -265,7 +269,7 @@ fn generate_explorer_links(
         "solana" => "https://explorer.solana.com",
         _ => "https://example.com",
     };
-    
+
     // Destination chain explorer
     let dest_explorer = match dest_chain {
         "bitcoin" => "https://blockstream.info/testnet",
@@ -275,21 +279,30 @@ fn generate_explorer_links(
         "solana" => "https://explorer.solana.com",
         _ => "https://example.com",
     };
-    
+
     // Seal reference link
     let seal_id = hex::encode(&proof_bundle.seal_ref.id);
-    links.push(("Seal ID", format!("{}/tx/{}", source_explorer, &seal_id[..16])));
-    
+    links.push((
+        "Seal ID",
+        format!("{}/tx/{}", source_explorer, &seal_id[..16]),
+    ));
+
     // Anchor block link
     let block_height = proof_bundle.anchor_ref.block_height;
-    links.push(("Anchor Block", format!("{}/block/{}", source_explorer, block_height)));
-    
+    links.push((
+        "Anchor Block",
+        format!("{}/block/{}", source_explorer, block_height),
+    ));
+
     // Inclusion proof link
     let block_hash = hex::encode(proof_bundle.inclusion_proof.block_hash.as_bytes());
-    links.push(("Inclusion Proof", format!("{}/block/{}", source_explorer, &block_hash[..16])));
-    
+    links.push((
+        "Inclusion Proof",
+        format!("{}/block/{}", source_explorer, &block_hash[..16]),
+    ));
+
     // Destination chain link
     links.push(("Destination Chain", dest_explorer.to_string()));
-    
+
     links
 }

@@ -21,10 +21,10 @@ use csv_core::proof::{FinalityProof, ProofBundle};
 
 #[cfg(feature = "rpc")]
 type SignedTransaction = (Vec<u8>, Vec<u8>, Vec<u8>);
-use csv_core::seal::CommitAnchor as CoreCommitAnchor;
-use csv_core::seal::SealPoint as CoreSealPoint;
 use csv_core::Hash;
 use csv_core::SealProtocol;
+use csv_core::seal::CommitAnchor as CoreCommitAnchor;
+use csv_core::seal::SealPoint as CoreSealPoint;
 
 use crate::checkpoint::{CheckpointVerifier, CheckpointVerifierTrait};
 use crate::config::SuiConfig;
@@ -183,8 +183,8 @@ fn build_sui_transaction_data(
     tx.extend_from_slice(&bcs_string(function_name));
     // type_arguments: Vec<TypeTag> (empty)
     tx.push(0); // length 0
-                // arguments: Vec<Argument>
-                // Argument::Input(u16) = variant 1
+    // arguments: Vec<Argument>
+    // Argument::Input(u16) = variant 1
     tx.extend_from_slice(&uleb128_encode(2)); // 2 arguments
     tx.push(1);
     tx.extend_from_slice(&0u16.to_le_bytes()); // Input(0)
@@ -644,7 +644,8 @@ impl SealProtocol for SuiSealProtocol {
                 .run_with_rpc(move |rpc| {
                     let cp_seq = anchor.checkpoint;
                     async move {
-                        verifier.is_checkpoint_certified(cp_seq, rpc.as_ref())
+                        verifier
+                            .is_checkpoint_certified(cp_seq, rpc.as_ref())
                             .await
                             .map_err(|e| SuiError::RpcError(e.to_string()))
                     }
@@ -682,7 +683,8 @@ impl SealProtocol for SuiSealProtocol {
             .run_with_rpc(move |rpc| {
                 let cp_seq = anchor.checkpoint;
                 async move {
-                    verifier.is_checkpoint_certified(cp_seq, rpc.as_ref())
+                    verifier
+                        .is_checkpoint_certified(cp_seq, rpc.as_ref())
                         .await
                         .map_err(|e| SuiError::RpcError(e.to_string()))
                 }

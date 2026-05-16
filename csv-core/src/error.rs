@@ -1,6 +1,6 @@
 //! Error types for CSV adapters
 
-use crate::mcp::{error_codes, FixAction, HasErrorSuggestion};
+use crate::mcp::{FixAction, HasErrorSuggestion, error_codes};
 use thiserror::Error;
 
 /// Result type alias for adapter operations
@@ -263,7 +263,10 @@ impl HasErrorSuggestion for ProtocolError {
             }
             ProtocolError::InvalidInput(msg) => format!("Invalid input parameters: {}", msg),
             ProtocolError::StorageError(msg) => {
-                format!("Storage operation failed: {}. Ensure the database is accessible and has sufficient space.", msg)
+                format!(
+                    "Storage operation failed: {}. Ensure the database is accessible and has sufficient space.",
+                    msg
+                )
             }
             ProtocolError::Generic(_) => {
                 "An unexpected error occurred. Check the logs for details \
@@ -271,19 +274,34 @@ impl HasErrorSuggestion for ProtocolError {
                     .to_string()
             }
             ProtocolError::InvalidStateTransition(msg) => {
-                format!("Invalid state transition: {}. Check the state machine and ensure transitions are valid.", msg)
+                format!(
+                    "Invalid state transition: {}. Check the state machine and ensure transitions are valid.",
+                    msg
+                )
             }
             ProtocolError::RpcQuorumFailed(msg) => {
-                format!("RPC quorum failed: {}. Check RPC endpoints and network connectivity.", msg)
+                format!(
+                    "RPC quorum failed: {}. Check RPC endpoints and network connectivity.",
+                    msg
+                )
             }
             ProtocolError::InvalidData(msg) => {
-                format!("Invalid data: {}. Check the data format and ensure it matches expected schema.", msg)
+                format!(
+                    "Invalid data: {}. Check the data format and ensure it matches expected schema.",
+                    msg
+                )
             }
             ProtocolError::VerificationError(msg) => {
-                format!("Verification error: {}. Check the proof data and verification logic.", msg)
+                format!(
+                    "Verification error: {}. Check the proof data and verification logic.",
+                    msg
+                )
             }
             ProtocolError::RpcError(msg) => {
-                format!("RPC error: {}. Check RPC endpoints and network connectivity.", msg)
+                format!(
+                    "RPC error: {}. Check RPC endpoints and network connectivity.",
+                    msg
+                )
             }
         }
     }

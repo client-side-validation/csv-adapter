@@ -57,8 +57,8 @@ impl DerivationPath {
     /// Create a BIP-86 derivation path (Bitcoin Taproot).
     pub fn new_bip86(account: u32, address_index: u32) -> Self {
         Self {
-            purpose: 86 | 0x8000_0000,  // BIP-86 hardened
-            coin_type: 0x8000_0000, // Bitcoin hardened
+            purpose: 86 | 0x8000_0000, // BIP-86 hardened
+            coin_type: 0x8000_0000,    // Bitcoin hardened
             account: account | 0x8000_0000,
             change: 0,
             address_index,
@@ -151,7 +151,7 @@ pub fn derive_key_from_name(
             return Err(Bip44Error::InvalidPath(format!(
                 "Unknown chain: {}",
                 chain_name
-            )))
+            )));
         }
     };
     derive_key(seed, &chain, account, address_index)
@@ -304,8 +304,8 @@ pub fn derive_address_from_chain_id(
 }
 
 fn derive_bitcoin_address_from_key(key_bytes: &[u8]) -> Result<String, Bip44Error> {
-    use bitcoin::key::TapTweak;
     use bitcoin::Address;
+    use bitcoin::key::TapTweak;
     use secp256k1::{Keypair, Secp256k1, SecretKey, XOnlyPublicKey};
 
     let secret_key = SecretKey::from_slice(key_bytes)

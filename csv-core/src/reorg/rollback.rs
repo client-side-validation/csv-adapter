@@ -114,7 +114,8 @@ impl<B: RollbackStorageBackend> RollbackHandler<B> {
     where
         F: Fn(&ReorgEvent) + Send + Sync + 'static,
     {
-        self.on_rollback.insert(chain.as_str().to_string(), Box::new(callback));
+        self.on_rollback
+            .insert(chain.as_str().to_string(), Box::new(callback));
     }
 
     /// Handle a reorg event
@@ -153,11 +154,9 @@ impl<B: RollbackStorageBackend> RollbackHandler<B> {
                 RollbackAction::RolledBack
             }
             // Minting state - mint may have been on reorged block
-            "minting" if source_block_height <= reorg_to_height => {
-                RollbackAction::Resume {
-                    from_state: "proof_validated".to_string(),
-                }
-            }
+            "minting" if source_block_height <= reorg_to_height => RollbackAction::Resume {
+                from_state: "proof_validated".to_string(),
+            },
             // Completed transfers are not affected (finality confirmed)
             "completed" => RollbackAction::RolledBack, // No action needed
             // Other states - conservative rollback
@@ -185,27 +184,35 @@ impl<B: RollbackStorageBackend> RollbackHandler<B> {
         let mut results = Vec::with_capacity(affected_transfers.len());
 
         for (transfer_id, state, block_height) in affected_transfers {
-            let action = self.determine_rollback_action(&state, *block_height, from_height, to_height);
+            let action =
+                self.determine_rollback_action(&state, *block_height, from_height, to_height);
 
             let new_state = match &action {
                 RollbackAction::Compromised => {
                     log::warn!(
                         "Transfer {} on chain {} marked as COMPROMISED (source lock invalidated at height {})",
-                        transfer_id, chain, block_height
+                        transfer_id,
+                        chain,
+                        block_height
                     );
                     "compromised"
                 }
                 RollbackAction::RolledBack => {
                     log::warn!(
                         "Transfer {} on chain {} marked as ROLLED BACK (reorg at height {})",
-                        transfer_id, chain, block_height
+                        transfer_id,
+                        chain,
+                        block_height
                     );
                     "rolled_back"
                 }
                 RollbackAction::Resume { from_state } => {
                     log::info!(
                         "Transfer {} on chain {} resuming from {} (reorg at height {})",
-                        transfer_id, chain, from_state, block_height
+                        transfer_id,
+                        chain,
+                        from_state,
+                        block_height
                     );
                     from_state.as_str()
                 }
@@ -228,22 +235,22 @@ impl<B: RollbackStorageBackend> RollbackHandler<B> {
                 .update_transfer_state(transfer_id, new_state, metadata.clone())
                 .await
             {
-                log::error!(
-                    "Failed to update transfer state for {}: {}",
-                    transfer_id, e
-                );
+                log::error!("Failed to update transfer state for {}: {}", transfer_id, e);
             }
 
             // Record the rollback event for audit
             if let Err(e) = self
                 .storage
-                .record_rollback(transfer_id, chain.as_str(), from_height, to_height, new_state)
+                .record_rollback(
+                    transfer_id,
+                    chain.as_str(),
+                    from_height,
+                    to_height,
+                    new_state,
+                )
                 .await
             {
-                log::error!(
-                    "Failed to record rollback event for {}: {}",
-                    transfer_id, e
-                );
+                log::error!("Failed to record rollback event for {}: {}", transfer_id, e);
             }
 
             results.push(RollbackResult {
@@ -292,9 +299,10 @@ impl RollbackStorageBackend for MockRollbackBackend {
         new_state: &str,
         _metadata: serde_json::Value,
     ) -> Result<(), crate::error::ProtocolError> {
-        let mut states = self.states.lock().map_err(|e| {
-            crate::error::ProtocolError::StorageError(format!("Lock error: {}", e))
-        })?;
+        let mut states = self
+            .states
+            .lock()
+            .map_err(|e| crate::error::ProtocolError::StorageError(format!("Lock error: {}", e)))?;
         states.insert(transfer_id.to_string(), new_state.to_string());
         Ok(())
     }
@@ -303,9 +311,10 @@ impl RollbackStorageBackend for MockRollbackBackend {
         &self,
         transfer_id: &str,
     ) -> Result<Option<String>, crate::error::ProtocolError> {
-        let states = self.states.lock().map_err(|e| {
-            crate::error::ProtocolError::StorageError(format!("Lock error: {}", e))
-        })?;
+        let states = self
+            .states
+            .lock()
+            .map_err(|e| crate::error::ProtocolError::StorageError(format!("Lock error: {}", e)))?;
         Ok(states.get(transfer_id).cloned())
     }
 
@@ -317,9 +326,10 @@ impl RollbackStorageBackend for MockRollbackBackend {
         to_height: u64,
         action: &str,
     ) -> Result<(), crate::error::ProtocolError> {
-        let mut log = self.rollback_log.lock().map_err(|e| {
-            crate::error::ProtocolError::StorageError(format!("Lock error: {}", e))
-        })?;
+        let mut log = self
+            .rollback_log
+            .lock()
+            .map_err(|e| crate::error::ProtocolError::StorageError(format!("Lock error: {}", e)))?;
         log.push((
             transfer_id.to_string(),
             chain.to_string(),
@@ -330,5 +340,3 @@ impl RollbackStorageBackend for MockRollbackBackend {
         Ok(())
     }
 }
-
-

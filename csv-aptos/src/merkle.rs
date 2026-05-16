@@ -71,7 +71,7 @@ impl MerkleNode {
         payload.push(0x01u8);
         payload.extend_from_slice(&left_hash);
         payload.extend_from_slice(&sanad_hash);
-        
+
         let hash = DomainSeparatedHash::<AptosAnchorDomain>::hash(&payload);
         hash.as_bytes().to_vec().try_into().unwrap_or([0u8; 32])
     }
@@ -312,7 +312,7 @@ impl StateProof {
         } else {
             payload.extend_from_slice(b"NOT_EXISTS");
         }
-        
+
         let hash = DomainSeparatedHash::<AptosAnchorDomain>::hash(&payload);
         hash.as_bytes().to_vec().try_into().unwrap_or([0u8; 32])
     }

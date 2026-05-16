@@ -27,9 +27,9 @@
 //!   should integrate `winterfell` or `stone-prover`. See Open Question #1.
 //! - **DA layer**: Proofs are posted to Celestia via blob transactions.
 
-use std::vec::Vec;
-use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::vec::Vec;
 
 use csv_core::hash::Hash;
 
@@ -79,7 +79,13 @@ impl IoTReading {
                 return Err(StarkError::MetadataTooLarge(m.len()));
             }
         }
-        Ok(Self { device_id, value, timestamp, signature, metadata })
+        Ok(Self {
+            device_id,
+            value,
+            timestamp,
+            signature,
+            metadata,
+        })
     }
 
     /// Compute a hash of this reading for Merkle tree leaf construction.
@@ -140,8 +146,16 @@ impl IoTReading {
         }
         let mut device_id = [0u8; 32];
         device_id.copy_from_slice(&bytes[..32]);
-        let value = u64::from_le_bytes(bytes[32..40].try_into().map_err(|_| StarkError::InvalidReading)?);
-        let timestamp = u64::from_le_bytes(bytes[40..48].try_into().map_err(|_| StarkError::InvalidReading)?);
+        let value = u64::from_le_bytes(
+            bytes[32..40]
+                .try_into()
+                .map_err(|_| StarkError::InvalidReading)?,
+        );
+        let timestamp = u64::from_le_bytes(
+            bytes[40..48]
+                .try_into()
+                .map_err(|_| StarkError::InvalidReading)?,
+        );
         let signature = bytes[48..112].to_vec();
 
         let metadata = if bytes.len() > 112 {
@@ -194,7 +208,10 @@ impl IoTReadingsBatch {
         // Compute Merkle root
         let merkle_root = Self::compute_merkle_root(&readings);
 
-        Ok(Self { readings, merkle_root })
+        Ok(Self {
+            readings,
+            merkle_root,
+        })
     }
 
     /// Compute the Merkle root of reading hashes.
@@ -355,7 +372,11 @@ pub trait IoTBatchVerifier {
     ///
     /// # Returns
     /// True if the proof is valid and the commitment matches
-    fn verify(&self, proof: &StarkProofBundle, expected_commitment: Hash) -> Result<bool, StarkError>;
+    fn verify(
+        &self,
+        proof: &StarkProofBundle,
+        expected_commitment: Hash,
+    ) -> Result<bool, StarkError>;
 
     /// Verify a proof without checking the commitment (quick check).
     fn verify_proof_structure(&self, proof: &StarkProofBundle) -> Result<bool, StarkError>;
@@ -380,7 +401,9 @@ pub trait IoTBatchVerifier {
 pub struct MockStarkProver;
 
 impl Default for MockStarkProver {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 impl IoTBatchProver for MockStarkProver {
@@ -394,7 +417,7 @@ impl IoTBatchProver for MockStarkProver {
 
         // Mock: produce deterministic "proof" bytes
         let mut proof_bytes = Vec::with_capacity(256);
-         proof_bytes.extend_from_slice(b"CSV-MOCK-STARK-PROOF");
+        proof_bytes.extend_from_slice(b"CSV-MOCK-STARK-PROOF");
         proof_bytes.extend_from_slice(batch.merkle_root.as_bytes());
         let len_bytes = (batch.readings.len() as u64).to_le_bytes();
         proof_bytes.extend_from_slice(&len_bytes);
@@ -402,19 +425,29 @@ impl IoTBatchProver for MockStarkProver {
         Ok(StarkProofBundle::from_batch(&batch.readings, proof_bytes))
     }
 
-    fn target_batch_size(&self) -> usize { MIN_BATCH_SIZE }
-    fn max_batch_size(&self) -> usize { MAX_BATCH_SIZE }
+    fn target_batch_size(&self) -> usize {
+        MIN_BATCH_SIZE
+    }
+    fn max_batch_size(&self) -> usize {
+        MAX_BATCH_SIZE
+    }
 }
 
 /// A mock/stub STARK verifier for development and testing.
 pub struct MockStarkVerifier;
 
 impl Default for MockStarkVerifier {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 impl IoTBatchVerifier for MockStarkVerifier {
-    fn verify(&self, proof: &StarkProofBundle, expected_commitment: Hash) -> Result<bool, StarkError> {
+    fn verify(
+        &self,
+        proof: &StarkProofBundle,
+        expected_commitment: Hash,
+    ) -> Result<bool, StarkError> {
         // Verify structure first
         if !self.verify_proof_structure(proof)? {
             return Ok(false);
@@ -464,7 +497,7 @@ impl BatchBuilder {
         }
     }
 
-   /// Add a reading to the current batch.
+    /// Add a reading to the current batch.
     ///
     /// Returns `Ok(())` if the reading was added, or `Err(batch)` with the
     /// completed batch if adding this reading would exceed the limit.
@@ -546,7 +579,7 @@ pub enum StarkError {
     #[error("Invalid reading data")]
     InvalidReading,
 
-     /// Invalid proof bytes are too short or malformed.
+    /// Invalid proof bytes are too short or malformed.
     #[error("Invalid proof: bytes too short")]
     InvalidProof,
 
@@ -683,7 +716,7 @@ mod tests {
         assert!(valid);
     }
 
-     #[test]
+    #[test]
     fn test_proof_bundle_serialization() {
         let readings = vec![make_reading(1, 10, 100)];
         let batch = IoTReadingsBatch::new(readings).unwrap();
@@ -753,7 +786,13 @@ mod tests {
     #[test]
     fn test_metadata_too_large() {
         let large_meta = vec![0u8; 257];
-        let result = IoTReading::new(test_device_id(), 42, 1000, test_signature(), Some(large_meta));
+        let result = IoTReading::new(
+            test_device_id(),
+            42,
+            1000,
+            test_signature(),
+            Some(large_meta),
+        );
         assert!(matches!(result, Err(StarkError::MetadataTooLarge(257))));
     }
 
@@ -789,7 +828,8 @@ mod tests {
     #[test]
     fn test_builder_with_metadata() {
         let meta = vec![0x01, 0x02];
-        let reading = IoTReading::new(test_device_id(), 42, 1000, test_signature(), Some(meta)).unwrap();
+        let reading =
+            IoTReading::new(test_device_id(), 42, 1000, test_signature(), Some(meta)).unwrap();
         let mut builder = BatchBuilder::new(4);
         assert!(builder.add(reading).is_ok());
         assert_eq!(builder.len(), 1);

@@ -7,8 +7,8 @@
 
 use csv_core::ChainId;
 use csv_keys::bip39::{Mnemonic, MnemonicType};
-use serde::{Serialize, Deserialize};
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -31,8 +31,7 @@ pub struct WalletMetadata {
 }
 
 /// Bitcoin network type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum BitcoinNetwork {
     Mainnet,
     #[default]
@@ -40,7 +39,6 @@ pub enum BitcoinNetwork {
     Signet,
     Regtest,
 }
-
 
 /// Extended wallet with metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,11 +68,15 @@ fn serialize_seed<S: serde::Serializer>(seed: &[u8; 64], serializer: S) -> Resul
     serializer.serialize_str(&hex)
 }
 
-fn deserialize_seed<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<[u8; 64], D::Error> {
+fn deserialize_seed<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<[u8; 64], D::Error> {
     let hex: String = serde::Deserialize::deserialize(deserializer)?;
     let bytes = hex::decode(&hex).map_err(serde::de::Error::custom)?;
     if bytes.len() != 64 {
-        return Err(serde::de::Error::custom("Seed must be 64 bytes (128 hex chars)"));
+        return Err(serde::de::Error::custom(
+            "Seed must be 64 bytes (128 hex chars)",
+        ));
     }
     let mut arr = [0u8; 64];
     arr.copy_from_slice(&bytes);
@@ -109,8 +111,8 @@ impl ExtendedWallet {
 
     /// Create from mnemonic phrase.
     pub fn from_mnemonic(phrase: &str) -> Result<Self, String> {
-        let mnemonic = Mnemonic::from_phrase(phrase)
-            .map_err(|e| format!("Invalid mnemonic: {}", e))?;
+        let mnemonic =
+            Mnemonic::from_phrase(phrase).map_err(|e| format!("Invalid mnemonic: {}", e))?;
         let seed = mnemonic.to_seed(None);
 
         let mut seed_bytes = [0u8; 64];
@@ -158,23 +160,23 @@ impl ExtendedWallet {
             return Err("Keystore not enabled for this wallet".to_string());
         }
 
-        let mut keystore = NativeKeystore::new()
-            .map_err(|e| format!("Failed to initialize keystore: {}", e))?;
+        let mut keystore =
+            NativeKeystore::new().map_err(|e| format!("Failed to initialize keystore: {}", e))?;
 
         let passphrase_obj = Passphrase::new(passphrase);
-        
+
         match keystore.retrieve_key(&self.metadata.id, &passphrase_obj) {
             Ok(secret_key) => {
                 let _bytes = secret_key.as_bytes();
                 let mut seed_array = [0u8; 64];
                 seed_array[..32].copy_from_slice(&self.seed[..32]);
                 seed_array[32..].copy_from_slice(&self.seed[32..]);
-                
+
                 // Verify the stored key matches by deriving a known address
                 let mut key_bytes = [0u8; 32];
                 key_bytes.copy_from_slice(&self.seed[32..]);
                 let _ = key_bytes;
-                
+
                 self.is_locked = false;
                 self.metadata.last_accessed = Some(chrono::Utc::now());
                 Ok(())
@@ -182,15 +184,11 @@ impl ExtendedWallet {
             Err(NativeKeystoreError::KeyNotFound(_)) => {
                 Err("Wallet not found in keystore".to_string())
             }
-            Err(NativeKeystoreError::PassphraseMismatch) => {
-                Err("Incorrect passphrase".to_string())
-            }
+            Err(NativeKeystoreError::PassphraseMismatch) => Err("Incorrect passphrase".to_string()),
             Err(NativeKeystoreError::SessionExpired) => {
                 Err("Session expired, please start a new session".to_string())
             }
-            Err(e) => {
-                Err(format!("Failed to unlock wallet: {}", e))
-            }
+            Err(e) => Err(format!("Failed to unlock wallet: {}", e)),
         }
     }
 
@@ -202,8 +200,8 @@ impl ExtendedWallet {
             return Err("Keystore not enabled for this wallet".to_string());
         }
 
-        let mut keystore = NativeKeystore::new()
-            .map_err(|e| format!("Failed to initialize keystore: {}", e))?;
+        let mut keystore =
+            NativeKeystore::new().map_err(|e| format!("Failed to initialize keystore: {}", e))?;
 
         let passphrase_obj = Passphrase::new(passphrase);
 
@@ -213,14 +211,15 @@ impl ExtendedWallet {
         key_bytes.copy_from_slice(&self.seed[..32]);
         let secret_key = SecretKey::new(key_bytes);
 
-        keystore.store_key(
-            &self.metadata.id,
-            "wallet-master",
-            Some(self.metadata.name.as_deref().unwrap_or("Primary Wallet")),
-            &secret_key,
-            &passphrase_obj,
-        )
-        .map_err(|e| format!("Failed to save wallet to keystore: {}", e))?;
+        keystore
+            .store_key(
+                &self.metadata.id,
+                "wallet-master",
+                Some(self.metadata.name.as_deref().unwrap_or("Primary Wallet")),
+                &secret_key,
+                &passphrase_obj,
+            )
+            .map_err(|e| format!("Failed to save wallet to keystore: {}", e))?;
 
         Ok(())
     }
@@ -229,8 +228,8 @@ impl ExtendedWallet {
     /// Decrypts and loads the seed using the provided passphrase.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn load_from_keystore(&mut self, passphrase: &str) -> Result<(), String> {
-        let mut keystore = NativeKeystore::new()
-            .map_err(|e| format!("Failed to initialize keystore: {}", e))?;
+        let mut keystore =
+            NativeKeystore::new().map_err(|e| format!("Failed to initialize keystore: {}", e))?;
 
         let passphrase_obj = Passphrase::new(passphrase);
 
@@ -247,25 +246,22 @@ impl ExtendedWallet {
             Err(NativeKeystoreError::KeyNotFound(_)) => {
                 Err("Wallet not found in keystore".to_string())
             }
-            Err(NativeKeystoreError::PassphraseMismatch) => {
-                Err("Incorrect passphrase".to_string())
-            }
+            Err(NativeKeystoreError::PassphraseMismatch) => Err("Incorrect passphrase".to_string()),
             Err(NativeKeystoreError::SessionExpired) => {
                 Err("Session expired, please start a new session".to_string())
             }
-            Err(e) => {
-                Err(format!("Failed to load wallet from keystore: {}", e))
-            }
+            Err(e) => Err(format!("Failed to load wallet from keystore: {}", e)),
         }
     }
 
     /// Delete the wallet from the native keystore.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn delete_from_keystore(&self, _passphrase: &str) -> Result<(), String> {
-        let mut keystore = NativeKeystore::new()
-            .map_err(|e| format!("Failed to initialize keystore: {}", e))?;
+        let mut keystore =
+            NativeKeystore::new().map_err(|e| format!("Failed to initialize keystore: {}", e))?;
 
-        keystore.delete_key(&self.metadata.id)
+        keystore
+            .delete_key(&self.metadata.id)
             .map_err(|e| format!("Failed to delete wallet from keystore: {}", e))?;
 
         Ok(())
@@ -274,8 +270,8 @@ impl ExtendedWallet {
     /// Check if a wallet exists in the keystore.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn exists_in_keystore(&self) -> Result<bool, String> {
-        let keystore = NativeKeystore::new()
-            .map_err(|e| format!("Failed to initialize keystore: {}", e))?;
+        let keystore =
+            NativeKeystore::new().map_err(|e| format!("Failed to initialize keystore: {}", e))?;
 
         Ok(keystore.list_keys().contains(&self.metadata.id))
     }
@@ -283,8 +279,8 @@ impl ExtendedWallet {
     /// Start a keystore session for batch operations.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn start_keystore_session() -> Result<(), String> {
-        let mut keystore = NativeKeystore::new()
-            .map_err(|e| format!("Failed to initialize keystore: {}", e))?;
+        let mut keystore =
+            NativeKeystore::new().map_err(|e| format!("Failed to initialize keystore: {}", e))?;
 
         keystore.start_session();
         Ok(())
@@ -293,8 +289,8 @@ impl ExtendedWallet {
     /// End the current keystore session.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn end_keystore_session() -> Result<(), String> {
-        let mut keystore = NativeKeystore::new()
-            .map_err(|e| format!("Failed to initialize keystore: {}", e))?;
+        let mut keystore =
+            NativeKeystore::new().map_err(|e| format!("Failed to initialize keystore: {}", e))?;
 
         keystore.end_session();
         Ok(())
@@ -303,8 +299,8 @@ impl ExtendedWallet {
     /// Get the security policy for the keystore.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn get_security_policy() -> Result<SecurityPolicy, String> {
-        let keystore = NativeKeystore::new()
-            .map_err(|e| format!("Failed to initialize keystore: {}", e))?;
+        let keystore =
+            NativeKeystore::new().map_err(|e| format!("Failed to initialize keystore: {}", e))?;
 
         Ok(keystore.security_policy().clone())
     }
@@ -312,23 +308,28 @@ impl ExtendedWallet {
     /// Update the keystore security policy.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn update_security_policy(policy: SecurityPolicy) -> Result<(), String> {
-        let mut keystore = NativeKeystore::new()
-            .map_err(|e| format!("Failed to initialize keystore: {}", e))?;
+        let mut keystore =
+            NativeKeystore::new().map_err(|e| format!("Failed to initialize keystore: {}", e))?;
 
-        keystore.update_security_policy(policy)
+        keystore
+            .update_security_policy(policy)
             .map_err(|e| format!("Failed to update security policy: {}", e))?;
 
         Ok(())
     }
 
     /// Derive a proper Taproot (P2TR) address using BIP-86
-    fn derive_taproot_address(&self, account_index: u32, address_index: u32) -> Result<String, String> {
-        use secp256k1::{Secp256k1, Keypair, XOnlyPublicKey};
+    fn derive_taproot_address(
+        &self,
+        account_index: u32,
+        address_index: u32,
+    ) -> Result<String, String> {
         use bitcoin::{
-            bip32::{DerivationPath, Xpriv},
             Address, Network as BitcoinNetworkType,
+            bip32::{DerivationPath, Xpriv},
             key::TapTweak,
         };
+        use secp256k1::{Keypair, Secp256k1, XOnlyPublicKey};
 
         // Map our network to Bitcoin network type
         let btc_network = match self.bitcoin_network {
@@ -350,10 +351,8 @@ impl ExtendedWallet {
             _ => 1,
         };
 
-        let path_str = format!(
-            "m/86'/{coin_type}'/{account_index}'/0/{address_index}"
-        );
-        
+        let path_str = format!("m/86'/{coin_type}'/{account_index}'/0/{address_index}");
+
         let path: DerivationPath = path_str
             .parse()
             .map_err(|e| format!("Invalid derivation path: {}", e))?;
@@ -379,11 +378,11 @@ impl ExtendedWallet {
 
     /// Get addresses for all chains.
     pub fn all_addresses(&self) -> Vec<(ChainId, String)> {
-        use secp256k1::{Secp256k1, SecretKey};
+        use blake2::Blake2b;
         use ed25519_dalek::SigningKey;
+        use secp256k1::{Secp256k1, SecretKey};
         use sha2::Digest;
         use sha3::Keccak256;
-        use blake2::Blake2b;
 
         let mut addresses = Vec::new();
 
@@ -411,7 +410,10 @@ impl ExtendedWallet {
             let hash: [u8; 32] = hasher.finalize().into();
             let mut address = [0u8; 20];
             address.copy_from_slice(&hash[12..]);
-            addresses.push((ChainId::new("ethereum"), format!("0x{}", hex::encode(address))));
+            addresses.push((
+                ChainId::new("ethereum"),
+                format!("0x{}", hex::encode(address)),
+            ));
         }
 
         // Sui
@@ -434,14 +436,20 @@ impl ExtendedWallet {
         hasher.update(aptos_verifying.as_bytes());
         hasher.update([0x00]);
         let hash: [u8; 32] = hasher.finalize().into();
-        addresses.push((ChainId::new("aptos"), format!("0x{}", hex::encode(&hash[..]))));
+        addresses.push((
+            ChainId::new("aptos"),
+            format!("0x{}", hex::encode(&hash[..])),
+        ));
 
         // Solana
         let mut solana_key = [0u8; 32];
         solana_key.copy_from_slice(&self.seed[..32]);
         let solana_signing = SigningKey::from_bytes(&solana_key);
         let solana_verifying: ed25519_dalek::VerifyingKey = solana_signing.verifying_key();
-        addresses.push((ChainId::new("solana"), bs58::encode(solana_verifying.as_bytes()).into_string()));
+        addresses.push((
+            ChainId::new("solana"),
+            bs58::encode(solana_verifying.as_bytes()).into_string(),
+        ));
 
         addresses
     }
@@ -449,7 +457,8 @@ impl ExtendedWallet {
     /// Get address for a specific chain.
     pub fn address(&self, chain: ChainId) -> String {
         let addresses = self.all_addresses();
-        addresses.iter()
+        addresses
+            .iter()
             .find(|(c, _)| *c == chain)
             .map(|(_, addr)| addr.clone())
             .unwrap_or_default()

@@ -12,7 +12,7 @@ fuzz_target!(|data: &[u8]| {
     // This tests that the parser handles malformed JSON gracefully
     if let Ok(s) = std::str::from_utf8(data) {
         let _: Result<serde_json::Value, _> = serde_json::from_str(s);
-        
+
         // Also test parsing as a generic RPC response structure
         #[derive(serde::Deserialize)]
         struct RpcResponse {

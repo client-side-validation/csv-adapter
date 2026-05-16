@@ -158,12 +158,12 @@ impl SuiConfig {
         }
         match &self.seal_contract.package_id {
             Some(id) if id.is_empty() => {
-                return Err("Seal contract package ID cannot be empty".to_string())
+                return Err("Seal contract package ID cannot be empty".to_string());
             }
             None => {
                 return Err(
                     "Seal contract package ID must be set — deploy the contract first".to_string(),
-                )
+                );
             }
             _ => {}
         }

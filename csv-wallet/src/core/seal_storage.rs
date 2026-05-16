@@ -8,7 +8,7 @@
 //! - EncryptedSealManager previously existed but was not wired into production paths
 //! - This module provides the key derivation and initialization from wallet unlock
 
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 /// Derive a 32-byte AES-256 encryption key from a wallet passphrase and salt.
 ///
@@ -21,11 +21,11 @@ use sha2::{Sha256, Digest};
 /// - The salt must be unique per wallet; reuse across wallets weakens security
 pub fn derive_seal_encryption_key(password: &str, salt: &[u8]) -> [u8; 32] {
     let mut key = [0u8; 32];
-    
+
     // PBKDF2-like iteration using HMAC-SHA256
     let mut derived = Vec::with_capacity(32);
     let mut block_number: u32 = 1;
-    
+
     // We need enough blocks to fill 32 bytes (SHA-256 output = 32 bytes, so 1 block)
     while derived.len() < 32 {
         // U = T_i = PRF(password, salt || INT_32_BE(i))
@@ -33,9 +33,9 @@ pub fn derive_seal_encryption_key(password: &str, salt: &[u8]) -> [u8; 32] {
         hasher.update(password.as_bytes());
         hasher.update(salt);
         hasher.update(block_number.to_be_bytes());
-        
+
         let mut u = hasher.finalize();
-        
+
         // Iterate 100k times
         for _ in 1..100_000 {
             let mut inner = Sha256::new();
@@ -43,11 +43,11 @@ pub fn derive_seal_encryption_key(password: &str, salt: &[u8]) -> [u8; 32] {
             inner.update(u);
             u = inner.finalize();
         }
-        
+
         derived.extend_from_slice(&u);
         block_number += 1;
     }
-    
+
     key.copy_from_slice(&derived[..32]);
     key
 }
@@ -89,7 +89,10 @@ mod tests {
     fn test_key_derivation_different_passwords() {
         let key1 = derive_key_from_passphrase("password-1");
         let key2 = derive_key_from_passphrase("password-2");
-        assert_ne!(key1, key2, "Different passphrases must produce different keys");
+        assert_ne!(
+            key1, key2,
+            "Different passphrases must produce different keys"
+        );
     }
 
     #[test]
@@ -102,6 +105,9 @@ mod tests {
     fn test_salt_generation_unique() {
         let salt1 = generate_salt();
         let salt2 = generate_salt();
-        assert_ne!(salt1, salt2, "Each salt generation must produce unique value");
+        assert_ne!(
+            salt1, salt2,
+            "Each salt generation must produce unique value"
+        );
     }
 }

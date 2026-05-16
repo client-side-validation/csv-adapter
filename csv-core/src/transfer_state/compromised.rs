@@ -34,11 +34,7 @@ pub enum CompromiseType {
 
 impl Compromised {
     /// Create a new compromised state
-    pub fn new(
-        data: TransferData,
-        compromise_type: CompromiseType,
-        details: String,
-    ) -> Self {
+    pub fn new(data: TransferData, compromise_type: CompromiseType, details: String) -> Self {
         Self {
             data,
             compromised_at: 0, // Will be set when compromise is detected

@@ -4,10 +4,10 @@
 //! from internal keys and merkle roots.
 
 use bitcoin::{
+    Address, Network, ScriptBuf,
     key::{TapTweak, XOnlyPublicKey},
     secp256k1::Secp256k1,
     taproot::TaprootSpendInfo,
-    Address, Network, ScriptBuf,
 };
 
 use csv_core::hash::Hash as CsvHash;

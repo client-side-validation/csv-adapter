@@ -4,9 +4,9 @@
 //! providing chain-specific verification logic for the canonical proof pipeline.
 
 use async_trait::async_trait;
+use csv_core::Hash;
 use csv_core::proof::{FinalityProof, InclusionProof};
 use csv_core::proof_pipeline::ChainVerifier;
-use csv_core::Hash;
 
 use crate::rpc::AptosRpc;
 
@@ -63,7 +63,10 @@ impl ChainVerifier for AptosVerifier {
     }
 
     /// Verify signature on proof bundle
-    async fn verify_signature(&self, _bundle: &csv_core::proof::ProofBundle) -> csv_core::Result<bool> {
+    async fn verify_signature(
+        &self,
+        _bundle: &csv_core::proof::ProofBundle,
+    ) -> csv_core::Result<bool> {
         // Placeholder - would verify signature on proof bundle
         Ok(true)
     }

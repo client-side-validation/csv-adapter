@@ -64,7 +64,12 @@ impl InclusionProof {
     /// # Safety
     /// The caller MUST ensure the proof_bytes are valid and non-empty.
     /// Violating this causes undefined behavior in proof verification.
-    pub unsafe fn new_unchecked(proof_bytes: Vec<u8>, block_hash: Hash, block_number: u64, position: u64) -> Self {
+    pub unsafe fn new_unchecked(
+        proof_bytes: Vec<u8>,
+        block_hash: Hash,
+        block_number: u64,
+        position: u64,
+    ) -> Self {
         Self {
             proof_bytes,
             block_hash,
@@ -120,7 +125,7 @@ impl FinalityProof {
         })
     }
 
-  /// Create a new $1 without validation.
+    /// Create a new $1 without validation.
     ///
     /// # Safety
     /// The caller MUST ensure the finality_data is valid for the target chain.
@@ -190,7 +195,7 @@ impl ProofBundle {
         })
     }
 
-   /// Create a new $1 without validation.
+    /// Create a new $1 without validation.
     ///
     /// # Safety
     /// The caller MUST ensure all fields are valid and consistent.

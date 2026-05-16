@@ -1,6 +1,6 @@
 //! Cross-chain transfer retry page.
 
-use crate::context::{use_wallet_context, TransferStatus};
+use crate::context::{TransferStatus, use_wallet_context};
 use crate::pages::common::*;
 use crate::routes::Route;
 use dioxus::prelude::*;

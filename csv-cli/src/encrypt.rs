@@ -18,10 +18,8 @@
 use aead::{Aead, AeadCore, KeyInit};
 use aes_gcm::Aes256Gcm;
 use aes_gcm::aes::cipher::generic_array::GenericArray;
-use argon2::{
-    Algorithm, Argon2, PasswordHasher, Version,
-};
 use argon2::password_hash::SaltString;
+use argon2::{Algorithm, Argon2, PasswordHasher, Version};
 use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -58,7 +56,10 @@ pub fn encrypt(plaintext: &[u8], passphrase: &str) -> anyhow::Result<EncryptedSt
 /// Decrypt an EncryptedState back to plaintext JSON.
 pub fn decrypt(encrypted: &EncryptedState, passphrase: &str) -> anyhow::Result<Vec<u8>> {
     if encrypted.v != 1 {
-        return Err(anyhow::anyhow!("Unsupported encryption version: {}", encrypted.v));
+        return Err(anyhow::anyhow!(
+            "Unsupported encryption version: {}",
+            encrypted.v
+        ));
     }
 
     let salt = B64
@@ -70,7 +71,8 @@ pub fn decrypt(encrypted: &EncryptedState, passphrase: &str) -> anyhow::Result<V
     if nonce_bytes.len() != 12 {
         return Err(anyhow::anyhow!("Invalid nonce length"));
     }
-    let nonce: GenericArray<u8, <Aes256Gcm as AeadCore>::NonceSize> = *GenericArray::from_slice(&nonce_bytes);
+    let nonce: GenericArray<u8, <Aes256Gcm as AeadCore>::NonceSize> =
+        *GenericArray::from_slice(&nonce_bytes);
     let ciphertext = B64
         .decode(&encrypted.d)
         .map_err(|e| anyhow::anyhow!("Invalid ciphertext encoding: {}", e))?;
@@ -178,8 +180,7 @@ mod tests {
 
     #[test]
     fn test_is_encrypted() {
-        let encrypted_json =
-            serde_json::to_string(&encrypt(b"test", "pass").unwrap()).unwrap();
+        let encrypted_json = serde_json::to_string(&encrypt(b"test", "pass").unwrap()).unwrap();
         assert!(is_encrypted(&encrypted_json));
         assert!(!is_encrypted(r#"{"plain": "data"}"#));
         assert!(!is_encrypted("not json at all"));

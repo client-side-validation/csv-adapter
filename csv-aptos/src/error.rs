@@ -3,7 +3,7 @@
 //! This module provides a comprehensive error taxonomy for the Aptos adapter,
 //! with chain-specific error variants and recovery guidance.
 
-use csv_core::mcp::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::mcp::{FixAction, HasErrorSuggestion, error_codes};
 use thiserror::Error;
 
 /// Comprehensive error types for the Aptos adapter.
@@ -308,11 +308,13 @@ mod tests {
     #[test]
     fn test_transient_errors() {
         assert!(AptosError::RpcError("connection refused".to_string()).is_transient());
-        assert!(AptosError::ConfirmationTimeout {
-            tx_hash: "abc".to_string(),
-            timeout_ms: 30000
-        }
-        .is_transient());
+        assert!(
+            AptosError::ConfirmationTimeout {
+                tx_hash: "abc".to_string(),
+                timeout_ms: 30000
+            }
+            .is_transient()
+        );
         assert!(AptosError::TransactionFailed("out of gas".to_string()).is_transient());
     }
 

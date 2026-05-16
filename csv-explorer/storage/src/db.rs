@@ -1,9 +1,9 @@
+use sqlx::SqlitePool;
 /// Database connection pool and initialization.
 ///
 /// Provides a typed wrapper around `SqlitePool` with automatic schema
 /// application on first connect.
 use sqlx::sqlite::SqlitePoolOptions;
-use sqlx::SqlitePool;
 use std::time::Duration;
 
 use csv_explorer_shared::Result;

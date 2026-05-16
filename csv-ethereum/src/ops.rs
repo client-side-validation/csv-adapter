@@ -17,6 +17,7 @@ use csv_core::backend::{
     DeploymentStatus, FinalityStatus, SanadOperationResult, TransactionInfo, TransactionStatus,
 };
 
+use csv_core::SealProtocol;
 #[cfg(feature = "rpc")]
 use csv_core::backend::SanadOperation;
 use csv_core::hash::Hash;
@@ -24,21 +25,20 @@ use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
 use csv_core::sanad::SanadId;
 use csv_core::seal::{CommitAnchor, SealPoint};
 use csv_core::signature::SignatureScheme;
-use csv_core::SealProtocol;
 use std::sync::Arc;
 
 #[cfg(feature = "rpc")]
 use crate::bindings::csv_lock::CsvLockClient;
 #[cfg(feature = "rpc")]
 use crate::bindings::csv_mint::CsvMintClient;
-#[cfg(feature = "rpc")]
-use alloy_sol_types::SolCall;
 use crate::config::EthereumConfig;
 use crate::finality::FinalityChecker;
 use crate::proofs::{CommitmentEventBuilder, EventProofVerifier};
 use crate::rpc::{EthereumRpc, RpcBlock, RpcTransaction};
 use crate::seal_contract::CsvSealAbi;
 use crate::seal_protocol::EthereumSealProtocol;
+#[cfg(feature = "rpc")]
+use alloy_sol_types::SolCall;
 
 /// Ethereum chain operations implementation
 pub struct EthereumBackend {
@@ -105,11 +105,17 @@ impl EthereumBackend {
             finality_depth: 12,
             ..Default::default()
         };
-        let seal = EthereumSealProtocol::from_config(seal_config, mock_rpc, [0u8; 20]).unwrap_or_else(|_| {
-            // Ultimate fallback - shouldn't happen
-            let fallback_rpc = Box::new(crate::rpc::MockEthereumRpc::new(0));
-            EthereumSealProtocol::from_config(EthereumConfig::default(), fallback_rpc, [0u8; 20]).unwrap()
-        });
+        let seal = EthereumSealProtocol::from_config(seal_config, mock_rpc, [0u8; 20])
+            .unwrap_or_else(|_| {
+                // Ultimate fallback - shouldn't happen
+                let fallback_rpc = Box::new(crate::rpc::MockEthereumRpc::new(0));
+                EthereumSealProtocol::from_config(
+                    EthereumConfig::default(),
+                    fallback_rpc,
+                    [0u8; 20],
+                )
+                .unwrap()
+            });
 
         Self {
             rpc,
@@ -156,18 +162,22 @@ impl EthereumBackend {
 
     /// Get the lock contract address if set
     fn lock_contract(&self) -> ChainOpResult<[u8; 20]> {
-        self.lock_contract_address
-            .ok_or_else(|| ChainOpError::InvalidInput(
-                "Lock contract address not configured. Set it with with_lock_contract()".to_string()
-            ))
+        self.lock_contract_address.ok_or_else(|| {
+            ChainOpError::InvalidInput(
+                "Lock contract address not configured. Set it with with_lock_contract()"
+                    .to_string(),
+            )
+        })
     }
 
     /// Get the mint contract address if set
     fn mint_contract(&self) -> ChainOpResult<[u8; 20]> {
-        self.mint_contract_address
-            .ok_or_else(|| ChainOpError::InvalidInput(
-                "Mint contract address not configured. Set it with with_mint_contract()".to_string()
-            ))
+        self.mint_contract_address.ok_or_else(|| {
+            ChainOpError::InvalidInput(
+                "Mint contract address not configured. Set it with with_mint_contract()"
+                    .to_string(),
+            )
+        })
     }
 
     /// Parse Ethereum address from string
@@ -255,12 +265,11 @@ impl EthereumBackend {
         calldata: &[u8],
         signer_key: &str,
     ) -> ChainOpResult<[u8; 32]> {
-        
         use alloy::consensus::{SignableTransaction, TxEip1559, TxEnvelope};
         use alloy::eips::eip2718::Encodable2718;
         use alloy::primitives::{Address, Bytes, TxKind, U256};
-        use alloy::signers::local::PrivateKeySigner;
         use alloy::signers::SignerSync;
+        use alloy::signers::local::PrivateKeySigner;
         use std::str::FromStr;
 
         // Parse the signer key
@@ -273,13 +282,15 @@ impl EthereumBackend {
         let sender_bytes: [u8; 20] = sender.into();
 
         // Get nonce
-        let nonce = self.rpc()
+        let nonce = self
+            .rpc()
             .get_transaction_count(sender_bytes)
             .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get nonce: {}", e)))?;
 
         // Get gas price
-        let gas_price = self.rpc()
+        let gas_price = self
+            .rpc()
             .get_gas_price()
             .await
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get gas price: {}", e)))?;
@@ -299,9 +310,9 @@ impl EthereumBackend {
 
         // Sign the transaction using SignableTransaction + SignerSync
         let sig_hash = tx.signature_hash();
-        let signature = signer
-            .sign_hash_sync(&sig_hash)
-            .map_err(|e| ChainOpError::SigningError(format!("Failed to sign transaction: {}", e)))?;
+        let signature = signer.sign_hash_sync(&sig_hash).map_err(|e| {
+            ChainOpError::SigningError(format!("Failed to sign transaction: {}", e))
+        })?;
 
         // Convert to signed transaction
         let signed_tx = tx.into_signed(signature);
@@ -311,10 +322,13 @@ impl EthereumBackend {
         let tx_bytes = tx_envelope.encoded_2718();
 
         // Send the raw transaction
-        let tx_hash = self.rpc()
+        let tx_hash = self
+            .rpc()
             .send_raw_transaction(tx_bytes.to_vec())
             .await
-            .map_err(|e| ChainOpError::TransactionError(format!("Failed to send transaction: {}", e)))?;
+            .map_err(|e| {
+                ChainOpError::TransactionError(format!("Failed to send transaction: {}", e))
+            })?;
 
         Ok(tx_hash)
     }
@@ -325,7 +339,7 @@ impl EthereumBackend {
         &self,
         tx_hash: &[u8; 32],
     ) -> ChainOpResult<crate::rpc::TransactionReceipt> {
-        use tokio::time::{sleep, Duration};
+        use tokio::time::{Duration, sleep};
 
         let max_attempts = 30;
         let poll_interval = Duration::from_secs(2);
@@ -339,14 +353,15 @@ impl EthereumBackend {
                 }
                 Err(e) => {
                     return Err(ChainOpError::RpcError(format!(
-                        "Failed to get receipt: {}", e
+                        "Failed to get receipt: {}",
+                        e
                     )));
                 }
             }
         }
 
         Err(ChainOpError::Timeout(
-            "Transaction not confirmed within timeout period".to_string()
+            "Transaction not confirmed within timeout period".to_string(),
         ))
     }
 
@@ -363,7 +378,8 @@ impl EthereumBackend {
         use secp256k1::Message;
 
         // Build the transaction hash for signing (RLP encode with chain ID)
-        let tx_hash = keccak256(alloy::consensus::SignableTransaction::signature_hash(tx).as_slice());
+        let tx_hash =
+            keccak256(alloy::consensus::SignableTransaction::signature_hash(tx).as_slice());
 
         // Create message from hash
         let message = Message::from_digest(tx_hash.into());
@@ -620,7 +636,7 @@ impl ChainSigner for EthereumBackend {
         // Ethereum uses ECDSA with secp256k1
         // Signature format: r (32 bytes) || s (32 bytes) || v (1 byte, recovery id)
 
-        use secp256k1::{ecdsa::Signature, Message, PublicKey, Secp256k1};
+        use secp256k1::{Message, PublicKey, Secp256k1, ecdsa::Signature};
         use sha3::{Digest, Keccak256};
 
         if signature.len() != 65 {
@@ -759,7 +775,6 @@ impl ChainBroadcaster for EthereumBackend {
 
         #[cfg(feature = "rpc")]
         {
-            
             use alloy_rlp::Decodable;
 
             // Decode the transaction using alloy's RLP decoder
@@ -769,7 +784,7 @@ impl ChainBroadcaster for EthereumBackend {
                     return Err(ChainOpError::InvalidInput(format!(
                         "Failed to RLP decode transaction: {}",
                         e
-                    )))
+                    )));
                 }
             };
 
@@ -1036,14 +1051,14 @@ impl ChainProofProvider for EthereumBackend {
             // Verify block hash matches the proof's block hash (if available)
             // Since RpcBlock doesn't have transactions, we verify block structure and confirmations
             let _tx_hash_bytes = self.parse_tx_hash(tx_hash)?;
-            
+
             // Verify block has valid structure
             if block.number == 0 {
                 return Err(ChainOpError::ProofVerificationError(
                     "Invalid block number in finality proof".to_string(),
                 ));
             }
-            
+
             if block.hash == [0u8; 32] {
                 return Err(ChainOpError::ProofVerificationError(
                     "Invalid block hash in finality proof".to_string(),
@@ -1159,11 +1174,9 @@ impl ChainSanadOps for EthereumBackend {
             let calldata = call.abi_encode();
 
             // Build and sign transaction using Alloy
-            let tx_hash = self.build_sign_and_send_transaction(
-                lock_contract,
-                &calldata,
-                owner_key_id,
-            ).await?;
+            let tx_hash = self
+                .build_sign_and_send_transaction(lock_contract, &calldata, owner_key_id)
+                .await?;
 
             // Wait for receipt
             let receipt = self.wait_for_receipt(&tx_hash).await?;
@@ -1227,11 +1240,9 @@ impl ChainSanadOps for EthereumBackend {
             let calldata = call.abi_encode();
 
             // Build and sign transaction
-            let tx_hash = self.build_sign_and_send_transaction(
-                mint_contract,
-                &calldata,
-                new_owner,
-            ).await?;
+            let tx_hash = self
+                .build_sign_and_send_transaction(mint_contract, &calldata, new_owner)
+                .await?;
 
             // Wait for receipt
             let receipt = self.wait_for_receipt(&tx_hash).await?;
@@ -1287,11 +1298,9 @@ impl ChainSanadOps for EthereumBackend {
             let calldata = call.abi_encode();
 
             // Build and sign transaction
-            let tx_hash = self.build_sign_and_send_transaction(
-                lock_contract,
-                &calldata,
-                owner_key_id,
-            ).await?;
+            let tx_hash = self
+                .build_sign_and_send_transaction(lock_contract, &calldata, owner_key_id)
+                .await?;
 
             // Wait for receipt
             let receipt = self.wait_for_receipt(&tx_hash).await?;
@@ -1418,7 +1427,7 @@ impl ChainSanadOps for EthereumBackend {
 }
 
 /// Parse a chain name string into a chain ID (u8)
-/// 
+///
 /// Used for cross-chain transfers to identify destination/source chains.
 fn parse_chain_id(chain_name: &str) -> ChainOpResult<u8> {
     match chain_name.to_lowercase().as_str() {
@@ -1453,7 +1462,9 @@ impl ChainBackend for EthereumBackend {
     }
 
     fn create_seal(&self, value: Option<u64>) -> ChainOpResult<SealPoint> {
-        let ethereum_seal = self.seal_protocol.create_seal(value)
+        let ethereum_seal = self
+            .seal_protocol
+            .create_seal(value)
             .map_err(|e| ChainOpError::Unknown(format!("Seal creation failed: {}", e)))?;
 
         // Convert EthereumSealPoint to core SealPoint
@@ -1481,7 +1492,8 @@ impl ChainBackend for EthereumBackend {
         let slot_index = u64::from_le_bytes(seal.id[20..28].try_into().unwrap());
 
         let nonce = seal.nonce.unwrap_or(0);
-        let ethereum_seal = crate::types::EthereumSealPoint::new(contract_address, slot_index, nonce);
+        let ethereum_seal =
+            crate::types::EthereumSealPoint::new(contract_address, slot_index, nonce);
 
         // Generate a random commitment for the publish call
         let mut commitment_bytes = [0u8; 32];
@@ -1489,7 +1501,9 @@ impl ChainBackend for EthereumBackend {
         let commitment = Hash::new(commitment_bytes);
 
         // Call the seal protocol's publish method
-        let ethereum_anchor = self.seal_protocol.publish(commitment, ethereum_seal)
+        let ethereum_anchor = self
+            .seal_protocol
+            .publish(commitment, ethereum_seal)
             .map_err(|e| ChainOpError::Unknown(format!("Seal publishing failed: {}", e)))?;
 
         // Convert EthereumCommitAnchor to core CommitAnchor
@@ -1510,31 +1524,31 @@ mod tests {
     #[test]
     fn test_ethereum_chain_operations_creation() {
         let rpc = Box::new(MockEthereumRpc::new(1000));
-      let config = EthereumConfig {
-             network: Network::Mainnet,
-             finality_depth: 15,
-             use_checkpoint_finality: true,
-             rpc_url: "http://127.0.0.1:8545".to_string(),
-             private_key: None,
-             lock_contract_address: None,
-             mint_contract_address: None,
-         };
-         let ops = EthereumBackend::new(rpc, config);
-         assert_eq!(ops.config.network.chain_id(), 1);
-     }
+        let config = EthereumConfig {
+            network: Network::Mainnet,
+            finality_depth: 15,
+            use_checkpoint_finality: true,
+            rpc_url: "http://127.0.0.1:8545".to_string(),
+            private_key: None,
+            lock_contract_address: None,
+            mint_contract_address: None,
+        };
+        let ops = EthereumBackend::new(rpc, config);
+        assert_eq!(ops.config.network.chain_id(), 1);
+    }
 
-     #[test]
-     fn test_address_validation() {
-         let rpc = Box::new(MockEthereumRpc::new(1000));
-         let config = EthereumConfig {
-             network: Network::Mainnet,
-             finality_depth: 15,
-             use_checkpoint_finality: true,
-             rpc_url: "http://127.0.0.1:8545".to_string(),
-             private_key: None,
-             lock_contract_address: None,
-             mint_contract_address: None,
-         };
+    #[test]
+    fn test_address_validation() {
+        let rpc = Box::new(MockEthereumRpc::new(1000));
+        let config = EthereumConfig {
+            network: Network::Mainnet,
+            finality_depth: 15,
+            use_checkpoint_finality: true,
+            rpc_url: "http://127.0.0.1:8545".to_string(),
+            private_key: None,
+            lock_contract_address: None,
+            mint_contract_address: None,
+        };
         let ops = EthereumBackend::new(rpc, config);
 
         // Valid address

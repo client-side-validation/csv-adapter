@@ -4,11 +4,11 @@
 //! enabling Solana to be used through the unified chain adapter interface.
 
 use async_trait::async_trait;
+use csv_core::ChainId;
 use csv_core::chain_config::ChainConfig;
 use csv_core::driver::{
     AccountModel, ChainCapabilities, ChainDriver, ChainError, ChainResult, RpcClient, Wallet,
 };
-use csv_core::ChainId;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::{Signature, Signer};
 use std::str::FromStr;
@@ -27,7 +27,9 @@ pub struct SolanaRpcClient {
 impl SolanaRpcClient {
     /// Create new RPC client from a SolanaRpc implementation
     pub fn new(rpc: Box<dyn SolanaRpc>) -> Self {
-        Self { inner: std::sync::Arc::from(rpc) }
+        Self {
+            inner: std::sync::Arc::from(rpc),
+        }
     }
 
     /// Create new RPC client from an Arc
@@ -280,7 +282,9 @@ impl ChainDriver for SolanaSealProtocol {
     }
 
     fn csv_program_id(&self) -> Option<&'static str> {
-        Some(Box::leak(self.config.csv_program_id.clone().into_boxed_str()))
+        Some(Box::leak(
+            self.config.csv_program_id.clone().into_boxed_str(),
+        ))
     }
 
     fn to_core_chain(&self) -> ChainId {

@@ -235,7 +235,7 @@ mod tests {
     use super::*;
     use csv_core::hash::Hash;
     use csv_core::seal::SealPoint;
-    use csv_core::zk_proof::{VerifierKey, ProofSystem};
+    use csv_core::zk_proof::{ProofSystem, VerifierKey};
 
     #[test]
     fn test_groth16_verifier_creation() {

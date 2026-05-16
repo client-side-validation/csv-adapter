@@ -93,7 +93,7 @@ impl ParallelVerifyService {
 
         // Process seals in batches to respect max_concurrent limit
         let mut all_results = Vec::with_capacity(total);
-        
+
         for chunk in seals.chunks(self.max_concurrent) {
             let chunk_results: Vec<_> = chunk
                 .iter()
@@ -101,7 +101,7 @@ impl ParallelVerifyService {
                     let seal_start = Instant::now();
                     let result = self.verify_single_seal(seal).await;
                     let duration = seal_start.elapsed().as_millis() as u64;
-                    
+
                     VerificationResult {
                         id: seal.id.clone(),
                         success: result.is_ok(),
@@ -110,7 +110,7 @@ impl ParallelVerifyService {
                     }
                 })
                 .collect();
-            
+
             let results = join_all(chunk_results).await;
             all_results.extend(results);
         }
@@ -163,7 +163,7 @@ impl ParallelVerifyService {
         info!("Starting parallel verification of {} proofs", total);
 
         let mut all_results = Vec::with_capacity(total);
-        
+
         for chunk in proofs.chunks(self.max_concurrent) {
             let chunk_results: Vec<_> = chunk
                 .iter()
@@ -171,7 +171,7 @@ impl ParallelVerifyService {
                     let proof_start = Instant::now();
                     let result = self.verify_single_proof(proof).await;
                     let duration = proof_start.elapsed().as_millis() as u64;
-                    
+
                     VerificationResult {
                         id: hex::encode(&proof.anchor_ref.anchor_id),
                         success: result.is_ok(),
@@ -180,7 +180,7 @@ impl ParallelVerifyService {
                     }
                 })
                 .collect();
-            
+
             let results = join_all(chunk_results).await;
             all_results.extend(results);
         }
@@ -257,7 +257,7 @@ impl ParallelVerifyService {
                     let start = Instant::now();
                     let result = self.verify_single_seal(seal).await;
                     let duration = start.elapsed().as_millis() as u64;
-                    
+
                     Ok(VerificationResult {
                         id: seal.id.clone(),
                         success: result.is_ok(),
@@ -303,7 +303,7 @@ mod tests {
     #[tokio::test]
     async fn test_verify_seals_parallel() {
         let service = ParallelVerifyService::new();
-        
+
         let seals = vec![
             SealRecord {
                 id: "seal1".to_string(),
@@ -324,7 +324,7 @@ mod tests {
         ];
 
         let (results, stats) = service.verify_seals_parallel(&seals).await;
-        
+
         assert_eq!(results.len(), 2);
         assert_eq!(stats.total, 2);
         assert_eq!(stats.successful, 2);
@@ -334,17 +334,15 @@ mod tests {
     #[tokio::test]
     async fn test_verify_seals_fail_fast() {
         let service = ParallelVerifyService::new();
-        
-        let seals = vec![
-            SealRecord {
-                id: "seal1".to_string(),
-                chain: "bitcoin".to_string(),
-                status: SealStatus::Unconsumed,
-                value: 1000,
-                created_at: Utc::now(),
-                sanad_id: "sanad1".to_string(),
-            },
-        ];
+
+        let seals = vec![SealRecord {
+            id: "seal1".to_string(),
+            chain: "bitcoin".to_string(),
+            status: SealStatus::Unconsumed,
+            value: 1000,
+            created_at: Utc::now(),
+            sanad_id: "sanad1".to_string(),
+        }];
 
         let result = service.verify_seals_fail_fast(&seals).await;
         assert!(result.is_ok());

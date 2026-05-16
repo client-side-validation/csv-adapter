@@ -1,8 +1,8 @@
 /// REST API handlers for the CSV Explorer.
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
 };
 use serde::{Deserialize, Serialize};
 
@@ -204,7 +204,7 @@ pub async fn get_transfer(
                 t.mint_tx_explorer_url = Some(get_explorer_url(&t.to_chain, mint_tx));
             }
             Ok(Json(ApiResponse::from(t.clone())))
-        },
+        }
         None => Err(not_found(&format!("Transfer {} not found", id))),
     }
 }
@@ -216,7 +216,10 @@ fn get_explorer_url(chain: &str, tx_hash: &str) -> String {
         "ethereum" => format!("https://sepolia.etherscan.io/tx/{}", tx_hash),
         "solana" => format!("https://explorer.solana.com/tx/{}?cluster=devnet", tx_hash),
         "sui" => format!("https://suiscan.xyz/testnet/tx/{}", tx_hash),
-        "aptos" => format!("https://explorer.aptoslabs.com/txn/{}?network=testnet", tx_hash),
+        "aptos" => format!(
+            "https://explorer.aptoslabs.com/txn/{}?network=testnet",
+            tx_hash
+        ),
         _ => format!("https://explorer.example.com/tx/{}", tx_hash),
     }
 }
@@ -357,7 +360,7 @@ pub async fn register_wallet_address(
                     error: "Invalid network. Must be: mainnet, testnet, or devnet".to_string(),
                     success: false,
                 }),
-            ))
+            ));
         }
     };
 
@@ -372,7 +375,7 @@ pub async fn register_wallet_address(
                     error: "Invalid priority. Must be: high, normal, or low".to_string(),
                     success: false,
                 }),
-            ))
+            ));
         }
     };
 
@@ -426,7 +429,7 @@ pub async fn unregister_wallet_address(
                     error: "Invalid network. Must be: mainnet, testnet, or devnet".to_string(),
                     success: false,
                 }),
-            ))
+            ));
         }
     };
 

@@ -27,7 +27,7 @@ use alloc::vec::Vec;
 use sha2::{Digest, Sha256};
 
 use crate::commitment::Commitment;
-use crate::commitment_chain::{verify_ordered_commitment_chain, ChainError, VerificationResult};
+use crate::commitment_chain::{ChainError, VerificationResult, verify_ordered_commitment_chain};
 use crate::consignment::Consignment;
 use crate::cross_chain::InclusionProof as CrossChainInclusionProof;
 use crate::hash::Hash;
@@ -150,7 +150,7 @@ impl ValidationClient {
             Err(e) => {
                 return ValidationResult::Rejected {
                     reason: ValidationError::CommitmentChainError(e),
-                }
+                };
             }
         };
 
@@ -536,9 +536,9 @@ impl Default for ValidationClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::OwnershipProof;
     use crate::consignment::Consignment;
     use crate::genesis::Genesis;
-    use crate::OwnershipProof;
 
     fn make_test_genesis() -> Genesis {
         Genesis::new(

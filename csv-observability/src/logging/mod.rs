@@ -355,7 +355,13 @@ impl Tracer {
 
     /// Finish a span
     pub async fn finish_span(&self, span_id: &str) {
-        if let Some(span) = self.spans.write().await.iter_mut().find(|s| s.span_id == span_id) {
+        if let Some(span) = self
+            .spans
+            .write()
+            .await
+            .iter_mut()
+            .find(|s| s.span_id == span_id)
+        {
             span.finish();
         }
     }
@@ -425,7 +431,7 @@ mod tests {
     async fn test_structured_logger() {
         let logger = StructuredLogger::new_no_output(LogLevel::Debug);
         logger.info("test_component", "test message").await;
-        
+
         let entries = logger.get_entries().await;
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].level, LogLevel::Info);
@@ -436,7 +442,7 @@ mod tests {
         let span = TraceSpan::new("trace-123".to_string(), "component", "operation");
         assert_eq!(span.trace_id, "trace-123");
         assert!(span.end_time.is_none());
-        
+
         let mut span = span;
         span.finish();
         assert!(span.end_time.is_some());
@@ -446,7 +452,7 @@ mod tests {
     fn test_child_span() {
         let parent = TraceSpan::new("trace-123".to_string(), "component", "parent_op");
         let child = parent.child("child_op");
-        
+
         assert_eq!(child.parent_span_id, Some(parent.span_id));
         assert_eq!(child.trace_id, parent.trace_id);
     }

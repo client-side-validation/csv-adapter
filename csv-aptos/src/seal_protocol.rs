@@ -16,6 +16,8 @@ use std::sync::Mutex;
 #[cfg(feature = "rpc")]
 use crate::proofs::StateProofVerifier;
 
+use csv_core::Hash;
+use csv_core::SealProtocol;
 use csv_core::commitment::Commitment;
 use csv_core::dag::DAGSegment;
 use csv_core::error::ProtocolError;
@@ -23,16 +25,14 @@ use csv_core::error::Result as CoreResult;
 use csv_core::proof::{FinalityProof, ProofBundle};
 use csv_core::seal::CommitAnchor as CoreCommitAnchor;
 use csv_core::seal::SealPoint as CoreSealPoint;
-use csv_core::Hash;
-use csv_core::SealProtocol;
 
 use crate::checkpoint::CheckpointVerifier;
 use crate::config::{AptosConfig, AptosNetwork};
 use crate::error::{AptosError, AptosResult};
 use crate::proofs::{CommitmentEventBuilder, EventProofVerifier};
+use crate::rpc::AptosRpc;
 #[cfg(not(feature = "rpc"))]
 use crate::rpc::{AptosLedgerInfo, AptosTransaction};
-use crate::rpc::AptosRpc;
 use crate::seal::SealRegistry;
 use crate::types::{AptosCommitAnchor, AptosFinalityProof, AptosInclusionProof, AptosSealPoint};
 
@@ -225,9 +225,9 @@ impl AptosSealProtocol {
         aptos_sdk::transaction::types::RawTransaction,
         Box<dyn std::error::Error + Send + Sync>,
     > {
+        use aptos_sdk::transaction::EntryFunction;
         use aptos_sdk::transaction::payload::TransactionPayload;
         use aptos_sdk::transaction::types::RawTransaction;
-        use aptos_sdk::transaction::EntryFunction;
         use aptos_sdk::types::{AccountAddress, ChainId, MoveModuleId};
 
         // Parse module address
@@ -641,7 +641,7 @@ impl SealProtocol for AptosSealProtocol {
             anchor.version
         );
 
-         #[cfg(feature = "rpc")]
+        #[cfg(feature = "rpc")]
         let is_certified = {
             let f_plus_one = self.config.f_plus_one();
             let rt = Handle::current();

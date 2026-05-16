@@ -25,19 +25,14 @@ fn main() -> Result<()> {
     println!("Creating subscription sanad on Bitcoin...");
     let commitment = Hash::from([1u8; 32]);
 
-    let sanad = rt.block_on(async {
-        client
-            .sanads()
-            .create(commitment, ChainId::new("bitcoin"))
-    })?;
+    let sanad =
+        rt.block_on(async { client.sanads().create(commitment, ChainId::new("bitcoin")) })?;
 
     println!("✓ Created sanad: {:?}\n", sanad.id);
 
     // Query the sanad
     println!("Querying sanad status...");
-    let found_sanad = rt.block_on(async {
-        client.sanads().get(&sanad.id)
-    })?;
+    let found_sanad = rt.block_on(async { client.sanads().get(&sanad.id) })?;
     if let Some(found_sanad) = found_sanad {
         println!("✓ Found sanad: {:?}\n", found_sanad.id);
     }
@@ -61,9 +56,7 @@ fn main() -> Result<()> {
     println!("\n✓ Transfer initiated: {}\n", transfer_id);
 
     // Check status
-    let status = rt.block_on(async {
-        client.transfers().status(&transfer_id)
-    })?;
+    let status = rt.block_on(async { client.transfers().status(&transfer_id) })?;
     println!("Transfer status: {:?}", status);
 
     println!("\n=== Demo Complete ===");

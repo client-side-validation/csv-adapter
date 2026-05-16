@@ -8,7 +8,7 @@ mod real_rpc_impl {
     use alloy::{
         consensus::TxEnvelope,
         eips::eip2718::Encodable2718,
-        primitives::{keccak256, Address, TxKind, U256},
+        primitives::{Address, TxKind, U256, keccak256},
         signers::local::PrivateKeySigner,
     };
     use async_trait::async_trait;
@@ -723,6 +723,6 @@ mod real_rpc_impl {
 
 #[cfg(feature = "rpc")]
 pub use real_rpc_impl::{
-    publish, publish_seal_consumption, verify_seal_consumption_in_receipt, AlloyRpcError,
-    EthereumNode,
+    AlloyRpcError, EthereumNode, publish, publish_seal_consumption,
+    verify_seal_consumption_in_receipt,
 };

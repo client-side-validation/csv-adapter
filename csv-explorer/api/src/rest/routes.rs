@@ -1,5 +1,5 @@
 /// REST API routes for the CSV Explorer.
-use axum::{routing::delete, routing::get, routing::post, Router};
+use axum::{Router, routing::delete, routing::get, routing::post};
 
 use super::handlers;
 

@@ -76,7 +76,7 @@ impl ReplayKey {
         payload.extend_from_slice(self.commitment_hash.as_bytes());
         payload.extend_from_slice(self.source_chain.as_bytes());
         payload.extend_from_slice(self.destination_chain.as_bytes());
-        
+
         DomainSeparatedHash::<ReplayRegistryDomain>::hash(&payload)
     }
 }
@@ -116,7 +116,7 @@ impl ReplayRegistry {
     /// false if it's a replay attempt.
     pub fn record_proof(&mut self, key: ReplayKey, timestamp: u64) -> bool {
         let key_hash = key.hash();
-        
+
         match self.entries.get(&key_hash) {
             Some(entry) => {
                 // Replay attempt detected
@@ -188,17 +188,34 @@ impl ReplayRegistry {
 /// [`csv_store::ReplayRegistryStore`](https://docs.rs/csv-store/latest/csv_store/struct.ReplayRegistryStore.html)
 pub trait ReplayRegistryBackend: Clone + Send + Sync + 'static {
     /// Record a proof, returning true if first time, false if replay
-    fn record_proof(&self, key: ReplayKey, timestamp: u64) -> impl core::future::Future<Output = crate::error::Result<bool>> + Send;
+    fn record_proof(
+        &self,
+        key: ReplayKey,
+        timestamp: u64,
+    ) -> impl core::future::Future<Output = crate::error::Result<bool>> + Send;
     /// Check if a proof has been seen before
-    fn has_been_seen(&self, key: &ReplayKey) -> impl core::future::Future<Output = crate::error::Result<bool>> + Send;
+    fn has_been_seen(
+        &self,
+        key: &ReplayKey,
+    ) -> impl core::future::Future<Output = crate::error::Result<bool>> + Send;
     /// Mark a proof as accepted
-    fn mark_accepted(&self, key: &ReplayKey) -> impl core::future::Future<Output = crate::error::Result<()>> + Send;
+    fn mark_accepted(
+        &self,
+        key: &ReplayKey,
+    ) -> impl core::future::Future<Output = crate::error::Result<()>> + Send;
     /// Get replay attempt count for a key
-    fn replay_attempts(&self, key: &ReplayKey) -> impl core::future::Future<Output = crate::error::Result<u64>> + Send;
+    fn replay_attempts(
+        &self,
+        key: &ReplayKey,
+    ) -> impl core::future::Future<Output = crate::error::Result<u64>> + Send;
     /// Get total tracked proofs
-    fn total_proofs(&self) -> impl core::future::Future<Output = crate::error::Result<usize>> + Send;
+    fn total_proofs(
+        &self,
+    ) -> impl core::future::Future<Output = crate::error::Result<usize>> + Send;
     /// Get total replay attempts detected
-    fn total_replay_attempts(&self) -> impl core::future::Future<Output = crate::error::Result<u64>> + Send;
+    fn total_replay_attempts(
+        &self,
+    ) -> impl core::future::Future<Output = crate::error::Result<u64>> + Send;
 }
 
 #[cfg(test)]
@@ -226,7 +243,7 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
+
         let key2 = ReplayKey::new(
             Hash::new([1u8; 32]),
             Hash::new([2u8; 32]),
@@ -234,7 +251,7 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
+
         assert_eq!(key1.hash(), key2.hash());
     }
 
@@ -247,7 +264,7 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
+
         let key2 = ReplayKey::new(
             Hash::new([1u8; 32]),
             Hash::new([2u8; 32]),
@@ -255,7 +272,7 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("solana"),
         );
-        
+
         assert_ne!(key1.hash(), key2.hash());
     }
 
@@ -269,7 +286,7 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
+
         let first_time = registry.record_proof(key.clone(), 1000);
         assert!(first_time);
         assert_eq!(registry.total_proofs(), 1);
@@ -285,10 +302,10 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
+
         registry.record_proof(key.clone(), 1000);
         let replay = registry.record_proof(key.clone(), 2000);
-        
+
         assert!(!replay);
         assert_eq!(registry.replay_attempts(&key), 1);
     }
@@ -303,7 +320,7 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
+
         assert!(!registry.has_been_seen(&key));
         registry.record_proof(key.clone(), 1000);
         assert!(registry.has_been_seen(&key));
@@ -319,10 +336,10 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
+
         registry.record_proof(key.clone(), 1000);
         registry.mark_accepted(&key);
-        
+
         assert!(registry.entries()[0].accepted);
     }
 }

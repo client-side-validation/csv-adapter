@@ -153,7 +153,8 @@ impl<B: ChainBackendForReconciliation> ReconciliationEngine<B> {
                 result.actions.push(ReconciliationAction::Compromised);
                 log::error!(
                     "Transfer {} COMPROMISED: source lock at height {} no longer in canonical chain",
-                    transfer_id, block_height
+                    transfer_id,
+                    block_height
                 );
                 continue;
             }
@@ -187,10 +188,7 @@ impl<B: ChainBackendForReconciliation> ReconciliationEngine<B> {
                     Err(e) => {
                         result.transfers_failed += 1;
                         result.actions.push(ReconciliationAction::NeedsReview);
-                        log::error!(
-                            "Transfer {} proof re-validation error: {}",
-                            transfer_id, e
-                        );
+                        log::error!("Transfer {} proof re-validation error: {}", transfer_id, e);
                         continue;
                     }
                 }
@@ -240,13 +238,15 @@ impl<B: ChainBackendForReconciliation> ReconciliationEngine<B> {
                 if current_hash == original_hash {
                     log::debug!(
                         "Transfer {} lock at height {} is still on canonical chain",
-                        transfer_id, block_height
+                        transfer_id,
+                        block_height
                     );
                     true
                 } else {
                     log::warn!(
                         "Transfer {} lock at height {} hash mismatch - block was reorged out",
-                        transfer_id, block_height
+                        transfer_id,
+                        block_height
                     );
                     false
                 }
@@ -254,7 +254,8 @@ impl<B: ChainBackendForReconciliation> ReconciliationEngine<B> {
             Err(e) => {
                 log::error!(
                     "Transfer {} failed to verify lock on canonical chain: {}",
-                    transfer_id, e
+                    transfer_id,
+                    e
                 );
                 // Conservative: if we can't verify, treat as potentially compromised
                 false
@@ -297,12 +298,10 @@ impl<B: ChainBackendForReconciliation> ReconciliationEngine<B> {
                     error: None,
                 })
             }
-            Err(e) => {
-                Err(format!(
-                    "Transfer {}: block {} not found on canonical chain: {}",
-                    transfer_id, block_height, e
-                ))
-            }
+            Err(e) => Err(format!(
+                "Transfer {}: block {} not found on canonical chain: {}",
+                transfer_id, block_height, e
+            )),
         }
     }
 
@@ -311,12 +310,7 @@ impl<B: ChainBackendForReconciliation> ReconciliationEngine<B> {
     /// Maps pre-reorg states to appropriate post-reconciliation states
     /// based on the reorg event. For deep reorgs (6+ blocks), applies more
     /// aggressive rollback to ensure security invariants are maintained.
-    fn compute_new_state(
-        &self,
-        state: &str,
-        block_height: &u64,
-        event: &ReorgEvent,
-    ) -> String {
+    fn compute_new_state(&self, state: &str, block_height: &u64, event: &ReorgEvent) -> String {
         // Calculate reorg depth
         let reorg_depth = event.old_height.saturating_sub(event.new_height);
 

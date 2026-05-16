@@ -35,8 +35,8 @@ fn txid_to_bytes(txid: &Txid) -> [u8; 32] {
     reversed.reverse();
     reversed
 }
-use bitcoin::{blockdata::block::Header, merkle_tree::PartialMerkleTree, Txid};
 use bitcoin::hashes::sha256d;
+use bitcoin::{Txid, blockdata::block::Header, merkle_tree::PartialMerkleTree};
 use csv_core::Hash as CoreHash;
 
 /// Double-SHA256 hash of two 32-byte inputs (Bitcoin Merkle node hash).
@@ -47,7 +47,7 @@ fn double_sha256(left: &[u8; 32], sanad: &[u8; 32]) -> [u8; 32] {
     let mut payload = Vec::with_capacity(64);
     payload.extend_from_slice(left);
     payload.extend_from_slice(sanad);
-    
+
     // Use domain-separated hash with Bitcoin seal domain
     let hash = DomainSeparatedHash::<BitcoinSealDomain>::hash(&payload);
     hash.as_bytes().to_vec().try_into().unwrap_or([0u8; 32])
@@ -470,10 +470,7 @@ pub fn to_rust_bitcoin_merkle_proof(
     all_txids: &[[u8; 32]],
     target_index: usize,
 ) -> Option<PartialMerkleTree> {
-    let txids: Vec<Txid> = all_txids
-        .iter()
-        .map(|t| bytes_to_txid(*t))
-        .collect();
+    let txids: Vec<Txid> = all_txids.iter().map(|t| bytes_to_txid(*t)).collect();
     if txids.is_empty() {
         return None;
     }
@@ -754,10 +751,7 @@ mod tests {
     fn test_consistency_pure_vs_rust_bitcoin_merkle_root() {
         let txids_raw = [[1u8; 32], [2u8; 32], [3u8; 32], [4u8; 32]];
         let pure_root = compute_merkle_root(&txids_raw).unwrap();
-        let rust_txids: Vec<Txid> = txids_raw
-            .iter()
-            .map(|t| bytes_to_txid(*t))
-            .collect();
+        let rust_txids: Vec<Txid> = txids_raw.iter().map(|t| bytes_to_txid(*t)).collect();
         let rust_root = compute_merkle_root_rust_bitcoin(&rust_txids).unwrap();
         assert_eq!(
             pure_root, rust_root,

@@ -4,10 +4,10 @@
 //! All seal nullifiers and sensitive state are encrypted at rest with HMAC integrity.
 
 use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Nonce,
+    aead::{Aead, AeadCore, KeyInit, OsRng},
 };
-use csv_core::mcp::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::mcp::{FixAction, HasErrorSuggestion, error_codes};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -232,8 +232,9 @@ impl EncryptedStorageManager {
 
         let envelope = EncryptedEnvelope::encrypt(&plaintext, &self.key)?;
 
-        let js_value = serde_wasm_bindgen::to_value(&envelope)
-            .map_err(|e| EncryptedStorageError::BrowserError(format!("JS conversion failed: {}", e)))?;
+        let js_value = serde_wasm_bindgen::to_value(&envelope).map_err(|e| {
+            EncryptedStorageError::BrowserError(format!("JS conversion failed: {}", e))
+        })?;
 
         self.set_indexeddb(key, js_value).await
     }
@@ -249,8 +250,10 @@ impl EncryptedStorageManager {
             .await?
             .ok_or_else(|| EncryptedStorageError::NotFound(key.to_string()))?;
 
-        let envelope: EncryptedEnvelope = serde_wasm_bindgen::from_value(js_value)
-            .map_err(|e| EncryptedStorageError::SerializeError(format!("JS conversion failed: {}", e)))?;
+        let envelope: EncryptedEnvelope =
+            serde_wasm_bindgen::from_value(js_value).map_err(|e| {
+                EncryptedStorageError::SerializeError(format!("JS conversion failed: {}", e))
+            })?;
 
         let plaintext = envelope.decrypt(&self.key)?;
 
@@ -466,8 +469,8 @@ impl EncryptedStorageManager {
 
     #[cfg(target_arch = "wasm32")]
     async fn open_database(&self) -> Result<web_sys::IdbDatabase, EncryptedStorageError> {
-        use wasm_bindgen::closure::Closure;
         use wasm_bindgen::JsCast;
+        use wasm_bindgen::closure::Closure;
 
         let window = web_sys::window()
             .ok_or_else(|| EncryptedStorageError::BrowserError("No window".to_string()))?;
@@ -483,20 +486,24 @@ impl EncryptedStorageManager {
             .map_err(|e| EncryptedStorageError::BrowserError(format!("{:?}", e)))?;
 
         let store_name = self.store_name.clone();
-        let on_upgrade = Closure::<dyn FnMut(_)>::new(move |event: web_sys::IdbVersionChangeEvent| {
-            let Some(target) = event.target() else {
-                return;
-            };
-            let Ok(request) = target.dyn_into::<web_sys::IdbOpenDbRequest>() else {
-                return;
-            };
-            let Ok(db) = request.result().and_then(|value| value.dyn_into::<web_sys::IdbDatabase>()) else {
-                return;
-            };
-            if !db.object_store_names().contains(&store_name) {
-                let _ = db.create_object_store(&store_name);
-            }
-        });
+        let on_upgrade =
+            Closure::<dyn FnMut(_)>::new(move |event: web_sys::IdbVersionChangeEvent| {
+                let Some(target) = event.target() else {
+                    return;
+                };
+                let Ok(request) = target.dyn_into::<web_sys::IdbOpenDbRequest>() else {
+                    return;
+                };
+                let Ok(db) = request
+                    .result()
+                    .and_then(|value| value.dyn_into::<web_sys::IdbDatabase>())
+                else {
+                    return;
+                };
+                if !db.object_store_names().contains(&store_name) {
+                    let _ = db.create_object_store(&store_name);
+                }
+            });
         open_request.set_onupgradeneeded(Some(on_upgrade.as_ref().unchecked_ref()));
         on_upgrade.forget();
 
@@ -511,9 +518,9 @@ impl EncryptedStorageManager {
         request: web_sys::IdbRequest,
     ) -> Result<wasm_bindgen::JsValue, EncryptedStorageError> {
         use js_sys::{Function, Promise};
-        use wasm_bindgen::closure::Closure;
         use wasm_bindgen::JsCast;
         use wasm_bindgen::JsValue;
+        use wasm_bindgen::closure::Closure;
         use wasm_bindgen_futures::JsFuture;
 
         let promise = Promise::new(&mut |resolve: Function, reject: Function| {
@@ -588,7 +595,10 @@ mod tests {
         envelope.ciphertext[0] ^= 0xFF;
 
         let result = envelope.decrypt(&key);
-        assert!(matches!(result, Err(EncryptedStorageError::IntegrityError(_))));
+        assert!(matches!(
+            result,
+            Err(EncryptedStorageError::IntegrityError(_))
+        ));
     }
 
     /// Regression test: Verify encryption produces different ciphertext for same plaintext
@@ -623,7 +633,10 @@ mod tests {
         envelope.nonce[0] ^= 0xFF;
 
         let result = envelope.decrypt(&key);
-        assert!(matches!(result, Err(EncryptedStorageError::IntegrityError(_))));
+        assert!(matches!(
+            result,
+            Err(EncryptedStorageError::IntegrityError(_))
+        ));
     }
 
     /// Regression test: Verify key derivation produces consistent keys
@@ -633,9 +646,16 @@ mod tests {
         let password = "test-password";
         let salt = b"test-salt";
 
-        let key1 = EncryptedStorageManager::derive_key_from_password(password, salt).await.unwrap();
-        let key2 = EncryptedStorageManager::derive_key_from_password(password, salt).await.unwrap();
+        let key1 = EncryptedStorageManager::derive_key_from_password(password, salt)
+            .await
+            .unwrap();
+        let key2 = EncryptedStorageManager::derive_key_from_password(password, salt)
+            .await
+            .unwrap();
 
-        assert_eq!(key1, key2, "Key derivation should be deterministic for same password/salt");
+        assert_eq!(
+            key1, key2,
+            "Key derivation should be deterministic for same password/salt"
+        );
     }
 }

@@ -1,14 +1,14 @@
+use async_graphql::Request;
 /// API server setup and configuration.
 ///
 /// Combines GraphQL and REST APIs with CORS, tracing, and metrics.
-use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
-use async_graphql::Request;
+use async_graphql::http::{GraphQLPlaygroundConfig, playground_source};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
+    Router,
     extract::State,
     response::{Html, IntoResponse},
     routing::get,
-    Router,
 };
 use sqlx::SqlitePool;
 use tower::ServiceBuilder;

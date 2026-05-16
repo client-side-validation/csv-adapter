@@ -2,8 +2,8 @@
 //!
 //! Simple storage manager for wallets.
 
-use super::encryption::{EncryptedWallet, encrypt, decrypt, EncryptionError};
-use csv_core::mcp::{HasErrorSuggestion, FixAction, error_codes};
+use super::encryption::{EncryptedWallet, EncryptionError, decrypt, encrypt};
+use csv_core::mcp::{FixAction, HasErrorSuggestion, error_codes};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -48,7 +48,8 @@ impl HasErrorSuggestion for StorageError {
             StorageError::SerializationError(_) => {
                 "Failed to serialize/deserialize wallet data. This may indicate \
                  data corruption or version incompatibility. \
-                 Try restoring from a backup or mnemonic.".to_string()
+                 Try restoring from a backup or mnemonic."
+                    .to_string()
             }
         }
     }
@@ -63,19 +64,16 @@ impl HasErrorSuggestion for StorageError {
     fn fix_action(&self) -> Option<FixAction> {
         match self {
             StorageError::EncryptionError(e) => e.fix_action(),
-            StorageError::NotFound(_) => {
-                Some(FixAction::CheckState {
-                    url: "https://docs.csv.dev/wallet/storage".to_string(),
-                    what: "Verify wallet exists and storage location is correct".to_string(),
-                })
-            }
-            StorageError::SerializationError(_) => {
-                Some(FixAction::Retry {
-                    parameter_changes: std::collections::HashMap::from([
-                        ("restore_from_mnemonic".to_string(), "true".to_string()),
-                    ]),
-                })
-            }
+            StorageError::NotFound(_) => Some(FixAction::CheckState {
+                url: "https://docs.csv.dev/wallet/storage".to_string(),
+                what: "Verify wallet exists and storage location is correct".to_string(),
+            }),
+            StorageError::SerializationError(_) => Some(FixAction::Retry {
+                parameter_changes: std::collections::HashMap::from([(
+                    "restore_from_mnemonic".to_string(),
+                    "true".to_string(),
+                )]),
+            }),
         }
     }
 }
@@ -107,15 +105,12 @@ impl WalletStorage {
     }
 
     /// Load and decrypt a wallet.
-    pub fn load_wallet(
-        &self,
-        wallet_id: &str,
-        password: &str,
-    ) -> Result<Vec<u8>, StorageError> {
+    pub fn load_wallet(&self, wallet_id: &str, password: &str) -> Result<Vec<u8>, StorageError> {
         let storage = self.storage.lock().unwrap();
-        let encrypted = storage.get(wallet_id)
+        let encrypted = storage
+            .get(wallet_id)
             .ok_or_else(|| StorageError::NotFound(wallet_id.to_string()))?;
-        
+
         decrypt(encrypted, password).map_err(StorageError::EncryptionError)
     }
 

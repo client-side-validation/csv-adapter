@@ -2,14 +2,14 @@
 //!
 //! Implements BIP-86 key derivation path: m/86'/0'/0'/0/{index}
 
+#[cfg(test)]
+use bitcoin::Txid;
 use bitcoin::{
+    Address, Network, OutPoint,
     bip32::{DerivationPath as BitcoinDerivationPath, Xpriv, Xpub},
     key::TapTweak,
     secp256k1::{self, Secp256k1, SecretKey, XOnlyPublicKey},
-    Address, Network, OutPoint,
 };
-#[cfg(test)]
-use bitcoin::Txid;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use std::sync::Mutex;
@@ -17,7 +17,7 @@ use std::sync::Mutex;
 #[allow(unused_imports)]
 use bitcoin_hashes::Hash;
 
-use bitcoin::secp256k1::rand::{rngs::OsRng, RngCore};
+use bitcoin::secp256k1::rand::{RngCore, rngs::OsRng};
 
 #[allow(unused_imports)]
 use crate::types::BitcoinSealPoint;
@@ -525,12 +525,9 @@ mod tests {
     fn test_wallet_utxo_selection() {
         let w = SealWallet::generate_random(Network::Signet);
         let path = Bip86Path::external(0, 0);
-        let t1 =
-            Txid::from_raw_hash(bitcoin::hashes::sha256d::Hash::from_byte_array([1u8; 32]));
-        let t2 =
-            Txid::from_raw_hash(bitcoin::hashes::sha256d::Hash::from_byte_array([2u8; 32]));
-        let t3 =
-            Txid::from_raw_hash(bitcoin::hashes::sha256d::Hash::from_byte_array([3u8; 32]));
+        let t1 = Txid::from_raw_hash(bitcoin::hashes::sha256d::Hash::from_byte_array([1u8; 32]));
+        let t2 = Txid::from_raw_hash(bitcoin::hashes::sha256d::Hash::from_byte_array([2u8; 32]));
+        let t3 = Txid::from_raw_hash(bitcoin::hashes::sha256d::Hash::from_byte_array([3u8; 32]));
         w.add_utxo(OutPoint::new(t1, 0), 50_000, path.clone());
         w.add_utxo(OutPoint::new(t2, 0), 30_000, path.clone());
         w.add_utxo(OutPoint::new(t3, 0), 20_000, path);
@@ -541,16 +538,14 @@ mod tests {
     #[test]
     fn test_wallet_insufficient_funds() {
         let w = SealWallet::generate_random(Network::Signet);
-        let txid =
-            Txid::from_raw_hash(bitcoin::hashes::sha256d::Hash::from_byte_array([1u8; 32]));
+        let txid = Txid::from_raw_hash(bitcoin::hashes::sha256d::Hash::from_byte_array([1u8; 32]));
         w.add_utxo(OutPoint::new(txid, 0), 10_000, Bip86Path::external(0, 0));
         assert!(w.select_utxos(20_000).is_err());
     }
     #[test]
     fn test_wallet_reserve_utxos() {
         let w = SealWallet::generate_random(Network::Signet);
-        let txid =
-            Txid::from_raw_hash(bitcoin::hashes::sha256d::Hash::from_byte_array([1u8; 32]));
+        let txid = Txid::from_raw_hash(bitcoin::hashes::sha256d::Hash::from_byte_array([1u8; 32]));
         let op = OutPoint::new(txid, 0);
         w.add_utxo(op, 100_000, Bip86Path::external(0, 0));
         assert_eq!(w.balance(), 100_000);

@@ -2,7 +2,7 @@
 
 use crate::context::types::{SanadStatus, TransferStatus};
 use crate::context::use_wallet_context;
-use crate::hooks::{format_balance_display, AccountBalance};
+use crate::hooks::{AccountBalance, format_balance_display};
 use crate::pages::common::*;
 use crate::routes::Route;
 use crate::wallet::account::ChainAccount;

@@ -3,9 +3,7 @@
 //! Type-safe bindings for the CSV Mint contract using Alloy.
 //! Generated from CSVMint.sol
 
-use alloy_primitives::{
-    Address, Bytes, FixedBytes, U256,
-};
+use alloy_primitives::{Address, Bytes, FixedBytes, U256};
 use alloy_sol_types::sol;
 
 // Solidity contract ABI
@@ -203,7 +201,10 @@ impl CsvMintClient {
     }
 
     /// Create an isNullifierRegistered call
-    pub fn is_nullifier_registered_call(&self, nullifier: FixedBytes<32>) -> CSVMint::isNullifierRegisteredCall {
+    pub fn is_nullifier_registered_call(
+        &self,
+        nullifier: FixedBytes<32>,
+    ) -> CSVMint::isNullifierRegisteredCall {
         CSVMint::isNullifierRegisteredCall { nullifier }
     }
 
@@ -248,7 +249,7 @@ mod tests {
     fn test_mint_sanad_call() {
         let addr = address!("0000000000000000000000000000000000000001");
         let mint = CSVMint::new(addr);
-        
+
         let sanad_id = FixedBytes::<32>::ZERO;
         let commitment = FixedBytes::<32>::ZERO;
         let state_root = FixedBytes::<32>::ZERO;
@@ -257,7 +258,7 @@ mod tests {
         let proof = Bytes::default();
         let proof_root = FixedBytes::<32>::ZERO;
         let leaf_position = U256::from(0);
-        
+
         let call = mint.mint_sanad_call(
             sanad_id,
             commitment,

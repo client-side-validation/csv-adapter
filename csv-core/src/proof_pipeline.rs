@@ -47,11 +47,7 @@ use crate::replay_registry::ReplayKey;
 #[async_trait::async_trait]
 pub trait ChainVerifier {
     /// Verify inclusion proof for a transaction on this chain
-    async fn verify_inclusion(
-        &self,
-        proof: &InclusionProof,
-        expected_root: Hash,
-    ) -> Result<bool>;
+    async fn verify_inclusion(&self, proof: &InclusionProof, expected_root: Hash) -> Result<bool>;
 
     /// Verify finality proof for a block on this chain
     async fn verify_finality(&self, proof: &FinalityProof) -> Result<bool>;
@@ -117,11 +113,21 @@ pub async fn validate_proof_bundle(
     let step1 = validate_structural(bundle);
     steps.push(step1.clone());
     if !step1.passed {
-        emit_proof_rejected_event(&event_registry, &source_chain, bundle, step1.error.as_deref()).await;
+        emit_proof_rejected_event(
+            &event_registry,
+            &source_chain,
+            bundle,
+            step1.error.as_deref(),
+        )
+        .await;
         return ValidationResult {
             accepted: false,
             steps,
-            error: Some(step1.error.unwrap_or_else(|| "Structural validation failed".to_string())),
+            error: Some(
+                step1
+                    .error
+                    .unwrap_or_else(|| "Structural validation failed".to_string()),
+            ),
         };
     }
 
@@ -129,11 +135,21 @@ pub async fn validate_proof_bundle(
     let step2 = validate_domain(bundle, &source_chain, &destination_chain);
     steps.push(step2.clone());
     if !step2.passed {
-        emit_proof_rejected_event(&event_registry, &source_chain, bundle, step2.error.as_deref()).await;
+        emit_proof_rejected_event(
+            &event_registry,
+            &source_chain,
+            bundle,
+            step2.error.as_deref(),
+        )
+        .await;
         return ValidationResult {
             accepted: false,
             steps,
-            error: Some(step2.error.unwrap_or_else(|| "Domain validation failed".to_string())),
+            error: Some(
+                step2
+                    .error
+                    .unwrap_or_else(|| "Domain validation failed".to_string()),
+            ),
         };
     }
 
@@ -141,11 +157,21 @@ pub async fn validate_proof_bundle(
     let step3 = validate_inclusion_proof(bundle, verifier).await;
     steps.push(step3.clone());
     if !step3.passed {
-        emit_proof_rejected_event(&event_registry, &source_chain, bundle, step3.error.as_deref()).await;
+        emit_proof_rejected_event(
+            &event_registry,
+            &source_chain,
+            bundle,
+            step3.error.as_deref(),
+        )
+        .await;
         return ValidationResult {
             accepted: false,
             steps,
-            error: Some(step3.error.unwrap_or_else(|| "Inclusion proof validation failed".to_string())),
+            error: Some(
+                step3
+                    .error
+                    .unwrap_or_else(|| "Inclusion proof validation failed".to_string()),
+            ),
         };
     }
 
@@ -153,11 +179,21 @@ pub async fn validate_proof_bundle(
     let step4 = validate_zk_proof(bundle, verifier).await;
     steps.push(step4.clone());
     if !step4.passed {
-        emit_proof_rejected_event(&event_registry, &source_chain, bundle, step4.error.as_deref()).await;
+        emit_proof_rejected_event(
+            &event_registry,
+            &source_chain,
+            bundle,
+            step4.error.as_deref(),
+        )
+        .await;
         return ValidationResult {
             accepted: false,
             steps,
-            error: Some(step4.error.unwrap_or_else(|| "ZK proof validation failed".to_string())),
+            error: Some(
+                step4
+                    .error
+                    .unwrap_or_else(|| "ZK proof validation failed".to_string()),
+            ),
         };
     }
 
@@ -165,11 +201,21 @@ pub async fn validate_proof_bundle(
     let step5 = validate_finality(bundle, verifier).await;
     steps.push(step5.clone());
     if !step5.passed {
-        emit_proof_rejected_event(&event_registry, &source_chain, bundle, step5.error.as_deref()).await;
+        emit_proof_rejected_event(
+            &event_registry,
+            &source_chain,
+            bundle,
+            step5.error.as_deref(),
+        )
+        .await;
         return ValidationResult {
             accepted: false,
             steps,
-            error: Some(step5.error.unwrap_or_else(|| "Finality validation failed".to_string())),
+            error: Some(
+                step5
+                    .error
+                    .unwrap_or_else(|| "Finality validation failed".to_string()),
+            ),
         };
     }
 
@@ -178,7 +224,8 @@ pub async fn validate_proof_bundle(
     steps.push(step6.clone());
     if !step6.passed {
         // Emit replay_detected event
-        let proof_hash = DomainSeparatedHash::<ProofBundleDomain>::hash(&bundle.inclusion_proof.proof_bytes);
+        let proof_hash =
+            DomainSeparatedHash::<ProofBundleDomain>::hash(&bundle.inclusion_proof.proof_bytes);
         log::warn!(
             "Replay detected: proof_hash={}, source={}, dest={}",
             proof_hash.to_hex(),
@@ -206,7 +253,11 @@ pub async fn validate_proof_bundle(
         return ValidationResult {
             accepted: false,
             steps,
-            error: Some(step6.error.unwrap_or_else(|| "Replay validation failed".to_string())),
+            error: Some(
+                step6
+                    .error
+                    .unwrap_or_else(|| "Replay validation failed".to_string()),
+            ),
         };
     }
 
@@ -214,11 +265,21 @@ pub async fn validate_proof_bundle(
     let step7 = validate_seal_registry(bundle, verifier).await;
     steps.push(step7.clone());
     if !step7.passed {
-        emit_proof_rejected_event(&event_registry, &source_chain, bundle, step7.error.as_deref()).await;
+        emit_proof_rejected_event(
+            &event_registry,
+            &source_chain,
+            bundle,
+            step7.error.as_deref(),
+        )
+        .await;
         return ValidationResult {
             accepted: false,
             steps,
-            error: Some(step7.error.unwrap_or_else(|| "Seal registry validation failed".to_string())),
+            error: Some(
+                step7
+                    .error
+                    .unwrap_or_else(|| "Seal registry validation failed".to_string()),
+            ),
         };
     }
 
@@ -226,11 +287,21 @@ pub async fn validate_proof_bundle(
     let step8 = validate_transition_legality(bundle);
     steps.push(step8.clone());
     if !step8.passed {
-        emit_proof_rejected_event(&event_registry, &source_chain, bundle, step8.error.as_deref()).await;
+        emit_proof_rejected_event(
+            &event_registry,
+            &source_chain,
+            bundle,
+            step8.error.as_deref(),
+        )
+        .await;
         return ValidationResult {
             accepted: false,
             steps,
-            error: Some(step8.error.unwrap_or_else(|| "Transition legality validation failed".to_string())),
+            error: Some(
+                step8
+                    .error
+                    .unwrap_or_else(|| "Transition legality validation failed".to_string()),
+            ),
         };
     }
 
@@ -238,11 +309,21 @@ pub async fn validate_proof_bundle(
     let step9 = validate_signature(bundle, verifier).await;
     steps.push(step9.clone());
     if !step9.passed {
-        emit_proof_rejected_event(&event_registry, &source_chain, bundle, step9.error.as_deref()).await;
+        emit_proof_rejected_event(
+            &event_registry,
+            &source_chain,
+            bundle,
+            step9.error.as_deref(),
+        )
+        .await;
         return ValidationResult {
             accepted: false,
             steps,
-            error: Some(step9.error.unwrap_or_else(|| "Signature validation failed".to_string())),
+            error: Some(
+                step9
+                    .error
+                    .unwrap_or_else(|| "Signature validation failed".to_string()),
+            ),
         };
     }
 
@@ -255,7 +336,8 @@ pub async fn validate_proof_bundle(
     steps.push(step10);
 
     // Emit proof_accepted event
-    let proof_hash = DomainSeparatedHash::<ProofBundleDomain>::hash(&bundle.inclusion_proof.proof_bytes);
+    let proof_hash =
+        DomainSeparatedHash::<ProofBundleDomain>::hash(&bundle.inclusion_proof.proof_bytes);
     log::info!(
         "Proof accepted: hash={}, source={}, dest={}",
         proof_hash.to_hex(),
@@ -294,7 +376,8 @@ async fn emit_proof_rejected_event(
     error: Option<&str>,
 ) {
     if let Some(registry) = event_registry {
-        let proof_hash = DomainSeparatedHash::<ProofBundleDomain>::hash(&bundle.inclusion_proof.proof_bytes);
+        let proof_hash =
+            DomainSeparatedHash::<ProofBundleDomain>::hash(&bundle.inclusion_proof.proof_bytes);
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -345,10 +428,11 @@ fn validate_domain(
 ) -> ValidationStep {
     // Verify that the proof is for the correct source/destination chains
     // by checking the domain-separated hash matches expected values
-    
+
     // Compute domain-separated hash of the proof bundle
-    let proof_hash = DomainSeparatedHash::<ProofBundleDomain>::hash(&bundle.inclusion_proof.proof_bytes);
-    
+    let proof_hash =
+        DomainSeparatedHash::<ProofBundleDomain>::hash(&bundle.inclusion_proof.proof_bytes);
+
     // Verify the proof hash matches the block hash (cross-chain consistency)
     if proof_hash != bundle.inclusion_proof.block_hash {
         return ValidationStep {
@@ -357,16 +441,19 @@ fn validate_domain(
             error: Some("Proof hash does not match block hash - domain mismatch".to_string()),
         };
     }
-    
+
     // Verify source and destination chains are different (cross-chain transfer)
     if source_chain == destination_chain {
         return ValidationStep {
             name: "domain_validation",
             passed: false,
-            error: Some("Source and destination chains must be different for cross-chain transfer".to_string()),
+            error: Some(
+                "Source and destination chains must be different for cross-chain transfer"
+                    .to_string(),
+            ),
         };
     }
-    
+
     ValidationStep {
         name: "domain_validation",
         passed: true,
@@ -402,10 +489,7 @@ async fn validate_inclusion_proof(
 }
 
 /// Step 4: ZK proof validation
-async fn validate_zk_proof(
-    _bundle: &ProofBundle,
-    verifier: &dyn ChainVerifier,
-) -> ValidationStep {
+async fn validate_zk_proof(_bundle: &ProofBundle, verifier: &dyn ChainVerifier) -> ValidationStep {
     // ZK proof may be optional for some chains
     // For now, we skip ZK proof validation as ProofBundle doesn't have a zk_proof field
     match verifier.verify_zk(&[]).await {
@@ -428,10 +512,7 @@ async fn validate_zk_proof(
 }
 
 /// Step 5: Finality validation
-async fn validate_finality(
-    bundle: &ProofBundle,
-    verifier: &dyn ChainVerifier,
-) -> ValidationStep {
+async fn validate_finality(bundle: &ProofBundle, verifier: &dyn ChainVerifier) -> ValidationStep {
     match verifier.verify_finality(&bundle.finality_proof).await {
         Ok(true) => ValidationStep {
             name: "finality_validation",
@@ -456,21 +537,20 @@ fn validate_replay(bundle: &ProofBundle) -> ValidationStep {
     // Check replay registry to prevent cross-chain replay attacks
     // In a real implementation, this would query the persistent replay registry
     // For now, we compute the replay key and verify it's not in a local cache
-    
+
     // Compute replay key from proof bundle
     let replay_key = ReplayKey::new(
         bundle.inclusion_proof.block_hash,
         bundle.inclusion_proof.block_hash, // seal_id (simplified - would be actual seal ID)
         bundle.inclusion_proof.block_hash, // commitment_hash (simplified)
-        ChainId::new("source"), // Would be actual source chain from bundle
-        ChainId::new("destination"), // Would be actual destination chain from bundle
+        ChainId::new("source"),            // Would be actual source chain from bundle
+        ChainId::new("destination"),       // Would be actual destination chain from bundle
     );
-    
+
     // Compute domain-separated hash of replay key
-    let _replay_hash = DomainSeparatedHash::<ReplayRegistryDomain>::hash(
-        &replay_key.hash().as_bytes()[..]
-    );
-    
+    let _replay_hash =
+        DomainSeparatedHash::<ReplayRegistryDomain>::hash(&replay_key.hash().as_bytes()[..]);
+
     // In production, check if this replay_hash exists in the persistent registry
     // For now, we pass this step (registry check would be async)
     ValidationStep {
@@ -487,10 +567,10 @@ async fn validate_seal_registry(
 ) -> ValidationStep {
     // Verify that the seal has not been consumed before
     // This prevents double-spend attacks
-    
+
     // Extract seal ID from proof bundle (simplified - would parse from actual proof)
     let seal_id = bundle.inclusion_proof.block_hash;
-    
+
     match verifier.verify_seal_registry(seal_id).await {
         Ok(true) => ValidationStep {
             name: "seal_registry_validation",
@@ -516,7 +596,7 @@ fn validate_transition_legality(bundle: &ProofBundle) -> ValidationStep {
     // 1. Proof must be for a valid state transition (locked -> minted)
     // 2. Block height must be within acceptable range
     // 3. Proof must not be expired
-    
+
     // Check that inclusion proof is not empty (basic sanity check)
     if bundle.inclusion_proof.proof_bytes.is_empty() {
         return ValidationStep {
@@ -525,7 +605,7 @@ fn validate_transition_legality(bundle: &ProofBundle) -> ValidationStep {
             error: Some("Inclusion proof is empty - invalid transition".to_string()),
         };
     }
-    
+
     // Check that finality proof is not empty
     if bundle.finality_proof.finality_data.is_empty() {
         return ValidationStep {
@@ -534,13 +614,13 @@ fn validate_transition_legality(bundle: &ProofBundle) -> ValidationStep {
             error: Some("Finality data is empty - invalid transition".to_string()),
         };
     }
-    
+
     // In production, additional checks would include:
     // - Verify block height is within protocol-defined window
     // - Verify proof timestamp is not expired
     // - Verify transition sequence is valid
     // - Check protocol version compatibility
-    
+
     ValidationStep {
         name: "transition_legality_validation",
         passed: true,
@@ -549,13 +629,10 @@ fn validate_transition_legality(bundle: &ProofBundle) -> ValidationStep {
 }
 
 /// Step 9: Signature validation
-async fn validate_signature(
-    bundle: &ProofBundle,
-    verifier: &dyn ChainVerifier,
-) -> ValidationStep {
+async fn validate_signature(bundle: &ProofBundle, verifier: &dyn ChainVerifier) -> ValidationStep {
     // Verify cryptographic signatures on the proof bundle
     // This ensures the proof was created by the legitimate owner
-    
+
     match verifier.verify_signature(bundle).await {
         Ok(true) => ValidationStep {
             name: "signature_validation",

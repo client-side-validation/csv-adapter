@@ -3,11 +3,11 @@
 //! Provides local storage and management of asset records using LocalStorage.
 
 use chrono::{DateTime, Utc};
-use csv_core::mcp::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::mcp::{FixAction, HasErrorSuggestion, error_codes};
 use csv_store::state::ChainId;
 use serde::{Deserialize, Serialize};
 
-use crate::storage::{asset_storage, LocalStorageManager};
+use crate::storage::{LocalStorageManager, asset_storage};
 
 /// An asset record stored locally.
 #[derive(Debug, Clone, Serialize, Deserialize)]

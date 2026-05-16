@@ -1,6 +1,6 @@
 //! Generate proof page.
 
-use crate::context::{use_wallet_context, ProofRecord, ProofStatus};
+use crate::context::{ProofRecord, ProofStatus, use_wallet_context};
 use crate::pages::common::*;
 use crate::routes::Route;
 use csv_store::state::ChainId;

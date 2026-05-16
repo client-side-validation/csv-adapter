@@ -6,11 +6,11 @@ use async_graphql::*;
 use sqlx::SqlitePool;
 use std::str::FromStr;
 
+use csv_explorer_shared::{CommitmentScheme, InclusionProofType};
 use csv_explorer_storage::repositories::{
     AdvancedProofRepository, ContractsRepository, SanadsRepository, SealsRepository,
     StatsRepository, TransfersRepository,
 };
-use csv_explorer_shared::{CommitmentScheme, InclusionProofType};
 
 use super::types::*;
 

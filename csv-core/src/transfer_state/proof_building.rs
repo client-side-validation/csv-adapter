@@ -56,6 +56,9 @@ impl ProofBuilding {
             ));
         }
 
-        Ok(ProofValidated::new(self.data, proof_hash.as_bytes().to_vec()))
+        Ok(ProofValidated::new(
+            self.data,
+            proof_hash.as_bytes().to_vec(),
+        ))
     }
 }

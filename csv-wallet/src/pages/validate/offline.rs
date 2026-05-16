@@ -19,8 +19,8 @@ use crate::routes::Route;
 use csv_core::proof::ProofBundle;
 use csv_core::signature::SignatureScheme;
 use csv_core::verifier::verify_proof;
-use dioxus::prelude::*;
 use dioxus::html::FileData;
+use dioxus::prelude::*;
 use wasm_bindgen::JsCast;
 
 /// Handle file upload with validation and error handling
@@ -31,17 +31,17 @@ async fn handle_file_upload(
 ) {
     let file_name = file_data.name();
     let file_size = file_data.size() as f64;
-    
+
     // Validate file size (10MB limit)
     const MAX_FILE_SIZE: f64 = 10.0 * 1024.0 * 1024.0; // 10MB in bytes
     if file_size > MAX_FILE_SIZE {
         file_error.set(Some(format!(
-            "File too large: {} (max 10MB allowed)", 
+            "File too large: {} (max 10MB allowed)",
             format_file_size(file_size)
         )));
         return;
     }
-    
+
     // Validate file extension
     let valid_extensions = ["json", "proof", "csv"];
     let extension = file_name
@@ -49,24 +49,24 @@ async fn handle_file_upload(
         .next_back()
         .unwrap_or("")
         .to_lowercase();
-    
+
     if !valid_extensions.contains(&extension.as_str()) {
         file_error.set(Some(format!(
-            "Unsupported file type: .{} (supported: .json, .proof, .csv)", 
+            "Unsupported file type: .{} (supported: .json, .proof, .csv)",
             extension
         )));
         return;
     }
-    
+
     // Clear any previous errors
     file_error.set(None);
-    
+
     // Log file selection
     web_sys::console::log_2(
         &"Processing file:".into(),
-        &format!("{} ({})", file_name, format_file_size(file_size)).into()
+        &format!("{} ({})", file_name, format_file_size(file_size)).into(),
     );
-    
+
     // Read file content as raw text using Dioxus FileData API
     match file_data.read_string().await {
         Ok(text) if !text.is_empty() => {
@@ -75,11 +75,11 @@ async fn handle_file_upload(
                 let text_len = text.len();
                 proof_input.set(text);
                 web_sys::console::log_1(
-                    &format!("Successfully loaded {} bytes from {}", text_len, file_name).into()
+                    &format!("Successfully loaded {} bytes from {}", text_len, file_name).into(),
                 );
             } else {
                 file_error.set(Some(
-                    "File does not appear to contain valid JSON proof data".to_string()
+                    "File does not appear to contain valid JSON proof data".to_string(),
                 ));
                 web_sys::console::log_1(&"Invalid JSON format in file".into());
             }
@@ -100,12 +100,12 @@ fn format_file_size(bytes: f64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB"];
     let mut size = bytes;
     let mut unit_index = 0;
-    
+
     while size >= 1024.0 && unit_index < UNITS.len() - 1 {
         size /= 1024.0;
         unit_index += 1;
     }
-    
+
     if unit_index == 0 {
         format!("{} {}", size as u64, UNITS[unit_index])
     } else {
@@ -163,7 +163,7 @@ pub fn OfflineVerify() -> Element {
                     ondrop: move |e| {
                         e.prevent_default();
                         is_dragging.set(false);
-                        
+
                         let files = e.data_transfer().files();
                         if let Some(file_data) = files.first() {
                             let file_data = file_data.clone();
@@ -177,14 +177,14 @@ pub fn OfflineVerify() -> Element {
                             });
                         }
                     },
-                    
+
                     div { class: "space-y-4",
                         div { class: "text-4xl", "📄" }
                         div {
                             h3 { class: "text-lg font-medium mb-2", "Drop your proof file here" }
                             p { class: "text-sm text-gray-400", "or click to browse" }
                         }
-                        
+
                       input {
                             r#type: "file",
                             accept: ".json,.proof,.csv",
@@ -204,7 +204,7 @@ pub fn OfflineVerify() -> Element {
                                 }
                             }
                         }
-                        
+
                         button {
                             class: "{btn_primary_class()}",
                             onclick: move |_| {
@@ -220,7 +220,7 @@ pub fn OfflineVerify() -> Element {
                             },
                             "Choose File"
                         }
-                        
+
                         div { class: "text-xs text-gray-500",
                             "Supported formats: JSON, .proof, .csv (max 10MB)"
                         }
@@ -237,7 +237,7 @@ pub fn OfflineVerify() -> Element {
                 // Manual input option
                 div { class: "mt-6 pt-6 border-t border-gray-800",
                     h3 { class: "text-md font-medium mb-3", "Or paste manually:" }
-                    
+
                     textarea {
                         class: "w-full h-64 p-4 bg-gray-900 border border-gray-700 rounded-lg \
                                font-mono text-sm resize-none focus:border-blue-500 focus:outline-none",
@@ -396,7 +396,10 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
                 "Inclusion proof valid ({} bytes, position: {}, block hash: {})",
                 bundle.inclusion_proof.proof_bytes.len(),
                 bundle.inclusion_proof.position,
-                hex::encode(&bundle.inclusion_proof.block_hash.as_bytes()[..8.min(bundle.inclusion_proof.block_hash.as_bytes().len())])
+                hex::encode(
+                    &bundle.inclusion_proof.block_hash.as_bytes()
+                        [..8.min(bundle.inclusion_proof.block_hash.as_bytes().len())]
+                )
             )
         } else {
             "Inclusion proof missing or invalid (empty proof or zero block hash)".to_string()
@@ -419,19 +422,22 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
         } else {
             format!(
                 "Insufficient confirmations: {} (need at least 6), deterministic: {}",
-                bundle.finality_proof.confirmations,
-                bundle.finality_proof.is_deterministic
+                bundle.finality_proof.confirmations, bundle.finality_proof.is_deterministic
             )
         },
     });
 
-   // Step 6: Seal validity check
+    // Step 6: Seal validity check
     let seal_valid = !bundle.seal_ref.id.is_empty();
     steps.push(VerificationStep {
         name: "Seal Registry Check".to_string(),
         passed: seal_valid,
         details: if seal_valid {
-            let nonce_info = bundle.seal_ref.nonce.map(|n| format!(", nonce: {n}")).unwrap_or_default();
+            let nonce_info = bundle
+                .seal_ref
+                .nonce
+                .map(|n| format!(", nonce: {n}"))
+                .unwrap_or_default();
             format!(
                 "Seal valid: {} ({} bytes){}",
                 hex::encode(&bundle.seal_ref.id[..8.min(bundle.seal_ref.id.len())]),
@@ -451,7 +457,9 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
         details: if anchor_valid {
             format!(
                 "Anchor valid: {} ({} bytes), block height: {}, metadata: {} bytes",
-                hex::encode(&bundle.anchor_ref.anchor_id[..8.min(bundle.anchor_ref.anchor_id.len())]),
+                hex::encode(
+                    &bundle.anchor_ref.anchor_id[..8.min(bundle.anchor_ref.anchor_id.len())]
+                ),
                 bundle.anchor_ref.anchor_id.len(),
                 bundle.anchor_ref.block_height,
                 bundle.anchor_ref.metadata.len()
@@ -463,10 +471,18 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
 
     let all_passed = steps.iter().all(|s| s.passed);
 
-    let failed_steps: Vec<&str> = steps.iter().filter(|s| !s.passed).map(|s| s.name.as_str()).collect();
+    let failed_steps: Vec<&str> = steps
+        .iter()
+        .filter(|s| !s.passed)
+        .map(|s| s.name.as_str())
+        .collect();
     let summary = if all_passed {
-        let anchor_id_hex = hex::encode(&bundle.anchor_ref.anchor_id[..8.min(bundle.anchor_ref.anchor_id.len())]);
-        let block_hash_hex = hex::encode(&bundle.inclusion_proof.block_hash.as_bytes()[..8.min(bundle.inclusion_proof.block_hash.as_bytes().len())]);
+        let anchor_id_hex =
+            hex::encode(&bundle.anchor_ref.anchor_id[..8.min(bundle.anchor_ref.anchor_id.len())]);
+        let block_hash_hex = hex::encode(
+            &bundle.inclusion_proof.block_hash.as_bytes()
+                [..8.min(bundle.inclusion_proof.block_hash.as_bytes().len())],
+        );
         let seal_id_hex = hex::encode(&bundle.seal_ref.id[..8.min(bundle.seal_ref.id.len())]);
         let root_commitment_hex = hex::encode(bundle.transition_dag.root_commitment.as_bytes());
         let dag_nodes = bundle.transition_dag.nodes.len();
@@ -476,7 +492,11 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
             String::new()
         };
 
-        let nonce_str = bundle.seal_ref.nonce.map(|n| format!(", nonce: {n}")).unwrap_or_default();
+        let nonce_str = bundle
+            .seal_ref
+            .nonce
+            .map(|n| format!(", nonce: {n}"))
+            .unwrap_or_default();
         format!(
             "All {} verification steps passed. This proof bundle is cryptographically valid and self-contained.\n\n\
              Chain Origin:\n\
@@ -497,7 +517,11 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
             block_hash_hex,
             bundle.inclusion_proof.block_hash.as_bytes().len(),
             bundle.finality_proof.confirmations,
-            if bundle.finality_proof.is_deterministic { "is" } else { "not" },
+            if bundle.finality_proof.is_deterministic {
+                "is"
+            } else {
+                "not"
+            },
             root_commitment_hex,
             dag_nodes,
             bundle.signatures.len(),

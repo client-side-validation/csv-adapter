@@ -1,8 +1,8 @@
 //! Cross-chain transfer page.
 
 use crate::context::{
-    use_wallet_context, ProofData, ProofRecord, ProofStatus, SanadStatus, SealContent, SealRecord,
-    SealStatus, TrackedTransfer, TransferStatus,
+    ProofData, ProofRecord, ProofStatus, SanadStatus, SealContent, SealRecord, SealStatus,
+    TrackedTransfer, TransferStatus, use_wallet_context,
 };
 use crate::pages::common::*;
 use crate::routes::Route;

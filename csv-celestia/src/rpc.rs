@@ -72,10 +72,7 @@ impl CelestiaNode {
 
     /// Create a new RPC client with quorum support
     #[cfg(all(feature = "rpc", feature = "quorum"))]
-    pub fn new_with_quorum(
-        endpoints: Vec<String>,
-        config: QuorumConfig,
-    ) -> Self {
+    pub fn new_with_quorum(endpoints: Vec<String>, config: QuorumConfig) -> Self {
         let providers: Vec<RpcProvider> = endpoints
             .into_iter()
             .map(|url| RpcProvider::new(url))
@@ -84,7 +81,9 @@ impl CelestiaNode {
         let quorum_client = QuorumClient::new(providers, config);
 
         Self {
-            endpoint: quorum_client.providers.get(0)
+            endpoint: quorum_client
+                .providers
+                .get(0)
                 .map(|p| p.url.clone())
                 .unwrap_or_else(|| "http://localhost:26658".to_string()),
             client: reqwest::Client::new(),
@@ -201,7 +200,8 @@ impl CelestiaRpc for CelestiaNode {
             .as_str()
             .ok_or_else(|| CelestiaError::RpcError("Missing data in response".to_string()))?;
 
-        BASE64.decode(data_b64)
+        BASE64
+            .decode(data_b64)
             .map_err(|e| CelestiaError::DeserializationError(format!("Base64 decode error: {}", e)))
     }
 

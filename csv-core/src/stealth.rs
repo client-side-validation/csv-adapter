@@ -29,8 +29,8 @@
 //! 3. **Spending Control**: Only the recipient with spend_sk can spend from stealth addresses
 
 use alloc::vec::Vec;
-use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::hash::Hash;
 
@@ -70,11 +70,17 @@ pub struct SpendPublicKey(pub [u8; 32]);
 
 impl SpendPublicKey {
     #[allow(missing_docs)]
-    pub fn from_bytes(bytes: [u8; 32]) -> Self { Self(bytes) }
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
     #[allow(missing_docs)]
-    pub fn as_bytes(&self) -> &[u8; 32] { &self.0 }
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
     #[allow(missing_docs)]
-    pub fn to_hex(&self) -> String { hex::encode(self.0) }
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.0)
+    }
 }
 
 impl core::fmt::Display for SpendPublicKey {
@@ -89,11 +95,17 @@ pub struct StealthAddress(pub [u8; 32]);
 
 impl StealthAddress {
     #[allow(missing_docs)]
-    pub fn from_bytes(bytes: [u8; 32]) -> Self { Self(bytes) }
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
     #[allow(missing_docs)]
-    pub fn as_bytes(&self) -> &[u8; 32] { &self.0 }
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
     #[allow(missing_docs)]
-    pub fn to_hex(&self) -> String { hex::encode(self.0) }
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.0)
+    }
 }
 
 impl core::fmt::Display for StealthAddress {
@@ -108,9 +120,13 @@ pub struct EphemeralPoint(pub [u8; 32]);
 
 impl EphemeralPoint {
     #[allow(missing_docs)]
-    pub fn from_bytes(bytes: [u8; 32]) -> Self { Self(bytes) }
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
     #[allow(missing_docs)]
-    pub fn as_bytes(&self) -> &[u8; 32] { &self.0 }
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
 }
 
 /// Full stealth address key pair for a recipient.
@@ -144,7 +160,11 @@ impl StealthWallet {
     /// * `ephemeral` — The sender's ephemeral point R = n*G
     /// * `scan_pk` — Recipient's scan public key
     /// * `spend_pk` — Recipient's spend public key
-    pub fn generate(recipient_scan_pk: &ScanPublicKey, _recipient_spend_pk: &SpendPublicKey, ephemeral: &EphemeralPoint) -> StealthAddress {
+    pub fn generate(
+        recipient_scan_pk: &ScanPublicKey,
+        _recipient_spend_pk: &SpendPublicKey,
+        ephemeral: &EphemeralPoint,
+    ) -> StealthAddress {
         // P' = SHA-256(R || scan_pk) * spend_pk (simplified: direct hash-based derivation)
         let mut hasher = Sha256::new();
         hasher.update(b"CSV-STEALTH-ADDR::");
@@ -287,7 +307,7 @@ mod tests {
     }
 
     #[test]
-     fn test_wallet_scan() {
+    fn test_wallet_scan() {
         let wallet = StealthWallet::new(test_scan_pk(), test_spend_pk());
         let ep1 = EphemeralPoint::from_bytes([0x03; 32]);
         let ep2 = EphemeralPoint::from_bytes([0x04; 32]);

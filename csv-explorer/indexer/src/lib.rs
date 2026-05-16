@@ -16,7 +16,7 @@ pub mod wallet_bridge;
 
 pub use chain_indexer::{AddressIndexingResult, ChainIndexer, ChainResult};
 pub use indexer_plugin::{IndexerPluginRegistry, IndexerPluginRegistryBuilder};
-pub use rpc_manager::{load_rpc_config, AuthType, RpcConfig, RpcEndpoint, RpcManager, RpcType};
+pub use rpc_manager::{AuthType, RpcConfig, RpcEndpoint, RpcManager, RpcType, load_rpc_config};
 pub use sync::SyncCoordinator;
 pub use wallet_bridge::{WalletIndexerBridge, WalletIndexerBridgeConfig};
 

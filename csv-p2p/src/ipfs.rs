@@ -162,10 +162,9 @@ impl IpfsTransport {
         match client.get(&gateway_url).send().await {
             Ok(response) => {
                 if response.status().is_success() {
-                    let bytes = response
-                        .bytes()
-                        .await
-                        .map_err(|e| TransportError::Network(format!("Failed to download: {}", e)))?;
+                    let bytes = response.bytes().await.map_err(|e| {
+                        TransportError::Network(format!("Failed to download: {}", e))
+                    })?;
                     let proof = crate::deserialize_proof(&bytes)?;
                     debug!(cid, "Retrieved ProofBundle from IPFS gateway");
                     return Ok(proof);
@@ -232,10 +231,10 @@ impl ProofTransport for IpfsTransport {
     /// Returns an EventId containing the IPFS CID.
     async fn broadcast_proof(&self, proof: &ProofBundle) -> Result<EventId, TransportError> {
         let cid = self.add_proof(proof).await?;
-        
+
         // Pin the proof to ensure persistence
         self.pin_proof(&cid).await?;
-        
+
         Ok(EventId::new(cid))
     }
 

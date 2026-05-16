@@ -80,15 +80,15 @@ pub mod wallet;
 
 // Re-export core types from csv-core (🔒 STABLE API only by default)
 pub use csv_core::{
-    CommitAnchor, Commitment, Consignment, CrossChainLockEvent, DAGNode, DAGSegment, FinalityProof,
-    Genesis, Hash, InclusionProof, OwnedState, OwnershipProof, ProofBundle, ProtocolError,
-    Result as CoreResult, Sanad, SanadId, Schema, SealPoint, SealProtocol, StateRef, StoreError,
-    Transition, CONSIGNMENT_VERSION, SCHEMA_VERSION,
+    CONSIGNMENT_VERSION, CommitAnchor, Commitment, Consignment, CrossChainLockEvent, DAGNode,
+    DAGSegment, FinalityProof, Genesis, Hash, InclusionProof, OwnedState, OwnershipProof,
+    ProofBundle, ProtocolError, Result as CoreResult, SCHEMA_VERSION, Sanad, SanadId, Schema,
+    SealPoint, SealProtocol, StateRef, StoreError, Transition,
 };
 
 // Re-export canonical protocol types (🔒 STABLE + 🟡 BETA)
 pub use csv_core::protocol_version::{
-    Capabilities, ChainId, ErrorCode, ProtocolVersion, SyncStatus, TransferStatus, PROTOCOL_VERSION,
+    Capabilities, ChainId, ErrorCode, PROTOCOL_VERSION, ProtocolVersion, SyncStatus, TransferStatus,
 };
 
 // ===========================================================================
@@ -102,7 +102,7 @@ pub use csv_core::protocol_version::{
 pub mod experimental {
     pub use csv_core::commit_mux::{CommitMux, MuxLeaf, MuxProof};
     pub use csv_core::rgb::{CrossChainError, RgbValidationError, RgbValidationResult};
-    pub use csv_core::vm::{execute_transition, DeterministicVM, VMError, VMInputs, VMOutputs};
+    pub use csv_core::vm::{DeterministicVM, VMError, VMInputs, VMOutputs, execute_transition};
 }
 
 /// Re-export error types

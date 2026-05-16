@@ -3,9 +3,9 @@
 //! Uses the official alloy-trie crate for MPT state root computation
 //! and proof verification, tested against Ethereum mainnet proof vectors.
 
-use alloy_primitives::{keccak256, Bytes, B256, U256};
+use alloy_primitives::{B256, Bytes, U256, keccak256};
 use alloy_trie::proof::ProofVerificationError;
-use alloy_trie::{proof::verify_proof, HashBuilder, Nibbles, EMPTY_ROOT_HASH};
+use alloy_trie::{EMPTY_ROOT_HASH, HashBuilder, Nibbles, proof::verify_proof};
 
 /// Verify a storage proof against the state root using alloy-trie
 ///
@@ -199,7 +199,7 @@ pub fn empty_root_hash() -> B256 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{Bytes, B256, U256};
+    use alloy_primitives::{B256, Bytes, U256};
 
     #[test]
     fn test_empty_storage_proof_fails() {

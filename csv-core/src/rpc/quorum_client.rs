@@ -236,7 +236,8 @@ impl QuorumClient {
                                 timestamp_ms: std::time::SystemTime::now()
                                     .duration_since(std::time::UNIX_EPOCH)
                                     .unwrap_or_default()
-                                    .as_millis() as u64,
+                                    .as_millis()
+                                    as u64,
                                 latency_ms,
                             };
                         }
@@ -257,7 +258,8 @@ impl QuorumClient {
                                     timestamp_ms: std::time::SystemTime::now()
                                         .duration_since(std::time::UNIX_EPOCH)
                                         .unwrap_or_default()
-                                        .as_millis() as u64,
+                                        .as_millis()
+                                        as u64,
                                     latency_ms,
                                 };
                             }
@@ -283,7 +285,8 @@ impl QuorumClient {
                                         timestamp_ms: std::time::SystemTime::now()
                                             .duration_since(std::time::UNIX_EPOCH)
                                             .unwrap_or_default()
-                                            .as_millis() as u64,
+                                            .as_millis()
+                                            as u64,
                                         latency_ms,
                                     }
                                 } else if let Some(result) = inner.result {
@@ -306,7 +309,8 @@ impl QuorumClient {
                                                 timestamp_ms: std::time::SystemTime::now()
                                                     .duration_since(std::time::UNIX_EPOCH)
                                                     .unwrap_or_default()
-                                                    .as_millis() as u64,
+                                                    .as_millis()
+                                                    as u64,
                                                 latency_ms,
                                             };
                                         }
@@ -324,7 +328,8 @@ impl QuorumClient {
                                         timestamp_ms: std::time::SystemTime::now()
                                             .duration_since(std::time::UNIX_EPOCH)
                                             .unwrap_or_default()
-                                            .as_millis() as u64,
+                                            .as_millis()
+                                            as u64,
                                         latency_ms,
                                     }
                                 } else {
@@ -341,7 +346,8 @@ impl QuorumClient {
                                         timestamp_ms: std::time::SystemTime::now()
                                             .duration_since(std::time::UNIX_EPOCH)
                                             .unwrap_or_default()
-                                            .as_millis() as u64,
+                                            .as_millis()
+                                            as u64,
                                         latency_ms,
                                     }
                                 }
@@ -360,7 +366,8 @@ impl QuorumClient {
                                     timestamp_ms: std::time::SystemTime::now()
                                         .duration_since(std::time::UNIX_EPOCH)
                                         .unwrap_or_default()
-                                        .as_millis() as u64,
+                                        .as_millis()
+                                        as u64,
                                     latency_ms,
                                 }
                             }
@@ -387,7 +394,7 @@ impl QuorumClient {
                                 .as_millis() as u64,
                             latency_ms,
                         }
-                    },
+                    }
                 }
             });
 
@@ -420,7 +427,11 @@ impl QuorumClient {
     /// Queries all providers in parallel, then checks if a quorum of responses
     /// agree on the result. Returns the consensus data if quorum is reached,
     /// or an error otherwise.
-    pub async fn query_quorum(&self, method: &str, params: &[serde_json::Value]) -> Result<Vec<u8>> {
+    pub async fn query_quorum(
+        &self,
+        method: &str,
+        params: &[serde_json::Value],
+    ) -> Result<Vec<u8>> {
         let responses = self.query_all(method, params).await;
 
         // Count successful responses
@@ -489,10 +500,7 @@ impl QuorumClient {
     ) -> Result<T> {
         let data = self.query_quorum(method, params).await?;
         serde_json::from_slice(&data).map_err(|e| {
-            crate::error::ProtocolError::InvalidData(format!(
-                "Failed to parse RPC response: {}",
-                e
-            ))
+            crate::error::ProtocolError::InvalidData(format!("Failed to parse RPC response: {}", e))
         })
     }
 
@@ -513,11 +521,8 @@ impl QuorumClient {
 
     /// Get transaction receipt with quorum.
     pub async fn get_transaction_receipt(&self, tx_hash: &str) -> Result<serde_json::Value> {
-        self.query_json(
-            "eth_getTransactionReceipt",
-            &[serde_json::json!(tx_hash)],
-        )
-        .await
+        self.query_json("eth_getTransactionReceipt", &[serde_json::json!(tx_hash)])
+            .await
     }
 
     /// Get the number of providers.
@@ -568,14 +573,20 @@ impl QuorumClient {
         self.metrics.clone()
     }
 
-    pub async fn query_all(&self, _method: &str, _params: &[serde_json::Value]) -> Vec<RpcResponse> {
+    pub async fn query_all(
+        &self,
+        _method: &str,
+        _params: &[serde_json::Value],
+    ) -> Vec<RpcResponse> {
         let mut responses = Vec::new();
         for provider in &self.providers {
             responses.push(RpcResponse {
                 provider: provider.url.clone(),
                 data: Vec::new(),
                 success: false,
-                error: Some("Quorum feature not enabled. Enable the 'quorum' Cargo feature.".to_string()),
+                error: Some(
+                    "Quorum feature not enabled. Enable the 'quorum' Cargo feature.".to_string(),
+                ),
                 timestamp_ms: 0,
                 latency_ms: 0,
             });
@@ -583,7 +594,11 @@ impl QuorumClient {
         responses
     }
 
-    pub async fn query_quorum(&self, _method: &str, _params: &[serde_json::Value]) -> Result<Vec<u8>> {
+    pub async fn query_quorum(
+        &self,
+        _method: &str,
+        _params: &[serde_json::Value],
+    ) -> Result<Vec<u8>> {
         Err(crate::error::ProtocolError::RpcQuorumFailed(
             "Quorum feature not enabled. Enable the 'quorum' Cargo feature.".to_string(),
         ))

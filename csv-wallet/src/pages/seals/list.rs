@@ -1,6 +1,6 @@
 //! Seals list page.
 
-use crate::context::{use_wallet_context, SealRecord, SealStatus};
+use crate::context::{SealRecord, SealStatus, use_wallet_context};
 use crate::pages::common::*;
 use crate::routes::Route;
 use csv_store::state::ChainId;

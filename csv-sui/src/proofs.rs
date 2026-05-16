@@ -321,19 +321,23 @@ mod tests {
             .await
             .unwrap();
         assert!(result.is_some());
-        assert!(StateProofVerifier::verify_object_exists([99u8; 32], &rpc)
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            StateProofVerifier::verify_object_exists([99u8; 32], &rpc)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]
     async fn test_verify_object_consumed() {
         let rpc = MockSuiRpc::new(1000);
         // Object not in test data means it's "consumed"
-        assert!(StateProofVerifier::verify_object_consumed([99u8; 32], &rpc)
-            .await
-            .unwrap());
+        assert!(
+            StateProofVerifier::verify_object_consumed([99u8; 32], &rpc)
+                .await
+                .unwrap()
+        );
     }
 
     #[tokio::test]

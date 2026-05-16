@@ -3,7 +3,7 @@
 //! This module provides a comprehensive error taxonomy for the Sui adapter,
 //! with chain-specific error variants and recovery guidance.
 
-use csv_core::mcp::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::mcp::{FixAction, HasErrorSuggestion, error_codes};
 use thiserror::Error;
 
 /// Comprehensive error types for the Sui adapter.
@@ -324,11 +324,13 @@ mod tests {
     #[test]
     fn test_transient_errors() {
         assert!(SuiError::RpcError("connection refused".to_string()).is_transient());
-        assert!(SuiError::ConfirmationTimeout {
-            tx_digest: "abc".to_string(),
-            timeout_ms: 30000
-        }
-        .is_transient());
+        assert!(
+            SuiError::ConfirmationTimeout {
+                tx_digest: "abc".to_string(),
+                timeout_ms: 30000
+            }
+            .is_transient()
+        );
         assert!(SuiError::TransactionFailed("execution failed".to_string()).is_transient());
     }
 

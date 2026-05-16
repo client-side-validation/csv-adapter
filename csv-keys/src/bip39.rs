@@ -28,8 +28,7 @@ pub enum Bip39Error {
 }
 
 /// Type of mnemonic phrase.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MnemonicType {
     /// 12 words (128 bits entropy).
     Words12,
@@ -72,7 +71,6 @@ impl MnemonicType {
         self.entropy_bits() / 8
     }
 }
-
 
 /// A BIP-39 mnemonic phrase.
 #[derive(Debug, Clone)]

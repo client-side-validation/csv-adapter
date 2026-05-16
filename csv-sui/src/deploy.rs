@@ -54,11 +54,9 @@ impl PackageDeployer {
         package_bytes: &[u8],
         gas_budget: u64,
     ) -> Result<PackageDeployment, SuiError> {
-        let signer_address = self
-            .config
-            .signer_address
-            .as_deref()
-            .ok_or_else(|| SuiError::ConfigurationError("signer_address is required for deployment".to_string()))?;
+        let signer_address = self.config.signer_address.as_deref().ok_or_else(|| {
+            SuiError::ConfigurationError("signer_address is required for deployment".to_string())
+        })?;
 
         let signer_bytes = hex::decode(signer_address.strip_prefix("0x").unwrap_or(signer_address))
             .map_err(|e| SuiError::SerializationError(format!("Invalid signer address: {}", e)))?;
@@ -66,11 +64,7 @@ impl PackageDeployer {
         let mut package_id = [0u8; 32];
         package_id.copy_from_slice(&signer_bytes[..32.min(signer_bytes.len())]);
 
-        let modules: Vec<String> = package_bytes
-            .chunks(64)
-            .map(hex::encode)
-            .take(10)
-            .collect();
+        let modules: Vec<String> = package_bytes.chunks(64).map(hex::encode).take(10).collect();
 
         let tx_digest = format!(
             "0x{}",

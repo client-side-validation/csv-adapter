@@ -17,9 +17,9 @@
 //! - Script: OP_RETURN <protocol_id (32 bytes)> <commitment (32 bytes)>
 
 use bitcoin::{
+    ScriptBuf,
     opcodes::all::OP_RETURN,
     script::{Builder, PushBytesBuf},
-    ScriptBuf,
 };
 
 use csv_core::hash::Hash;

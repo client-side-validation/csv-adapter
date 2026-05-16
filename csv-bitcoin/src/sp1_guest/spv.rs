@@ -4,7 +4,7 @@
 //! that can run inside the SP1 zkVM. It verifies that a transaction was
 //! included in a Bitcoin block without requiring a full node.
 
-use bitcoin::hashes::{sha256d, Hash as BitcoinHash};
+use bitcoin::hashes::{Hash as BitcoinHash, sha256d};
 use csv_core::hash::Hash;
 use csv_core::protocol_version::builtin;
 use csv_core::seal::SealPoint;

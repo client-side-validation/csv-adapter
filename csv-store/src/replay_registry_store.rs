@@ -9,7 +9,7 @@
 use csv_core::hash::Hash;
 use csv_core::protocol_version::ChainId;
 use csv_core::replay_registry::{ReplayEntry, ReplayKey};
-use rusqlite::{params, Connection, Result as RusqliteResult};
+use rusqlite::{Connection, Result as RusqliteResult, params};
 
 /// Persistent replay registry store
 ///
@@ -24,7 +24,7 @@ impl ReplayRegistryStore {
     /// Create a new replay registry store with the given database path
     pub fn new(database_path: &str) -> RusqliteResult<Self> {
         let db = Connection::open(database_path)?;
-        
+
         // Initialize schema
         db.execute_batch(
             r#"
@@ -44,7 +44,7 @@ impl ReplayRegistryStore {
             CREATE INDEX IF NOT EXISTS idx_seal_id ON replay_registry(seal_id);
             "#,
         )?;
-        
+
         Ok(Self { db })
     }
 
@@ -54,14 +54,14 @@ impl ReplayRegistryStore {
     /// false if it's a replay attempt.
     pub fn record_proof(&self, key: ReplayKey, timestamp: u64) -> RusqliteResult<bool> {
         let key_hash = key.hash();
-        
+
         // Check if already exists
         let count: i64 = self.db.query_row(
             "SELECT COUNT(*) FROM replay_registry WHERE key_hash = ?",
             [key_hash.as_bytes()],
             |row| row.get(0),
         )?;
-        
+
         if count > 0 {
             // Replay attempt - increment counter
             self.db.execute(
@@ -129,7 +129,7 @@ impl ReplayRegistryStore {
         let mut stmt = self.db.prepare(
             "SELECT proof_hash, seal_id, commitment_hash, source_chain, destination_chain, first_seen_at, replay_attempts, accepted FROM replay_registry"
         )?;
-        
+
         let rows = stmt.query_map([], |row| {
             Ok(ReplayEntry {
                 key: ReplayKey::new(
@@ -144,22 +144,20 @@ impl ReplayRegistryStore {
                 accepted: row.get(7)?,
             })
         })?;
-        
+
         let mut entries = Vec::new();
         for row in rows {
             entries.push(row?);
         }
-        
+
         Ok(entries)
     }
 
     /// Get the total number of tracked proofs
     pub fn total_proofs(&self) -> RusqliteResult<usize> {
-        let count: i64 = self.db.query_row(
-            "SELECT COUNT(*) FROM replay_registry",
-            [],
-            |row| row.get(0),
-        )?;
+        let count: i64 = self
+            .db
+            .query_row("SELECT COUNT(*) FROM replay_registry", [], |row| row.get(0))?;
         Ok(count as usize)
     }
 

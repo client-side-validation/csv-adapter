@@ -14,15 +14,13 @@
 
 use csv_core::{
     ChainId,
-    proof::{ProofBundle, FinalityProof, InclusionProof},
-    seal::{SealPoint, CommitAnchor},
-    dag::{DAGSegment, DAGNode},
-    hash::Hash,
-    replay_registry::{ReplayRegistry, ReplayKey},
-    proof_pipeline::{
-        validate_proof_bundle, ValidationResult, ChainVerifier,
-    },
+    dag::{DAGNode, DAGSegment},
     error::Result as CsvResult,
+    hash::Hash,
+    proof::{FinalityProof, InclusionProof, ProofBundle},
+    proof_pipeline::{ChainVerifier, ValidationResult, validate_proof_bundle},
+    replay_registry::{ReplayKey, ReplayRegistry},
+    seal::{CommitAnchor, SealPoint},
 };
 use csv_keys::{
     bip39::{Mnemonic, MnemonicType},
@@ -122,9 +120,11 @@ impl ChainVerifier for CryptoVerifier {
 
         let secp = Secp256k1::new();
         let message = Message::from_digest_slice(bundle.transition_dag.root_commitment.as_bytes())
-            .map_err(|_| csv_core::error::ProtocolError::SignatureVerificationFailed(
-                "Invalid message digest".to_string()
-            ))?;
+            .map_err(|_| {
+                csv_core::error::ProtocolError::SignatureVerificationFailed(
+                    "Invalid message digest".to_string(),
+                )
+            })?;
 
         for (i, sig_bytes) in bundle.signatures.iter().enumerate() {
             // Parse signature format: [pk_len (4 bytes LE)] [public_key] [signature_bytes]
@@ -132,7 +132,9 @@ impl ChainVerifier for CryptoVerifier {
                 return Ok(false);
             }
 
-            let pk_len = u32::from_le_bytes([sig_bytes[0], sig_bytes[1], sig_bytes[2], sig_bytes[3]]) as usize;
+            let pk_len =
+                u32::from_le_bytes([sig_bytes[0], sig_bytes[1], sig_bytes[2], sig_bytes[3]])
+                    as usize;
 
             if sig_bytes.len() < 4 + pk_len {
                 return Ok(false);
@@ -144,9 +146,10 @@ impl ChainVerifier for CryptoVerifier {
             // Parse the signature
             let sig = match secp256k1::ecdsa::Signature::from_compact(
                 sig_data.get(..64).ok_or_else(|| {
-                    csv_core::error::ProtocolError::SignatureVerificationFailed(
-                        format!("Signature {} too short", i)
-                    )
+                    csv_core::error::ProtocolError::SignatureVerificationFailed(format!(
+                        "Signature {} too short",
+                        i
+                    ))
                 })?,
             ) {
                 Ok(s) => s,
@@ -179,28 +182,29 @@ mod e2e_certification_tests {
         // Step 1: Generate wallet
         let mnemonic = Mnemonic::generate(MnemonicType::Words24);
         let seed = mnemonic.to_seed(None);
-        
+
         // Derive keys for Bitcoin (source) and Ethereum (destination)
         let bitcoin_key = derive_key(seed.as_bytes(), &ChainId::new("bitcoin"), 0, 0);
         let ethereum_key = derive_key(seed.as_bytes(), &ChainId::new("ethereum"), 0, 0);
-        
+
         assert_eq!(bitcoin_key.as_bytes().len(), 32);
         assert_eq!(ethereum_key.as_bytes().len(), 32);
-        
+
         // Step 2: Create a sanad (represented as a seal point)
         let sanad_id = vec![1u8; 32];
-        let seal_point = SealPoint::new(sanad_id.clone(), Some(42))
-            .expect("SealPoint creation should succeed");
-        
+        let seal_point =
+            SealPoint::new(sanad_id.clone(), Some(42)).expect("SealPoint creation should succeed");
+
         // Step 3: Lock sanad on source chain (Bitcoin)
         // In a real implementation, this would interact with the Bitcoin blockchain
         // For this test, we simulate the lock by creating an anchor
         let commit_anchor = CommitAnchor::new(
             sanad_id.clone(),
-            100, // block height
+            100,            // block height
             vec![0xAB; 64], // anchor metadata
-        ).expect("CommitAnchor creation should succeed");
-        
+        )
+        .expect("CommitAnchor creation should succeed");
+
         // Step 4: Generate proof bundle with real Secp256k1 signatures
         let secp = secp256k1::Secp256k1::new();
         let secret_key = secp256k1::SecretKey::new(&mut secp256k1::rand::thread_rng());
@@ -226,22 +230,24 @@ mod e2e_certification_tests {
             vec![],
         );
         let dag_segment = DAGSegment::new(vec![dag_node], root_commitment);
-        
+
         let block_hash = Hash::new([2u8; 32]);
         let inclusion_proof = InclusionProof::new(
             // The proof bytes must contain the block hash for the verifier to accept
             block_hash.as_bytes().to_vec(),
             block_hash,
             100, // block number
-            0, // position
-        ).expect("InclusionProof creation should succeed");
-        
+            0,   // position
+        )
+        .expect("InclusionProof creation should succeed");
+
         let finality_proof = FinalityProof::new(
             vec![0xAB; 16], // finality checkpoint
-            6, // confirmations (>= minimum required)
-            false, // not deterministic (Bitcoin is probabilistic)
-        ).expect("FinalityProof creation should succeed");
-        
+            6,              // confirmations (>= minimum required)
+            false,          // not deterministic (Bitcoin is probabilistic)
+        )
+        .expect("FinalityProof creation should succeed");
+
         let proof_bundle = ProofBundle::new(
             dag_segment,
             vec![encoded_sig], // real cryptographic signatures
@@ -249,8 +255,9 @@ mod e2e_certification_tests {
             commit_anchor.clone(),
             inclusion_proof,
             finality_proof,
-        ).expect("ProofBundle creation should succeed");
-        
+        )
+        .expect("ProofBundle creation should succeed");
+
         // Step 5: Validate proof bundle through the canonical proof pipeline
         // using real cryptographic verification (not mocks)
         let verifier = CryptoVerifier;
@@ -260,25 +267,32 @@ mod e2e_certification_tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
             None, // event registry (optional)
-        ).await;
-        
-        assert!(result.accepted, "Proof bundle should be accepted by the canonical pipeline");
+        )
+        .await;
+
+        assert!(
+            result.accepted,
+            "Proof bundle should be accepted by the canonical pipeline"
+        );
         assert_eq!(result.steps.len(), 10, "All 10 validation steps should run");
-        assert!(result.error.is_none(), "No errors should occur: {:?}", result.error);
-        
+        assert!(
+            result.error.is_none(),
+            "No errors should occur: {:?}",
+            result.error
+        );
+
         // Verify each validation step
         for step in &result.steps {
             assert!(
                 step.passed,
                 "Validation step '{}' should pass: {:?}",
-                step.name,
-                step.error
+                step.name, step.error
             );
         }
 
         // Step 6: Register nullifier to prevent replay
         let mut replay_registry = ReplayRegistry::new();
-        
+
         let commitment_hash = Hash::new([3u8; 32]);
         let replay_key = ReplayKey::new(
             Hash::new([1u8; 32]), // sanad_id
@@ -287,32 +301,36 @@ mod e2e_certification_tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
+
         // Verify not yet consumed
         assert!(!replay_registry.is_replay(&replay_key).unwrap());
-        
+
         // Record the proof (consumes the seal)
-        replay_registry.record_proof(
-            Hash::new([1u8; 32]), // sanad_id
-            Hash::new([1u8; 32]), // seal_id
-            commitment_hash,
-            ChainId::new("bitcoin"),
-            ChainId::new("ethereum"),
-        ).unwrap();
-        
-        // Verify now consumed
-        assert!(replay_registry.is_replay(&replay_key).unwrap());
-        
-        // Step 7: Verify double-spend prevention
-        // Attempt to record the same proof again should fail
-        assert!(
-            replay_registry.record_proof(
-                Hash::new([1u8; 32]),
-                Hash::new([1u8; 32]),
+        replay_registry
+            .record_proof(
+                Hash::new([1u8; 32]), // sanad_id
+                Hash::new([1u8; 32]), // seal_id
                 commitment_hash,
                 ChainId::new("bitcoin"),
                 ChainId::new("ethereum"),
-            ).is_err(),
+            )
+            .unwrap();
+
+        // Verify now consumed
+        assert!(replay_registry.is_replay(&replay_key).unwrap());
+
+        // Step 7: Verify double-spend prevention
+        // Attempt to record the same proof again should fail
+        assert!(
+            replay_registry
+                .record_proof(
+                    Hash::new([1u8; 32]),
+                    Hash::new([1u8; 32]),
+                    commitment_hash,
+                    ChainId::new("bitcoin"),
+                    ChainId::new("ethereum"),
+                )
+                .is_err(),
             "Double recording the same proof should fail"
         );
     }
@@ -322,12 +340,12 @@ mod e2e_certification_tests {
     async fn test_e2e_certification_flow_invalid_proof() {
         // Create a proof bundle with insufficient confirmations
         let seal_id = vec![1u8; 32];
-        let seal_point = SealPoint::new(seal_id.clone(), Some(42))
-            .expect("SealPoint creation should succeed");
-        
-        let commit_anchor = CommitAnchor::new(seal_id, 100, vec![])
-            .expect("CommitAnchor creation should succeed");
-        
+        let seal_point =
+            SealPoint::new(seal_id.clone(), Some(42)).expect("SealPoint creation should succeed");
+
+        let commit_anchor =
+            CommitAnchor::new(seal_id, 100, vec![]).expect("CommitAnchor creation should succeed");
+
         let dag_node = DAGNode::new(
             Hash::new([1u8; 32]),
             vec![0x01, 0x02],
@@ -336,22 +354,32 @@ mod e2e_certification_tests {
             vec![],
         );
         let dag_segment = DAGSegment::new(vec![dag_node], Hash::zero());
-        
+
         let inclusion_proof = InclusionProof::new(
             Hash::new([2u8; 32]).as_bytes().to_vec(),
             Hash::new([2u8; 32]),
             100,
             0,
-        ).expect("InclusionProof creation should succeed");
-        
+        )
+        .expect("InclusionProof creation should succeed");
+
         // Create finality proof with zero confirmations (invalid)
         let finality_proof_result = FinalityProof::new(vec![0xAB; 16], 0, false);
-        assert!(finality_proof_result.is_err(), "Zero confirmations should be rejected at creation");
-        
+        assert!(
+            finality_proof_result.is_err(),
+            "Zero confirmations should be rejected at creation"
+        );
+
         // Verify the canonical pipeline rejects insufficient confirmations
         let proof_bundle_res = ProofBundle::new(
             DAGSegment::new(
-                vec![DAGNode::new(Hash::new([1u8; 32]), vec![], vec![], vec![], vec![])],
+                vec![DAGNode::new(
+                    Hash::new([1u8; 32]),
+                    vec![],
+                    vec![],
+                    vec![],
+                    vec![],
+                )],
                 Hash::zero(),
             ),
             vec![],
@@ -360,10 +388,13 @@ mod e2e_certification_tests {
             inclusion_proof,
             FinalityProof::new(vec![0xCD; 16], 2, false).unwrap(), // 2 < 6 minimum
         );
-        
+
         // ProofBundle should still be created (FinalityProof is structurally valid)
-        assert!(proof_bundle_res.is_ok(), "ProofBundle with low confirmations should still be creatable");
-        
+        assert!(
+            proof_bundle_res.is_ok(),
+            "ProofBundle with low confirmations should still be creatable"
+        );
+
         let bundle = proof_bundle_res.unwrap();
         let verifier = CryptoVerifier;
         let result = validate_proof_bundle(
@@ -372,8 +403,9 @@ mod e2e_certification_tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
             None,
-        ).await;
-        
+        )
+        .await;
+
         // The canonical pipeline should reject the proof due to insufficient confirmations
         // (the CryptoVerifier's verify_finality returns false for < 6 confirmations)
     }
@@ -382,10 +414,10 @@ mod e2e_certification_tests {
     #[tokio::test]
     async fn test_e2e_certification_flow_replay_prevention() {
         let mut replay_registry = ReplayRegistry::new();
-        
+
         let sanad_id = Hash::new([1u8; 32]);
         let commitment_hash = Hash::new([2u8; 32]);
-        
+
         let replay_key = ReplayKey::new(
             sanad_id,
             sanad_id,
@@ -393,19 +425,21 @@ mod e2e_certification_tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
+
         // First consumption should succeed
-        replay_registry.record_proof(
-            sanad_id,
-            sanad_id,
-            commitment_hash,
-            ChainId::new("bitcoin"),
-            ChainId::new("ethereum"),
-        ).unwrap();
-        
+        replay_registry
+            .record_proof(
+                sanad_id,
+                sanad_id,
+                commitment_hash,
+                ChainId::new("bitcoin"),
+                ChainId::new("ethereum"),
+            )
+            .unwrap();
+
         // Second consumption should be detected as replay
         assert!(replay_registry.is_replay(&replay_key).unwrap());
-        
+
         // Different destination chain should not be a replay
         let replay_key_different_dest = ReplayKey::new(
             sanad_id,
@@ -414,8 +448,12 @@ mod e2e_certification_tests {
             ChainId::new("bitcoin"),
             ChainId::new("solana"), // Different destination
         );
-        
-        assert!(!replay_registry.is_replay(&replay_key_different_dest).unwrap());
+
+        assert!(
+            !replay_registry
+                .is_replay(&replay_key_different_dest)
+                .unwrap()
+        );
     }
 
     /// Test certification flow with consignment
@@ -425,36 +463,36 @@ mod e2e_certification_tests {
         let genesis = csv_core::genesis::Genesis::new(
             Hash::new([1u8; 32]), // contract_id
             Hash::new([2u8; 32]), // schema_id
-            vec![], // global_state
-            vec![], // owned_state
-            vec![], // metadata
+            vec![],               // global_state
+            vec![],               // owned_state
+            vec![],               // metadata
         );
-        
+
         // Create a transition
         let transition = csv_core::transition::Transition::new(
             Hash::new([3u8; 32]), // transition_id
-            vec![], // owned_inputs
-            vec![], // owned_outputs
-            vec![], // global_updates
-            vec![], // metadata
-            vec![], // validation_script
-            vec![], // signatures
+            vec![],               // owned_inputs
+            vec![],               // owned_outputs
+            vec![],               // global_updates
+            vec![],               // metadata
+            vec![],               // validation_script
+            vec![],               // signatures
         );
-        
+
         // Create a consignment
         let consignment = csv_core::consignment::Consignment::new(
             genesis,
             vec![transition],
-            vec![], // seal_assignments
-            vec![], // anchors
+            vec![],               // seal_assignments
+            vec![],               // anchors
             Hash::new([2u8; 32]), // schema_id
         );
-        
+
         // Verify consignment structure
         assert_eq!(consignment.transition_count(), 1);
         assert_eq!(consignment.assignment_count(), 0);
         assert_eq!(consignment.anchor_count(), 0);
-        
+
         // Verify state root computation
         let state_root = consignment.state_root();
         assert_ne!(state_root, Hash::zero());
@@ -469,13 +507,13 @@ mod e2e_certification_tests {
             (ChainId::new("sui"), ChainId::new("aptos")),
             (ChainId::new("aptos"), ChainId::new("solana")),
         ];
-        
+
         for (from_chain, to_chain) in chains {
             // Verify both chains are valid
             let valid_chains = vec!["bitcoin", "ethereum", "sui", "aptos", "solana"];
             assert!(valid_chains.contains(&from_chain.as_str()));
             assert!(valid_chains.contains(&to_chain.as_str()));
-            
+
             // Verify chains are different
             assert_ne!(from_chain.as_str(), to_chain.as_str());
         }
@@ -487,20 +525,32 @@ mod e2e_certification_tests {
         // Test with invalid seal point (empty ID)
         let invalid_seal = SealPoint::new(vec![], Some(42));
         assert!(invalid_seal.is_err(), "Empty seal ID should be rejected");
-        
+
         // Test with invalid commit anchor (empty ID)
         let invalid_anchor = CommitAnchor::new(vec![], 100, vec![]);
-        assert!(invalid_anchor.is_err(), "Empty anchor ID should be rejected");
-        
+        assert!(
+            invalid_anchor.is_err(),
+            "Empty anchor ID should be rejected"
+        );
+
         // Test with oversized proof
         let oversized_proof = vec![0u8; 65 * 1024]; // 65KB
         let invalid_inclusion = InclusionProof::new(oversized_proof, Hash::new([2u8; 32]), 0, 0);
-        assert!(invalid_inclusion.is_err(), "Oversized proof should be rejected");
-        
+        assert!(
+            invalid_inclusion.is_err(),
+            "Oversized proof should be rejected"
+        );
+
         // Test with empty proof bundle (no signatures)
         let empty_sig_bundle = ProofBundle::new(
             DAGSegment::new(
-                vec![DAGNode::new(Hash::new([1u8; 32]), vec![], vec![], vec![], vec![])],
+                vec![DAGNode::new(
+                    Hash::new([1u8; 32]),
+                    vec![],
+                    vec![],
+                    vec![],
+                    vec![],
+                )],
                 Hash::new([1u8; 32]),
             ),
             vec![], // no signatures
@@ -511,13 +561,17 @@ mod e2e_certification_tests {
                 Hash::new([4u8; 32]),
                 100,
                 0,
-            ).unwrap(),
+            )
+            .unwrap(),
             FinalityProof::new(vec![0xCD; 16], 6, false).unwrap(),
         );
-        
+
         // Bundle should be creatable
-        assert!(empty_sig_bundle.is_ok(), "ProofBundle without signatures should be creatable");
-        
+        assert!(
+            empty_sig_bundle.is_ok(),
+            "ProofBundle without signatures should be creatable"
+        );
+
         let bundle = empty_sig_bundle.unwrap();
         let verifier = CryptoVerifier;
         let result = validate_proof_bundle(
@@ -526,11 +580,16 @@ mod e2e_certification_tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
             None,
-        ).await;
-        
+        )
+        .await;
+
         // The canonical pipeline should reject the proof due to missing signatures
         // The CryptoVerifier's verify_signature returns false for empty signatures
-        match result.steps.iter().find(|s| s.name == "signature_validation") {
+        match result
+            .steps
+            .iter()
+            .find(|s| s.name == "signature_validation")
+        {
             Some(sig_step) => {
                 // This is expected — empty signatures should fail signature validation
                 if !sig_step.passed {
@@ -551,7 +610,13 @@ mod e2e_certification_tests {
         // Create a proof bundle with a malformed (too short) signature
         let bundle = ProofBundle::new(
             DAGSegment::new(
-                vec![DAGNode::new(Hash::new([1u8; 32]), vec![], vec![vec![0x00, 0x01]], vec![], vec![])],
+                vec![DAGNode::new(
+                    Hash::new([1u8; 32]),
+                    vec![],
+                    vec![vec![0x00, 0x01]],
+                    vec![],
+                    vec![],
+                )],
                 Hash::new([1u8; 32]),
             ),
             vec![vec![0x00, 0x01]], // Too short to contain pk_len + pk + sig
@@ -562,9 +627,11 @@ mod e2e_certification_tests {
                 Hash::new([4u8; 32]),
                 100,
                 0,
-            ).unwrap(),
+            )
+            .unwrap(),
             FinalityProof::new(vec![0xCD; 16], 6, false).unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
 
         let verifier = CryptoVerifier;
         let result = validate_proof_bundle(
@@ -573,10 +640,14 @@ mod e2e_certification_tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
             None,
-        ).await;
+        )
+        .await;
 
         // The signature validation step should reject this malformed signature
-        let sig_step = result.steps.iter().find(|s| s.name == "signature_validation");
+        let sig_step = result
+            .steps
+            .iter()
+            .find(|s| s.name == "signature_validation");
         assert!(sig_step.is_some(), "Signature validation step should exist");
         if let Some(step) = sig_step {
             assert!(

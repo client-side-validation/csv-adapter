@@ -21,24 +21,24 @@
 //! - **RolledBack**: Transfer rolled back due to reorg
 //! - **Compromised**: Transfer compromised (security incident)
 
-pub mod locked;
 pub mod awaiting_finality;
+pub mod completed;
+pub mod compromised;
+pub mod locked;
+pub mod minting;
 pub mod proof_building;
 pub mod proof_validated;
-pub mod minting;
-pub mod completed;
 pub mod rolled_back;
-pub mod compromised;
 
 // Re-export state types
-pub use locked::Locked;
 pub use awaiting_finality::AwaitingFinality;
+pub use completed::Completed;
+pub use compromised::Compromised;
+pub use locked::Locked;
+pub use minting::Minting;
 pub use proof_building::ProofBuilding;
 pub use proof_validated::ProofValidated;
-pub use minting::Minting;
-pub use completed::Completed;
 pub use rolled_back::RolledBack;
-pub use compromised::Compromised;
 
 use crate::hash::Hash;
 use crate::protocol_version::ChainId;

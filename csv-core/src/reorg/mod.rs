@@ -9,5 +9,7 @@ pub mod rollback;
 
 // Re-exports
 pub use detector::ReorgDetector;
-pub use reconciliation::{ChainBackendForReconciliation, ReconciliationEngine, ReconciliationResult};
-pub use rollback::{RollbackHandler, RollbackStorageBackend, RollbackResult};
+pub use reconciliation::{
+    ChainBackendForReconciliation, ReconciliationEngine, ReconciliationResult,
+};
+pub use rollback::{RollbackHandler, RollbackResult, RollbackStorageBackend};

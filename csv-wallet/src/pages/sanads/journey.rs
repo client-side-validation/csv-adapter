@@ -4,8 +4,8 @@
 //! helping users understand the relationship between these concepts.
 
 use crate::context::{
-    use_wallet_context, ProofRecord, ProofStatus, SanadStatus, SealContent, SealRecord, SealStatus,
-    TrackedSanad,
+    ProofRecord, ProofStatus, SanadStatus, SealContent, SealRecord, SealStatus, TrackedSanad,
+    use_wallet_context,
 };
 use crate::pages::common::*;
 use crate::routes::Route;

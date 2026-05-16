@@ -332,11 +332,7 @@ impl DriverRegistry {
     }
 
     /// Register a factory that receives the discovered chain configuration.
-    pub fn register_with_config(
-        &mut self,
-        chain_id: &str,
-        factory: DriverFactory,
-    ) {
+    pub fn register_with_config(&mut self, chain_id: &str, factory: DriverFactory) {
         self.factories.insert(chain_id.to_string(), factory);
     }
 

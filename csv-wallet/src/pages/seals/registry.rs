@@ -22,7 +22,7 @@
 //! | Ethereum | Nullifier registration | Contract-enforced |
 //! | Solana | PDA closure | Program-enforced |
 
-use crate::context::{use_wallet_context, SealRecord, SealStatus};
+use crate::context::{SealRecord, SealStatus, use_wallet_context};
 use crate::pages::common::*;
 use crate::routes::Route;
 use dioxus::prelude::*;

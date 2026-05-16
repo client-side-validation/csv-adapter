@@ -32,7 +32,7 @@
 
 pub mod spv;
 
-pub use spv::{verify_bitcoin_spv, Sp1BtcSpvInput, Sp1BtcSpvOutput};
+pub use spv::{Sp1BtcSpvInput, Sp1BtcSpvOutput, verify_bitcoin_spv};
 
 /// SP1 guest program entry point for Bitcoin SPV verification.
 ///

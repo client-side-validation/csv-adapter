@@ -85,7 +85,11 @@ impl<B: RecoveryStorageBackend> RecoveryEngine<B> {
         let step1 = self.load_persistent_state().await;
         steps.push(step1.clone());
         if !step1.success {
-            errors.push(step1.error.unwrap_or_else(|| "Failed to load persistent state".to_string()));
+            errors.push(
+                step1
+                    .error
+                    .unwrap_or_else(|| "Failed to load persistent state".to_string()),
+            );
             return Ok(RecoveryResult {
                 success: false,
                 steps,
@@ -97,7 +101,11 @@ impl<B: RecoveryStorageBackend> RecoveryEngine<B> {
         let step2 = self.validate_state_consistency().await;
         steps.push(step2.clone());
         if !step2.success {
-            errors.push(step2.error.unwrap_or_else(|| "State validation failed".to_string()));
+            errors.push(
+                step2
+                    .error
+                    .unwrap_or_else(|| "State validation failed".to_string()),
+            );
             // Continue with recovery despite validation errors
         }
 
@@ -105,21 +113,33 @@ impl<B: RecoveryStorageBackend> RecoveryEngine<B> {
         let step3 = self.detect_in_flight_operations().await;
         steps.push(step3.clone());
         if !step3.success {
-            errors.push(step3.error.unwrap_or_else(|| "Failed to detect in-flight operations".to_string()));
+            errors.push(
+                step3
+                    .error
+                    .unwrap_or_else(|| "Failed to detect in-flight operations".to_string()),
+            );
         }
 
         // Step 4: Resume or rollback incomplete operations
         let step4 = self.recover_incomplete_operations().await;
         steps.push(step4.clone());
         if !step4.success {
-            errors.push(step4.error.unwrap_or_else(|| "Failed to recover incomplete operations".to_string()));
+            errors.push(
+                step4
+                    .error
+                    .unwrap_or_else(|| "Failed to recover incomplete operations".to_string()),
+            );
         }
 
         // Step 5: Rebuild in-memory structures
         let step5 = self.rebuild_memory_structures().await;
         steps.push(step5.clone());
         if !step5.success {
-            errors.push(step5.error.unwrap_or_else(|| "Failed to rebuild memory structures".to_string()));
+            errors.push(
+                step5
+                    .error
+                    .unwrap_or_else(|| "Failed to rebuild memory structures".to_string()),
+            );
             return Ok(RecoveryResult {
                 success: false,
                 steps,
@@ -131,28 +151,44 @@ impl<B: RecoveryStorageBackend> RecoveryEngine<B> {
         let step6 = self.verify_chain_finality().await;
         steps.push(step6.clone());
         if !step6.success {
-            errors.push(step6.error.unwrap_or_else(|| "Chain finality verification failed".to_string()));
+            errors.push(
+                step6
+                    .error
+                    .unwrap_or_else(|| "Chain finality verification failed".to_string()),
+            );
         }
 
         // Step 7: Check for reorgs
         let step7 = self.check_for_reorgs().await;
         steps.push(step7.clone());
         if !step7.success {
-            errors.push(step7.error.unwrap_or_else(|| "Reorg check failed".to_string()));
+            errors.push(
+                step7
+                    .error
+                    .unwrap_or_else(|| "Reorg check failed".to_string()),
+            );
         }
 
         // Step 8: Apply necessary rollbacks
         let step8 = self.apply_rollbacks().await;
         steps.push(step8.clone());
         if !step8.success {
-            errors.push(step8.error.unwrap_or_else(|| "Rollback application failed".to_string()));
+            errors.push(
+                step8
+                    .error
+                    .unwrap_or_else(|| "Rollback application failed".to_string()),
+            );
         }
 
         // Step 9: Resume normal operation
         let step9 = self.resume_normal_operation().await;
         steps.push(step9.clone());
         if !step9.success {
-            errors.push(step9.error.unwrap_or_else(|| "Failed to resume normal operation".to_string()));
+            errors.push(
+                step9
+                    .error
+                    .unwrap_or_else(|| "Failed to resume normal operation".to_string()),
+            );
             return Ok(RecoveryResult {
                 success: false,
                 steps,
@@ -206,7 +242,7 @@ impl<B: RecoveryStorageBackend> RecoveryEngine<B> {
         // 3. Transfer state invariants hold
         // 4. Replay registry consistency
         // 5. Block height monotonicity
-        
+
         // Check that state checksum exists
         if self.state_checksum.is_none() {
             return RecoveryStep {
@@ -215,7 +251,7 @@ impl<B: RecoveryStorageBackend> RecoveryEngine<B> {
                 error: Some("State checksum not found - corrupted state".to_string()),
             };
         }
-        
+
         // In production, would validate actual checksums and invariants
         RecoveryStep {
             name: "validate_state_consistency",
@@ -519,23 +555,30 @@ impl<B: RecoveryStorageBackend> RecoveryEngine<B> {
     async fn apply_rollbacks(&mut self) -> RecoveryStep {
         for (chain, old_height, _new_height) in &self.detected_reorgs {
             // Find transfers affected by this reorg
-            match self.backend.get_transfers_at_height(chain, *old_height).await {
+            match self
+                .backend
+                .get_transfers_at_height(chain, *old_height)
+                .await
+            {
                 Ok(affected) => {
                     for transfer_id in &affected {
                         // In production, would check the transfer state and apply
                         // appropriate rollback (Compromised, RolledBack, etc.)
-                        let _ = self.backend.update_transfer_state(
-                            transfer_id,
-                            &TransferRecoveryState {
-                                transfer_id: *transfer_id,
-                                state: "rolled_back".to_string(),
-                                source_chain: chain.clone(),
-                                destination_chain: String::new(),
-                                source_tx_hash: None,
-                                attempt_counter: 0,
-                                last_updated: 0,
-                            },
-                        ).await;
+                        let _ = self
+                            .backend
+                            .update_transfer_state(
+                                transfer_id,
+                                &TransferRecoveryState {
+                                    transfer_id: *transfer_id,
+                                    state: "rolled_back".to_string(),
+                                    source_chain: chain.clone(),
+                                    destination_chain: String::new(),
+                                    source_tx_hash: None,
+                                    attempt_counter: 0,
+                                    last_updated: 0,
+                                },
+                            )
+                            .await;
                     }
                 }
                 Err(e) => {
@@ -547,7 +590,7 @@ impl<B: RecoveryStorageBackend> RecoveryEngine<B> {
                 }
             }
         }
-        
+
         RecoveryStep {
             name: "apply_rollbacks",
             success: true,
@@ -563,9 +606,9 @@ impl<B: RecoveryStorageBackend> RecoveryEngine<B> {
         // 3. Start background monitors (finality, reorg)
         // 4. Resume operation processing
         // 5. Emit recovery complete event
-        
+
         self.recovered = true;
-        
+
         RecoveryStep {
             name: "resume_normal_operation",
             success: true,
@@ -629,31 +672,59 @@ pub struct RecoveryResult {
 /// - Reorg events (for rollback detection)
 pub trait RecoveryStorageBackend: Clone + Send + Sync + 'static {
     /// Load last known block heights for all tracked chains
-    fn load_last_known_heights(&self) -> impl core::future::Future<Output = Result<Vec<(String, u64)>>> + Send;
+    fn load_last_known_heights(
+        &self,
+    ) -> impl core::future::Future<Output = Result<Vec<(String, u64)>>> + Send;
 
     /// Find transfers in non-terminal states (in-flight)
-    fn find_in_flight_transfers(&self) -> impl core::future::Future<Output = Result<Vec<Hash>>> + Send;
+    fn find_in_flight_transfers(
+        &self,
+    ) -> impl core::future::Future<Output = Result<Vec<Hash>>> + Send;
 
     /// Get transfer state for recovery
-    fn get_transfer_state(&self, transfer_id: &Hash) -> impl core::future::Future<Output = Result<Option<TransferRecoveryState>>> + Send;
+    fn get_transfer_state(
+        &self,
+        transfer_id: &Hash,
+    ) -> impl core::future::Future<Output = Result<Option<TransferRecoveryState>>> + Send;
 
     /// Update transfer state after recovery
-    fn update_transfer_state(&self, transfer_id: &Hash, state: &TransferRecoveryState) -> impl core::future::Future<Output = Result<()>> + Send;
+    fn update_transfer_state(
+        &self,
+        transfer_id: &Hash,
+        state: &TransferRecoveryState,
+    ) -> impl core::future::Future<Output = Result<()>> + Send;
 
     /// Record a reorg event
-    fn record_reorg(&self, chain: &str, old_height: u64, new_height: u64) -> impl core::future::Future<Output = Result<()>> + Send;
+    fn record_reorg(
+        &self,
+        chain: &str,
+        old_height: u64,
+        new_height: u64,
+    ) -> impl core::future::Future<Output = Result<()>> + Send;
 
     /// Get recent reorg events
-    fn get_recent_reorgs(&self, limit: usize) -> impl core::future::Future<Output = Result<Vec<(String, u64, u64)>>> + Send;
+    fn get_recent_reorgs(
+        &self,
+        limit: usize,
+    ) -> impl core::future::Future<Output = Result<Vec<(String, u64, u64)>>> + Send;
 
     /// Get transfers affected by a reorg at a given height
-    fn get_transfers_at_height(&self, chain: &str, height: u64) -> impl core::future::Future<Output = Result<Vec<Hash>>> + Send;
+    fn get_transfers_at_height(
+        &self,
+        chain: &str,
+        height: u64,
+    ) -> impl core::future::Future<Output = Result<Vec<Hash>>> + Send;
 
     /// Persist a recovery checkpoint
-    fn persist_checkpoint(&self, checkpoint: &RecoveryCheckpoint) -> impl core::future::Future<Output = Result<()>> + Send;
+    fn persist_checkpoint(
+        &self,
+        checkpoint: &RecoveryCheckpoint,
+    ) -> impl core::future::Future<Output = Result<()>> + Send;
 
     /// Load the last recovery checkpoint
-    fn load_checkpoint(&self) -> impl core::future::Future<Output = Result<Option<RecoveryCheckpoint>>> + Send;
+    fn load_checkpoint(
+        &self,
+    ) -> impl core::future::Future<Output = Result<Option<RecoveryCheckpoint>>> + Send;
 }
 
 /// Transfer state for recovery purposes
@@ -717,7 +788,8 @@ mod tests {
         fn get_transfer_state(
             &self,
             _transfer_id: &Hash,
-        ) -> impl core::future::Future<Output = Result<Option<TransferRecoveryState>>> + Send {
+        ) -> impl core::future::Future<Output = Result<Option<TransferRecoveryState>>> + Send
+        {
             async { Ok(None) }
         }
 
@@ -772,7 +844,7 @@ mod tests {
         let backend = MockBackend::default();
         let mut engine = RecoveryEngine::new(backend);
         let result = engine.startup_sequence().await.unwrap();
-        
+
         assert!(result.success);
         assert_eq!(result.steps.len(), 9);
         assert!(engine.is_recovered());
@@ -788,13 +860,14 @@ mod tests {
     #[test]
     fn test_last_known_height() {
         let backend = MockBackend {
-            last_known_heights: alloc::sync::Arc::new(std::sync::Mutex::new(vec![
-                ("bitcoin".to_string(), 100),
-            ])),
+            last_known_heights: alloc::sync::Arc::new(std::sync::Mutex::new(vec![(
+                "bitcoin".to_string(),
+                100,
+            )])),
             in_flight: alloc::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
         };
         let engine = RecoveryEngine::new(backend);
-        
+
         assert_eq!(engine.get_last_known_height("bitcoin"), Some(100));
         assert_eq!(engine.get_last_known_height("ethereum"), None);
     }

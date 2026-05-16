@@ -7,8 +7,8 @@ use solana_sdk::{
     account::Account, pubkey::Pubkey, signature::Signature, transaction::Transaction,
 };
 
-use crate::error::SolanaResult;
 use crate::error::SolanaError;
+use crate::error::SolanaResult;
 use crate::types::{AccountChange, ConfirmationStatus};
 
 /// Trait for Solana RPC operations (synchronous, matching other chain adapters)
@@ -33,7 +33,7 @@ pub trait SolanaRpc: Send + Sync {
 
     /// Get account changes between slots
     fn get_account_changes(&self, from_slot: u64, to_slot: u64)
-        -> SolanaResult<Vec<AccountChange>>;
+    -> SolanaResult<Vec<AccountChange>>;
 
     /// Wait for transaction confirmation (polls with std::thread::sleep)
     fn wait_for_confirmation(&self, signature: &Signature) -> SolanaResult<ConfirmationStatus>;

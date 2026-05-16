@@ -98,7 +98,7 @@ pub use proof_id::{ProofId, ProofLocation};
 pub use types::{CelestiaAnchor, CelestiaFinalityProof, CelestiaMetadata, CelestiaSealPoint};
 
 // Client and DA
-pub use client::{create_test_client, CelestiaClient, ClientConfig};
+pub use client::{CelestiaClient, ClientConfig, create_test_client};
 pub use da_layer::{CelestiaDaLayer, CelestiaRpc, DaLayerConfig, DataAvailabilityLayer};
 
 // IPFS

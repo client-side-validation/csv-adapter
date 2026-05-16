@@ -337,23 +337,26 @@ impl RpcManager {
             if endpoint.url.is_empty() {
                 continue;
             }
-            
+
             let client = build_http_client(&endpoint);
-            
+
             // Send health check request with 2 second timeout
             let health_check = match endpoint.endpoint_type {
                 RpcType::Http => {
                     // Send minimal JSON-RPC request based on chain type
                     let payload = Self::health_check_payload(chain_id);
                     let timeout_duration = Duration::from_secs(2);
-                    
+
                     match tokio::time::timeout(
                         timeout_duration,
-                        client.post(&endpoint.url)
+                        client
+                            .post(&endpoint.url)
                             .header("Content-Type", "application/json")
                             .body(payload)
-                            .send()
-                    ).await {
+                            .send(),
+                    )
+                    .await
+                    {
                         Ok(Ok(response)) => response.status().is_success(),
                         _ => false,
                     }
@@ -363,14 +366,14 @@ impl RpcManager {
                     true
                 }
             };
-            
+
             if health_check {
                 return Some((endpoint.url, client));
             }
         }
         None
     }
-    
+
     /// Generate appropriate health check payload for each chain type
     fn health_check_payload(chain_id: &str) -> String {
         match chain_id {
@@ -381,7 +384,8 @@ impl RpcManager {
                     "method": "eth_blockNumber",
                     "params": [],
                     "id": 1
-                }).to_string()
+                })
+                .to_string()
             }
             "solana" | "solana-devnet" => {
                 // getSlot
@@ -390,7 +394,8 @@ impl RpcManager {
                     "method": "getSlot",
                     "params": [],
                     "id": 1
-                }).to_string()
+                })
+                .to_string()
             }
             "bitcoin" => {
                 // getblockcount
@@ -399,7 +404,8 @@ impl RpcManager {
                     "method": "getblockcount",
                     "params": [],
                     "id": 1
-                }).to_string()
+                })
+                .to_string()
             }
             "aptos" => {
                 // Get latest ledger version
@@ -408,7 +414,8 @@ impl RpcManager {
                     "method": "get_ledger_info",
                     "params": [],
                     "id": 1
-                }).to_string()
+                })
+                .to_string()
             }
             "sui" => {
                 // Get latest checkpoint
@@ -417,7 +424,8 @@ impl RpcManager {
                     "method": "sui_getLatestCheckpointSequenceNumber",
                     "params": [],
                     "id": 1
-                }).to_string()
+                })
+                .to_string()
             }
             _ => {
                 // Generic health check
@@ -426,7 +434,8 @@ impl RpcManager {
                     "method": "health",
                     "params": [],
                     "id": 1
-                }).to_string()
+                })
+                .to_string()
             }
         }
     }

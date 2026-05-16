@@ -221,7 +221,7 @@ impl FileKeystore {
                 let home = dirs::home_dir().ok_or(FileKeystoreError::DirectoryNotFound(
                     "Home directory not found".to_string(),
                 ))?;
-                
+
                 home.join(".csv/keystore")
             }
         };
@@ -303,8 +303,12 @@ impl FileKeystore {
         keystore.save_to(&file_path)?;
 
         // Update metadata
-        self.meta
-            .add_key(id.to_string(), chain.to_string(), label.map(String::from), file_id);
+        self.meta.add_key(
+            id.to_string(),
+            chain.to_string(),
+            label.map(String::from),
+            file_id,
+        );
 
         // Save metadata
         let meta_path = self.keystore_dir.join(Self::META_FILE);
@@ -367,10 +371,15 @@ impl FileKeystore {
     /// Find the keystore file path for a given key ID.
     fn find_keystore_file_for_id(&self, id: &str) -> Result<std::path::PathBuf, FileKeystoreError> {
         // Find the entry in metadata
-        let entry = self.meta.find(id).ok_or_else(|| FileKeystoreError::KeyNotFound(id.to_string()))?;
+        let entry = self
+            .meta
+            .find(id)
+            .ok_or_else(|| FileKeystoreError::KeyNotFound(id.to_string()))?;
 
         // Construct the file path from the file_id
-        let file_path = self.keystore_dir.join(format!("keystore-{}.json", entry.file_id));
+        let file_path = self
+            .keystore_dir
+            .join(format!("keystore-{}.json", entry.file_id));
         Ok(file_path)
     }
 
@@ -454,8 +463,12 @@ impl FileKeystore {
         let file_path = self.keystore_dir.join(format!("keystore-{}.json", id));
         keystore.save_to(&file_path)?;
 
-        self.meta
-            .add_key(id.clone(), chain.to_string(), label.map(String::from), id.clone());
+        self.meta.add_key(
+            id.clone(),
+            chain.to_string(),
+            label.map(String::from),
+            id.clone(),
+        );
 
         let meta_path = self.keystore_dir.join(Self::META_FILE);
         let meta_json = serde_json::to_string_pretty(&self.meta)?;

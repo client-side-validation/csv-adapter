@@ -202,7 +202,10 @@ impl Commitment {
         // Build the full payload for domain-separated hashing
         let mut payload = Vec::new();
         payload.extend_from_slice(&csv_tagged_hash("commitment-version", &[self.version]));
-        payload.extend_from_slice(&csv_tagged_hash("commitment-protocol-id", &self.protocol_id));
+        payload.extend_from_slice(&csv_tagged_hash(
+            "commitment-protocol-id",
+            &self.protocol_id,
+        ));
         payload.extend_from_slice(&csv_tagged_hash(
             "commitment-mpc-root",
             self.mpc_root.as_bytes(),
@@ -220,8 +223,11 @@ impl Commitment {
             self.transition_payload_hash.as_bytes(),
         ));
         payload.extend_from_slice(&csv_tagged_hash("commitment-seal", self.seal_id.as_bytes()));
-        payload.extend_from_slice(&csv_tagged_hash("commitment-domain", &self.domain_separator));
-        
+        payload.extend_from_slice(&csv_tagged_hash(
+            "commitment-domain",
+            &self.domain_separator,
+        ));
+
         DomainSeparatedHash::<TransferCommitmentDomain>::hash(&payload)
     }
 

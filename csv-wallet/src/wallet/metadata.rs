@@ -18,8 +18,7 @@ pub struct WalletMetadata {
 }
 
 /// Bitcoin network type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum BitcoinNetwork {
     Mainnet,
     #[default]
@@ -27,4 +26,3 @@ pub enum BitcoinNetwork {
     Signet,
     Regtest,
 }
-

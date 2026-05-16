@@ -9,8 +9,8 @@
 #[allow(unused_imports)]
 use bitcoin::hashes::Hash as _;
 use bitcoin::{
-    absolute::LockTime, consensus::encode::serialize as tx_serialize, Address, Amount, ScriptBuf,
-    Sequence, TxIn, TxOut, Txid,
+    Address, Amount, ScriptBuf, Sequence, TxIn, TxOut, Txid, absolute::LockTime,
+    consensus::encode::serialize as tx_serialize,
 };
 
 use crate::tapret::TapretCommitment;

@@ -6,7 +6,8 @@
 
 use csv_core::seal_protocol::SealProtocol;
 use csv_core::{
-    dag::DAGSegment, error::ProtocolError, proof::ProofBundle, signature::SignatureScheme, Hash, Result,
+    Hash, Result, dag::DAGSegment, error::ProtocolError, proof::ProofBundle,
+    signature::SignatureScheme,
 };
 use sha2::{Digest, Sha256};
 use solana_sdk::pubkey::Pubkey;
@@ -424,13 +425,12 @@ impl SealProtocol for SolanaSealProtocol {
         #[cfg(feature = "rpc")]
         {
             let rpc = self.check_rpc()?;
-            let account = rpc.get_account(&seal_point.account)
-                .map_err(|e| {
-                    ProtocolError::NetworkError(format!(
-                        "Failed to check account status on-chain: {}",
-                        e
-                    ))
-                })?;
+            let account = rpc.get_account(&seal_point.account).map_err(|e| {
+                ProtocolError::NetworkError(format!(
+                    "Failed to check account status on-chain: {}",
+                    e
+                ))
+            })?;
 
             // If account doesn't exist or has zero lamports, it's already been consumed
             if account.lamports == 0 {
@@ -492,21 +492,17 @@ impl SealProtocol for SolanaSealProtocol {
             let seals = self.active_seals.lock().unwrap();
             seals
                 .first()
-                .map(|s| {
-                    unsafe {
-                        csv_core::seal::SealPoint::new_unchecked(
-                            s.account.to_bytes().to_vec(),
-                            Some(s.lamports),
-                        )
-                    }
+                .map(|s| unsafe {
+                    csv_core::seal::SealPoint::new_unchecked(
+                        s.account.to_bytes().to_vec(),
+                        Some(s.lamports),
+                    )
                 })
-                .unwrap_or_else(|| {
-                    unsafe {
-                        csv_core::seal::SealPoint::new_unchecked(
-                            anchor_ref.signature.as_ref()[..32].to_vec(),
-                            None,
-                        )
-                    }
+                .unwrap_or_else(|| unsafe {
+                    csv_core::seal::SealPoint::new_unchecked(
+                        anchor_ref.signature.as_ref()[..32].to_vec(),
+                        None,
+                    )
                 })
         };
 
@@ -527,7 +523,11 @@ impl SealProtocol for SolanaSealProtocol {
                     .iter()
                     .flat_map(|p| p.proof.iter().flatten().copied())
                     .collect(),
-                Hash::new(anchor_ref.signature.as_ref()[..32].try_into().unwrap_or([0u8; 32])),
+                Hash::new(
+                    anchor_ref.signature.as_ref()[..32]
+                        .try_into()
+                        .unwrap_or([0u8; 32]),
+                ),
                 anchor_ref.slot,
                 anchor_ref.slot,
             )

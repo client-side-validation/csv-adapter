@@ -73,13 +73,12 @@ impl PersistentTransferRegistry {
 
     /// Check if a sanad has already been transferred (double-spend check).
     pub async fn is_transferred(&self, sanad_id: &str) -> Result<bool, CrossChainError> {
-        let count: Option<i64> = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM transfers WHERE sanad_id = ?",
-        )
-        .bind(sanad_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| CrossChainError::Database(e.to_string()))?;
+        let count: Option<i64> =
+            sqlx::query_scalar("SELECT COUNT(*) FROM transfers WHERE sanad_id = ?")
+                .bind(sanad_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| CrossChainError::Database(e.to_string()))?;
 
         Ok(count.unwrap_or(0) > 0)
     }
@@ -125,7 +124,10 @@ impl PersistentTransferRegistry {
     }
 
     /// Query transfers by sanad ID.
-    pub async fn query_by_sanad(&self, sanad_id: &str) -> Result<Vec<TransferInfo>, CrossChainError> {
+    pub async fn query_by_sanad(
+        &self,
+        sanad_id: &str,
+    ) -> Result<Vec<TransferInfo>, CrossChainError> {
         let rows = sqlx::query_as::<_, TransferInfo>(
             r#"SELECT id, sanad_id, from_chain, to_chain, from_owner, to_owner,
                      lock_tx, mint_tx, created_at, completed_at
@@ -195,8 +197,10 @@ impl PersistentTransferRegistry {
     ///
     /// Useful for periodic checkpointing: call after the orchestrator records
     /// new transfers so that in-memory state survives process restarts.
-    pub async fn save_from_registry(&self, registry: &CrossChainRegistry) -> Result<(), CrossChainError> {
-
+    pub async fn save_from_registry(
+        &self,
+        registry: &CrossChainRegistry,
+    ) -> Result<(), CrossChainError> {
         for entry in registry.all_transfers() {
             let row = Self::registry_entry_to_transfer_info(entry);
             self.record_transfer(
@@ -216,7 +220,9 @@ impl PersistentTransferRegistry {
 
     // --- Internal helpers ---
 
-    fn transfer_info_to_registry_entry(row: &TransferInfo) -> Result<CrossChainRegistryEntry, CrossChainError> {
+    fn transfer_info_to_registry_entry(
+        row: &TransferInfo,
+    ) -> Result<CrossChainRegistryEntry, CrossChainError> {
         let parse_hash = |hex: &str| -> Result<Hash, CrossChainError> {
             let bytes = hex::decode(hex.trim_start_matches("0x"))
                 .map_err(|e| CrossChainError::Database(format!("invalid hash hex: {}", e)))?;
@@ -233,9 +239,15 @@ impl PersistentTransferRegistry {
 
         Ok(CrossChainRegistryEntry {
             sanad_id: parse_hash(&row.sanad_id)?,
-            source_chain: row.from_chain.parse().map_err(|_| CrossChainError::Database("invalid from_chain".to_string()))?,
+            source_chain: row
+                .from_chain
+                .parse()
+                .map_err(|_| CrossChainError::Database("invalid from_chain".to_string()))?,
             source_seal: parse_seal(&row.lock_tx)?,
-            destination_chain: row.to_chain.parse().map_err(|_| CrossChainError::Database("invalid to_chain".to_string()))?,
+            destination_chain: row
+                .to_chain
+                .parse()
+                .map_err(|_| CrossChainError::Database("invalid to_chain".to_string()))?,
             destination_seal: match row.mint_tx.as_ref() {
                 Some(mint) => parse_seal(mint).unwrap_or_else(|_| {
                     // mint_tx may be invalid at time of lock; use placeholder
@@ -258,7 +270,8 @@ impl PersistentTransferRegistry {
 
     fn registry_entry_to_transfer_info(entry: &CrossChainRegistryEntry) -> TransferInfo {
         TransferInfo {
-            id: format!("transfer_{}_{}_{}", 
+            id: format!(
+                "transfer_{}_{}_{}",
                 entry.sanad_id.to_hex(),
                 entry.source_chain,
                 entry.destination_chain,

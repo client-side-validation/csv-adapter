@@ -31,25 +31,28 @@ pub mod node;
 
 #[cfg(feature = "rpc")]
 pub use node::{
-    publish, publish_seal_consumption, verify_seal_consumption_in_receipt, AlloyRpcError,
-    EthereumNode,
+    AlloyRpcError, EthereumNode, publish, publish_seal_consumption,
+    verify_seal_consumption_in_receipt,
 };
 
-pub use backend::{create_ethereum_adapter, EthereumRpcClient, EthereumWallet};
+pub use backend::{EthereumRpcClient, EthereumWallet, create_ethereum_adapter};
 pub use config::EthereumConfig;
 pub use error::EthereumError;
 pub use finality::{FinalityChecker, FinalityConfig};
 pub use rpc::EthereumRpc;
 #[cfg(test)]
 pub use rpc::MockEthereumRpc;
-pub use sanad_contract::{CsvLockAbi, CsvMintAbi, cross_chain_lock_signature, sanad_minted_signature, sanad_refunded_signature};
+pub use sanad_contract::{
+    CsvLockAbi, CsvMintAbi, cross_chain_lock_signature, sanad_minted_signature,
+    sanad_refunded_signature,
+};
 pub use seal_contract::CsvSealAbi;
 pub use seal_protocol::EthereumSealProtocol;
 pub use types::{
     EthereumCommitAnchor, EthereumFinalityProof, EthereumInclusionProof, EthereumSealPoint,
 };
 pub use zk_verifier::{
-    generate_verifier_contract_bytecode, EthereumGroth16Verifier, SolidityGroth16Proof,
+    EthereumGroth16Verifier, SolidityGroth16Proof, generate_verifier_contract_bytecode,
 };
 
 // Ops exports

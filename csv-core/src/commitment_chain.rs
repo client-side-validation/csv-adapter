@@ -54,15 +54,15 @@ pub enum ChainError {
     EmptyChain,
     #[error("Chain does not start at genesis (first commitment has non-zero previous_commitment)")]
     NotGenesis,
-    #[error(
-        "Commitment chain broken at index {index}: expected previous {expected}, got {actual}"
-    )]
+    #[error("Commitment chain broken at index {index}: expected previous {expected}, got {actual}")]
     BrokenChain {
         index: usize,
         expected: Hash,
         actual: Hash,
     },
-    #[error("Commitment at index {index} has inconsistent contract_id: expected {expected}, got {actual}")]
+    #[error(
+        "Commitment at index {index} has inconsistent contract_id: expected {expected}, got {actual}"
+    )]
     ContractIdMismatch {
         index: usize,
         expected: Hash,

@@ -4,7 +4,7 @@
 //! seal was consumed on-chain. The proof can be verified by anyone without
 //! requiring access to blockchain RPC.
 
-use crate::context::{use_wallet_context, ProofRecord, ProofStatus};
+use crate::context::{ProofRecord, ProofStatus, use_wallet_context};
 use crate::pages::common::*;
 use crate::routes::Route;
 use csv_core::zk_proof::ZkSealProof;

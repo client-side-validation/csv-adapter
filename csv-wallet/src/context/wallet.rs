@@ -2,7 +2,7 @@
 
 use crate::context::state::AppState;
 use crate::context::types::*;
-use crate::services::subscription::{WalletSubscriptionManager, AdaptivePoller};
+use crate::services::subscription::{AdaptivePoller, WalletSubscriptionManager};
 use crate::storage::{self, LocalStorageManager, UNIFIED_STORAGE_KEY, WALLET_MNEMONIC_KEY};
 use crate::wallet_core::{ChainAccount, WalletData};
 use dioxus::prelude::*;
@@ -64,14 +64,15 @@ impl WalletContext {
         selected_contract: Signal<Option<ContractRecord>>,
     ) -> Self {
         let store = storage::wallet_storage().ok();
-        
+
         // Initialize WebSocket subscription manager with default explorer URL
-        let explorer_url = std::env::var("EXPLORER_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
+        let explorer_url =
+            std::env::var("EXPLORER_URL").unwrap_or_else(|_| "http://localhost:8080".to_string());
         let subscription_manager = Arc::new(WalletSubscriptionManager::new(explorer_url));
-        
+
         // Initialize adaptive poller with per-chain intervals
         let adaptive_poller = Arc::new(AdaptivePoller::new());
-        
+
         // Set chain intervals in subscription manager
         let mut intervals = std::collections::HashMap::new();
         intervals.insert("solana".to_string(), 1000);
@@ -80,7 +81,7 @@ impl WalletContext {
         intervals.insert("ethereum".to_string(), 12000);
         intervals.insert("bitcoin".to_string(), 15000);
         subscription_manager.set_chain_intervals(intervals);
-        
+
         let mut ctx = Self {
             state,
             store,
@@ -121,7 +122,9 @@ impl WalletContext {
     #[cfg(target_arch = "wasm32")]
     pub async fn migrate_seals_to_encrypted(&self) -> Result<usize, String> {
         let sealed = self.encrypted_seal_store.lock().unwrap();
-        let store = sealed.as_ref().ok_or("Encrypted seal store not initialized")?;
+        let store = sealed
+            .as_ref()
+            .ok_or("Encrypted seal store not initialized")?;
 
         let current_seals = self.seals();
         let mut count = 0;
@@ -129,7 +132,9 @@ impl WalletContext {
         for seal in current_seals {
             let key = format!("seal:{}", seal.seal_ref);
             if let Err(e) = store.save(&key, &seal).await {
-                web_sys::console::error_1(&format!("Failed to encrypt seal {}: {:?}", seal.seal_ref, e).into());
+                web_sys::console::error_1(
+                    &format!("Failed to encrypt seal {}: {:?}", seal.seal_ref, e).into(),
+                );
             } else {
                 count += 1;
             }
@@ -149,8 +154,12 @@ impl WalletContext {
 
     /// Get a reference to the native keystore for desktop builds.
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn get_native_keystore(&self) -> Result<std::sync::MutexGuard<'_, Option<NativeKeystore>>, String> {
-        self.native_keystore.lock().map_err(|e| format!("Failed to lock keystore: {}", e))
+    pub fn get_native_keystore(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, Option<NativeKeystore>>, String> {
+        self.native_keystore
+            .lock()
+            .map_err(|e| format!("Failed to lock keystore: {}", e))
     }
 
     /// Check if wallet data has been loaded from storage.
@@ -523,10 +532,21 @@ impl WalletContext {
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let mut ks_guard = self.native_keystore.lock().map_err(|e| format!("Failed to lock keystore: {}", e))?;
-            let keystore = ks_guard.as_mut()
+            let mut ks_guard = self
+                .native_keystore
+                .lock()
+                .map_err(|e| format!("Failed to lock keystore: {}", e))?;
+            let keystore = ks_guard
+                .as_mut()
                 .ok_or("Native keystore not initialized. Call init_native_keystore() first.")?;
-            keystore.store_key(&keystore_id, &chain_name, Some(name), &secret_key, &passphrase_obj)
+            keystore
+                .store_key(
+                    &keystore_id,
+                    &chain_name,
+                    Some(name),
+                    &secret_key,
+                    &passphrase_obj,
+                )
                 .map_err(|e| e.to_string())?;
         }
 
@@ -547,11 +567,20 @@ impl WalletContext {
 
     /// Retrieve a stored key from the native keystore.
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn retrieve_key_from_keystore(&self, key_id: &str, passphrase: &str) -> Result<String, String> {
-        let mut ks_guard = self.native_keystore.lock().map_err(|e| format!("Failed to lock keystore: {}", e))?;
-        let keystore = ks_guard.as_mut()
+    pub fn retrieve_key_from_keystore(
+        &self,
+        key_id: &str,
+        passphrase: &str,
+    ) -> Result<String, String> {
+        let mut ks_guard = self
+            .native_keystore
+            .lock()
+            .map_err(|e| format!("Failed to lock keystore: {}", e))?;
+        let keystore = ks_guard
+            .as_mut()
             .ok_or("Native keystore not initialized. Call init_native_keystore() first.")?;
-        let secret_key = keystore.retrieve_key(key_id, &csv_keys::memory::Passphrase::new(passphrase))
+        let secret_key = keystore
+            .retrieve_key(key_id, &csv_keys::memory::Passphrase::new(passphrase))
             .map_err(|e| e.to_string())?;
         Ok(hex::encode(secret_key.as_bytes()))
     }
@@ -559,8 +588,12 @@ impl WalletContext {
     /// List all stored key IDs in the native keystore.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn list_stored_keys(&self) -> Result<Vec<String>, String> {
-        let ks_guard = self.native_keystore.lock().map_err(|e| format!("Failed to lock keystore: {}", e))?;
-        let keystore = ks_guard.as_ref()
+        let ks_guard = self
+            .native_keystore
+            .lock()
+            .map_err(|e| format!("Failed to lock keystore: {}", e))?;
+        let keystore = ks_guard
+            .as_ref()
             .ok_or("Native keystore not initialized. Call init_native_keystore() first.")?;
         Ok(keystore.list_keys())
     }
@@ -751,7 +784,9 @@ impl WalletContext {
             // Fire-and-forget async save - we don't block the UI on this
             wasm_bindgen_futures::spawn_local(async move {
                 if let Err(e) = store.save(&key, &seal_clone).await {
-                    web_sys::console::error_1(&format!("Failed to save encrypted seal: {:?}", e).into());
+                    web_sys::console::error_1(
+                        &format!("Failed to save encrypted seal: {:?}", e).into(),
+                    );
                 }
             });
         }
@@ -766,7 +801,9 @@ impl WalletContext {
             let store = store.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 if let Err(e) = store.delete(&key).await {
-                    web_sys::console::error_1(&format!("Failed to delete encrypted seal: {:?}", e).into());
+                    web_sys::console::error_1(
+                        &format!("Failed to delete encrypted seal: {:?}", e).into(),
+                    );
                 }
             });
         }
@@ -891,13 +928,23 @@ impl WalletContext {
 
     /// Subscribe to real-time updates for a specific address and chain.
     #[cfg(not(target_arch = "wasm32"))]
-    pub async fn subscribe_to_address(&self, address: &str, chain: Option<&str>) -> Result<(), String> {
-        self.subscription_manager.subscribe(address, chain, None).await
+    pub async fn subscribe_to_address(
+        &self,
+        address: &str,
+        chain: Option<&str>,
+    ) -> Result<(), String> {
+        self.subscription_manager
+            .subscribe(address, chain, None)
+            .await
     }
 
     /// Unsubscribe from updates for a specific address.
     #[cfg(not(target_arch = "wasm32"))]
-    pub async fn unsubscribe_from_address(&self, address: &str, chain: Option<&str>) -> Result<(), String> {
+    pub async fn unsubscribe_from_address(
+        &self,
+        address: &str,
+        chain: Option<&str>,
+    ) -> Result<(), String> {
         self.subscription_manager.unsubscribe(address, chain).await
     }
 
@@ -961,9 +1008,10 @@ impl WalletContext {
         request_id: String,
     ) -> Result<bool, String> {
         let guard = self.bitcoin_batcher.lock().unwrap();
-        let batcher = guard.as_ref()
+        let batcher = guard
+            .as_ref()
             .ok_or("Bitcoin MPC batcher not enabled. Call enable_bitcoin_batcher() first.")?;
-        
+
         Ok(batcher.queue(commitment, seal, request_id))
     }
 
@@ -991,12 +1039,18 @@ impl WalletContext {
     /// - `Err` if batcher not enabled or no pending seals
     pub fn build_bitcoin_mpc_tree(
         &self,
-    ) -> Result<(csv_core::commit_mux::CommitMux, Vec<csv_bitcoin::mpc_batch::PendingCommitment>), String> {
+    ) -> Result<
+        (
+            csv_core::commit_mux::CommitMux,
+            Vec<csv_bitcoin::mpc_batch::PendingCommitment>,
+        ),
+        String,
+    > {
         let guard = self.bitcoin_batcher.lock().unwrap();
-        let batcher = guard.as_ref()
-            .ok_or("Bitcoin MPC batcher not enabled.")?;
-        
-        batcher.build_mpc_tree()
+        let batcher = guard.as_ref().ok_or("Bitcoin MPC batcher not enabled.")?;
+
+        batcher
+            .build_mpc_tree()
             .ok_or("No pending Bitcoin seals to batch".to_string())
     }
 
@@ -1009,10 +1063,10 @@ impl WalletContext {
         commitments: &[csv_bitcoin::mpc_batch::PendingCommitment],
     ) -> Result<Vec<(String, csv_core::commit_mux::MuxProof)>, String> {
         let guard = self.bitcoin_batcher.lock().unwrap();
-        let batcher = guard.as_ref()
-            .ok_or("Bitcoin MPC batcher not enabled.")?;
-        
-        batcher.generate_proofs(tree, commitments)
+        let batcher = guard.as_ref().ok_or("Bitcoin MPC batcher not enabled.")?;
+
+        batcher
+            .generate_proofs(tree, commitments)
             .map_err(|e| format!("Failed to generate MPC proofs: {}", e))
     }
 

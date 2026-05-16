@@ -76,7 +76,8 @@ impl ProviderMetrics {
     pub fn record_success(&self, latency_ms: u64) {
         self.requests.fetch_add(1, Ordering::Relaxed);
         self.successful.fetch_add(1, Ordering::Relaxed);
-        self.total_latency_ms.fetch_add(latency_ms, Ordering::Relaxed);
+        self.total_latency_ms
+            .fetch_add(latency_ms, Ordering::Relaxed);
         self.last_success.store(latency_ms, Ordering::Relaxed);
     }
 
@@ -171,7 +172,8 @@ impl RpcMetrics {
             return metrics.clone();
         }
         let metrics = Arc::new(ProviderMetrics::new(provider));
-        self.provider_metrics.insert(provider.to_string(), metrics.clone());
+        self.provider_metrics
+            .insert(provider.to_string(), metrics.clone());
         metrics
     }
 
@@ -179,7 +181,8 @@ impl RpcMetrics {
     pub fn record_success(&mut self, provider: &str, latency_ms: u64) {
         self.total_requests.fetch_add(1, Ordering::Relaxed);
         self.successful_requests.fetch_add(1, Ordering::Relaxed);
-        self.total_latency_ms.fetch_add(latency_ms, Ordering::Relaxed);
+        self.total_latency_ms
+            .fetch_add(latency_ms, Ordering::Relaxed);
 
         let metrics = self.get_or_create_provider(provider);
         metrics.record_success(latency_ms);

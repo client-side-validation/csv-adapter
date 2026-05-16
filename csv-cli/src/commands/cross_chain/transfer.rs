@@ -4,8 +4,8 @@
 
 use anyhow::Result;
 
-use csv_core::hash::Hash;
 use csv_core::SanadId;
+use csv_core::hash::Hash;
 use csv_sdk::CsvClient;
 
 use crate::config::{Chain, Config};
@@ -72,7 +72,10 @@ pub async fn cmd_transfer(
         .map_err(|e| anyhow::anyhow!("Failed to create CSV client: {}", e))?;
 
     // Execute the real cross-chain transfer via runtime
-    output::info(&format!("Locking Sanad {} on {:?}", sanad_id_hash, from_chain));
+    output::info(&format!(
+        "Locking Sanad {} on {:?}",
+        sanad_id_hash, from_chain
+    ));
     let sanad = SanadId(sanad_id_hash);
     let transfer_id = client
         .transfers()
@@ -83,7 +86,10 @@ pub async fn cmd_transfer(
         .await
         .map_err(|e| anyhow::anyhow!("Transfer execution failed: {}", e))?;
 
-    output::success(&format!("Transfer {} initiated. Sanad locked on source chain.", transfer_id));
+    output::success(&format!(
+        "Transfer {} initiated. Sanad locked on source chain.",
+        transfer_id
+    ));
 
     // Clone for use in record after get_address call
     let from_chain_clone = from.clone();

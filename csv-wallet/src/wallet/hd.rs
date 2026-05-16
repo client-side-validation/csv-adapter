@@ -74,8 +74,8 @@ impl ExtendedWallet {
 
     /// Create from mnemonic phrase.
     pub fn from_mnemonic(phrase: &str) -> Result<Self, String> {
-        let mnemonic = Mnemonic::from_phrase(phrase)
-            .map_err(|e| format!("Invalid mnemonic: {}", e))?;
+        let mnemonic =
+            Mnemonic::from_phrase(phrase).map_err(|e| format!("Invalid mnemonic: {}", e))?;
         let seed = mnemonic.to_seed(None);
 
         let mut seed_bytes = [0u8; 64];
@@ -109,9 +109,9 @@ impl ExtendedWallet {
         address_index: u32,
     ) -> Result<String, String> {
         use bitcoin::{
+            Address, Network as BitcoinNetworkType,
             bip32::{DerivationPath, Xpriv},
             key::TapTweak,
-            Address, Network as BitcoinNetworkType,
         };
         use secp256k1::Secp256k1;
 

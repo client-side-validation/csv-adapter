@@ -4,7 +4,7 @@
 //! During the full consolidation, the implementation will be moved here.
 
 #[allow(unused_imports)]
-pub use crate::context::wallet::{use_wallet_context, WalletContext, WalletProvider};
+pub use crate::context::wallet::{WalletContext, WalletProvider, use_wallet_context};
 
 // Re-export types that the context depends on
 #[allow(unused_imports)]

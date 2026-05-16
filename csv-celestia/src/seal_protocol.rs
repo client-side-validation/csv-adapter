@@ -373,7 +373,7 @@ where
             _ => {
                 return Err(CelestiaError::InternalError(
                     "Expected hybrid or ipfs-backed location".to_string(),
-                ))
+                ));
             }
         };
 

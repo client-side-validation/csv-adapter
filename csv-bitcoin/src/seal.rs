@@ -48,13 +48,13 @@ impl SealRegistry {
     pub fn with_storage(path: &str) -> Result<Self, BitcoinError> {
         let storage = SqliteSealStore::open(path)
             .map_err(|e| BitcoinError::StorageError(format!("Failed to open seal store: {}", e)))?;
-        
+
         let mut registry = Self::new();
         registry.storage = Some(storage);
-        
+
         // Load existing seals from storage
         registry.load_from_storage()?;
-        
+
         Ok(registry)
     }
 
@@ -62,9 +62,10 @@ impl SealRegistry {
     #[cfg(feature = "rpc")]
     fn load_from_storage(&mut self) -> BitcoinResult<()> {
         if let Some(ref storage) = self.storage {
-            let records = storage.get_seals("bitcoin")
+            let records = storage
+                .get_seals("bitcoin")
                 .map_err(|e| BitcoinError::StorageError(format!("Failed to load seals: {}", e)))?;
-            
+
             for record in records {
                 self.used_seals.insert(record.seal_id);
             }
@@ -80,7 +81,7 @@ impl SealRegistry {
         // Actual persistence happens in mark_seal_used_with_storage which has &mut self
         Ok(())
     }
-    
+
     /// Mark a seal as used and persist to storage (requires &mut self for storage)
     #[cfg(feature = "rpc")]
     pub fn mark_seal_used_with_storage(
@@ -88,11 +89,9 @@ impl SealRegistry {
         seal: &BitcoinSealPoint,
         height: u64,
     ) -> BitcoinResult<()> {
-        
-        
         // First mark in memory
         self.mark_seal_used_at_height(seal, height)?;
-        
+
         // Then persist if storage is configured
         if let Some(ref mut storage) = self.storage {
             let record = csv_core::SealRecord {
@@ -108,8 +107,9 @@ impl SealRegistry {
             // Use interior mutability via the trait method
             // Since we can't mutably borrow from &self, we need a different approach
             // For now, skip persistence in this context - will be done by caller
-            storage.save_seal(&record)
-                .map_err(|e| BitcoinError::StorageError(format!("Failed to persist seal: {}", e)))?;
+            storage.save_seal(&record).map_err(|e| {
+                BitcoinError::StorageError(format!("Failed to persist seal: {}", e))
+            })?;
         }
         Ok(())
     }
@@ -122,7 +122,8 @@ impl SealRegistry {
     /// Check if a seal at a specific path has been used
     pub fn is_seal_used_by_path(&self, path: &Bip86Path) -> bool {
         // Check if this specific derivation path has been used
-        self.used_paths.contains(&(path.account, path.change, path.index))
+        self.used_paths
+            .contains(&(path.account, path.change, path.index))
     }
 
     /// Mark a seal as used with its derivation path
@@ -134,7 +135,8 @@ impl SealRegistry {
         // First mark the seal as used
         self.mark_seal_used(seal)?;
         // Then track the path
-        self.used_paths.insert((path.account, path.change, path.index));
+        self.used_paths
+            .insert((path.account, path.change, path.index));
         Ok(())
     }
 
@@ -168,10 +170,10 @@ impl SealRegistry {
         let seal_bytes = seal.to_vec();
         self.seal_queue.push(seal_bytes.clone());
         self.used_seals.insert(seal_bytes.clone());
-        
+
         // Note: To persist, use mark_seal_used_with_storage() when storage is configured
         let _ = height; // Height is tracked but not persisted in this method
-        
+
         Ok(())
     }
 
@@ -183,7 +185,8 @@ impl SealRegistry {
 
     /// Clear a path from the used paths set (for reorg rollback)
     pub fn clear_path(&mut self, path: &Bip86Path) {
-        self.used_paths.remove(&(path.account, path.change, path.index));
+        self.used_paths
+            .remove(&(path.account, path.change, path.index));
     }
 
     /// Get the current number of used seals

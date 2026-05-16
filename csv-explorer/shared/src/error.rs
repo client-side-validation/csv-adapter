@@ -1,4 +1,4 @@
-use csv_core::mcp::{error_codes, FixAction, HasErrorSuggestion};
+use csv_core::mcp::{FixAction, HasErrorSuggestion, error_codes};
 /// Error types for the CSV Explorer.
 use thiserror::Error;
 

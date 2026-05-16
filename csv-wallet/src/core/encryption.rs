@@ -3,10 +3,10 @@
 //! Provides AES-256-GCM encryption for wallet storage with Argon2id KDF.
 
 use aes_gcm::{
+    Aes256Gcm, Key, Nonce,
     aead::{Aead, AeadCore, KeyInit, OsRng},
-    Aes256Gcm, Nonce, Key,
 };
-use csv_core::mcp::{HasErrorSuggestion, FixAction, error_codes};
+use csv_core::mcp::{FixAction, HasErrorSuggestion, error_codes};
 use zeroize::Zeroize;
 
 /// Error type for encryption operations.
@@ -41,18 +41,21 @@ impl HasErrorSuggestion for EncryptionError {
             EncryptionError::EncryptionFailed(_) => {
                 "Wallet encryption failed. This may indicate a system issue. \
                  Try: 1) Restarting the application, 2) Using a different password, \
-                 3) Checking available system memory.".to_string()
+                 3) Checking available system memory."
+                    .to_string()
             }
             EncryptionError::DecryptionFailed(_) => {
                 "Wallet decryption failed. The data may be corrupted or the \
                  wrong encryption parameters were used. Ensure you have the \
-                 correct wallet file and try again.".to_string()
+                 correct wallet file and try again."
+                    .to_string()
             }
             EncryptionError::InvalidPassword => {
                 "Invalid password. The password you entered does not match \
                  the one used to encrypt this wallet. Check for: \
                  1) Typos or extra spaces, 2) Caps Lock, 3) Different keyboard layout. \
-                 Passwords cannot be recovered - ensure you have your mnemonic backed up.".to_string()
+                 Passwords cannot be recovered - ensure you have your mnemonic backed up."
+                    .to_string()
             }
         }
     }
@@ -63,17 +66,16 @@ impl HasErrorSuggestion for EncryptionError {
 
     fn fix_action(&self) -> Option<FixAction> {
         match self {
-            EncryptionError::InvalidPassword => {
-                Some(FixAction::CheckState {
-                    url: "https://docs.csv.dev/wallet/recovery".to_string(),
-                    what: "Verify password or recover from mnemonic".to_string(),
-                })
-            }
+            EncryptionError::InvalidPassword => Some(FixAction::CheckState {
+                url: "https://docs.csv.dev/wallet/recovery".to_string(),
+                what: "Verify password or recover from mnemonic".to_string(),
+            }),
             EncryptionError::EncryptionFailed(_) | EncryptionError::DecryptionFailed(_) => {
                 Some(FixAction::Retry {
-                    parameter_changes: std::collections::HashMap::from([
-                        ("verify_memory".to_string(), "true".to_string()),
-                    ]),
+                    parameter_changes: std::collections::HashMap::from([(
+                        "verify_memory".to_string(),
+                        "true".to_string(),
+                    )]),
                 })
             }
         }
@@ -95,17 +97,17 @@ pub struct EncryptedWallet {
 pub fn encrypt(data: &[u8], password: &str) -> Result<EncryptedWallet, EncryptionError> {
     // Generate random nonce
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-    
+
     // Derive key from password with random salt
     let salt = Aes256Gcm::generate_nonce(&mut OsRng);
     let key = derive_key(password, &salt);
-    
+
     let cipher = Aes256Gcm::new(&key);
-    
+
     let ciphertext = cipher
         .encrypt(&nonce, data)
         .map_err(|e| EncryptionError::EncryptionFailed(format!("AES-GCM encryption: {}", e)))?;
-    
+
     Ok(EncryptedWallet {
         ciphertext: base64_encode(&ciphertext),
         nonce: base64_encode(&nonce),
@@ -121,12 +123,12 @@ pub fn decrypt(encrypted: &EncryptedWallet, password: &str) -> Result<Vec<u8>, E
         .map_err(|e| EncryptionError::DecryptionFailed(format!("Invalid nonce: {}", e)))?;
     let salt = base64_decode(&encrypted.salt)
         .map_err(|e| EncryptionError::DecryptionFailed(format!("Invalid salt: {}", e)))?;
-    
+
     let key = derive_key(password, &salt);
     let cipher = Aes256Gcm::new(&key);
-    
+
     let nonce = Nonce::from_slice(&nonce);
-    
+
     cipher
         .decrypt(nonce, ciphertext.as_ref())
         .map_err(|_| EncryptionError::InvalidPassword)
@@ -136,23 +138,22 @@ pub fn decrypt(encrypted: &EncryptedWallet, password: &str) -> Result<Vec<u8>, E
 /// This provides memory-hard key derivation to resist brute-force attacks.
 fn derive_key(password: &str, salt: &[u8]) -> Key<Aes256Gcm> {
     use argon2::{
-        password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
         Argon2, Params,
+        password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
     };
-    
+
     // Use Argon2id with recommended parameters for interactive use
     // t=2 iterations, m=64 MiB, p=4 parallelism
     let params = Params::new(65536, 2, 4, None).expect("Invalid Argon2 params");
     let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
-    
+
     // Hash the password with the salt
-    let salt_string = SaltString::encode_b64(&salt)
-        .expect("Invalid salt for base64 encoding");
+    let salt_string = SaltString::encode_b64(&salt).expect("Invalid salt for base64 encoding");
     let password_hash = argon2
         .hash_password(password.as_bytes(), &salt_string)
         .expect("Failed to hash password")
         .hash;
-    
+
     // Extract the hash bytes (first 32 bytes for AES-256)
     let hash_bytes = password_hash
         .as_ref()
@@ -180,7 +181,7 @@ fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
     }
     (0..s.len())
         .step_by(2)
-        .map(|i| u8::from_str_radix(&s[i..i+2], 16).map_err(|e| e.to_string()))
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| e.to_string()))
         .collect()
 }
 
@@ -197,10 +198,10 @@ mod tests {
     fn test_encrypt_decrypt() {
         let data = b"test wallet data";
         let password = "secure_password";
-        
+
         let encrypted = encrypt(data, password).unwrap();
         let decrypted = decrypt(&encrypted, password).unwrap();
-        
+
         assert_eq!(data.to_vec(), decrypted);
     }
 
@@ -209,10 +210,10 @@ mod tests {
         let data = b"test wallet data";
         let password = "correct_password";
         let wrong_password = "wrong_password";
-        
+
         let encrypted = encrypt(data, password).unwrap();
         let result = decrypt(&encrypted, wrong_password);
-        
+
         assert!(result.is_err());
     }
 }

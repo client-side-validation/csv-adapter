@@ -1,6 +1,6 @@
 //! Transaction card component.
 
-use crate::context::{use_wallet_context, TransactionRecord, TransactionStatus};
+use crate::context::{TransactionRecord, TransactionStatus, use_wallet_context};
 use crate::pages::common::*;
 use crate::routes::Route;
 use dioxus::prelude::*;

@@ -7,7 +7,7 @@
 //! - ChainId signatures display
 //! - Raw proof data viewer
 
-use crate::components::hash_display::{shorten_hash, HashDisplay};
+use crate::components::hash_display::{HashDisplay, shorten_hash};
 use dioxus::prelude::*;
 
 /// Cross-chain proof data structure.
