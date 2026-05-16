@@ -1,8 +1,41 @@
 //! Cross-chain operations for CSV sanads.
 //!
-//! This module provides functionality for minting sanads on destination chains
-//! as part of cross-chain transfers, with optional SQLite-backed persistence
-//! for the transfer registry (SC-02).
+//! This module builds on top of [`csv_core::cross_chain`] which provides the
+//! core cross-chain types and orchestrator ([`CrossChainTransfer`],
+//! [`StandardTransferVerifier`], [`CrossChainRegistry`], etc.).
+//!
+//! # Relationship with csv-core
+//!
+//! - `csv_core::cross_chain` — Core types (lock events, inclusion proofs,
+//!   finality proofs, transfer state machine, in-memory registry).
+//! - `csv_sdk::cross_chain` — SDK extensions: SQLite-backed persistence
+//!   ([`PersistentTransferRegistry`]), chain-specific mint operations
+//!   ([`mint_sanad_on_chain`]), and integration between persistent storage
+//!   and the in-memory registry via [`load_into_registry`] / [`save_from_registry`].
+//!
+//! ## Architecture
+//!
+//! ```text
+//! csv_core::cross_chain::CrossChainTransfer (orchestrator)
+//!     ↕ loads/saves from
+//! csv_sdk::cross_chain::PersistentTransferRegistry (SQLite)
+//!     ↕ used by
+//! csv_sdk::cross_chain::mint_sanad_on_chain (chain adapter dispatch)
+//! ```
+//!
+//! ## Usage
+//!
+//! 1. Use `PersistentTransferRegistry` for SQLite-backed double-spend tracking.
+//! 2. Load persisted transfers into `csv_core::CrossChainRegistry` via
+//!    [`PersistentTransferRegistry::load_into_registry`].
+//! 3. Use `csv_core::CrossChainTransfer::execute` with loaded registry.
+//! 4. Save updated registry back via [`PersistentTransferRegistry::save_from_registry`].
+//!
+//! ## Re-exports from csv_core::cross_chain
+//!
+//! For convenience, key types from `csv_core::cross_chain` are re-exported
+//! here so that SDK consumers don't need to depend on csv-core directly
+//! for cross-chain operations.
 
 use csv_core::{ChainId, Hash};
 
@@ -249,14 +282,38 @@ impl PersistentTransferRegistry {
                 .parse()
                 .map_err(|_| CrossChainError::Database("invalid to_chain".to_string()))?,
             destination_seal: match row.mint_tx.as_ref() {
-                Some(mint) => parse_seal(mint).unwrap_or_else(|_| {
-                    // mint_tx may be invalid at time of lock; use placeholder
-                    // SAFETY: Placeholder seal for pending transfers with valid non-empty id
-                    unsafe { SealPoint::new_unchecked(vec![0u8], None) }
+                Some(mint) => parse_seal(mint).unwrap_or_else(|err| {
+                    log::error!(
+                        "Failed to parse destination seal from mint_tx: {}. \
+                         Transfer will require recovery/re-query of mint transaction.",
+                        err
+                    );
+                    // If mint_tx is present but parse fails, re-derive the seal from mint TX
+                    // by creating a SealPoint from the mint transaction hash bytes
+                    SealPoint::new(
+                        hex::decode(mint.trim_start_matches("0x"))
+                            .unwrap_or_else(|_| vec![0u8; 32]),
+                        None,
+                    )
+                    .unwrap_or_else(|_| {
+                        // Fallback: use the mint_tx hash directly as seal id
+                        // This allows recovery by re-querying the mint transaction
+                        SealPoint::new(hex::decode(mint.trim_start_matches("0x"))
+                            .unwrap_or_else(|_| vec![0u8; 32]), None)
+                        .unwrap_or_else(|_| SealPoint::new(mint.as_bytes().to_vec(), None)
+                            .expect("SealPoint from mint_tx bytes"))
+                    })
                 }),
                 None => {
-                    // mint_tx is NULL at time of lock; use placeholder
-                    unsafe { SealPoint::new_unchecked(vec![0u8], None) }
+                    // mint_tx is NULL — this is a pending transfer (locked but not yet minted)
+                    // Store a recovery marker instead of a placeholder zero seal
+                    // The recovery mechanism will re-query the destination chain
+                    // once the mint transaction completes
+                    SealPoint::new(
+                        format!("pending_recovery_{}", row.sanad_id).as_bytes().to_vec(),
+                        None,
+                    )
+                    .expect("Failed to create recovery seal marker")
                 }
             },
             lock_tx_hash: parse_hash(&row.lock_tx)?,

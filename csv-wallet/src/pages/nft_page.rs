@@ -1,6 +1,6 @@
 //! NFT Gallery page component
 
-use crate::context::{NftCollection, NftRecord, NftStatus};
+use crate::context::{NftCollection, NftRecord, NftStatus, use_wallet_context};
 use dioxus::prelude::*;
 
 #[component]
@@ -62,15 +62,16 @@ pub fn NftPage() -> Element {
 /// 3. Store NFT data in wallet state
 #[component]
 pub fn NftGallery() -> Element {
-    // TODO: Wire to real NFT data source via context
-    // For now, show empty state with instructions
-    let has_nfts = false;
+    // Read NFTs from wallet context state
+    let wallet_ctx = use_wallet_context();
+    let nfts = wallet_ctx.nfts.clone();
 
     rsx! {
-        if has_nfts {
+        if !nfts.is_empty() {
             div { class: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
-                // NFT cards will render here when data is available
-                "NFT collection will appear here once connected to an NFT data source."
+                for nft in nfts {
+                    NftCard { nft: nft.clone() }
+                }
             }
         } else {
             div { class: "flex flex-col items-center justify-center py-16 text-center",
@@ -79,12 +80,7 @@ pub fn NftGallery() -> Element {
                     "No NFTs Found"
                 }
                 p { class: "text-gray-600 dark:text-gray-400 max-w-md mb-6",
-                    "This feature requires connection to an NFT data source (e.g., Alchemy, Moralis, or direct chain queries)."
-                }
-                div { class: "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 max-w-lg",
-                    p { class: "text-sm text-blue-800 dark:text-blue-200",
-                        "To implement: Add NFT service to AppContext that fetches from blockchain RPC or NFT APIs."
-                    }
+                    "Your NFTs will appear here once you receive or mint them through the CSV protocol."
                 }
             }
         }
@@ -96,13 +92,16 @@ pub fn NftGallery() -> Element {
 /// **NOTE**: Currently displays empty state. Requires NFT service implementation.
 #[component]
 pub fn NftCollections() -> Element {
-    // TODO: Wire to real NFT collection data
-    let has_collections = false;
+    // Read NFT collections from wallet context state
+    let wallet_ctx = use_wallet_context();
+    let collections = wallet_ctx.nft_collections.clone();
 
     rsx! {
-        if has_collections {
+        if !collections.is_empty() {
             div { class: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
-                "Collections will appear here once connected to an NFT data source."
+                for collection in collections {
+                    CollectionCard { collection: collection.clone() }
+                }
             }
         } else {
             div { class: "flex flex-col items-center justify-center py-16 text-center",
@@ -111,7 +110,7 @@ pub fn NftCollections() -> Element {
                     "No Collections Found"
                 }
                 p { class: "text-gray-600 dark:text-gray-400 max-w-md",
-                    "NFT collections will appear here once you connect to an NFT data source."
+                    "NFT collections will appear here once you receive or mint them."
                 }
             }
         }

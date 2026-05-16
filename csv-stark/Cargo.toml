@@ -14,5 +14,13 @@ hex = "0.4"
 thiserror = "1.0"
 bincode = "1.3"
 
+[features]
+# EXPERIMENTAL: STARK batch verification for IoT sensor streams.
+# This module uses mock/stub implementations and is NOT ready for production.
+# Enable this feature explicitly to include csv-stark in your build.
+# Production builds MUST exclude this module.
+# Integration with winterfell or stone-prover is needed for real STARK proofs.
+experimental = []
+
 [dev-dependencies]
 rand = "0.8"

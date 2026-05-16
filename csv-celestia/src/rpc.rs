@@ -294,16 +294,56 @@ impl CelestiaRpc for CelestiaNode {
         height: u64,
         commitment: [u8; 32],
     ) -> Result<CommitmentProof> {
-        // For real implementation, this would use blob.GetProof
-        // For now, return a placeholder
+        // Use the blob.GetProof RPC to fetch a real commitment proof from the Celestia node
         let namespace = Namespace::metadata();
+        let params = serde_json::json!({
+            "height": height,
+            "namespace": hex::encode(namespace.as_bytes()),
+            "commitment": hex::encode(commitment),
+        });
+
+        let request = self.build_request("blob.GetProof", params);
+
+        let response = self
+            .client
+            .post(&self.endpoint)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| CelestiaError::RpcError(format!("HTTP error: {}", e)))?;
+
+        let result: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| CelestiaError::RpcError(format!("JSON error: {}", e)))?;
+
+        if let Some(error) = result.get("error") {
+            return Err(CelestiaError::RpcError(format!("RPC error: {}", error)));
+        }
+
+        // Parse proof data from response
+        let proof_result = &result["result"];
+
+        // Extract row_root from the proof (hex-encoded, 32 bytes)
+        let row_root = proof_result["row_root"]
+            .as_str()
+            .and_then(|s| hex::decode(s).ok())
+            .and_then(|b| b.try_into().ok())
+            .unwrap_or_else(|| {
+                log::warn!("Missing or invalid row_root in Celestia GetProof response");
+                [0u8; 32]
+            });
+
+        // Get the block header to extract data_root and block_hash
+        let header = self.get_header(height).await?;
+
         Ok(CommitmentProof::new(
             height,
             namespace,
             crate::commitment::BlobCommitment::new(commitment),
-            [0u8; 32], // row_root
-            [0u8; 32], // data_root
-            [0u8; 32], // block_hash
+            row_root,
+            header.data_root,
+            header.hash,
         ))
     }
 

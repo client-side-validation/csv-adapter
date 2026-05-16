@@ -102,16 +102,33 @@ impl ChainVerifier for SolanaVerifier {
                 }
             }
             Err(e) => {
-                // Account not found or RPC error
-                // In Solana, an account that doesn't exist was either
-                // never created or has been closed
-                log::warn!(
-                    "Solana account not found for seal {}: {}",
-                    hex::encode(seal_id.as_bytes()),
-                    e
-                );
-                // Account doesn't exist - assume consumed
-                Ok(false)
+                // Check if the account simply doesn't exist (never created or was closed)
+                // vs a genuine RPC error
+                let err_str = e.to_string().to_lowercase();
+                if err_str.contains("not found")
+                    || err_str.contains("no account")
+                    || err_str.contains("does not exist")
+                    || err_str.contains("address not found")
+                {
+                    // Account doesn't exist on-chain — was never created or has been closed/consumed
+                    log::warn!(
+                        "Solana seal account not found for seal {}: {}",
+                        hex::encode(seal_id.as_bytes()),
+                        e
+                    );
+                    Ok(false)
+                } else {
+                    // Genuine RPC error — fail loudly rather than returning a silent false
+                    log::error!(
+                        "Solana RPC error while querying seal registry for {}: {}",
+                        hex::encode(seal_id.as_bytes()),
+                        e
+                    );
+                    Err(csv_core::ProtocolError::NetworkError(format!(
+                        "Failed to query Solana seal registry: {}",
+                        e
+                    )))
+                }
             }
         }
     }

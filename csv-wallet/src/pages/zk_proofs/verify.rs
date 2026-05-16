@@ -286,8 +286,22 @@ fn verify_zk_proof(input: &str) -> Result<(ZkSealProof, bool), String> {
     // Verify based on proof system
     let valid = match proof.verifier_key.proof_system {
         csv_core::zk_proof::ProofSystem::SP1 => {
-            // Bitcoin SPV proofs use structural validation (no ZkVerifier impl yet)
-            proof.is_structurally_valid()
+            // Bitcoin SPV proofs
+            #[cfg(feature = "csv-bitcoin")]
+            {
+                use csv_bitcoin::zk_prover::BitcoinSpvProver;
+                use csv_core::zk_proof::ZkProver;
+                // Use Bitcoin SP1 prover to verify the proof
+                let prover = BitcoinSpvProver::new();
+                prover.verify(&proof).map_err(|e| format!("SP1 verification failed: {}", e))?
+            }
+            #[cfg(not(feature = "csv-bitcoin"))]
+            {
+                // Bitcoin verifier not available in this build
+                return Err(
+                    "Bitcoin SP1 proof verification requires 'csv-bitcoin' feature".to_string()
+                );
+            }
         }
         csv_core::zk_proof::ProofSystem::Groth16 => {
             #[cfg(feature = "csv-ethereum")]
@@ -296,18 +310,23 @@ fn verify_zk_proof(input: &str) -> Result<(ZkSealProof, bool), String> {
                 use csv_ethereum::zk_verifier::EthereumGroth16Verifier;
                 // Use Ethereum Groth16 verifier
                 let verifier = EthereumGroth16Verifier::new();
-                verifier.verify(&proof).is_ok()
+                verifier.verify(&proof)
+                    .map_err(|e| format!("Groth16 verification failed: {}", e))?
             }
             #[cfg(not(feature = "csv-ethereum"))]
             {
                 // Ethereum verifier not available in this build
-                // For now, accept mock proofs (structural validation only)
-                proof.is_structurally_valid()
+                return Err(
+                    "Ethereum Groth16 proof verification requires 'csv-ethereum' feature".to_string()
+                );
             }
         }
         _ => {
-            // Unsupported proof system - fall back to structural validation
-            proof.is_structurally_valid()
+            // Unsupported proof system
+            return Err(format!(
+                "Unsupported proof system: {}. Supported systems: SP1, Groth16",
+                proof.verifier_key.proof_system
+            ));
         }
     };
 

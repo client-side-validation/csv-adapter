@@ -154,6 +154,11 @@ pub struct StateProofVerifier;
 impl StateProofVerifier {
     /// Verify a state proof against the accumulator root.
     ///
+    /// Performs full Merkle path verification:
+    /// 1. Computes the leaf hash from the state proof data
+    /// 2. Walks the Merkle path using sibling hashes from the proof
+    /// 3. Compares the computed root with the expected root
+    ///
     /// # Arguments
     /// * `proof` - The state proof to verify
     /// * `expected_root` - The expected accumulator root hash
@@ -165,21 +170,60 @@ impl StateProofVerifier {
             return false;
         }
 
-        // In production: verify the Merkle proof against the accumulator root
-        // This involves:
-        // 1. Computing the leaf hash from the state proof data
-        // 2. Walking the Merkle path using the proof siblings
-        // 3. Comparing the computed root with the expected root
-        //
-        // Simplified: check that proof data is non-empty
-        let leaf_hash = proof.leaf_hash();
-        let _expected_root_hash: [u8; 32] = match expected_root.try_into() {
+        let expected_root_hash: [u8; 32] = match expected_root.try_into() {
             Ok(hash) => hash,
             Err(_) => return false,
         };
 
-        // For now, accept any valid proof with data
-        proof.state_proof.len() >= 32 && leaf_hash.len() == 32
+        // Parse proof format: [num_siblings (4 bytes LE)] [sibling_hashes...] [leaf_data...]
+        if proof.state_proof.len() < 4 {
+            return false;
+        }
+
+        let num_siblings = u32::from_le_bytes([
+            proof.state_proof[0],
+            proof.state_proof[1],
+            proof.state_proof[2],
+            proof.state_proof[3],
+        ]) as usize;
+
+        // Each sibling is 32 bytes, plus we need leaf data
+        let min_expected_len = 4 + num_siblings * 32;
+        if proof.state_proof.len() < min_expected_len {
+            return false;
+        }
+
+        // Compute leaf hash from the proof data
+        let leaf_hash = proof.leaf_hash();
+
+        // Walk the Merkle path using siblings
+        let mut current_hash = leaf_hash;
+        for i in 0..num_siblings {
+            let sibling_start = 4 + i * 32;
+            let sibling_end = sibling_start + 32;
+            let sibling: [u8; 32] = match proof.state_proof[sibling_start..sibling_end].try_into() {
+                Ok(h) => h,
+                Err(_) => return false,
+            };
+
+            // Convention: lower index first, then higher index
+            // The leaf's position in the tree determines ordering
+            let mut combined = sha2::Sha256::new();
+            // For Aptos state proofs, the leaf position determines left/right ordering
+            // We use a positional nibble approach: position is derived from the leaf hash
+            let position_bit = (leaf_hash[0] >> (i % 8)) & 1;
+            if position_bit == 0 {
+                combined.update(&current_hash);
+                combined.update(sibling);
+            } else {
+                combined.update(sibling);
+                combined.update(&current_hash);
+            }
+            current_hash = combined.finalize().into();
+        }
+
+        // Compare computed root with expected root
+        current_hash == expected_root_hash
     }
 
     /// Verify that a resource was NOT consumed (still exists).

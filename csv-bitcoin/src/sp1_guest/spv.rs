@@ -134,10 +134,36 @@ impl Sp1BtcSpvOutput {
     }
 
     /// Create a ZkSealProof from this output
+    ///
+    /// The verifier key is loaded from the `SP1_VERIFIER_KEY` environment variable
+    /// at runtime. This ensures that the verification key is never hardcoded in
+    /// the binary and can be rotated without code changes.
     pub fn to_zk_proof(&self, proof_bytes: Vec<u8>) -> Result<ZkSealProof, &'static str> {
+        let key_bytes = if let Ok(key_hex) = std::env::var("SP1_VERIFIER_KEY") {
+            hex::decode(&key_hex)
+                .map_err(|_| "SP1_VERIFIER_KEY must be a valid hex string")?
+        } else {
+            #[cfg(test)]
+            {
+                // Use a deterministic test key in test builds
+                let mut key = vec![0u8; 64];
+                key[0] = 0xAB;
+                key[63] = 0xCD;
+                key
+            }
+            #[cfg(not(test))]
+            {
+                return Err(
+                    "SP1_VERIFIER_KEY environment variable not set. \
+                     Set SP1_VERIFIER_KEY to the hex-encoded SP1 verifier \
+                     verification key before generating ZK proofs."
+                );
+            }
+        };
+
         let verifier_key = VerifierKey::new(
             builtin::BITCOIN.clone(),
-            vec![0u8; 64], // Placeholder - real key would be loaded from env
+            key_bytes,
             ProofSystem::SP1,
             1,
         );
