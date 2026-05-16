@@ -319,7 +319,7 @@ impl TransferBuilder {
             .confirm_transaction(
                 self.from_chain.clone(),
                 &lock_tx_hash,
-                1, // required confirmations
+                1,   // required confirmations
                 300, // 5 minute timeout
             )
             .await?;
@@ -366,7 +366,12 @@ impl TransferBuilder {
         let commitment = Hash::new(commitment_bytes);
         let inclusion_proof = self
             .runtime
-            .build_inclusion_proof(self.from_chain.clone(), &commitment, finality_block)
+            .build_inclusion_proof(
+                self.from_chain.clone(),
+                &commitment,
+                finality_block,
+                lock_tx_hash.as_bytes(),
+            )
             .await?;
 
         // Step 3.5: Broadcast proof via P2P for destination chain discovery

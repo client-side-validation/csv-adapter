@@ -28,6 +28,31 @@ pub fn mint_sanad_from_hex_key(
         transaction::Transaction,
     };
 
+    fn post_rpc_json(rpc_url: String, request: serde_json::Value) -> SolanaResult<serde_json::Value> {
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| SolanaError::Rpc(format!("Failed to build HTTP runtime: {}", e)))?;
+
+            rt.block_on(async move {
+                let response = reqwest::Client::new()
+                    .post(&rpc_url)
+                    .json(&request)
+                    .send()
+                    .await
+                    .map_err(|e| SolanaError::Rpc(format!("RPC request failed: {}", e)))?;
+
+                response
+                    .json()
+                    .await
+                    .map_err(|e| SolanaError::Rpc(format!("Failed to parse RPC response: {}", e)))
+            })
+        })
+        .join()
+        .map_err(|_| SolanaError::Rpc("HTTP worker thread panicked".to_string()))?
+    }
+
     // Parse private key from hex
     let cleaned = private_key_hex.trim().trim_start_matches("0x").trim();
     let key_bytes =
@@ -52,21 +77,16 @@ pub fn mint_sanad_from_hex_key(
         .map_err(|e| SolanaError::InvalidProgramId(format!("Invalid program ID: {}", e)))?;
 
     // Get recent blockhash via JSON-RPC
-    let client = reqwest::blocking::Client::new();
-    let blockhash_resp = client
-        .post(rpc_url)
-        .json(&json!({
+    let blockhash_json = post_rpc_json(
+        rpc_url.to_string(),
+        json!({
             "jsonrpc": "2.0",
             "method": "getLatestBlockhash",
             "params": [],
             "id": 1
-        }))
-        .send()
-        .map_err(|e| SolanaError::Rpc(format!("Failed to get blockhash: {}", e)))?;
-
-    let blockhash_json: serde_json::Value = blockhash_resp
-        .json()
-        .map_err(|e| SolanaError::Rpc(format!("Failed to parse blockhash: {}", e)))?;
+        }),
+    )
+    .map_err(|e| SolanaError::Rpc(format!("Failed to get blockhash: {}", e)))?;
 
     let blockhash_str = blockhash_json
         .get("result")
@@ -135,20 +155,16 @@ pub fn mint_sanad_from_hex_key(
     let tx_base64 = general_purpose::STANDARD.encode(&tx_bytes);
 
     // Send via JSON-RPC
-    let send_resp = client
-        .post(rpc_url)
-        .json(&json!({
+    let send_json = post_rpc_json(
+        rpc_url.to_string(),
+        json!({
             "jsonrpc": "2.0",
             "method": "sendTransaction",
             "params": [tx_base64, {"encoding": "base64"}],
             "id": 1
-        }))
-        .send()
-        .map_err(|e| SolanaError::Transaction(format!("Send request failed: {}", e)))?;
-
-    let send_json: serde_json::Value = send_resp
-        .json()
-        .map_err(|e| SolanaError::Transaction(format!("Failed to parse response: {}", e)))?;
+        }),
+    )
+    .map_err(|e| SolanaError::Transaction(format!("Send request failed: {}", e)))?;
 
     if let Some(error) = send_json.get("error") {
         return Err(SolanaError::Transaction(format!("RPC error: {}", error)));

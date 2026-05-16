@@ -139,10 +139,9 @@ pub mod real_rpc_impl {
                                     .client
                                     .get_slot_with_commitment(CommitmentConfig::confirmed())
                                 {
-                                    Ok(confirmed_slot)
-                                        if confirmed_slot <= finalized_slot => {
-                                            return Ok(ConfirmationStatus::Finalized);
-                                        }
+                                    Ok(confirmed_slot) if confirmed_slot <= finalized_slot => {
+                                        return Ok(ConfirmationStatus::Finalized);
+                                    }
                                     _ => return Ok(ConfirmationStatus::Confirmed),
                                 }
                             }

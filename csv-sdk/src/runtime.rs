@@ -28,10 +28,10 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-#[cfg(feature = "tokio")]
-use tokio::sync::Mutex;
 #[cfg(not(feature = "tokio"))]
 use std::sync::Mutex;
+#[cfg(feature = "tokio")]
+use tokio::sync::Mutex;
 #[cfg(feature = "wasm")]
 #[allow(unused_imports)]
 use wasm_bindgen_futures::spawn_local;
@@ -213,11 +213,12 @@ impl ChainRuntime {
         chain: ChainId,
         commitment: &Hash,
         block_height: u64,
+        anchor_id: &[u8],
     ) -> Result<csv_core::InclusionProof, CsvError> {
         let adapter = self.get_adapter(chain.clone()).await?;
 
         adapter
-            .build_inclusion_proof(commitment, block_height)
+            .build_inclusion_proof(commitment, block_height, anchor_id)
             .await
             .map_err(|e| CsvError::ProtocolError {
                 chain: chain.clone(),
@@ -563,7 +564,7 @@ impl ChainRuntime {
 
         // Build inclusion proof from chain state
         let inclusion_proof = adapter
-            .build_inclusion_proof(&commitment, block_height)
+            .build_inclusion_proof(&commitment, block_height, sanad_id.as_bytes())
             .await
             .map_err(|e| CsvError::ProtocolError {
                 chain: chain.clone(),
@@ -755,38 +756,36 @@ impl ChainRuntime {
         use csv_p2p::{NostrTransport, ProofTransport};
 
         let mut transport = NostrTransport::new();
-        transport.initialize().await.map_err(|e| CsvError::P2PError(format!(
-            "Failed to initialize Nostr transport: {}", e
-        )))?;
+        transport.initialize().await.map_err(|e| {
+            CsvError::P2PError(format!("Failed to initialize Nostr transport: {}", e))
+        })?;
 
         // Build a minimal ProofBundle from the InclusionProof for broadcast
         let proof_bundle = csv_core::ProofBundle {
             transition_dag: csv_core::dag::DAGSegment::new(vec![], proof.block_hash),
             signatures: vec![],
-            seal_ref: csv_core::SealPoint::new(vec![], None).map_err(|e| CsvError::P2PError(format!(
-                "Failed to create seal ref: {}", e
-            )))?,
+            seal_ref: csv_core::SealPoint::new(vec![], None)
+                .map_err(|e| CsvError::P2PError(format!("Failed to create seal ref: {}", e)))?,
             anchor_ref: csv_core::seal::CommitAnchor::new(
                 vec![],
                 proof.position,
                 chain.to_string().into_bytes(),
-            ).map_err(|e| CsvError::P2PError(format!(
-                "Failed to create anchor ref: {}", e
-            )))?,
+            )
+            .map_err(|e| CsvError::P2PError(format!("Failed to create anchor ref: {}", e)))?,
             inclusion_proof: proof.clone(),
-            finality_proof: csv_core::FinalityProof::new(vec![], 1, true).map_err(|e| CsvError::P2PError(format!(
-                "Failed to create finality proof: {}", e
-            )))?,
+            finality_proof: csv_core::FinalityProof::new(vec![], 1, true).map_err(|e| {
+                CsvError::P2PError(format!("Failed to create finality proof: {}", e))
+            })?,
         };
 
-        transport.broadcast_proof(&proof_bundle).await.map_err(|e| CsvError::P2PError(format!(
-            "Failed to broadcast proof to Nostr relays: {}", e
-        )))?;
+        transport
+            .broadcast_proof(&proof_bundle)
+            .await
+            .map_err(|e| {
+                CsvError::P2PError(format!("Failed to broadcast proof to Nostr relays: {}", e))
+            })?;
 
-        log::info!(
-            "Proof for chain {:?} broadcast via Nostr P2P",
-            chain
-        );
+        log::info!("Proof for chain {:?} broadcast via Nostr P2P", chain);
 
         Ok(())
     }
@@ -821,15 +820,13 @@ impl ChainRuntime {
 }
 
 /// Adapter configuration for the runtime.
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct RuntimeConfig {
     /// RPC endpoints for each chain
     pub rpc_endpoints: HashMap<ChainId, String>,
     /// Chain-specific configuration
     pub chain_config: HashMap<ChainId, HashMap<String, String>>,
 }
-
 
 /// Builder for constructing chain-specific ChainBackend instances.
 ///
@@ -882,11 +879,12 @@ impl AdapterBuilder {
             })?;
 
         // Create ChainOperations from SealProtocol (this implements ChainBackend)
-        let operations =
-            EthereumBackend::from_seal_protocol(Arc::new(seal)).map_err(|e| CsvError::ProtocolError {
+        let operations = EthereumBackend::from_seal_protocol(Arc::new(seal)).map_err(|e| {
+            CsvError::ProtocolError {
                 chain: ChainId::new("ethereum"),
                 message: format!("Failed to create Ethereum chain operations: {}", e),
-            })?;
+            }
+        })?;
 
         Ok(Arc::new(operations))
     }
@@ -907,11 +905,12 @@ impl AdapterBuilder {
                 message: format!("Failed to create Sui seal protocol: {}", e),
             })?;
 
-        let operations =
-            SuiBackend::from_seal_protocol(Arc::new(seal)).map_err(|e| CsvError::ProtocolError {
+        let operations = SuiBackend::from_seal_protocol(Arc::new(seal)).map_err(|e| {
+            CsvError::ProtocolError {
                 chain: ChainId::new("sui"),
                 message: format!("Failed to create Sui chain operations: {}", e),
-            })?;
+            }
+        })?;
 
         Ok(Arc::new(operations))
     }
@@ -932,11 +931,12 @@ impl AdapterBuilder {
                 message: format!("Failed to create Aptos seal protocol: {}", e),
             })?;
 
-        let operations =
-            AptosBackend::from_seal_protocol(Arc::new(seal)).map_err(|e| CsvError::ProtocolError {
+        let operations = AptosBackend::from_seal_protocol(Arc::new(seal)).map_err(|e| {
+            CsvError::ProtocolError {
                 chain: ChainId::new("aptos"),
                 message: format!("Failed to create Aptos chain operations: {}", e),
-            })?;
+            }
+        })?;
 
         Ok(Arc::new(operations))
     }
@@ -958,11 +958,12 @@ impl AdapterBuilder {
                 message: format!("Failed to create Solana seal protocol: {}", e),
             })?;
 
-        let operations =
-            SolanaBackend::from_seal_protocol(Arc::new(seal)).map_err(|e| CsvError::ProtocolError {
+        let operations = SolanaBackend::from_seal_protocol(Arc::new(seal)).map_err(|e| {
+            CsvError::ProtocolError {
                 chain: ChainId::new("solana"),
                 message: format!("Failed to create Solana chain operations: {}", e),
-            })?;
+            }
+        })?;
 
         Ok(Arc::new(operations))
     }
@@ -984,11 +985,12 @@ impl AdapterBuilder {
                 message: format!("Failed to create Bitcoin seal protocol: {}", e),
             })?;
 
-        let operations =
-            BitcoinBackend::from_seal_protocol(Arc::new(seal)).map_err(|e| CsvError::ProtocolError {
+        let operations = BitcoinBackend::from_seal_protocol(Arc::new(seal)).map_err(|e| {
+            CsvError::ProtocolError {
                 chain: ChainId::new("bitcoin"),
                 message: format!("Failed to create Bitcoin chain operations: {}", e),
-            })?;
+            }
+        })?;
 
         Ok(Arc::new(operations))
     }

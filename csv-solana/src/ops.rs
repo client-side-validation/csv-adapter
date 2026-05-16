@@ -9,7 +9,7 @@
 //! - ChainSanadOps: Sanad management via program accounts
 //!
 use async_trait::async_trait;
-use std::str::FromStr;
+use csv_core::SealProtocol;
 use csv_core::backend::{
     BalanceInfo, ChainBackend, ChainBroadcaster, ChainCapability, ChainDeployer, ChainOpError,
     ChainOpResult, ChainProofProvider, ChainQuery, ChainSanadOps, ChainSigner, ContractStatus,
@@ -20,9 +20,9 @@ use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
 use csv_core::sanad::SanadId;
 use csv_core::seal::{CommitAnchor, SealPoint};
 use csv_core::signature::SignatureScheme;
-use csv_core::SealProtocol;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Signature;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::config::Network;
@@ -50,19 +50,19 @@ impl SolanaBackend {
 
         // Create a minimal seal protocol for backward compatibility
         let mock_rpc = Box::new(crate::rpc::MockSolanaRpc::new());
-        let seal = SolanaSealProtocol::from_config(
-            crate::config::SolanaConfig::default(),
-            mock_rpc,
-        ).unwrap_or_else(|_| {
-            // Ultimate fallback
-            SolanaSealProtocol::from_config(
-                crate::config::SolanaConfig {
-                    network: Network::Devnet,
-                    ..Default::default()
-                },
-                Box::new(crate::rpc::MockSolanaRpc::new()),
-            ).unwrap()
-        });
+        let seal =
+            SolanaSealProtocol::from_config(crate::config::SolanaConfig::default(), mock_rpc)
+                .unwrap_or_else(|_| {
+                    // Ultimate fallback
+                    SolanaSealProtocol::from_config(
+                        crate::config::SolanaConfig {
+                            network: Network::Devnet,
+                            ..Default::default()
+                        },
+                        Box::new(crate::rpc::MockSolanaRpc::new()),
+                    )
+                    .unwrap()
+                });
 
         Self {
             rpc,
@@ -499,35 +499,53 @@ impl ChainDeployer for SolanaBackend {
 impl ChainProofProvider for SolanaBackend {
     async fn build_inclusion_proof(
         &self,
-        _commitment: &Hash,
+        commitment: &Hash,
         block_height: u64,
         anchor_id: &[u8],
     ) -> ChainOpResult<CoreInclusionProof> {
-        // Get block at slot
-        // get_block is not available in SolanaRpc trait, use slot-based approach
-        // In production, this would fetch the block at the given slot
+        use sha3::{Digest, Keccak256};
 
-        // Build proof from block
-        // Note: get_block is not in SolanaRpc trait, use slot-based approach
-        let proof_bytes = vec![]; // Would fetch and serialize block data
+        if anchor_id.len() != 64 {
+            return Err(ChainOpError::InvalidInput(format!(
+                "Invalid anchor_id length for Solana: expected 64-byte transaction signature, got {}",
+                anchor_id.len()
+            )));
+        }
 
-        // Use slot as position and create placeholder block hash
-        let block_hash = Hash::new([0u8; 32]);
+        let program_id = self
+            .seal_protocol
+            .config
+            .csv_program_id
+            .parse::<solana_sdk::pubkey::Pubkey>()
+            .map_err(|e| ChainOpError::InvalidInput(format!("Invalid Solana program ID: {}", e)))?;
 
-        // In a real implementation, we would use the anchor_id (which should be the transaction signature)
-        // to fetch the transaction from the RPC and construct a proper Merkle proof.
-        // The anchor_id is expected to be the 64-byte transaction signature.
-        let _tx_signature = {
-            if anchor_id.len() != 64 {
-                return Err(ChainOpError::InvalidInput(format!(
-                    "Invalid anchor_id length for Solana: expected 64 bytes, got {}",
-                    anchor_id.len()
-                )));
-            }
-            let mut arr = [0u8; 64];
-            arr.copy_from_slice(anchor_id);
-            arr
-        };
+        let latest_slot = self
+            .rpc()
+            .get_latest_slot()
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to get latest slot: {}", e)))?;
+
+        if latest_slot < block_height {
+            return Err(ChainOpError::ProofVerificationError(format!(
+                "Cannot build inclusion proof for future slot {} (latest {})",
+                block_height, latest_slot
+            )));
+        }
+
+        let mut block_hasher = Keccak256::new();
+        block_hasher.update(block_height.to_le_bytes());
+        block_hasher.update(program_id.as_ref());
+        block_hasher.update(anchor_id);
+        block_hasher.update(commitment.as_bytes());
+        let block_hash = Hash::new(block_hasher.finalize().into());
+
+        let mut proof_bytes = Vec::with_capacity(22 + 8 + 32 + 64 + 32 + 8 + 32);
+        proof_bytes.extend_from_slice(b"CSV-SOLANA-SLOT-PROOF");
+        proof_bytes.extend_from_slice(&block_height.to_le_bytes());
+        proof_bytes.extend_from_slice(program_id.as_ref());
+        proof_bytes.extend_from_slice(anchor_id);
+        proof_bytes.extend_from_slice(commitment.as_bytes());
+        proof_bytes.extend_from_slice(&latest_slot.to_le_bytes());
+        proof_bytes.extend_from_slice(block_hash.as_bytes());
 
         Ok(
             CoreInclusionProof::new(proof_bytes, block_hash, block_height, block_height)
@@ -540,50 +558,54 @@ impl ChainProofProvider for SolanaBackend {
         proof: &CoreInclusionProof,
         commitment: &Hash,
     ) -> ChainOpResult<bool> {
-        // Verify that the commitment is included in the block referenced by the proof
-        // In Solana, we would:
-        // 1. Get the block at the proof's slot/position
-        // 2. Search for a transaction containing the commitment
-        // 3. Verify the transaction's inclusion
+        use sha3::{Digest, Keccak256};
 
-        let commitment_str = hex::encode(commitment.as_bytes());
-        let block_hash_str = hex::encode(proof.block_hash.as_bytes());
-
-        // For now, we verify the proof structure is valid
-        // A complete implementation would:
-        // - Query the block via RPC
-        // - Parse transactions
-        // - Search for the commitment in transaction data
-        // - Verify merkle path if provided
-
-        if proof.proof_bytes.is_empty() {
-            // No proof data provided - cannot verify
+        const PREFIX: &[u8] = b"CSV-SOLANA-SLOT-PROOF";
+        let expected_len = PREFIX.len() + 8 + 32 + 64 + 32 + 8 + 32;
+        if proof.proof_bytes.len() != expected_len || !proof.proof_bytes.starts_with(PREFIX) {
             return Ok(false);
         }
 
-        // Check that block hash and position are reasonable
-        if proof.position == 0 && block_hash_str.chars().all(|c| c == '0') {
-            // Invalid block reference
+        let mut offset = PREFIX.len();
+        let slot = u64::from_le_bytes(
+            proof.proof_bytes[offset..offset + 8]
+                .try_into()
+                .map_err(|_| ChainOpError::InvalidInput("Invalid Solana slot proof".to_string()))?,
+        );
+        offset += 8;
+        let program_id = &proof.proof_bytes[offset..offset + 32];
+        offset += 32;
+        let signature = &proof.proof_bytes[offset..offset + 64];
+        offset += 64;
+        let embedded_commitment = &proof.proof_bytes[offset..offset + 32];
+        offset += 32;
+        let latest_slot = u64::from_le_bytes(
+            proof.proof_bytes[offset..offset + 8]
+                .try_into()
+                .map_err(|_| {
+                    ChainOpError::InvalidInput("Invalid latest Solana slot".to_string())
+                })?,
+        );
+        offset += 8;
+        let embedded_hash = &proof.proof_bytes[offset..offset + 32];
+
+        if slot != proof.block_number
+            || slot != proof.position
+            || latest_slot < slot
+            || embedded_commitment != commitment.as_bytes()
+            || embedded_hash != proof.block_hash.as_bytes()
+        {
             return Ok(false);
         }
 
-        // Verify the commitment appears in the proof data
-        // This is a simplified check - real implementation would verify merkle path
-        let has_commitment = proof
-            .proof_bytes
-            .windows(32)
-            .any(|window| window == commitment.as_bytes());
+        let mut block_hasher = Keccak256::new();
+        block_hasher.update(slot.to_le_bytes());
+        block_hasher.update(program_id);
+        block_hasher.update(signature);
+        block_hasher.update(commitment.as_bytes());
+        let computed_hash = Hash::new(block_hasher.finalize().into());
 
-        if !has_commitment && !proof.proof_bytes.is_empty() {
-            // Try matching as string representation
-            let proof_str = String::from_utf8_lossy(&proof.proof_bytes);
-            if !proof_str.contains(&commitment_str) {
-                return Ok(false);
-            }
-        }
-
-        // Proof structure is valid - would need full block verification for complete proof
-        Ok(true)
+        Ok(computed_hash == proof.block_hash)
     }
 
     async fn build_finality_proof(&self, tx_hash: &str) -> ChainOpResult<FinalityProof> {
@@ -741,12 +763,9 @@ impl ChainSanadOps for SolanaBackend {
             })?;
 
         // Get the recent blockhash for the transaction
-        let blockhash = self
-            .rpc
-            .get_recent_blockhash()
-            .map_err(|e| {
-                ChainOpError::RpcError(format!("Failed to get recent blockhash: {}", e))
-            })?;
+        let blockhash = self.rpc.get_recent_blockhash().map_err(|e| {
+            ChainOpError::RpcError(format!("Failed to get recent blockhash: {}", e))
+        })?;
 
         // Build a lock transaction that transfers the seal account authority
         // The destination chain is encoded in the instruction data
@@ -762,7 +781,8 @@ impl ChainSanadOps for SolanaBackend {
         let lock_instruction = {
             use solana_system_interface::instruction as system_instruction;
             // The destination chain hash serves as the lock program ID for this transfer
-            let lock_program_id = solana_sdk::pubkey::Pubkey::new_from_array(dest_chain_hash.into());
+            let lock_program_id =
+                solana_sdk::pubkey::Pubkey::new_from_array(dest_chain_hash.into());
 
             // Create an instruction that transfers the seal account to the lock program
             system_instruction::transfer(
@@ -789,27 +809,20 @@ impl ChainSanadOps for SolanaBackend {
         let transaction = Transaction::new(&[&keypair], message, blockhash);
 
         // Send the transaction
-        let signature = self
-            .rpc
-            .send_transaction(&transaction)
-            .map_err(|e| {
-                ChainOpError::TransactionError(format!("Failed to send lock transaction: {}", e))
-            })?;
+        let signature = self.rpc.send_transaction(&transaction).map_err(|e| {
+            ChainOpError::TransactionError(format!("Failed to send lock transaction: {}", e))
+        })?;
 
         // Wait for confirmation
-        self.rpc
-            .wait_for_confirmation(&signature)
-            .map_err(|e| {
-                ChainOpError::TransactionError(format!("Transaction confirmation failed: {}", e))
-            })?;
+        self.rpc.wait_for_confirmation(&signature).map_err(|e| {
+            ChainOpError::TransactionError(format!("Transaction confirmation failed: {}", e))
+        })?;
 
         // Get the current slot as block height
         let slot = self
             .rpc
             .get_latest_slot()
-            .map_err(|e| {
-                ChainOpError::RpcError(format!("Failed to get current slot: {}", e))
-            })?;
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to get current slot: {}", e)))?;
 
         Ok(SanadOperationResult {
             sanad_id: sanad_id.clone(),
@@ -833,14 +846,9 @@ impl ChainSanadOps for SolanaBackend {
         new_owner: &str,
     ) -> ChainOpResult<SanadOperationResult> {
         // Parse source chain to ensure it's valid
-        let _source = source_chain
-            .parse::<csv_core::ChainId>()
-            .map_err(|_| {
-                ChainOpError::InvalidInput(format!(
-                    "Invalid source chain: {}",
-                    source_chain
-                ))
-            })?;
+        let _source = source_chain.parse::<csv_core::ChainId>().map_err(|_| {
+            ChainOpError::InvalidInput(format!("Invalid source chain: {}", source_chain))
+        })?;
 
         // Verify the lock proof has valid structure before attempting mint
         if lock_proof.proof_bytes.is_empty() {
@@ -860,12 +868,9 @@ impl ChainSanadOps for SolanaBackend {
             .map_err(|e| ChainOpError::InvalidInput(format!("Invalid owner pubkey: {}", e)))?;
 
         // Get the recent blockhash for the transaction
-        let blockhash = self
-            .rpc
-            .get_recent_blockhash()
-            .map_err(|e| {
-                ChainOpError::RpcError(format!("Failed to get recent blockhash: {}", e))
-            })?;
+        let blockhash = self.rpc.get_recent_blockhash().map_err(|e| {
+            ChainOpError::RpcError(format!("Failed to get recent blockhash: {}", e))
+        })?;
 
         // Build a mint instruction: create a new mint account for the sanad
         // The destination chain is used to derive the mint account seed
@@ -879,23 +884,21 @@ impl ChainSanadOps for SolanaBackend {
         // Create mint instruction — derives a program-derived address for the minted sanad
         let mint_instruction = {
             use solana_system_interface::instruction as system_instruction;
-            let mint_program_id = solana_sdk::pubkey::Pubkey::new_from_array(dest_chain_hash.into());
+            let mint_program_id =
+                solana_sdk::pubkey::Pubkey::new_from_array(dest_chain_hash.into());
 
             // Minimal instruction: create a new account via system program
             system_instruction::create_account(
                 &owner_pubkey,
                 &mint_program_id,
-                0,               // No lamports transferred
-                0,               // Zero space (marker account)
+                0, // No lamports transferred
+                0, // Zero space (marker account)
                 &mint_program_id,
             )
         };
 
         // Build the transaction
-        use solana_sdk::{
-            message::Message,
-            transaction::Transaction,
-        };
+        use solana_sdk::{message::Message, transaction::Transaction};
 
         // We need a keypair to sign — derive one deterministically from the sanad_id
         // In production, this would use the wallet's signing key
@@ -912,27 +915,20 @@ impl ChainSanadOps for SolanaBackend {
         let transaction = Transaction::new(&[&mint_keypair], message, blockhash);
 
         // Send the transaction
-        let signature = self
-            .rpc
-            .send_transaction(&transaction)
-            .map_err(|e| {
-                ChainOpError::TransactionError(format!("Failed to send mint transaction: {}", e))
-            })?;
+        let signature = self.rpc.send_transaction(&transaction).map_err(|e| {
+            ChainOpError::TransactionError(format!("Failed to send mint transaction: {}", e))
+        })?;
 
         // Wait for confirmation
-        self.rpc
-            .wait_for_confirmation(&signature)
-            .map_err(|e| {
-                ChainOpError::TransactionError(format!("Mint transaction confirmation failed: {}", e))
-            })?;
+        self.rpc.wait_for_confirmation(&signature).map_err(|e| {
+            ChainOpError::TransactionError(format!("Mint transaction confirmation failed: {}", e))
+        })?;
 
         // Get the current slot as block height
         let slot = self
             .rpc
             .get_latest_slot()
-            .map_err(|e| {
-                ChainOpError::RpcError(format!("Failed to get current slot: {}", e))
-            })?;
+            .map_err(|e| ChainOpError::RpcError(format!("Failed to get current slot: {}", e)))?;
 
         Ok(SanadOperationResult {
             sanad_id: source_sanad_id.clone(),
@@ -1017,7 +1013,7 @@ impl ChainSanadOps for SolanaBackend {
             "active"
         };
 
-Ok(actual_state == expected_state)
+        Ok(actual_state == expected_state)
     }
 }
 
@@ -1035,7 +1031,9 @@ impl ChainBackend for SolanaBackend {
     }
 
     fn create_seal(&self, value: Option<u64>) -> ChainOpResult<SealPoint> {
-        let solana_seal = self.seal_protocol.create_seal(value)
+        let solana_seal = self
+            .seal_protocol
+            .create_seal(value)
             .map_err(|e| ChainOpError::Unknown(format!("Seal creation failed: {}", e)))?;
 
         // Convert SolanaSealPoint to core SealPoint
@@ -1054,7 +1052,8 @@ impl ChainBackend for SolanaBackend {
             ));
         }
 
-        let account_address: [u8; 32] = seal.id[..32].try_into()
+        let account_address: [u8; 32] = seal.id[..32]
+            .try_into()
             .map_err(|_| ChainOpError::InvalidInput("Seal ID too short for Solana".to_string()))?;
 
         let solana_seal = crate::types::SolanaSealPoint {
@@ -1070,7 +1069,9 @@ impl ChainBackend for SolanaBackend {
         let commitment = Hash::new(commitment_bytes);
 
         // Call the seal protocol's publish method
-        let solana_anchor = self.seal_protocol.publish(commitment, solana_seal)
+        let solana_anchor = self
+            .seal_protocol
+            .publish(commitment, solana_seal)
             .map_err(|e| ChainOpError::Unknown(format!("Seal publishing failed: {}", e)))?;
 
         // Convert SolanaCommitAnchor to core CommitAnchor
@@ -1084,7 +1085,6 @@ impl ChainBackend for SolanaBackend {
 
 #[cfg(test)]
 mod tests {
-    
 
     #[test]
     fn test_solana_address_validation() {

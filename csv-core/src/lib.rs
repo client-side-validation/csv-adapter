@@ -162,8 +162,8 @@ pub mod stealth;
 
 // Protocol version, chain IDs, transfer status, error codes, capabilities
 pub use protocol_version::{
-    builtin, Capabilities, ChainId, ErrorCode, ProtocolVersion, SyncStatus, TransferStatus,
-    SimplifiedTransferStatus, simplified_to_full, PROTOCOL_VERSION,
+    Capabilities, ChainId, ErrorCode, PROTOCOL_VERSION, ProtocolVersion, SimplifiedTransferStatus,
+    SyncStatus, TransferStatus, builtin, simplified_to_full,
 };
 
 // ===========================================================================
@@ -174,7 +174,7 @@ pub use commitment::Commitment;
 pub use hash::Hash;
 pub use sanad::{OwnershipProof, Sanad, SanadError, SanadId};
 pub use seal::{CommitAnchor, SealPoint};
-pub use signature::{parse_signatures_from_bytes, verify_signatures, Signature, SignatureScheme};
+pub use signature::{Signature, SignatureScheme, parse_signatures_from_bytes, verify_signatures};
 
 // DAG and proofs
 pub use dag::{DAGNode, DAGSegment};
@@ -195,8 +195,8 @@ pub use backend::{
 
 // Event schemas (Production Guarantee Plan Phase 6)
 pub use events::{
-    event_names, metadata_fields, CsvEvent, EventData, EventFilter, EventFinalityStatus,
-    EventIndexer, EventIndexerRegistry,
+    CsvEvent, EventData, EventFilter, EventFinalityStatus, EventIndexer, EventIndexerRegistry,
+    event_names, metadata_fields,
 };
 
 // Cross-chain transfer
@@ -222,13 +222,13 @@ pub use commitments_ext::{
 };
 
 // Agent-friendly types
-pub use mcp::{error_codes, ErrorSuggestion, FixAction, HasErrorSuggestion};
+pub use mcp::{ErrorSuggestion, FixAction, HasErrorSuggestion, error_codes};
 
 // Production hardening
 pub use hardening::{
-    BoundedQueue, CircuitBreaker, CircuitState, MemoryLimits, TimeoutConfig,
-    DEFAULT_CIRCUIT_MAX_FAILURES, DEFAULT_CIRCUIT_RESET_TIMEOUT, DEFAULT_HEALTH_CHECK_TIMEOUT,
-    DEFAULT_RPC_TIMEOUT, MAX_CACHE_SIZE, MAX_REGISTRY_SIZE, MAX_SEAL_NULLIFIER_SIZE,
+    BoundedQueue, CircuitBreaker, CircuitState, DEFAULT_CIRCUIT_MAX_FAILURES,
+    DEFAULT_CIRCUIT_RESET_TIMEOUT, DEFAULT_HEALTH_CHECK_TIMEOUT, DEFAULT_RPC_TIMEOUT,
+    MAX_CACHE_SIZE, MAX_REGISTRY_SIZE, MAX_SEAL_NULLIFIER_SIZE, MemoryLimits, TimeoutConfig,
 };
 
 // State machine (Phase 1)
@@ -259,9 +259,9 @@ pub use driver::{ChainDriver, ChainDriverExt, ChainError, ChainResult, RpcClient
 
 // Unified driver registry (Phase 2)
 pub use driver_registry::{
-    create_driver, global_factory, init_global_factory, is_chain_supported as is_driver_supported,
     BuiltDriverPlugin, DriverDiscovery, DriverMetadata, DriverPlugin, DriverPluginBuildError,
-    DriverPluginBuilder, DriverRegistry,
+    DriverPluginBuilder, DriverRegistry, create_driver, global_factory, init_global_factory,
+    is_chain_supported as is_driver_supported,
 };
 
 // ===========================================================================
@@ -277,8 +277,8 @@ pub use commit_mux::{CommitMux, MerkleBranchNode, MuxLeaf, MuxProof, ProtocolId}
 /// These APIs may change or be removed without notice.
 #[cfg(feature = "experimental")]
 pub use vm::{
-    execute_transition, AluVmAdapter, DeterministicVM, MeteredVMAdapter, PassthroughVM, VMError,
-    VMInputs, VMOutputs,
+    AluVmAdapter, DeterministicVM, MeteredVMAdapter, PassthroughVM, VMError, VMInputs, VMOutputs,
+    execute_transition,
 };
 
 /// Experimental module — feature-gated behind `experimental`.
@@ -301,8 +301,8 @@ pub use atomic_swap::{
 // ===========================================================================
 
 pub use stealth::{
-    compute_ephemeral_point, derive_stealth_base, EphemeralPoint, ScanPublicKey, SpendPublicKey,
-    StealthAddress, StealthAddressPair, StealthScanEntry, StealthWallet,
+    EphemeralPoint, ScanPublicKey, SpendPublicKey, StealthAddress, StealthAddressPair,
+    StealthScanEntry, StealthWallet, compute_ephemeral_point, derive_stealth_base,
 };
 
 // ===========================================================================

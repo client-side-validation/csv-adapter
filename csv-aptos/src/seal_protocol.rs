@@ -196,7 +196,9 @@ impl AptosSealProtocol {
         };
 
         #[cfg(not(feature = "rpc"))]
-        let exists = Ok(true);
+        let exists: AptosResult<bool> = Err(AptosError::FeatureNotEnabled(
+            "Aptos seal availability requires the 'rpc' feature; refusing to assume the on-chain resource exists".to_string(),
+        ));
 
         let exists = exists.map_err(|e: AptosError| ProtocolError::from(e))?;
 

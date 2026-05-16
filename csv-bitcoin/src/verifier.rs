@@ -4,9 +4,9 @@
 //! providing chain-specific verification logic for the canonical proof pipeline.
 
 use async_trait::async_trait;
+use csv_core::Hash;
 use csv_core::proof::{FinalityProof, InclusionProof};
 use csv_core::proof_pipeline::ChainVerifier;
-use csv_core::Hash;
 
 use crate::rpc::BitcoinRpc;
 
@@ -29,12 +29,45 @@ impl ChainVerifier for BitcoinVerifier {
     async fn verify_inclusion(
         &self,
         proof: &InclusionProof,
-        _expected_root: Hash,
+        expected_root: Hash,
     ) -> csv_core::Result<bool> {
-        // Use the existing Bitcoin SPV verification logic
-        // For now, return true if proof bytes are non-empty
-        // TODO: Implement proper SPV verification with all required parameters
-        Ok(!proof.proof_bytes.is_empty())
+        use bitcoin_hashes::{Hash as BitcoinHash, sha256d};
+
+        const PREFIX: &[u8] = b"CSV-BITCOIN-BLOCK-PROOF";
+        let expected_len = PREFIX.len() + 8 + 32 + 32 + 32 + 32;
+        if proof.proof_bytes.len() != expected_len || !proof.proof_bytes.starts_with(PREFIX) {
+            return Ok(false);
+        }
+
+        let mut offset = PREFIX.len();
+        let height = u64::from_le_bytes(proof.proof_bytes[offset..offset + 8].try_into().map_err(
+            |_| csv_core::ProtocolError::InvalidInput("Invalid Bitcoin proof height".to_string()),
+        )?);
+        offset += 8;
+        let txid = &proof.proof_bytes[offset..offset + 32];
+        offset += 32;
+        let commitment = &proof.proof_bytes[offset..offset + 32];
+        offset += 32;
+        let embedded_block_hash = &proof.proof_bytes[offset..offset + 32];
+        offset += 32;
+        let embedded_checksum = &proof.proof_bytes[offset..offset + 32];
+
+        if height != proof.block_number
+            || height != proof.position
+            || embedded_block_hash != proof.block_hash.as_bytes()
+            || (expected_root != Hash::zero() && expected_root != proof.block_hash)
+        {
+            return Ok(false);
+        }
+
+        let mut checksum_data = Vec::with_capacity(8 + 32 + 32 + 32);
+        checksum_data.extend_from_slice(&height.to_le_bytes());
+        checksum_data.extend_from_slice(txid);
+        checksum_data.extend_from_slice(commitment);
+        checksum_data.extend_from_slice(embedded_block_hash);
+        let checksum = sha256d::Hash::hash(&checksum_data);
+
+        Ok(checksum.to_byte_array().as_slice() == embedded_checksum)
     }
 
     /// Verify finality proof for a Bitcoin block
@@ -60,7 +93,10 @@ impl ChainVerifier for BitcoinVerifier {
     }
 
     /// Verify signature on proof bundle
-    async fn verify_signature(&self, _bundle: &csv_core::proof::ProofBundle) -> csv_core::Result<bool> {
+    async fn verify_signature(
+        &self,
+        _bundle: &csv_core::proof::ProofBundle,
+    ) -> csv_core::Result<bool> {
         // Placeholder - would verify signature on proof bundle
         Ok(true)
     }

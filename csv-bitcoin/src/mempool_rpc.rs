@@ -8,7 +8,7 @@
 
 use bitcoin::{OutPoint, Txid};
 use bitcoin_hashes::Hash as BitcoinHash;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -45,40 +45,65 @@ impl MempoolSignetRpc {
         Self { client, base_url }
     }
 
+    fn run_http<T, F>(future: F) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
+    where
+        T: Send + 'static,
+        F: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>>
+            + Send
+            + 'static,
+    {
+        thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| format!("Failed to build HTTP runtime: {}", e))?;
+            rt.block_on(future)
+        })
+        .join()
+        .map_err(|_| "HTTP worker thread panicked".into())
+        .and_then(|result| result)
+    }
+
     /// HTTP GET with automatic retry and exponential backoff
-    fn get_with_retry<T: serde::de::DeserializeOwned>(
+    fn get_with_retry<T: serde::de::DeserializeOwned + Send + 'static>(
         &self,
         url: &str,
     ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
-        let mut last_err = None;
-        let mut backoff = INITIAL_BACKOFF;
+        let client = self.client.clone();
+        let url = url.to_string();
 
-        for attempt in 0..=MAX_RETRIES {
-            if attempt > 0 {
-                log::warn!(
-                    "Retry {}/{} for {} after {:?} backoff",
-                    attempt,
-                    MAX_RETRIES,
-                    url,
-                    backoff
-                );
-                thread::sleep(backoff);
-                backoff *= 2;
+        Self::run_http(async move {
+            let mut last_err = None;
+            let mut backoff = INITIAL_BACKOFF;
+
+            for attempt in 0..=MAX_RETRIES {
+                if attempt > 0 {
+                    log::warn!(
+                        "Retry {}/{} for {} after {:?} backoff",
+                        attempt,
+                        MAX_RETRIES,
+                        url,
+                        backoff
+                    );
+                    tokio::time::sleep(backoff).await;
+                    backoff *= 2;
+                }
+
+                match client.get(&url).send().await {
+                    Ok(resp) if resp.status().is_success() => {
+                        return resp.json::<T>().await.map_err(|e| e.into());
+                    }
+                    Ok(resp) => {
+                        last_err = Some(format!("HTTP {} at {}", resp.status(), url).into());
+                    }
+                    Err(e) => {
+                        last_err = Some(format!("Network error at {}: {}", url, e).into());
+                    }
+                }
             }
 
-            match self.client.get(url).send() {
-                Ok(resp) if resp.status().is_success() => {
-                    return resp.json::<T>().map_err(|e| e.into());
-                }
-                Ok(resp) => {
-                    last_err = Some(format!("HTTP {} at {}", resp.status(), url).into());
-                }
-                Err(e) => {
-                    last_err = Some(format!("Network error at {}: {}", url, e).into());
-                }
-            }
-        }
-        Err(last_err.unwrap_or_else(|| "Max retries exceeded".into()))
+            Err(last_err.unwrap_or_else(|| "Max retries exceeded".into()))
+        })
     }
 
     /// HTTP GET text with retry
@@ -86,28 +111,34 @@ impl MempoolSignetRpc {
         &self,
         url: &str,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        let mut last_err = None;
-        let mut backoff = INITIAL_BACKOFF;
+        let client = self.client.clone();
+        let url = url.to_string();
 
-        for attempt in 0..=MAX_RETRIES {
-            if attempt > 0 {
-                thread::sleep(backoff);
-                backoff *= 2;
+        Self::run_http(async move {
+            let mut last_err = None;
+            let mut backoff = INITIAL_BACKOFF;
+
+            for attempt in 0..=MAX_RETRIES {
+                if attempt > 0 {
+                    tokio::time::sleep(backoff).await;
+                    backoff *= 2;
+                }
+
+                match client.get(&url).send().await {
+                    Ok(resp) if resp.status().is_success() => {
+                        return resp.text().await.map_err(|e| e.into());
+                    }
+                    Ok(resp) => {
+                        last_err = Some(format!("HTTP {} at {}", resp.status(), url).into());
+                    }
+                    Err(e) => {
+                        last_err = Some(format!("Network error at {}: {}", url, e).into());
+                    }
+                }
             }
 
-            match self.client.get(url).send() {
-                Ok(resp) if resp.status().is_success() => {
-                    return resp.text().map_err(|e| e.into());
-                }
-                Ok(resp) => {
-                    last_err = Some(format!("HTTP {} at {}", resp.status(), url).into());
-                }
-                Err(e) => {
-                    last_err = Some(format!("Network error at {}: {}", url, e).into());
-                }
-            }
-        }
-        Err(last_err.unwrap_or_else(|| "Max retries exceeded".into()))
+            Err(last_err.unwrap_or_else(|| "Max retries exceeded".into()))
+        })
     }
 
     /// HTTP POST text with retry
@@ -116,36 +147,43 @@ impl MempoolSignetRpc {
         url: &str,
         body: String,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        let mut last_err = None;
-        let mut backoff = INITIAL_BACKOFF;
+        let client = self.client.clone();
+        let url = url.to_string();
 
-        for attempt in 0..=MAX_RETRIES {
-            if attempt > 0 {
-                thread::sleep(backoff);
-                backoff *= 2;
+        Self::run_http(async move {
+            let mut last_err = None;
+            let mut backoff = INITIAL_BACKOFF;
+
+            for attempt in 0..=MAX_RETRIES {
+                if attempt > 0 {
+                    tokio::time::sleep(backoff).await;
+                    backoff *= 2;
+                }
+
+                match client
+                    .post(&url)
+                    .header("Content-Type", "text/plain")
+                    .body(body.clone())
+                    .send()
+                    .await
+                {
+                    Ok(resp) if resp.status().is_success() => {
+                        return resp.text().await.map_err(|e| e.into());
+                    }
+                    Ok(resp) => {
+                        let status = resp.status();
+                        let error_text = resp.text().await.unwrap_or_default();
+                        last_err =
+                            Some(format!("HTTP {} at {}: {}", status, url, error_text).into());
+                    }
+                    Err(e) => {
+                        last_err = Some(format!("Network error at {}: {}", url, e).into());
+                    }
+                }
             }
 
-            match self
-                .client
-                .post(url)
-                .header("Content-Type", "text/plain")
-                .body(body.clone())
-                .send()
-            {
-                Ok(resp) if resp.status().is_success() => {
-                    return resp.text().map_err(|e| e.into());
-                }
-                Ok(resp) => {
-                    let status = resp.status();
-                    let error_text = resp.text().unwrap_or_default();
-                    last_err = Some(format!("HTTP {} at {}: {}", status, url, error_text).into());
-                }
-                Err(e) => {
-                    last_err = Some(format!("Network error at {}: {}", url, e).into());
-                }
-            }
-        }
-        Err(last_err.unwrap_or_else(|| "Max retries exceeded".into()))
+            Err(last_err.unwrap_or_else(|| "Max retries exceeded".into()))
+        })
     }
 
     /// Get block info (height, tx count, etc.)

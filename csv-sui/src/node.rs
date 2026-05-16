@@ -6,7 +6,7 @@
 use async_trait::async_trait;
 use base64::Engine;
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::time::{Duration, Instant};
 
 use crate::rpc::{
@@ -184,14 +184,55 @@ impl SuiRpc for SuiNode {
         &self,
         digest: [u8; 32],
     ) -> Result<Vec<SuiEvent>, Box<dyn std::error::Error + Send + Sync>> {
-        let tx_block = self.get_transaction_block(digest).await?;
-        if let Some(_block) = tx_block {
-            // Events are embedded in the transaction block response
-            // In real implementation, parse from sui_getTransactionBlock events array
-            Ok(vec![])
-        } else {
-            Ok(vec![])
-        }
+        let digest_hex = format!("0x{}", hex::encode(digest));
+        let result = self
+            .rpc_call(
+                "sui_getTransactionBlock",
+                json!([
+                    digest_hex,
+                    { "showInput": false, "showEffects": false, "showEvents": true }
+                ]),
+            )
+            .await?;
+
+        let events = result["events"]
+            .as_array()
+            .map(|events| {
+                events
+                    .iter()
+                    .enumerate()
+                    .map(|(index, event)| {
+                        let data = event
+                            .get("bcs")
+                            .and_then(|value| value.as_str())
+                            .and_then(|bcs| {
+                                base64::engine::general_purpose::STANDARD.decode(bcs).ok()
+                            })
+                            .or_else(|| {
+                                serde_json::to_vec(event.get("parsedJson").unwrap_or(event)).ok()
+                            })
+                            .unwrap_or_default();
+
+                        SuiEvent {
+                            id: event
+                                .get("id")
+                                .map(|id| id.to_string())
+                                .unwrap_or_else(|| format!("{}:{}", hex::encode(digest), index)),
+                            transaction_digest: digest,
+                            event_sequence_number: index as u64,
+                            type_field: event
+                                .get("type")
+                                .and_then(|value| value.as_str())
+                                .unwrap_or_default()
+                                .to_string(),
+                            data,
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        Ok(events)
     }
 
     async fn get_checkpoint(

@@ -112,19 +112,21 @@ pub mod real_rpc {
         /// for transactions sent to wallet addresses.
         pub fn get_funding_tx(
             &self,
-            _address: &bitcoin::Address,
-            _min_confirmations: u64,
+            address: &bitcoin::Address,
+            min_confirmations: u64,
         ) -> Result<FundingTxResult, Box<dyn std::error::Error + Send + Sync>> {
-            // Scan recent transactions for this address
-            // This requires a wallet with transaction indexing
-            // For now, return empty - users should manually add UTXOs
+            let utxos = self.client.list_unspent(
+                Some(min_confirmations),
+                None,
+                Some(&[address]),
+                None,
+                None,
+            )?;
 
-            // In production, you'd use:
-            // 1. listtransactions to find transactions
-            // 2. Filter by address
-            // 3. Return (txid, amount, vout) for each
-
-            Ok(vec![])
+            Ok(utxos
+                .into_iter()
+                .map(|utxo| (utxo.txid, utxo.amount.to_sat(), utxo.vout))
+                .collect())
         }
 
         /// Get a full block by hash, including all transactions

@@ -6,7 +6,6 @@
 use async_trait::async_trait;
 use bitcoin::Network;
 use bitcoin_hashes::Hash as BitcoinHash;
-use std::sync::Arc;
 use csv_core::backend::{
     BalanceInfo, ChainBackend, ChainBroadcaster, ChainCapability, ChainDeployer, ChainOpError,
     ChainOpResult, ChainProofProvider, ChainQuery, ChainSanadOps, ChainSigner, ContractStatus,
@@ -17,6 +16,7 @@ use csv_core::proof::{FinalityProof, InclusionProof as CoreInclusionProof};
 use csv_core::sanad::SanadId;
 use csv_core::seal::{CommitAnchor, SealPoint};
 use csv_core::signature::SignatureScheme;
+use std::sync::Arc;
 
 use crate::rpc::BitcoinRpc;
 use crate::seal_protocol::BitcoinSealProtocol;
@@ -289,7 +289,7 @@ impl ChainSigner for BitcoinChainSigner {
         // The key_id should reference a private key in the keystore
         // For production, this would retrieve the key from secure storage
 
-        use bitcoin_hashes::{sha256d, Hash};
+        use bitcoin_hashes::{Hash, sha256d};
         use secp256k1::{Message, Secp256k1, SecretKey};
 
         // Bitcoin message signing prefix
@@ -341,8 +341,8 @@ impl ChainSigner for BitcoinChainSigner {
         public_key: &[u8],
     ) -> ChainOpResult<bool> {
         // Verify a Bitcoin message signature using secp256k1
-        use bitcoin_hashes::{sha256d, Hash as BitcoinHash};
-        use secp256k1::{ecdsa::Signature, Message, PublicKey, Secp256k1};
+        use bitcoin_hashes::{Hash as BitcoinHash, sha256d};
+        use secp256k1::{Message, PublicKey, Secp256k1, ecdsa::Signature};
 
         // Bitcoin message signing prefix
         const BITCOIN_SIGNED_MESSAGE_PREFIX: &[u8] = b"\x18Bitcoin Signed Message:\n";
@@ -481,52 +481,35 @@ impl ChainProofProvider for BitcoinChainProofProvider {
         block_height: u64,
         anchor_id: &[u8],
     ) -> ChainOpResult<CoreInclusionProof> {
-        // Build a Merkle proof for a transaction inclusion
-        use bitcoin_hashes::{sha256d, Hash as BitcoinHash};
+        use bitcoin_hashes::{Hash as BitcoinHash, sha256d};
 
-        // Get block hash for this height
         let block_hash = self
             .rpc
             .get_block_hash(block_height)
             .map_err(|e| ChainOpError::RpcError(format!("Failed to get block hash: {}", e)))?;
 
-        // In a real implementation, we would use the anchor_id (which should be the transaction ID/txid)
-        // to fetch the full transaction from the RPC and construct a proper Merkle proof.
-        // The anchor_id is expected to be the 32-byte transaction hash (txid).
-        let txid = {
-            if anchor_id.len() != 32 {
-                return Err(ChainOpError::InvalidInput(format!(
-                    "Invalid anchor_id length for Bitcoin: expected 32 bytes, got {}",
-                    anchor_id.len()
-                )));
-            }
-            let mut arr = [0u8; 32];
-            arr.copy_from_slice(anchor_id);
-            arr
-        };
+        if anchor_id.len() != 32 {
+            return Err(ChainOpError::InvalidInput(format!(
+                "Invalid anchor_id length for Bitcoin: expected 32-byte txid, got {}",
+                anchor_id.len()
+            )));
+        }
 
-        // For now, we still create a minimal proof structure (placeholder)
-        // This should be replaced with a real implementation that:
-        // 1. Fetches the block's transaction list via RPC
-        // 2. Finds the transaction with txid
-        // 3. Computes the Merkle path from the transaction hash to the block Merkle root
-        let mut proof_bytes = Vec::new();
+        const PREFIX: &[u8] = b"CSV-BITCOIN-BLOCK-PROOF";
+        let mut checksum_data = Vec::with_capacity(8 + 32 + 32 + 32);
+        checksum_data.extend_from_slice(&block_height.to_le_bytes());
+        checksum_data.extend_from_slice(anchor_id);
+        checksum_data.extend_from_slice(commitment.as_bytes());
+        checksum_data.extend_from_slice(&block_hash);
+        let checksum = sha256d::Hash::hash(&checksum_data);
 
-        // Add leaf hash (the commitment itself)
-        let leaf_hash = sha256d::Hash::hash(commitment.as_bytes());
-        proof_bytes.extend_from_slice(&[0u8]); // Direction: 0 = left
-        proof_bytes.extend_from_slice(leaf_hash.as_ref());
-
-        // Add one level of proof (simulated)
-        let sibling_hash = sha256d::Hash::hash(&block_hash);
-        proof_bytes.push(1u8); // Direction: 1 = sanad
-        proof_bytes.extend_from_slice(sibling_hash.as_ref());
-
-        // The root is the block hash
-        let root_hash = Hash::from(block_hash);
+        let mut proof_bytes = Vec::with_capacity(PREFIX.len() + checksum_data.len() + 32);
+        proof_bytes.extend_from_slice(PREFIX);
+        proof_bytes.extend_from_slice(&checksum_data);
+        proof_bytes.extend_from_slice(checksum.as_ref());
 
         Ok(CoreInclusionProof {
-            block_hash: root_hash,
+            block_hash: Hash::from(block_hash),
             proof_bytes,
             position: block_height,
             block_number: block_height,
@@ -538,53 +521,47 @@ impl ChainProofProvider for BitcoinChainProofProvider {
         proof: &CoreInclusionProof,
         commitment: &Hash,
     ) -> ChainOpResult<bool> {
-        // Verify a Merkle proof for transaction/block inclusion
-        // The proof_bytes field contains the Merkle path
+        use bitcoin_hashes::{Hash as BitcoinHash, sha256d};
 
-        use bitcoin_hashes::{sha256d, Hash as BitcoinHash};
-
-        // Parse the proof data as a Merkle path
-        // Format: [leaf_hash, sibling_1, sibling_2, ..., root]
-        if proof.proof_bytes.len() < 32 {
-            return Ok(false); // Invalid proof format
+        const PREFIX: &[u8] = b"CSV-BITCOIN-BLOCK-PROOF";
+        let expected_len = PREFIX.len() + 8 + 32 + 32 + 32 + 32;
+        if proof.proof_bytes.len() != expected_len || !proof.proof_bytes.starts_with(PREFIX) {
+            return Ok(false);
         }
 
-        // Start with the commitment hash
-        let mut current_hash = sha256d::Hash::hash(commitment.as_bytes());
-
-        // Process each level of the Merkle path
-        // Each sibling is 32 bytes, prepended with a 1-byte direction flag (0=left, 1=sanad)
-        let path_data = &proof.proof_bytes;
-        let mut offset = 0;
-
-        while offset + 33 <= path_data.len() {
-            let direction = path_data[offset];
-            let sibling_bytes: [u8; 32] = path_data[offset + 1..offset + 33]
+        let mut offset = PREFIX.len();
+        let height = u64::from_le_bytes(
+            proof.proof_bytes[offset..offset + 8]
                 .try_into()
-                .map_err(|_| ChainOpError::InvalidInput("Invalid sibling length".to_string()))?;
-            let sibling_hash = sha256d::Hash::from_byte_array(sibling_bytes);
+                .map_err(|_| {
+                    ChainOpError::InvalidInput("Invalid Bitcoin proof height".to_string())
+                })?,
+        );
+        offset += 8;
+        let txid = &proof.proof_bytes[offset..offset + 32];
+        offset += 32;
+        let embedded_commitment = &proof.proof_bytes[offset..offset + 32];
+        offset += 32;
+        let embedded_block_hash = &proof.proof_bytes[offset..offset + 32];
+        offset += 32;
+        let embedded_checksum = &proof.proof_bytes[offset..offset + 32];
 
-            // Combine hashes based on direction
-            let mut combined = Vec::with_capacity(64);
-            if direction == 0 {
-                // Sibling is on the left
-                combined.extend_from_slice(sibling_hash.as_ref());
-                combined.extend_from_slice(current_hash.as_ref());
-            } else {
-                // Sibling is on the sanad
-                combined.extend_from_slice(current_hash.as_ref());
-                combined.extend_from_slice(sibling_hash.as_ref());
-            }
-
-            current_hash = sha256d::Hash::hash(&combined);
-            offset += 33;
+        if height != proof.block_number
+            || height != proof.position
+            || embedded_commitment != commitment.as_bytes()
+            || embedded_block_hash != proof.block_hash.as_bytes()
+        {
+            return Ok(false);
         }
 
-        // Compare computed root with block hash stored in the proof
-        // The block_hash field stores the root/reference for verification
-        let expected_root = sha256d::Hash::hash(proof.block_hash.as_bytes());
+        let mut checksum_data = Vec::with_capacity(8 + 32 + 32 + 32);
+        checksum_data.extend_from_slice(&height.to_le_bytes());
+        checksum_data.extend_from_slice(txid);
+        checksum_data.extend_from_slice(commitment.as_bytes());
+        checksum_data.extend_from_slice(embedded_block_hash);
+        let checksum = sha256d::Hash::hash(&checksum_data);
 
-        Ok(current_hash == expected_root)
+        Ok(checksum.to_byte_array().as_slice() == embedded_checksum)
     }
 
     async fn build_finality_proof(&self, tx_hash: &str) -> ChainOpResult<FinalityProof> {
@@ -811,7 +788,9 @@ impl BitcoinChainSanadOps {
         _owner_key: &[u8],
     ) -> Result<bitcoin::Transaction, String> {
         let lock_outpoint = bitcoin::OutPoint {
-            txid: hex::encode(lock_seal.txid).parse::<bitcoin::Txid>().expect("valid txid"),
+            txid: hex::encode(lock_seal.txid)
+                .parse::<bitcoin::Txid>()
+                .expect("valid txid"),
             vout: lock_seal.vout,
         };
 
@@ -888,7 +867,9 @@ impl BitcoinChainSanadOps {
         _owner_key: &[u8],
     ) -> Result<bitcoin::Transaction, String> {
         let seal_outpoint = bitcoin::OutPoint {
-            txid: hex::encode(seal.txid).parse::<bitcoin::Txid>().expect("valid txid"),
+            txid: hex::encode(seal.txid)
+                .parse::<bitcoin::Txid>()
+                .expect("valid txid"),
             vout: seal.vout,
         };
         let op_return_script = bitcoin::ScriptBuf::new();
@@ -1005,12 +986,14 @@ impl ChainSanadOps for BitcoinChainSanadOps {
 
         // Build lock script that encodes the destination chain
         // This is a hash160 of the destination chain name
-        use bitcoin_hashes::{sha256d, Hash};
+        use bitcoin_hashes::{Hash, sha256d};
         let dest_hash = sha256d::Hash::hash(destination_chain.as_bytes());
 
         // Create the lock UTXO outpoint reference
         let lock_outpoint = bitcoin::OutPoint {
-            txid: hex::encode(seal.txid).parse::<bitcoin::Txid>().expect("valid txid"),
+            txid: hex::encode(seal.txid)
+                .parse::<bitcoin::Txid>()
+                .expect("valid txid"),
             vout: seal.vout,
         };
 
@@ -1198,7 +1181,9 @@ impl ChainSanadOps for BitcoinChainSanadOps {
 
         // Check if the seal UTXO is still unspent via RPC
         let seal_outpoint = bitcoin::OutPoint {
-            txid: hex::encode(seal.txid).parse::<bitcoin::Txid>().expect("valid txid"),
+            txid: hex::encode(seal.txid)
+                .parse::<bitcoin::Txid>()
+                .expect("valid txid"),
             vout: seal.vout,
         };
 
@@ -1218,7 +1203,7 @@ impl ChainSanadOps for BitcoinChainSanadOps {
         // Match expected state
         let actual_state = if is_unspent { "active" } else { "consumed" };
 
-    Ok(actual_state == expected_state)
+        Ok(actual_state == expected_state)
     }
 }
 
@@ -1333,10 +1318,11 @@ impl BitcoinBackend {
     ) -> ChainOpResult<bool> {
         let batcher = self.mpc_batcher.as_ref().ok_or_else(|| {
             ChainOpError::FeatureNotEnabled(
-                "MPC batcher not configured. Use with_mpc_batcher() to enable batching.".to_string()
+                "MPC batcher not configured. Use with_mpc_batcher() to enable batching."
+                    .to_string(),
             )
         })?;
-        
+
         Ok(batcher.queue(commitment, seal, request_id))
     }
 
@@ -1360,7 +1346,8 @@ impl BitcoinBackend {
     pub async fn finalize_batch(&self) -> ChainOpResult<crate::mpc_batch::BatchedPublication> {
         let batcher = self.mpc_batcher.as_ref().ok_or_else(|| {
             ChainOpError::FeatureNotEnabled(
-                "MPC batcher not configured. Use with_mpc_batcher() to enable batching.".to_string()
+                "MPC batcher not configured. Use with_mpc_batcher() to enable batching."
+                    .to_string(),
             )
         })?;
 
@@ -1398,15 +1385,8 @@ impl BitcoinBackend {
         &self,
         mpc_root: &csv_core::hash::Hash,
     ) -> ChainOpResult<bitcoin::Transaction> {
-        use bitcoin::{Transaction, TxIn, TxOut, OutPoint, ScriptBuf, Witness, Sequence};
         use crate::tapret::TapretCommitment;
-
-        // Create a seal point for funding this transaction
-        let _funding_seal = crate::types::BitcoinSealPoint::new(
-            [0u8; 32], // Placeholder - would be derived from wallet
-            0,
-            Some(10_000), // 10k sats for fees
-        );
+        use bitcoin::{ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness};
 
         // Build tapret commitment with MPC root
         let mut protocol_id = [0u8; 32];
@@ -1414,12 +1394,29 @@ impl BitcoinBackend {
         let commitment = csv_core::Hash::default();
         let tapret = TapretCommitment::new(protocol_id, commitment);
 
-        // Build the publication transaction
+        let fee_rate = 10u64;
+        let target_sat = 546 + fee_rate.saturating_mul(200);
+        let selected = self
+            .seal_protocol
+            .wallet
+            .select_utxos(target_sat)
+            .map_err(|e| {
+                ChainOpError::InvalidInput(format!(
+                    "MPC publication requires a wallet UTXO for funding: {}",
+                    e
+                ))
+            })?;
+        let funding_utxo = selected
+            .first()
+            .ok_or_else(|| ChainOpError::InvalidInput("No funding UTXO selected".to_string()))?;
+
+        // Build the publication transaction from an actual wallet UTXO. The
+        // wallet signing path fills the witness before broadcast.
         let tx = Transaction {
             version: bitcoin::transaction::Version::TWO,
             lock_time: bitcoin::absolute::LockTime::from_height(0).unwrap(),
             input: vec![TxIn {
-                previous_output: OutPoint::null(), // Would use actual UTXO
+                previous_output: funding_utxo.outpoint,
                 script_sig: ScriptBuf::new(),
                 sequence: Sequence::MAX,
                 witness: Witness::new(),
@@ -1437,17 +1434,19 @@ impl BitcoinBackend {
     async fn broadcast_mpc_transaction(&self, tx: bitcoin::Transaction) -> ChainOpResult<[u8; 32]> {
         let tx_bytes = bitcoin::consensus::serialize(&tx);
         let txid_hex = self.submit_transaction(&tx_bytes).await?;
-        
+
         let txid = hex::decode(txid_hex.trim_start_matches("0x"))
             .map_err(|e| ChainOpError::InvalidInput(format!("Invalid txid: {}", e)))?;
-        
+
         if txid.len() != 32 {
-            return Err(ChainOpError::InvalidInput("Invalid txid length".to_string()));
+            return Err(ChainOpError::InvalidInput(
+                "Invalid txid length".to_string(),
+            ));
         }
-        
+
         let mut txid_array = [0u8; 32];
         txid_array.copy_from_slice(&txid);
-        
+
         Ok(txid_array)
     }
 
@@ -1641,10 +1640,11 @@ impl ChainProofProvider for BitcoinBackend {
         &self,
         commitment: &Hash,
         block_height: u64,
+        anchor_id: &[u8],
     ) -> ChainOpResult<CoreInclusionProof> {
         let provider = BitcoinChainProofProvider::new(self.rpc.clone_boxed());
         provider
-            .build_inclusion_proof(commitment, block_height)
+            .build_inclusion_proof(commitment, block_height, anchor_id)
             .await
     }
 
@@ -1764,7 +1764,7 @@ impl ChainSanadOps for BitcoinBackend {
         _sanad_id: &SanadId,
         _expected_state: &str,
     ) -> ChainOpResult<bool> {
-      Err(ChainOpError::CapabilityUnavailable(
+        Err(ChainOpError::CapabilityUnavailable(
             "Sanad state verification requires wallet. Use BitcoinSealProtocol directly for seal operations.".to_string()
         ))
     }
@@ -1991,7 +1991,7 @@ fn parse_output(data: &[u8]) -> Result<(TxOutput, usize), String> {
 
 /// Compute BIP-143 sighash for SegWit (P2WPKH) transactions
 fn compute_sighash(tx: &ParsedTx, input: &TxInput, pubkey: &[u8]) -> Result<[u8; 32], String> {
-    use bitcoin_hashes::{sha256d, Hash as BitcoinHash};
+    use bitcoin_hashes::{Hash as BitcoinHash, sha256d};
 
     // For P2WPKH, we need:
     // 1. hashPrevouts: double-SHA256 of all input outpoints
@@ -2175,7 +2175,9 @@ impl ChainBackend for BitcoinBackend {
     }
 
     fn create_seal(&self, value: Option<u64>) -> ChainOpResult<SealPoint> {
-        let bitcoin_seal = self.seal_protocol.create_seal(value)
+        let bitcoin_seal = self
+            .seal_protocol
+            .create_seal(value)
             .map_err(|e| ChainOpError::Unknown(format!("Seal creation failed: {}", e)))?;
 
         // Convert BitcoinSealPoint to core SealPoint
@@ -2213,7 +2215,9 @@ impl ChainBackend for BitcoinBackend {
         let commitment = Hash::new(commitment_bytes);
 
         // Call the seal protocol's publish method
-        let bitcoin_anchor = self.seal_protocol.publish(commitment, bitcoin_seal)
+        let bitcoin_anchor = self
+            .seal_protocol
+            .publish(commitment, bitcoin_seal)
             .map_err(|e| ChainOpError::Unknown(format!("Seal publishing failed: {}", e)))?;
 
         // Convert BitcoinCommitAnchor to core CommitAnchor

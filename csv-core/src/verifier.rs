@@ -44,7 +44,7 @@
 
 use crate::error::{ProtocolError, Result};
 use crate::proof::ProofBundle;
-use crate::signature::{verify_signatures, Signature, SignatureScheme};
+use crate::signature::{Signature, SignatureScheme, verify_signatures};
 
 /// Verify a proof bundle according to the CSV verification pipeline.
 ///
@@ -565,40 +565,38 @@ mod tests {
     fn test_seal_double_spend_regression() {
         // Regression test for double-spend vulnerability
         // This test ensures that the same seal cannot be used in multiple proof bundles
-        
+
         let seal_id = vec![1u8, 2, 3];
-        
+
         // Create first proof bundle with the seal
         let bundle1 = test_bundle_with_signatures().unwrap();
-        
+
         // Simulate a seal registry that tracks consumed seals
         let mut consumed_seals = std::collections::HashSet::new();
-        
+
         // First verification should succeed
-        let seal_registry1 = |seal_id_check: &[u8]| {
-            consumed_seals.contains(seal_id_check)
-        };
+        let seal_registry1 = |seal_id_check: &[u8]| consumed_seals.contains(seal_id_check);
         assert!(verify_proof(&bundle1, seal_registry1, SignatureScheme::Secp256k1).is_ok());
-        
+
         // Mark the seal as consumed
         consumed_seals.insert(seal_id.clone());
-        
+
         // Create second proof bundle with the same seal (double-spend attempt)
         let bundle2 = test_bundle_with_signatures().unwrap();
-        
+
         // Second verification should fail due to seal being consumed
-        let seal_registry2 = |seal_id_check: &[u8]| {
-            consumed_seals.contains(seal_id_check)
-        };
+        let seal_registry2 = |seal_id_check: &[u8]| consumed_seals.contains(seal_id_check);
         let result = verify_proof(&bundle2, seal_registry2, SignatureScheme::Secp256k1);
-        
+
         // Verify that the double-spend attempt is rejected
         assert!(result.is_err(), "Double-spend attempt should be rejected");
-        
+
         // Verify the error message indicates seal replay
         let error_msg = result.unwrap_err().to_string();
         assert!(
-            error_msg.contains("seal") || error_msg.contains("replay") || error_msg.contains("consumed"),
+            error_msg.contains("seal")
+                || error_msg.contains("replay")
+                || error_msg.contains("consumed"),
             "Error should indicate seal replay/consumption: {}",
             error_msg
         );

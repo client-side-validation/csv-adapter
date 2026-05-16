@@ -462,7 +462,7 @@ pub trait TransferVerifier {
     /// 3. Ownership proof valid (owner signature matches)
     /// 4. Lock event matches expected sanad_id and commitment
     fn verify_transfer_proof(&self, proof: &CrossChainTransferProof)
-        -> Result<(), CrossChainError>;
+    -> Result<(), CrossChainError>;
 }
 
 /// Trait for minting a Sanad on a destination chain.
@@ -518,7 +518,10 @@ impl<'a> StandardTransferVerifier<'a> {
             ));
         }
 
-        if !proof.inclusion_proof.matches_chain(&proof.lock_event.source_chain) {
+        if !proof
+            .inclusion_proof
+            .matches_chain(&proof.lock_event.source_chain)
+        {
             return Err(CrossChainError::InvalidInclusionProof);
         }
 
@@ -530,7 +533,9 @@ impl<'a> StandardTransferVerifier<'a> {
             return Err(CrossChainError::InvalidInclusionProof);
         }
 
-        let attested_root = proof.inclusion_proof.attested_root_hash(proof.hash_algorithm);
+        let attested_root = proof
+            .inclusion_proof
+            .attested_root_hash(proof.hash_algorithm);
         if attested_root == Hash::zero()
             || proof.source_state_root == Hash::zero()
             || proof.source_state_root != attested_root
@@ -545,10 +550,14 @@ impl<'a> StandardTransferVerifier<'a> {
         }
 
         let finalized_by_depth = proof.finality_proof.current_height
-            >= proof.finality_proof.height.saturating_add(proof.finality_proof.depth);
+            >= proof
+                .finality_proof
+                .height
+                .saturating_add(proof.finality_proof.depth);
         if !proof.finality_proof.is_finalized || !finalized_by_depth {
             return Err(CrossChainError::InsufficientFinality(
-                proof.finality_proof
+                proof
+                    .finality_proof
                     .current_height
                     .saturating_sub(proof.finality_proof.height),
                 proof.finality_proof.depth,
@@ -579,11 +588,17 @@ impl TransferVerifier for StandardTransferVerifier<'_> {
     ) -> Result<(), CrossChainError> {
         self.verify_compatibility(proof)?;
 
-        if self.registry.is_sanad_transferred(&proof.lock_event.sanad_id) {
+        if self
+            .registry
+            .is_sanad_transferred(&proof.lock_event.sanad_id)
+        {
             return Err(CrossChainError::AlreadyMinted);
         }
 
-        if self.registry.is_seal_consumed(&proof.lock_event.source_seal) {
+        if self
+            .registry
+            .is_seal_consumed(&proof.lock_event.source_seal)
+        {
             return Err(CrossChainError::AlreadyLocked);
         }
 
@@ -856,7 +871,9 @@ mod tests {
 
         let secp = Secp256k1::new();
         let secret_key = SecretKey::from_slice(&[7u8; 32]).unwrap();
-        let public_key = PublicKey::from_secret_key(&secp, &secret_key).serialize().to_vec();
+        let public_key = PublicKey::from_secret_key(&secp, &secret_key)
+            .serialize()
+            .to_vec();
         let message = Message::from_digest_slice(commitment.as_bytes()).unwrap();
         let signature = secp
             .sign_ecdsa(&message, &secret_key)
@@ -913,7 +930,11 @@ mod tests {
     fn test_standard_verifier_accepts_matching_chain_and_hash_algorithm() {
         let registry = CrossChainRegistry::new();
         let verifier = StandardTransferVerifier::new(&registry);
-        assert!(verifier.verify_transfer_proof(&sample_transfer_proof()).is_ok());
+        assert!(
+            verifier
+                .verify_transfer_proof(&sample_transfer_proof())
+                .is_ok()
+        );
     }
 
     #[test]
