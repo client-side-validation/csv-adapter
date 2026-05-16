@@ -116,7 +116,7 @@ pub mod real_rpc {
             min_confirmations: u64,
         ) -> Result<FundingTxResult, Box<dyn std::error::Error + Send + Sync>> {
             let utxos = self.client.list_unspent(
-                Some(min_confirmations),
+                Some(min_confirmations.try_into().unwrap()),
                 None,
                 Some(&[address]),
                 None,

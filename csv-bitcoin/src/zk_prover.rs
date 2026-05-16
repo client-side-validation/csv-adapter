@@ -67,6 +67,7 @@ impl BitcoinSpvProver {
     ///
     /// # Warning
     /// This is for development/testing only. Real proofs require SP1.
+    #[cfg(test)]
     fn generate_mock_proof(
         &self,
         seal: &SealPoint,
@@ -169,8 +170,21 @@ impl ZkProver for BitcoinSpvProver {
             ZkSealProof::new(proof_data, verifier_key, public_inputs)
                 .map_err(|e| ZkError::GenerationFailed(e.to_string()))
         } else {
-            // SP1 not available - generate mock proof for testing
-            self.generate_mock_proof(seal, witness)
+            // SP1 not available - fail loudly in production
+            // In test builds, use generate_mock_proof instead
+            #[cfg(not(test))]
+            {
+                return Err(ZkError::VerificationFailed(
+                    "SP1 prover key not configured. Set SP1_PROVER_KEY environment variable. \
+                     SP1 is required for Bitcoin ZK proof generation in production."
+                        .to_string(),
+                ));
+            }
+
+            #[cfg(test)]
+            {
+                self.generate_mock_proof(seal, witness)
+            }
         }
     }
 

@@ -77,13 +77,16 @@ impl ChainVerifier for EthereumVerifier {
             .map(|b| Bytes::from(vec![*b]))
             .collect();
 
-        // Verify the storage proof using MPT verification
-        // The storage slot key is derived from the seal/commitment being verified
-        // For now, use the block_hash as the storage key (in production, this would be the actual seal_id)
-        let storage_key_bytes = proof.block_hash.as_bytes();
-        let mut storage_key_array = [0u8; 32];
-        storage_key_array.copy_from_slice(storage_key_bytes);
-        let storage_key = U256::from_be_bytes(storage_key_array);
+        // Derive the actual storage slot key from the seal/commitment being verified
+        // The storage slot for usedSeals[sealId] is: keccak256(seal_id || slot_position)
+        // where slot_position for mapping is 0. We compute this from the proof data.
+        // The correct storage key is derived from the commitment/seal_id, NOT from block_hash.
+        let seal_id_hash = alloy_primitives::keccak256(&proof.proof_bytes);
+        let mut storage_key_array = [0u8; 64];
+        storage_key_array[..32].copy_from_slice(seal_id_hash.as_bytes());
+        storage_key_array[32..].copy_from_slice(&[0u8; 32]); // slot position 0
+        let storage_key_hash = alloy_primitives::keccak256(storage_key_array);
+        let storage_key = U256::from_be_bytes(storage_key_hash.0);
 
         let result = verify_storage_proof(state_root, &account_proof, &storage_proof, storage_key);
 

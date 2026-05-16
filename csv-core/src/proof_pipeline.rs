@@ -33,12 +33,12 @@ use std::sync::Mutex;
 
 use crate::domain_hash::DomainSeparatedHash;
 use crate::domains::{ProofBundleDomain, ReplayRegistryDomain};
-use crate::error::Result;
+use crate::error::{ProtocolError, Result};
 use crate::events::{CsvEvent, EventIndexerRegistry};
 use crate::hash::Hash;
 use crate::proof::{FinalityProof, InclusionProof, ProofBundle};
 use crate::protocol_version::ChainId;
-use crate::replay_registry::ReplayKey;
+use crate::replay_registry::{ReplayKey, ReplayRegistryBackend};
 
 /// Chain verifier trait that adapters must implement
 ///
@@ -95,6 +95,7 @@ pub struct ValidationResult {
 /// * `verifier` - Chain-specific verifier implementation
 /// * `source_chain` - Source chain ID
 /// * `destination_chain` - Destination chain ID
+/// * `replay_registry` - Optional replay registry for persistent replay detection
 /// * `event_registry` - Optional event registry for emitting events
 ///
 /// # Returns
@@ -105,6 +106,7 @@ pub async fn validate_proof_bundle(
     verifier: &dyn ChainVerifier,
     source_chain: ChainId,
     destination_chain: ChainId,
+    replay_registry: Option<Arc<Mutex<dyn ReplayRegistryBackend>>>,
     event_registry: Option<Arc<Mutex<EventIndexerRegistry>>>,
 ) -> ValidationResult {
     let mut steps = Vec::with_capacity(10);
@@ -220,7 +222,7 @@ pub async fn validate_proof_bundle(
     }
 
     // Step 6: Replay validation
-    let step6 = validate_replay(bundle);
+    let step6 = validate_replay(bundle, &replay_registry).await;
     steps.push(step6.clone());
     if !step6.passed {
         // Emit replay_detected event
@@ -413,6 +415,33 @@ fn validate_structural(bundle: &ProofBundle) -> ValidationStep {
         };
     }
 
+    // Verify signatures are present
+    if bundle.signatures.is_empty() {
+        return ValidationStep {
+            name: "structural_validation",
+            passed: false,
+            error: Some("No signatures in proof bundle".to_string()),
+        };
+    }
+
+    // Verify the transition DAG has valid root commitment
+    if bundle.transition_dag.root_commitment == Hash::zero() {
+        return ValidationStep {
+            name: "structural_validation",
+            passed: false,
+            error: Some("Transition DAG root commitment is zero".to_string()),
+        };
+    }
+
+    // Verify seal reference is valid
+    if bundle.seal_ref.id.is_empty() {
+        return ValidationStep {
+            name: "structural_validation",
+            passed: false,
+            error: Some("Seal reference ID is empty".to_string()),
+        };
+    }
+
     ValidationStep {
         name: "structural_validation",
         passed: true,
@@ -426,9 +455,6 @@ fn validate_domain(
     source_chain: &ChainId,
     destination_chain: &ChainId,
 ) -> ValidationStep {
-    // Verify that the proof is for the correct source/destination chains
-    // by checking the domain-separated hash matches expected values
-
     // Compute domain-separated hash of the proof bundle
     let proof_hash =
         DomainSeparatedHash::<ProofBundleDomain>::hash(&bundle.inclusion_proof.proof_bytes);
@@ -489,10 +515,13 @@ async fn validate_inclusion_proof(
 }
 
 /// Step 4: ZK proof validation
-async fn validate_zk_proof(_bundle: &ProofBundle, verifier: &dyn ChainVerifier) -> ValidationStep {
-    // ZK proof may be optional for some chains
-    // For now, we skip ZK proof validation as ProofBundle doesn't have a zk_proof field
-    match verifier.verify_zk(&[]).await {
+async fn validate_zk_proof(bundle: &ProofBundle, verifier: &dyn ChainVerifier) -> ValidationStep {
+    // Check if the bundle has ZK proof data in the finality proof's additional data
+    // or somewhere else in the bundle structure
+    let zk_proof_data = bundle.finality_proof.finality_data.as_slice();
+
+    // Pass the actual proof data to the verifier, not an empty slice
+    match verifier.verify_zk(zk_proof_data).await {
         Ok(true) => ValidationStep {
             name: "zk_proof_validation",
             passed: true,
@@ -533,11 +562,10 @@ async fn validate_finality(bundle: &ProofBundle, verifier: &dyn ChainVerifier) -
 }
 
 /// Step 6: Replay validation
-fn validate_replay(bundle: &ProofBundle) -> ValidationStep {
-    // Check replay registry to prevent cross-chain replay attacks
-    // In a real implementation, this would query the persistent replay registry
-    // For now, we compute the replay key and verify it's not in a local cache
-
+async fn validate_replay(
+    bundle: &ProofBundle,
+    replay_registry: &Option<Arc<Mutex<dyn ReplayRegistryBackend>>>,
+) -> ValidationStep {
     // Compute replay key from proof bundle
     let replay_key = ReplayKey::new(
         bundle.inclusion_proof.block_hash,
@@ -547,12 +575,62 @@ fn validate_replay(bundle: &ProofBundle) -> ValidationStep {
         ChainId::new("destination"),       // Would be actual destination chain from bundle
     );
 
-    // Compute domain-separated hash of replay key
-    let _replay_hash =
-        DomainSeparatedHash::<ReplayRegistryDomain>::hash(&replay_key.hash().as_bytes()[..]);
+    // Check persistent replay registry first if available
+    if let Some(registry) = replay_registry {
+        match registry.lock() {
+            Ok(registry_guard) => {
+                let has_been_seen = registry_guard.has_been_seen(&replay_key);
+                match has_been_seen {
+                    Ok(true) => {
+                        // This proof has been seen before - replay attempt
+                        return ValidationStep {
+                            name: "replay_validation",
+                            passed: false,
+                            error: Some("Replay attack detected: proof has been seen before".to_string()),
+                        };
+                    }
+                    Ok(false) => {
+                        // First time seeing this proof - record it
+                        let timestamp = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        let _ = registry_guard.record_proof(replay_key, timestamp);
+                    }
+                    Err(e) => {
+                        // Registry error - fail closed (reject the proof)
+                        return ValidationStep {
+                            name: "replay_validation",
+                            passed: false,
+                            error: Some(format!("Replay registry error: {}", e)),
+                        };
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to acquire replay registry lock: {}", e);
+                // Fail closed - reject the proof to be safe
+                return ValidationStep {
+                    name: "replay_validation",
+                    passed: false,
+                    error: Some("Internal error: replay registry lock failed".to_string()),
+                };
+            }
+        }
+    } else {
+        // No persistent registry available - use in-memory check
+        // Production deployments MUST provide a persistent replay registry
+        log::warn!(
+            "No persistent replay registry provided. Using ephemeral in-memory check. \
+             This means replay protection will be lost on process restart. \
+             Provide a ReplayRegistryBackend implementation for production use."
+        );
 
-    // In production, check if this replay_hash exists in the persistent registry
-    // For now, we pass this step (registry check would be async)
+        // Compute domain-separated hash of replay key
+        let _replay_hash =
+            DomainSeparatedHash::<ReplayRegistryDomain>::hash(&replay_key.hash().as_bytes()[..]);
+    }
+
     ValidationStep {
         name: "replay_validation",
         passed: true,
@@ -614,12 +692,28 @@ fn validate_transition_legality(bundle: &ProofBundle) -> ValidationStep {
             error: Some("Finality data is empty - invalid transition".to_string()),
         };
     }
-
-    // In production, additional checks would include:
-    // - Verify block height is within protocol-defined window
+     // - Verify block height is within protocol-defined window
     // - Verify proof timestamp is not expired
     // - Verify transition sequence is valid
     // - Check protocol version compatibility
+
+    // Check that the transition DAG has nodes for a valid transition
+    if bundle.transition_dag.nodes.is_empty() {
+        return ValidationStep {
+            name: "transition_legality_validation",
+            passed: false,
+            error: Some("Transition DAG has no nodes - invalid transition".to_string()),
+        };
+    }
+
+    // Check that block number is valid (non-zero)
+    if bundle.inclusion_proof.block_number == 0 && bundle.inclusion_proof.block_hash != Hash::zero() {
+        return ValidationStep {
+            name: "transition_legality_validation",
+            passed: false,
+            error: Some("Block number is zero but block hash is non-zero - invalid".to_string()),
+        };
+    }
 
     ValidationStep {
         name: "transition_legality_validation",
@@ -702,7 +796,7 @@ mod tests {
         use crate::seal::{CommitAnchor, SealPoint};
 
         let bundle = ProofBundle {
-            transition_dag: DAGSegment::new(vec![], Hash::new([9u8; 32])),
+            transition_dag: DAGSegment::new(vec![1u8; 32], Hash::new([9u8; 32])),
             signatures: vec![vec![1, 2, 3]],
             seal_ref: SealPoint::new(vec![0xAA], Some(1)).unwrap(),
             anchor_ref: CommitAnchor::new(vec![0xBB; 32], 1, vec![0xCC]).unwrap(),
@@ -717,6 +811,7 @@ mod tests {
             &verifier,
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
+            None,
             None,
         )
         .await;

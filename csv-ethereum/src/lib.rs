@@ -38,7 +38,16 @@ pub use config::EthereumConfig;
 pub use error::EthereumError;
 pub use finality::{FinalityChecker, FinalityConfig};
 pub use rpc::EthereumRpc;
+/// Mock Ethereum RPC for testing - ONLY available in test builds
+/// 
+/// Note: This mock is gated behind `#[cfg(test)]` to prevent it from being
+/// used in production code. Integration tests in external crates that need
+/// this mock should depend on it under `[dev-dependencies]` only.
 #[cfg(test)]
+pub use rpc::MockEthereumRpc;
+/// Re-exported for integration tests - NOT for production use.
+/// Use the `test-utils` feature flag for external crate testing.
+#[cfg(feature = "test-utils")]
 pub use rpc::MockEthereumRpc;
 pub use sanad_contract::{
     CsvLockAbi, CsvMintAbi, cross_chain_lock_signature, sanad_minted_signature,

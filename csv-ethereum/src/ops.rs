@@ -1385,44 +1385,56 @@ impl ChainSanadOps for EthereumBackend {
         sanad_id: &SanadId,
         expected_state: &str,
     ) -> ChainOpResult<bool> {
-        // Query the CSV seal contract for the seal state
-        // The sanad_id contains the commitment hash
+        // Query the CSV seal contract for the seal state using eth_call
+        let lock_contract = self.lock_contract()?;
         let commitment = sanad_id.0.as_bytes();
+        let mut commitment_array = [0u8; 32];
+        let copy_len = commitment.len().min(32);
+        commitment_array[..copy_len].copy_from_slice(&commitment[..copy_len]);
 
-        // In a full implementation, we would:
-        // 1. Call the CSV seal contract's getSealState(bytes32 commitment) function
-        // 2. Parse the returned state (active, locked, consumed, etc.)
-        // 3. Compare with expected_state
+        // Build the eth_call to getSealState(bytes32 commitment) function
+        // Function selector: keccak256("getSealState(bytes32)")[0..4]
+        use sha3::{Digest, Keccak256};
+        let mut selector_input = Vec::new();
+        selector_input.extend_from_slice(b"getSealState(bytes32)");
+        let selector_hash = Keccak256::digest(&selector_input);
+        let selector = &selector_hash[..4];
 
-        // For now, we check if we can get transaction info about this commitment
-        // This is a simplified check - production would use eth_call to query contract state
-        let tx_hash = hex::encode(commitment);
+        // Build the calldata: selector (4 bytes) + commitment (32 bytes)
+        let mut calldata = Vec::with_capacity(36);
+        calldata.extend_from_slice(selector);
+        calldata.extend_from_slice(&commitment_array);
 
-        // Try to get transaction info - if it exists, the seal was created
-        match self.get_transaction(&tx_hash).await {
-            Ok(tx_info) => {
-                // Transaction found - check confirmations for state
-                let has_confirmations = match &tx_info.status {
-                    csv_core::backend::TransactionStatus::Confirmed { confirmations, .. } => {
-                        *confirmations > 0
-                    }
-                    _ => false,
-                };
-                if has_confirmations {
-                    let actual_state = "active";
-                    return Ok(actual_state == expected_state);
-                }
+        // Perform the eth_call to query contract state
+        // This is a read-only call that doesn't create a transaction
+        let result = self
+            .rpc
+            .call_contract(lock_contract, &calldata)
+            .await
+            .map_err(|e| {
+                ChainOpError::RpcError(format!("Failed to call getSealState: {}", e))
+            })?;
+
+        if result.is_empty() || result.len() < 32 {
+            // Empty response means the seal doesn't exist
+            if expected_state == "never_created" || expected_state == "consumed" {
+                return Ok(true);
             }
-            Err(_) => {
-                // Transaction not found - seal may not exist or be consumed
-                if expected_state == "consumed" || expected_state == "never_created" {
-                    return Ok(true);
-                }
-            }
+            return Ok(false);
         }
 
-        // Default: return false if we can't determine state
-        Ok(false)
+        // Parse the state from the response
+        // The contract returns a uint8: 0=Active, 1=Locked, 2=Consumed, 3=Expired
+        let state_value = u8::from_be_bytes([result[31]]);
+        let actual_state = match state_value {
+            0 => "active",
+            1 => "locked",
+            2 => "consumed",
+            3 => "expired",
+            _ => "unknown",
+        };
+
+        Ok(actual_state == expected_state)
     }
 }
 

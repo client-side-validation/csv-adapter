@@ -5,11 +5,13 @@
 
 use async_trait::async_trait;
 use csv_core::Hash;
-use csv_core::proof::{FinalityProof, InclusionProof};
+use csv_core::proof::{FinalityProof, InclusionProof, ProofBundle};
 use csv_core::proof_pipeline::ChainVerifier;
+use csv_core::signature::{Signature, SignatureScheme, verify_signatures};
 
 use crate::proofs::verify_inclusion_proof;
 use crate::rpc::SolanaRpc;
+use solana_sdk::pubkey::Pubkey;
 
 /// Solana verifier implementing ChainVerifier trait
 pub struct SolanaVerifier {
@@ -21,6 +23,15 @@ impl SolanaVerifier {
     /// Create a new Solana verifier
     pub fn new(rpc: Box<dyn SolanaRpc>) -> Self {
         Self { rpc }
+    }
+
+    /// Convert a seal_id Hash to a Solana Pubkey
+    fn seal_id_to_pubkey(&self, seal_id: Hash) -> Pubkey {
+        let bytes = seal_id.as_bytes();
+        let mut pubkey_bytes = [0u8; 32];
+        let copy_len = bytes.len().min(32);
+        pubkey_bytes[..copy_len].copy_from_slice(&bytes[..copy_len]);
+        Pubkey::new_from_array(pubkey_bytes)
     }
 }
 
@@ -39,37 +50,117 @@ impl ChainVerifier for SolanaVerifier {
     /// Verify finality proof for a Solana block
     async fn verify_finality(&self, proof: &FinalityProof) -> csv_core::Result<bool> {
         // Solana has probabilistic finality - check confirmations
-        // Require at least 32 confirmations for Solana finality
         let required_confirmations = 32;
-        let is_finalized = proof.confirmations >= required_confirmations;
 
-        Ok(is_finalized)
+        if proof.confirmations >= required_confirmations {
+            if proof.finality_data.is_empty() {
+                return Ok(false);
+            }
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Verify zero-knowledge proof (if applicable)
     async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<bool> {
-        // Solana doesn't use ZK proofs for basic operations
-        // Return true if proof is empty, otherwise verify if needed
-        if proof.is_empty() {
-            Ok(true)
-        } else {
-            // Placeholder - would implement actual ZK proof verification if needed
-            Ok(true)
+        if !proof.is_empty() {
+            return Err(csv_core::ProtocolError::VerificationFailed(
+                "ZK proofs are not supported for Solana operations. \
+                 Set zk_proof_data to empty for Solana transactions."
+                    .to_string(),
+            ));
         }
-    }
-
-    /// Verify seal registry (check if seal has been consumed)
-    async fn verify_seal_registry(&self, _seal_id: Hash) -> csv_core::Result<bool> {
-        // Placeholder - would query Solana blockchain to check if account is consumed
         Ok(true)
     }
 
+    /// Verify seal registry (check if seal has been consumed)
+    ///
+    /// Queries the Solana blockchain via RPC to check if the PDA account
+    /// associated with the seal_id has been closed/consumed.
+    async fn verify_seal_registry(&self, seal_id: Hash) -> csv_core::Result<bool> {
+        // Convert the seal_id to a Pubkey (the PDA address of the seal)
+        let pubkey = self.seal_id_to_pubkey(seal_id);
+
+        // Query the Solana RPC to get the account at this pubkey
+        match self.rpc.get_account(&pubkey) {
+            Ok(account) => {
+                // Account exists - check if it's been consumed
+                // In Solana, a consumed (closed) PDA has:
+                // - lamports == 0 (lamports transferred to sysvar)
+                // - data.len() == 0 or owner == System program
+                let is_consumed = account.lamports == 0
+                    || account.data.is_empty()
+                    || account.owner == solana_sdk::system_program::id();
+
+                if is_consumed {
+                    // Seal has been consumed - not available
+                    Ok(false)
+                } else {
+                    // Account exists with data - seal is available
+                    Ok(true)
+                }
+            }
+            Err(e) => {
+                // Account not found or RPC error
+                // In Solana, an account that doesn't exist was either
+                // never created or has been closed
+                log::warn!(
+                    "Solana account not found for seal {}: {}",
+                    hex::encode(seal_id.as_bytes()),
+                    e
+                );
+                // Account doesn't exist - assume consumed
+                Ok(false)
+            }
+        }
+    }
+
     /// Verify signature on proof bundle
+    ///
+    /// Parses signatures from the proof bundle and verifies them
+    /// using the Solana Ed25519 signature scheme.
     async fn verify_signature(
         &self,
-        _bundle: &csv_core::proof::ProofBundle,
+        bundle: &ProofBundle,
     ) -> csv_core::Result<bool> {
-        // Placeholder - would verify signature on proof bundle
+        if bundle.signatures.is_empty() {
+            return Err(csv_core::ProtocolError::SignatureVerificationFailed(
+                "No signatures in proof bundle".to_string(),
+            ));
+        }
+
+        // Parse signatures from the bundle
+        let mut signatures = Vec::with_capacity(bundle.signatures.len());
+
+        for (i, sig_bytes) in bundle.signatures.iter().enumerate() {
+            if sig_bytes.len() < 4 {
+                return Err(csv_core::ProtocolError::SignatureVerificationFailed(
+                    format!("Signature {} too short for header", i),
+                ));
+            }
+
+            let pk_len =
+                u32::from_le_bytes([sig_bytes[0], sig_bytes[1], sig_bytes[2], sig_bytes[3]])
+                    as usize;
+
+            if sig_bytes.len() < 4 + pk_len {
+                return Err(csv_core::ProtocolError::SignatureVerificationFailed(
+                    format!("Signature {} too short for public key", i),
+                ));
+            }
+
+            let public_key = sig_bytes[4..4 + pk_len].to_vec();
+            let signature = sig_bytes[4 + pk_len..].to_vec();
+            let message = bundle.transition_dag.root_commitment.as_bytes().to_vec();
+
+            signatures.push(Signature::new(signature, public_key, message));
+        }
+
+        // Solana primarily uses Ed25519 for signatures
+        verify_signatures(&signatures, SignatureScheme::Ed25519)
+            .map_err(|e| csv_core::ProtocolError::SignatureVerificationFailed(e.to_string()))?;
+
         Ok(true)
     }
 }

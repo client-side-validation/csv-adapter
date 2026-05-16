@@ -393,15 +393,19 @@ impl PedersenCommitment {
     /// * `value` - The value to commit to
     /// * `blinding_factor` - The random blinding factor (32 bytes recommended)
     pub fn new(value: u64, blinding_factor: &[u8]) -> Self {
-        // In a real implementation, this would use elliptic curve arithmetic
-        // For now, we compute a hash-based commitment
-        let mut hasher = Sha256::new();
-        hasher.update(blinding_factor);
-        hasher.update(value.to_le_bytes());
-        let commitment = hasher.finalize().to_vec();
+        // Use domain-separated hashing for the commitment to prevent
+        // cross-protocol binding attacks.
+        // Real Pedersen commitments would use elliptic curve: C = r*G + v*H
+        // This hash-based approach is a domain-separated approximation that
+        // provides binding but not the hiding property of Pedersen commitments.
+        use crate::tagged_hash::csv_tagged_hash;
+        let commitment = csv_tagged_hash(
+            "urn:lnp-bp:csv:pedersen-commitment:v1",
+            &[blinding_factor, &value.to_le_bytes()].concat(),
+        );
 
         Self {
-            commitment,
+            commitment: commitment.as_bytes().to_vec(),
             blinding_factor: blinding_factor.to_vec(),
             value,
         }
@@ -411,20 +415,39 @@ impl PedersenCommitment {
     ///
     /// Recomputes the commitment and checks it matches
     pub fn verify(&self) -> bool {
-        let mut hasher = Sha256::new();
-        hasher.update(&self.blinding_factor);
-        hasher.update(self.value.to_le_bytes());
-        let computed = hasher.finalize().to_vec();
-        computed == self.commitment
+        use crate::tagged_hash::csv_tagged_hash;
+        let computed = csv_tagged_hash(
+            "urn:lnp-bp:csv:pedersen-commitment:v1",
+            &[&self.blinding_factor, &self.value.to_le_bytes()].concat(),
+        );
+        computed.as_bytes() == self.commitment.as_slice()
     }
 
     /// Add two Pedersen commitments (homomorphic property)
     ///
     /// C1 + C2 = (r1 + r2)*G + (v1 + v2)*H
+    ///
+    /// # Note
+    /// This is a simulated homomorphic addition using hash concatenation.
+    /// A real Pedersen commitment would use elliptic curve point addition,
+    /// which requires the `curve25519-dalek` or `ark-ec` crate.
+    /// This hash-based approximation preserves the binding property but
+    /// loses the homomorphic property. For true Pedersen commitments,
+    /// enable the `zk` feature and use `zk_proof::pedersen` instead.
     pub fn add(&self, other: &PedersenCommitment) -> PedersenCommitment {
+        use crate::tagged_hash::csv_tagged_hash;
+        let combined_blinding = csv_tagged_hash(
+            "urn:lnp-bp:csv:pedersen-add-blinding:v1",
+            &[&self.blinding_factor, &other.blinding_factor].concat(),
+        );
+        let combined_commitment = csv_tagged_hash(
+            "urn:lnp-bp:csv:pedersen-add-commitment:v1",
+            &[self.commitment.as_slice(), other.commitment.as_slice()].concat(),
+        );
+
         PedersenCommitment {
-            commitment: self.commitment.clone(), // Simplified: real impl would use EC addition
-            blinding_factor: self.blinding_factor.clone(),
+            commitment: combined_commitment.as_bytes().to_vec(),
+            blinding_factor: combined_blinding.as_bytes().to_vec(),
             value: self.value + other.value,
         }
     }
