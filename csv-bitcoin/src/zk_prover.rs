@@ -19,13 +19,11 @@
 //! - Verifiable: Anyone can verify without trusting Bitcoin RPC
 
 use bitcoin::hashes::Hash as BitcoinHash;
-use csv_core::hash::Hash;
 use csv_core::protocol_version::builtin;
 use csv_core::seal::SealPoint;
 use csv_core::zk_proof::{
     ChainWitness, ProofSystem, VerifierKey, ZkError, ZkProver, ZkPublicInputs, ZkSealProof,
 };
-use sha2::{Digest, Sha256};
 
 /// Bitcoin SPV ZK Prover using SP1
 ///
@@ -73,6 +71,8 @@ impl BitcoinSpvProver {
         seal: &SealPoint,
         witness: &ChainWitness,
     ) -> Result<ZkSealProof, ZkError> {
+        use sha2::{Digest, Sha256};
+        
         // Create a deterministic mock proof based on witness hash
         let mut hasher = Sha256::new();
         hasher.update(&seal.id);

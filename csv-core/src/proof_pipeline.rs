@@ -33,7 +33,7 @@ use std::sync::Mutex;
 
 use crate::domain_hash::DomainSeparatedHash;
 use crate::domains::{ProofBundleDomain, ReplayRegistryDomain};
-use crate::error::{ProtocolError, Result};
+use crate::error::Result;
 use crate::events::{CsvEvent, EventIndexerRegistry};
 use crate::hash::Hash;
 use crate::proof::{FinalityProof, InclusionProof, ProofBundle};
@@ -106,7 +106,7 @@ pub async fn validate_proof_bundle(
     verifier: &dyn ChainVerifier,
     source_chain: ChainId,
     destination_chain: ChainId,
-    replay_registry: Option<Arc<Mutex<dyn ReplayRegistryBackend>>>,
+    replay_registry: Option<Arc<dyn ReplayRegistryBackend>>,
     event_registry: Option<Arc<Mutex<EventIndexerRegistry>>>,
 ) -> ValidationResult {
     let mut steps = Vec::with_capacity(10);
@@ -564,7 +564,7 @@ async fn validate_finality(bundle: &ProofBundle, verifier: &dyn ChainVerifier) -
 /// Step 6: Replay validation
 async fn validate_replay(
     bundle: &ProofBundle,
-    replay_registry: &Option<Arc<Mutex<dyn ReplayRegistryBackend>>>,
+    replay_registry: &Option<Arc<dyn ReplayRegistryBackend>>,
 ) -> ValidationStep {
     // Compute replay key from proof bundle
     let replay_key = ReplayKey::new(
@@ -577,43 +577,29 @@ async fn validate_replay(
 
     // Check persistent replay registry first if available
     if let Some(registry) = replay_registry {
-        match registry.lock() {
-            Ok(registry_guard) => {
-                let has_been_seen = registry_guard.has_been_seen(&replay_key);
-                match has_been_seen {
-                    Ok(true) => {
-                        // This proof has been seen before - replay attempt
-                        return ValidationStep {
-                            name: "replay_validation",
-                            passed: false,
-                            error: Some("Replay attack detected: proof has been seen before".to_string()),
-                        };
-                    }
-                    Ok(false) => {
-                        // First time seeing this proof - record it
-                        let timestamp = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_secs();
-                        let _ = registry_guard.record_proof(replay_key, timestamp);
-                    }
-                    Err(e) => {
-                        // Registry error - fail closed (reject the proof)
-                        return ValidationStep {
-                            name: "replay_validation",
-                            passed: false,
-                            error: Some(format!("Replay registry error: {}", e)),
-                        };
-                    }
-                }
-            }
-            Err(e) => {
-                log::error!("Failed to acquire replay registry lock: {}", e);
-                // Fail closed - reject the proof to be safe
+        match registry.has_been_seen(&replay_key).await {
+            Ok(true) => {
+                // This proof has been seen before - replay attempt
                 return ValidationStep {
                     name: "replay_validation",
                     passed: false,
-                    error: Some("Internal error: replay registry lock failed".to_string()),
+                    error: Some("Replay attack detected: proof has been seen before".to_string()),
+                };
+            }
+            Ok(false) => {
+                // First time seeing this proof - record it
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                let _ = registry.record_proof(replay_key, timestamp).await;
+            }
+            Err(e) => {
+                // Registry error - fail closed (reject the proof)
+                return ValidationStep {
+                    name: "replay_validation",
+                    passed: false,
+                    error: Some(format!("Replay registry error: {}", e)),
                 };
             }
         }
@@ -749,6 +735,7 @@ async fn validate_signature(bundle: &ProofBundle, verifier: &dyn ChainVerifier) 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::replay_registry::ReplayRegistry;
 
     struct MockVerifier;
 

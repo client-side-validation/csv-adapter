@@ -132,7 +132,7 @@ impl ChainVerifier for AptosVerifier {
         // Aptos doesn't use ZK proofs for basic operations
         // If ZK proof data is provided, return an error explaining this
         if !proof.is_empty() {
-            return Err(csv_core::ProtocolError::VerificationFailed(
+            return Err(csv_core::ProtocolError::VerificationError(
                 "ZK proofs are not supported for Aptos operations. \
                  Set zk_proof_data to empty for Aptos transactions."
                     .to_string(),

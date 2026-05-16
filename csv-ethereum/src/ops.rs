@@ -1407,34 +1407,12 @@ impl ChainSanadOps for EthereumBackend {
 
         // Perform the eth_call to query contract state
         // This is a read-only call that doesn't create a transaction
-        let result = self
-            .rpc
-            .call_contract(lock_contract, &calldata)
-            .await
-            .map_err(|e| {
-                ChainOpError::RpcError(format!("Failed to call getSealState: {}", e))
-            })?;
-
-        if result.is_empty() || result.len() < 32 {
-            // Empty response means the seal doesn't exist
-            if expected_state == "never_created" || expected_state == "consumed" {
-                return Ok(true);
-            }
-            return Ok(false);
-        }
-
-        // Parse the state from the response
-        // The contract returns a uint8: 0=Active, 1=Locked, 2=Consumed, 3=Expired
-        let state_value = u8::from_be_bytes([result[31]]);
-        let actual_state = match state_value {
-            0 => "active",
-            1 => "locked",
-            2 => "consumed",
-            3 => "expired",
-            _ => "unknown",
-        };
-
-        Ok(actual_state == expected_state)
+        // Note: call_contract is not available in the EthereumRpc trait
+        // This functionality needs to be implemented or the code path refactored
+        Err(ChainOpError::FeatureNotEnabled(
+            "call_contract method not available in EthereumRpc trait. \
+             This functionality needs to be implemented via eth_call RPC method.".to_string()
+        ))
     }
 }
 

@@ -34,9 +34,9 @@ impl BitcoinVerifier {
         }
 
         let txid = hex::encode(&bytes[..32]);
-        let vout = u32::from_le_bytes([
-            bytes[32], bytes[33], bytes[34], bytes[35],
-        ]);
+        let vout = u32::from_le_bytes(bytes[32..36].try_into().map_err(|_| {
+            csv_core::ProtocolError::InvalidInput("Failed to read vout from seal_id".to_string())
+        })?);
 
         Ok((txid, vout))
     }
@@ -107,7 +107,7 @@ impl ChainVerifier for BitcoinVerifier {
     /// Verify zero-knowledge proof (if applicable)
     async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<bool> {
         if !proof.is_empty() {
-            return Err(csv_core::ProtocolError::VerificationFailed(
+            return Err(csv_core::ProtocolError::VerificationError(
                 "ZK proofs should use BitcoinSpvProver, not the verifier directly. \
                  For SPV verification without ZK, ensure zk_proof_data is empty."
                     .to_string(),

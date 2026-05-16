@@ -45,10 +45,6 @@ pub use rpc::EthereumRpc;
 /// this mock should depend on it under `[dev-dependencies]` only.
 #[cfg(test)]
 pub use rpc::MockEthereumRpc;
-/// Re-exported for integration tests - NOT for production use.
-/// Use the `test-utils` feature flag for external crate testing.
-#[cfg(feature = "test-utils")]
-pub use rpc::MockEthereumRpc;
 pub use sanad_contract::{
     CsvLockAbi, CsvMintAbi, cross_chain_lock_signature, sanad_minted_signature,
     sanad_refunded_signature,

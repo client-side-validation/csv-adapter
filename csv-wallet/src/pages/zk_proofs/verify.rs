@@ -291,9 +291,12 @@ fn verify_zk_proof(input: &str) -> Result<(ZkSealProof, bool), String> {
             {
                 use csv_bitcoin::zk_prover::BitcoinSpvProver;
                 use csv_core::zk_proof::ZkProver;
-                // Use Bitcoin SP1 prover to verify the proof
-                let prover = BitcoinSpvProver::new();
-                prover.verify(&proof).map_err(|e| format!("SP1 verification failed: {}", e))?
+                // BitcoinSpvProver is for proof generation, not verification
+                // Verification requires a separate verifier implementation
+                return Err(
+                    "Bitcoin SP1 proof verification not yet implemented. \
+                     BitcoinSpvProver generates proofs but verification requires a separate verifier component.".to_string()
+                );
             }
             #[cfg(not(feature = "csv-bitcoin"))]
             {
@@ -310,8 +313,10 @@ fn verify_zk_proof(input: &str) -> Result<(ZkSealProof, bool), String> {
                 use csv_ethereum::zk_verifier::EthereumGroth16Verifier;
                 // Use Ethereum Groth16 verifier
                 let verifier = EthereumGroth16Verifier::new();
-                verifier.verify(&proof)
-                    .map_err(|e| format!("Groth16 verification failed: {}", e))?
+                let _public_inputs = verifier.verify(&proof)
+                    .map_err(|e| format!("Groth16 verification failed: {}", e))?;
+                // Verification succeeded - return true
+                true
             }
             #[cfg(not(feature = "csv-ethereum"))]
             {

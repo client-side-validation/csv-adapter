@@ -65,7 +65,7 @@ impl ChainVerifier for SolanaVerifier {
     /// Verify zero-knowledge proof (if applicable)
     async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<bool> {
         if !proof.is_empty() {
-            return Err(csv_core::ProtocolError::VerificationFailed(
+            return Err(csv_core::ProtocolError::VerificationError(
                 "ZK proofs are not supported for Solana operations. \
                  Set zk_proof_data to empty for Solana transactions."
                     .to_string(),
@@ -89,9 +89,11 @@ impl ChainVerifier for SolanaVerifier {
                 // In Solana, a consumed (closed) PDA has:
                 // - lamports == 0 (lamports transferred to sysvar)
                 // - data.len() == 0 or owner == System program
+                // System program ID: 11111111111111111111111111111111
+                let system_program_id = Pubkey::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
                 let is_consumed = account.lamports == 0
                     || account.data.is_empty()
-                    || account.owner == solana_sdk::system_program::id();
+                    || account.owner == system_program_id;
 
                 if is_consumed {
                     // Seal has been consumed - not available

@@ -64,24 +64,17 @@ pub fn NftPage() -> Element {
 pub fn NftGallery() -> Element {
     // Read NFTs from wallet context state
     let wallet_ctx = use_wallet_context();
-    let nfts = wallet_ctx.nfts.clone();
+    // NFT feature not yet implemented - display empty state
+    let _nfts: Vec<NftRecord> = Vec::new(); // TODO: Implement NFT fetching when WalletContext has nfts field
 
     rsx! {
-        if !nfts.is_empty() {
-            div { class: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
-                for nft in nfts {
-                    NftCard { nft: nft.clone() }
-                }
+        div { class: "flex flex-col items-center justify-center py-16 text-center",
+            div { class: "text-6xl mb-4", "\u{1F3A8}" }
+            h3 { class: "text-xl font-semibold text-gray-900 dark:text-white mb-2",
+                "NFT Gallery Coming Soon"
             }
-        } else {
-            div { class: "flex flex-col items-center justify-center py-16 text-center",
-                div { class: "text-6xl mb-4", "\u{1F3A8}" }
-                h3 { class: "text-xl font-semibold text-gray-900 dark:text-white mb-2",
-                    "No NFTs Found"
-                }
-                p { class: "text-gray-600 dark:text-gray-400 max-w-md mb-6",
-                    "Your NFTs will appear here once you receive or mint them through the CSV protocol."
-                }
+            p { class: "text-gray-600 dark:text-gray-400 max-w-md mb-6",
+                "NFT functionality is under development. This feature will be available in a future update."
             }
         }
     }
@@ -94,24 +87,17 @@ pub fn NftGallery() -> Element {
 pub fn NftCollections() -> Element {
     // Read NFT collections from wallet context state
     let wallet_ctx = use_wallet_context();
-    let collections = wallet_ctx.nft_collections.clone();
+    // NFT collections feature not yet implemented - display empty state
+    let _collections: Vec<NftCollection> = Vec::new(); // TODO: Implement NFT collection fetching when WalletContext has nft_collections field
 
     rsx! {
-        if !collections.is_empty() {
-            div { class: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
-                for collection in collections {
-                    CollectionCard { collection: collection.clone() }
-                }
+        div { class: "flex flex-col items-center justify-center py-16 text-center",
+            div { class: "text-6xl mb-4", "\u{1F5BC}" }
+            h3 { class: "text-xl font-semibold text-gray-900 dark:text-white mb-2",
+                "NFT Collections Coming Soon"
             }
-        } else {
-            div { class: "flex flex-col items-center justify-center py-16 text-center",
-                div { class: "text-6xl mb-4", "\u{1F5BC}" }
-                h3 { class: "text-xl font-semibold text-gray-900 dark:text-white mb-2",
-                    "No Collections Found"
-                }
-                p { class: "text-gray-600 dark:text-gray-400 max-w-md",
-                    "NFT collections will appear here once you receive or mint them."
-                }
+            p { class: "text-gray-600 dark:text-gray-400 max-w-md mb-6",
+                "NFT collection functionality is under development. This feature will be available in a future update."
             }
         }
     }

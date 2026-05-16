@@ -10,7 +10,6 @@
 
 use crate::hash::Hash;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::str::FromStr;
 
 // ---------------------------------------------------------------------------
@@ -399,13 +398,16 @@ impl PedersenCommitment {
         // This hash-based approach is a domain-separated approximation that
         // provides binding but not the hiding property of Pedersen commitments.
         use crate::tagged_hash::csv_tagged_hash;
-        let commitment = csv_tagged_hash(
+        let mut payload = Vec::with_capacity(blinding_factor.len() + 8);
+        payload.extend_from_slice(blinding_factor);
+        payload.extend_from_slice(&value.to_le_bytes());
+        let hash = csv_tagged_hash(
             "urn:lnp-bp:csv:pedersen-commitment:v1",
-            &[blinding_factor, &value.to_le_bytes()].concat(),
+            &payload,
         );
 
         Self {
-            commitment: commitment.as_bytes().to_vec(),
+            commitment: hash.to_vec(),
             blinding_factor: blinding_factor.to_vec(),
             value,
         }
@@ -416,11 +418,14 @@ impl PedersenCommitment {
     /// Recomputes the commitment and checks it matches
     pub fn verify(&self) -> bool {
         use crate::tagged_hash::csv_tagged_hash;
+        let mut payload = Vec::with_capacity(self.blinding_factor.len() + 8);
+        payload.extend_from_slice(&self.blinding_factor);
+        payload.extend_from_slice(&self.value.to_le_bytes());
         let computed = csv_tagged_hash(
             "urn:lnp-bp:csv:pedersen-commitment:v1",
-            &[&self.blinding_factor, &self.value.to_le_bytes()].concat(),
+            &payload,
         );
-        computed.as_bytes() == self.commitment.as_slice()
+        computed.as_slice() == self.commitment.as_slice()
     }
 
     /// Add two Pedersen commitments (homomorphic property)
@@ -436,18 +441,25 @@ impl PedersenCommitment {
     /// enable the `zk` feature and use `zk_proof::pedersen` instead.
     pub fn add(&self, other: &PedersenCommitment) -> PedersenCommitment {
         use crate::tagged_hash::csv_tagged_hash;
+        let mut blinding_payload = Vec::with_capacity(self.blinding_factor.len() + other.blinding_factor.len());
+        blinding_payload.extend_from_slice(&self.blinding_factor);
+        blinding_payload.extend_from_slice(&other.blinding_factor);
         let combined_blinding = csv_tagged_hash(
             "urn:lnp-bp:csv:pedersen-add-blinding:v1",
-            &[&self.blinding_factor, &other.blinding_factor].concat(),
+            &blinding_payload,
         );
+
+        let mut commitment_payload = Vec::with_capacity(self.commitment.len() + other.commitment.len());
+        commitment_payload.extend_from_slice(self.commitment.as_slice());
+        commitment_payload.extend_from_slice(other.commitment.as_slice());
         let combined_commitment = csv_tagged_hash(
             "urn:lnp-bp:csv:pedersen-add-commitment:v1",
-            &[self.commitment.as_slice(), other.commitment.as_slice()].concat(),
+            &commitment_payload,
         );
 
         PedersenCommitment {
-            commitment: combined_commitment.as_bytes().to_vec(),
-            blinding_factor: combined_blinding.as_bytes().to_vec(),
+            commitment: combined_commitment.to_vec(),
+            blinding_factor: combined_blinding.to_vec(),
             value: self.value + other.value,
         }
     }
