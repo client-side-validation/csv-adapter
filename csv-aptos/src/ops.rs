@@ -23,6 +23,7 @@ use csv_core::signature::SignatureScheme;
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
+use crate::address_utils::{format_address, parse_aptos_address};
 use crate::config::AptosNetwork;
 use crate::proofs::CommitmentEventBuilder;
 #[cfg(not(feature = "rpc"))]
@@ -47,15 +48,7 @@ pub struct AptosBackend {
 impl AptosBackend {
     /// Create new Aptos chain operations from RPC client
     pub fn new(rpc: Box<dyn AptosRpc>, network: AptosNetwork) -> Self {
-        let mut domain = [0u8; 32];
-        domain[..10].copy_from_slice(b"CSV-APTOS-");
-        domain[10] = network.chain_id();
-
-        // Build event builder with default module address
-        let module_address = [0u8; 32];
-        let event_builder = CommitmentEventBuilder::new(module_address, "CSV::AnchorEvent");
-
-        // Create a minimal seal protocol for backward compatibility
+        // Create a minimal seal protocol to derive domain separator
         let mock_rpc = Box::new(crate::rpc::MockAptosRpc::new(0));
         let seal = AptosSealProtocol::from_config(
             crate::config::AptosConfig {
@@ -76,10 +69,17 @@ impl AptosBackend {
             .unwrap()
         });
 
+        // MED-DUP-03: Derive domain separator from SealProtocol instead of recomputing
+        let domain_separator = seal.domain();
+
+        // Build event builder with default module address
+        let module_address = [0u8; 32];
+        let event_builder = CommitmentEventBuilder::new(module_address, "CSV::AnchorEvent");
+
         Self {
             rpc,
             network,
-            domain_separator: domain,
+            domain_separator,
             event_builder,
             seal_protocol: Arc::new(seal),
         }
@@ -112,11 +112,6 @@ impl AptosBackend {
         let mut addr = [0u8; 32];
         addr.copy_from_slice(&bytes);
         Ok(addr)
-    }
-
-    /// Format Aptos address for display
-    fn format_address(&self, addr: [u8; 32]) -> String {
-        format!("0x{}", hex::encode(addr))
     }
 
     /// Parse transaction hash (version)

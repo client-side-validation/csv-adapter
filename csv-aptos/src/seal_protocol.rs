@@ -37,6 +37,7 @@ use crate::rpc::AptosRpc;
 use crate::rpc::{AptosLedgerInfo, AptosTransaction};
 use crate::seal::SealRegistry;
 use crate::types::{AptosCommitAnchor, AptosFinalityProof, AptosInclusionProof, AptosSealPoint};
+use crate::address_utils::{format_address, parse_aptos_address};
 
 #[cfg(feature = "rpc")]
 fn spawn_blocking_async<F, T>(future: F) -> Result<T, AptosError>
@@ -426,30 +427,6 @@ impl AptosSealProtocol {
 
         Ok(())
     }
-}
-
-/// Format an Aptos address as hex for display.
-fn format_address(addr: [u8; 32]) -> String {
-    format!("0x{}", hex::encode(addr))
-}
-
-/// Parse an Aptos address string (e.g., "0x1" or "0xabc...").
-fn parse_aptos_address(s: &str) -> Result<[u8; 32], String> {
-    let hex_str = s.trim_start_matches("0x");
-    let mut padded = String::new();
-    for _ in 0..(64 - hex_str.len()) {
-        padded.push('0');
-    }
-    padded.push_str(hex_str);
-
-    let bytes = hex::decode(&padded).map_err(|e| format!("Invalid hex: {}", e))?;
-    if bytes.len() != 32 {
-        return Err(format!("Address must be 32 bytes, got {}", bytes.len()));
-    }
-
-    let mut addr = [0u8; 32];
-    addr.copy_from_slice(&bytes);
-    Ok(addr)
 }
 
 impl SealProtocol for AptosSealProtocol {

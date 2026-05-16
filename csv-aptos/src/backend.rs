@@ -12,6 +12,7 @@ use csv_core::driver::{
     AccountModel, ChainCapabilities, ChainDriver, ChainError, ChainResult, RpcClient, Wallet,
 };
 
+use crate::address_utils::parse_aptos_address;
 use crate::config::{AptosConfig, AptosNetwork};
 use crate::rpc::AptosRpc;
 use crate::seal_protocol::AptosSealProtocol;
@@ -308,25 +309,6 @@ impl Wallet for AptosWallet {
         // Key import successful - key is validated and address is derived
         Ok(())
     }
-}
-
-/// Parse Aptos address string
-fn parse_aptos_address(s: &str) -> Result<[u8; 32], String> {
-    let hex_str = s.trim_start_matches("0x");
-    let mut padded = String::new();
-    for _ in 0..(64 - hex_str.len()) {
-        padded.push('0');
-    }
-    padded.push_str(hex_str);
-
-    let bytes = hex::decode(&padded).map_err(|e| format!("Invalid hex: {}", e))?;
-    if bytes.len() != 32 {
-        return Err(format!("Address must be 32 bytes, got {}", bytes.len()));
-    }
-
-    let mut addr = [0u8; 32];
-    addr.copy_from_slice(&bytes);
-    Ok(addr)
 }
 
 /// Chain capabilities for Aptos

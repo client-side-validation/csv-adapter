@@ -23,6 +23,30 @@ use crate::seal_protocol::BitcoinSealProtocol;
 use crate::types::BitcoinSealPoint;
 use csv_core::SealProtocol;
 
+/// Bitcoin-specific extension to ChainSigner that accepts prevout amounts
+/// 
+/// HIGH-BTC-01: BIP-143 sighash requires the spent UTXO value.
+/// This trait provides a Bitcoin-specific signing method that accepts
+/// prevout amounts for proper sighash computation.
+#[async_trait]
+pub trait BitcoinChainSigner: Send + Sync {
+    /// Sign a Bitcoin transaction with prevout amounts for BIP-143 sighash
+    ///
+    /// # Arguments
+    /// * `tx_data` - The transaction bytes to sign
+    /// * `key_id` - Identifier for the signing key
+    /// * `prevout_amounts` - Vector of (input_index, amount) pairs for each input
+    ///
+    /// # Returns
+    /// The signed transaction bytes
+    async fn sign_transaction_with_prevouts(
+        &self,
+        tx_data: &[u8],
+        key_id: &str,
+        prevout_amounts: Vec<(usize, u64)>,
+    ) -> ChainOpResult<Vec<u8>>;
+}
+
 /// Encode a value as a Bitcoin-style variable length integer (varint)
 fn encode_varint(value: u64) -> Vec<u8> {
     match value {
@@ -261,9 +285,10 @@ impl ChainSigner for BitcoinChainSigner {
             // For P2WPKH: scriptCode = 0x1976a914{20-byte-pubkey-hash}88ac
             // But for Taproot (P2TR), we use a different sighash algorithm
 
-            // Simplified: sign the tx hash directly for demonstration
-            // Real implementation needs proper sighash computation per BIP-143 (SegWit) or BIP-341 (Taproot)
-            let sighash = compute_sighash(&tx, input, &pubkey_bytes).map_err(|e| {
+            // HIGH-BTC-01: BIP-143 sighash requires the spent UTXO value
+            // We need prevout amounts to compute the sighash correctly
+            // For now, fail closed until prevout amounts are provided via a proper API
+            let sighash = compute_sighash(&tx, input, &pubkey_bytes, None).map_err(|e| {
                 ChainOpError::SigningError(format!("Failed to compute sighash: {}", e))
             })?;
 
@@ -380,7 +405,89 @@ impl ChainSigner for BitcoinChainSigner {
     }
 
     fn signature_scheme(&self) -> SignatureScheme {
-        SignatureScheme::Secp256k1
+        SignatureScheme::Schnorr
+    }
+}
+
+#[async_trait]
+impl BitcoinChainSigner for BitcoinChainSigner {
+    async fn sign_transaction_with_prevouts(
+        &self,
+        tx_data: &[u8],
+        key_id: &str,
+        prevout_amounts: Vec<(usize, u64)>,
+    ) -> ChainOpResult<Vec<u8>> {
+        // Parse key_id as hex-encoded private key (32 bytes)
+        let key_bytes = hex::decode(key_id).map_err(|_| {
+            ChainOpError::SigningError(
+                "Invalid key_id format. Expected hex-encoded 32-byte key.".to_string(),
+            )
+        })?;
+
+        if key_bytes.len() != 32 {
+            return Err(ChainOpError::SigningError(
+                "Invalid key length. Expected 32 bytes.".to_string(),
+            ));
+        }
+
+        let secret_key = secp256k1::SecretKey::from_slice(&key_bytes)
+            .map_err(|e| ChainOpError::SigningError(format!("Invalid secret key: {}", e)))?;
+
+        // Parse the transaction from bytes
+        let tx = parse_bitcoin_tx(tx_data).map_err(|e| {
+            ChainOpError::InvalidInput(format!("Failed to parse transaction: {}", e))
+        })?;
+
+        // Validate prevout amounts
+        if prevout_amounts.len() != tx.inputs.len() {
+            return Err(ChainOpError::InvalidInput(format!(
+                "Prevout amounts count ({}) must match input count ({})",
+                prevout_amounts.len(),
+                tx.inputs.len()
+            )));
+        }
+
+        // Sign each input with its corresponding prevout amount
+        let secp = secp256k1::Secp256k1::new();
+        let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
+        let x_only_pubkey = secp256k1::XOnlyPublicKey::from(public_key);
+        let pubkey_bytes = x_only_pubkey.serialize();
+
+        let mut signed_witnesses: Vec<Vec<Vec<u8>>> = Vec::new();
+
+        for (idx, input) in tx.inputs.iter().enumerate() {
+            // Find the prevout amount for this input
+            let amount = prevout_amounts
+                .iter()
+                .find(|(i, _)| *i == idx)
+                .map(|(_, amt)| *amt)
+                .ok_or_else(|| {
+                    ChainOpError::InvalidInput(format!(
+                        "Missing prevout amount for input index {}",
+                        idx
+                    ))
+                })?;
+
+            // Compute sighash with the prevout amount
+            let sighash = compute_sighash(&tx, input, &pubkey_bytes, Some(amount)).map_err(|e| {
+                ChainOpError::SigningError(format!("Failed to compute sighash: {}", e))
+            })?;
+
+            let message = secp256k1::Message::from_digest_slice(&sighash)
+                .map_err(|e| ChainOpError::SigningError(format!("Invalid sighash: {}", e)))?;
+
+            let signature = secp.sign_ecdsa(&message, &secret_key);
+            let sig_bytes = signature.serialize_compact().to_vec();
+
+            // Witness stack for P2WPKH: [signature, public_key]
+            signed_witnesses.push(vec![sig_bytes, pubkey_bytes.to_vec()]);
+        }
+
+        // Build the final signed transaction with witness data
+        let signed_tx = build_signed_transaction(&tx, signed_witnesses)
+            .map_err(|e| ChainOpError::SigningError(format!("Failed to build signed tx: {}", e)))?;
+
+        Ok(signed_tx)
     }
 }
 
@@ -1963,13 +2070,26 @@ fn parse_output(data: &[u8]) -> Result<(TxOutput, usize), String> {
 }
 
 /// Compute BIP-143 sighash for SegWit (P2WPKH) transactions
-fn compute_sighash(tx: &ParsedTx, input: &TxInput, pubkey: &[u8]) -> Result<[u8; 32], String> {
+fn compute_sighash(
+    tx: &ParsedTx,
+    input: &TxInput,
+    pubkey: &[u8],
+    prevout_amount: Option<u64>,
+) -> Result<[u8; 32], String> {
     use bitcoin_hashes::{Hash as BitcoinHash, sha256d};
+
+    // HIGH-BTC-01: BIP-143 sighash requires the spent UTXO value
+    // If prevout amount is not provided, fail closed
+    let amount = prevout_amount.ok_or_else(|| {
+        "BIP-143 sighash requires the spent UTXO value; refusing to sign without prevout amounts"
+            .to_string()
+    })?;
 
     // For P2WPKH, we need:
     // 1. hashPrevouts: double-SHA256 of all input outpoints
     // 2. hashSequence: double-SHA256 of all input sequences
     // 3. hashOutputs: double-SHA256 of all outputs
+    // 4. The spent UTXO amount (for BIP-143)
 
     let mut prevouts_data = Vec::new();
     for inp in &tx.inputs {
@@ -1993,18 +2113,25 @@ fn compute_sighash(tx: &ParsedTx, input: &TxInput, pubkey: &[u8]) -> Result<[u8;
     let hash_outputs = sha256d::Hash::hash(&outputs_data);
 
     let script_code = p2wpkh_script_code(pubkey)?;
-    let _ = (
-        tx,
-        input,
-        hash_prevouts,
-        hash_sequence,
-        hash_outputs,
-        script_code,
-    );
-    Err(
-        "BIP-143 sighash requires the spent UTXO value; refusing to sign without prevout amounts"
-            .to_string(),
-    )
+
+    // BIP-143 sighash preimage for P2WPKH:
+    // version (4) + hashPrevouts (32) + hashSequence (32) + outpoint (36) + scriptCode (var) + amount (8) + nSequence (4) + hashOutputs (32) + locktime (4) + sighashType (4)
+    let mut preimage = Vec::new();
+    preimage.extend_from_slice(&tx.version.to_le_bytes());
+    preimage.extend_from_slice(hash_prevouts.as_ref());
+    preimage.extend_from_slice(hash_sequence.as_ref());
+    preimage.extend_from_slice(&input.txid);
+    preimage.extend_from_slice(&input.vout.to_le_bytes());
+    preimage.extend_from_slice(&encode_varint(script_code.len() as u64));
+    preimage.extend_from_slice(&script_code);
+    preimage.extend_from_slice(&amount.to_le_bytes());
+    preimage.extend_from_slice(&input.sequence.to_le_bytes());
+    preimage.extend_from_slice(hash_outputs.as_ref());
+    preimage.extend_from_slice(&tx.locktime.to_le_bytes());
+    preimage.extend_from_slice(&1u32.to_le_bytes()); // SIGHASH_ALL
+
+    let sighash = sha256d::Hash::hash(&preimage);
+    Ok(sighash.to_byte_array())
 }
 
 /// Build BIP-143 scriptCode for a P2WPKH input:

@@ -7,6 +7,7 @@
 #![allow(missing_docs)]
 #![allow(dead_code)]
 
+pub mod anchor_client;
 pub mod backend;
 pub mod config;
 pub mod error;

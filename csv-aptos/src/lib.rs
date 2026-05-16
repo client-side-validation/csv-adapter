@@ -34,9 +34,11 @@
 #![allow(missing_docs)]
 #![allow(dead_code)]
 
+pub mod address_utils;
 pub mod backend;
 pub mod checkpoint;
 pub mod config;
+pub mod entry_function;
 pub mod error;
 pub mod merkle;
 pub mod ops;

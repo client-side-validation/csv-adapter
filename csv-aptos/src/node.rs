@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use reqwest::Client;
 use serde_json::Value;
 
+use crate::address_utils::format_address;
 use crate::rpc::{
     AptosBlockInfo, AptosEvent, AptosLedgerInfo, AptosResource, AptosRpc, AptosTransaction,
     BoxFuture,
@@ -74,11 +75,6 @@ impl AptosNode {
     /// Parse u64 from string (Aptos returns numbers as strings)
     fn parse_u64(value: &Value) -> u64 {
         value.as_u64().unwrap_or_default()
-    }
-
-    /// Format address as hex string
-    fn format_address(addr: [u8; 32]) -> String {
-        format!("0x{}", hex::encode(addr))
     }
 
     /// Parse a transaction from API response

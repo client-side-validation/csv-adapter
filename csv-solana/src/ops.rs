@@ -45,10 +45,7 @@ pub struct SolanaBackend {
 impl SolanaBackend {
     /// Create new Solana chain operations from RPC client
     pub fn new(rpc: Box<dyn SolanaRpc>, network: Network) -> Self {
-        let mut domain = [0u8; 32];
-        domain[..12].copy_from_slice(b"CSV-SOLANA--");
-
-        // Create a minimal seal protocol for backward compatibility
+        // Create a minimal seal protocol to derive domain separator
         let mock_rpc = Box::new(crate::rpc::MockSolanaRpc::new());
         let seal =
             SolanaSealProtocol::from_config(crate::config::SolanaConfig::default(), mock_rpc)
@@ -64,10 +61,13 @@ impl SolanaBackend {
                     .unwrap()
                 });
 
+        // MED-DUP-03: Derive domain separator from SealProtocol instead of recomputing
+        let domain_separator = seal.get_domain();
+
         Self {
             rpc,
             network,
-            domain_separator: domain,
+            domain_separator,
             seal_protocol: Arc::new(seal),
         }
     }
