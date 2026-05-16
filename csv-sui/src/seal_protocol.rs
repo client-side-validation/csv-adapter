@@ -111,6 +111,8 @@ fn build_sui_transaction_data(
     module_name: &str,
     function_name: &str,
     seal_object_id: [u8; 32],
+    seal_object_version: u64,
+    seal_object_digest: [u8; 32],
     commitment: [u8; 32],
     sender: [u8; 32],
     gas_objects: &[SuiObject],
@@ -164,8 +166,8 @@ fn build_sui_transaction_data(
     tx.push(1);
     // ObjectArg::ImmOrOwnedObject (variant 0): (ObjectID, u64 version, ObjectDigest)
     tx.extend_from_slice(&seal_object_id);
-    tx.extend_from_slice(&1u64.to_le_bytes()); // version 1
-    tx.extend_from_slice(&[0u8; 32]); // digest (zeroed for owned objects)
+    tx.extend_from_slice(&seal_object_version.to_le_bytes());
+    tx.extend_from_slice(&seal_object_digest);
 
     // Input 1: CallArg::Pure (variant 0)
     tx.push(0);
@@ -439,11 +441,18 @@ impl SuiSealProtocol {
         );
 
         // Get gas objects and sender address from RPC
-        let (sender, gas_objects) = self
-            .run_with_rpc(|rpc| async move {
+        let seal_object_id = seal.object_id;
+        let (sender, gas_objects, seal_object) = self
+            .run_with_rpc(move |rpc| async move {
                 let sender = rpc.sender_address().await?;
                 let gas_objects = rpc.get_gas_objects(sender).await?;
-                Ok((sender, gas_objects))
+                let seal_object = rpc.get_object(seal_object_id).await?.ok_or_else(|| {
+                    SuiError::StateProofFailed(format!(
+                        "Sui seal object {} not found",
+                        format_object_id(seal_object_id)
+                    ))
+                })?;
+                Ok((sender, gas_objects, seal_object))
             })
             .map_err(|e| format!("Failed to get gas data: {}", e))?;
 
@@ -458,6 +467,8 @@ impl SuiSealProtocol {
             &module_name,
             &function_name,
             seal.object_id,
+            seal_object.version,
+            seal_object.digest,
             commitment,
             sender,
             &gas_objects,
@@ -664,9 +675,46 @@ impl SealProtocol for SuiSealProtocol {
 
         // Build inclusion proof with real checkpoint data
         let checkpoint_hash = checkpoint_info.digest;
+        let object_proof = self
+            .run_with_rpc(|rpc| async move {
+                let tx = rpc
+                    .get_transaction_block(anchor.tx_digest)
+                    .await
+                    .map_err(|e| SuiError::RpcError(e.to_string()))?
+                    .ok_or_else(|| {
+                        SuiError::StateProofFailed(format!(
+                            "Transaction {} not found",
+                            hex::encode(anchor.tx_digest)
+                        ))
+                    })?;
+
+                let mut proof = Vec::new();
+                proof.extend_from_slice(&anchor.tx_digest);
+                proof.extend_from_slice(&anchor.object_id);
+                proof.extend_from_slice(&anchor.checkpoint.to_le_bytes());
+                for change in tx.effects.modified_objects {
+                    proof.extend_from_slice(&change.object_id);
+                    proof.extend_from_slice(&(change.change_type.len() as u32).to_le_bytes());
+                    proof.extend_from_slice(change.change_type.as_bytes());
+                }
+                Ok(proof)
+            })
+            .map_err(|e| {
+                ProtocolError::InclusionProofFailed(format!(
+                    "Failed to build Sui object inclusion proof from transaction effects: {}",
+                    e
+                ))
+            })?;
+
+        if object_proof.len() <= 72 {
+            return Err(ProtocolError::InclusionProofFailed(
+                "Sui transaction effects do not contain object changes for inclusion proof"
+                    .to_string(),
+            ));
+        }
 
         Ok(SuiInclusionProof::new(
-            vec![0u8; 32], // object_proof would come from tx effects
+            object_proof,
             checkpoint_hash,
             anchor.checkpoint,
         ))

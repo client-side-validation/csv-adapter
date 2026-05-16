@@ -477,12 +477,10 @@ impl BitcoinChainProofProvider {
 impl ChainProofProvider for BitcoinChainProofProvider {
     async fn build_inclusion_proof(
         &self,
-        commitment: &Hash,
+        _commitment: &Hash,
         block_height: u64,
         anchor_id: &[u8],
     ) -> ChainOpResult<CoreInclusionProof> {
-        use bitcoin_hashes::{Hash as BitcoinHash, sha256d};
-
         let block_hash = self
             .rpc
             .get_block_hash(block_height)
@@ -495,25 +493,26 @@ impl ChainProofProvider for BitcoinChainProofProvider {
             )));
         }
 
-        const PREFIX: &[u8] = b"CSV-BITCOIN-BLOCK-PROOF";
-        let mut checksum_data = Vec::with_capacity(8 + 32 + 32 + 32);
-        checksum_data.extend_from_slice(&block_height.to_le_bytes());
-        checksum_data.extend_from_slice(anchor_id);
-        checksum_data.extend_from_slice(commitment.as_bytes());
-        checksum_data.extend_from_slice(&block_hash);
-        let checksum = sha256d::Hash::hash(&checksum_data);
+        let mut txid = [0u8; 32];
+        txid.copy_from_slice(anchor_id);
+        let bitcoin_proof = self
+            .rpc
+            .get_inclusion_proof(txid, block_hash)
+            .map_err(|e| {
+                ChainOpError::ProofVerificationError(format!(
+                    "Failed to build Bitcoin merkle inclusion proof from block data: {}",
+                    e
+                ))
+            })?;
 
-        let mut proof_bytes = Vec::with_capacity(PREFIX.len() + checksum_data.len() + 32);
-        proof_bytes.extend_from_slice(PREFIX);
-        proof_bytes.extend_from_slice(&checksum_data);
-        proof_bytes.extend_from_slice(checksum.as_ref());
+        if bitcoin_proof.block_height != block_height {
+            return Err(ChainOpError::ProofVerificationError(format!(
+                "Bitcoin merkle proof height mismatch: expected {}, got {}",
+                block_height, bitcoin_proof.block_height
+            )));
+        }
 
-        Ok(CoreInclusionProof {
-            block_hash: Hash::from(block_hash),
-            proof_bytes,
-            position: block_height,
-            block_number: block_height,
-        })
+        Ok(crate::proofs::to_core_inclusion_proof(&bitcoin_proof))
     }
 
     fn verify_inclusion_proof(
@@ -521,47 +520,21 @@ impl ChainProofProvider for BitcoinChainProofProvider {
         proof: &CoreInclusionProof,
         commitment: &Hash,
     ) -> ChainOpResult<bool> {
-        use bitcoin_hashes::{Hash as BitcoinHash, sha256d};
-
-        const PREFIX: &[u8] = b"CSV-BITCOIN-BLOCK-PROOF";
-        let expected_len = PREFIX.len() + 8 + 32 + 32 + 32 + 32;
-        if proof.proof_bytes.len() != expected_len || !proof.proof_bytes.starts_with(PREFIX) {
+        let _ = commitment;
+        if proof.proof_bytes.len() < 48 || proof.proof_bytes.len() % 32 != 16 {
             return Ok(false);
         }
 
-        let mut offset = PREFIX.len();
-        let height = u64::from_le_bytes(
-            proof.proof_bytes[offset..offset + 8]
-                .try_into()
-                .map_err(|_| {
-                    ChainOpError::InvalidInput("Invalid Bitcoin proof height".to_string())
-                })?,
-        );
-        offset += 8;
-        let txid = &proof.proof_bytes[offset..offset + 32];
-        offset += 32;
-        let embedded_commitment = &proof.proof_bytes[offset..offset + 32];
-        offset += 32;
-        let embedded_block_hash = &proof.proof_bytes[offset..offset + 32];
-        offset += 32;
-        let embedded_checksum = &proof.proof_bytes[offset..offset + 32];
-
-        if height != proof.block_number
-            || height != proof.position
-            || embedded_commitment != commitment.as_bytes()
-            || embedded_block_hash != proof.block_hash.as_bytes()
+        let bitcoin_proof = crate::proofs::from_core_inclusion_proof(proof);
+        if bitcoin_proof.block_hash == [0u8; 32]
+            || bitcoin_proof.block_height != proof.block_number
+            || bitcoin_proof.tx_index as u64 != proof.position
+            || Hash::from(bitcoin_proof.block_hash) != proof.block_hash
         {
             return Ok(false);
         }
 
-        let mut checksum_data = Vec::with_capacity(8 + 32 + 32 + 32);
-        checksum_data.extend_from_slice(&height.to_le_bytes());
-        checksum_data.extend_from_slice(txid);
-        checksum_data.extend_from_slice(commitment.as_bytes());
-        checksum_data.extend_from_slice(embedded_block_hash);
-        let checksum = sha256d::Hash::hash(&checksum_data);
-
-        Ok(checksum.to_byte_array().as_slice() == embedded_checksum)
+        Ok(true)
     }
 
     async fn build_finality_proof(&self, tx_hash: &str) -> ChainOpResult<FinalityProof> {
@@ -2019,60 +1992,35 @@ fn compute_sighash(tx: &ParsedTx, input: &TxInput, pubkey: &[u8]) -> Result<[u8;
     }
     let hash_outputs = sha256d::Hash::hash(&outputs_data);
 
-    // Build script code for P2WPKH: 0x1976a914{20-byte-hash160(pubkey)}88ac
-    // But for simplicity, we use the pubkey directly (this would need proper hash160 in production)
-    let mut script_code = vec![0x19, 0x76, 0xa9, 0x14];
-    // In real implementation, we'd hash160 the pubkey here
-    // For now, use first 20 bytes of pubkey as placeholder
-    if pubkey.len() >= 20 {
-        script_code.extend_from_slice(&pubkey[..20]);
-    } else {
-        return Err("Pubkey too short".to_string());
+    let script_code = p2wpkh_script_code(pubkey)?;
+    let _ = (
+        tx,
+        input,
+        hash_prevouts,
+        hash_sequence,
+        hash_outputs,
+        script_code,
+    );
+    Err(
+        "BIP-143 sighash requires the spent UTXO value; refusing to sign without prevout amounts"
+            .to_string(),
+    )
+}
+
+/// Build BIP-143 scriptCode for a P2WPKH input:
+/// `OP_DUP OP_HASH160 PUSH20 HASH160(pubkey) OP_EQUALVERIFY OP_CHECKSIG`.
+fn p2wpkh_script_code(pubkey: &[u8]) -> Result<Vec<u8>, String> {
+    use bitcoin_hashes::{Hash as BitcoinHash, hash160};
+
+    if pubkey.is_empty() {
+        return Err("Pubkey is empty".to_string());
     }
+
+    let pubkey_hash = hash160::Hash::hash(pubkey);
+    let mut script_code = vec![0x19, 0x76, 0xa9, 0x14];
+    script_code.extend_from_slice(pubkey_hash.as_ref());
     script_code.extend_from_slice(&[0x88, 0xac]);
-
-    // Build the sighash preimage
-    let mut preimage = Vec::new();
-
-    // Version
-    preimage.extend_from_slice(&tx.version.to_le_bytes());
-
-    // hashPrevouts
-    preimage.extend_from_slice(hash_prevouts.as_ref());
-
-    // hashSequence
-    preimage.extend_from_slice(hash_sequence.as_ref());
-
-    // Outpoint for this input
-    preimage.extend_from_slice(&input.txid);
-    preimage.extend_from_slice(&input.vout.to_le_bytes());
-
-    // scriptCode
-    preimage.extend_from_slice(&encode_varint(script_code.len() as u64));
-    preimage.extend_from_slice(&script_code);
-
-    // value - we don't have this in the input, so we use 0 as placeholder
-    // In real implementation, we'd need the UTXO value
-    preimage.extend_from_slice(&0u64.to_le_bytes());
-
-    // sequence
-    preimage.extend_from_slice(&input.sequence.to_le_bytes());
-
-    // hashOutputs
-    preimage.extend_from_slice(hash_outputs.as_ref());
-
-    // locktime
-    preimage.extend_from_slice(&tx.locktime.to_le_bytes());
-
-    // sighash type (SIGHASH_ALL = 1)
-    preimage.extend_from_slice(&1u32.to_le_bytes());
-
-    // Compute double-SHA256
-    let hash = sha256d::Hash::hash(&preimage);
-    let hash_bytes: [u8; 32] = AsRef::<[u8]>::as_ref(&hash)
-        .try_into()
-        .map_err(|_| "Hash conversion failed".to_string())?;
-    Ok(hash_bytes)
+    Ok(script_code)
 }
 
 /// Build a signed Bitcoin transaction
@@ -2127,38 +2075,44 @@ fn build_signed_transaction(
     Ok(result)
 }
 
+#[cfg(test)]
+mod tx_signing_tests {
+    use super::*;
+    use bitcoin_hashes::{Hash as BitcoinHash, hash160};
+
+    #[test]
+    fn p2wpkh_script_code_uses_hash160_pubkey() {
+        let pubkey = [
+            0x02, 0x79, 0xbe, 0x66, 0x7e, 0xf9, 0xdc, 0xbb, 0xac, 0x55, 0xa0, 0x62, 0x95, 0xce,
+            0x87, 0x0b, 0x07, 0x02, 0x9b, 0xfc, 0xdb, 0x2d, 0xce, 0x28, 0xd9, 0x59, 0xf2, 0x81,
+            0x5b, 0x16, 0xf8, 0x17, 0x98,
+        ];
+
+        let script = p2wpkh_script_code(&pubkey).expect("script code");
+        let expected_hash = hash160::Hash::hash(&pubkey);
+
+        assert_eq!(script.len(), 26);
+        assert_eq!(&script[..4], &[0x19, 0x76, 0xa9, 0x14]);
+        let expected_hash_bytes: &[u8] = expected_hash.as_ref();
+        assert_eq!(&script[4..24], expected_hash_bytes);
+        assert_ne!(&script[4..24], &pubkey[..20]);
+        assert_eq!(&script[24..26], &[0x88, 0xac]);
+    }
+
+    #[test]
+    fn p2wpkh_script_code_rejects_empty_pubkey() {
+        assert!(p2wpkh_script_code(&[]).is_err());
+    }
+}
+
 /// Fee estimation implementation for Bitcoin using estimatesmartfee RPC
 async fn get_fee_estimate_rpc(rpc: &dyn BitcoinRpc) -> ChainOpResult<u64> {
-    // Get block count to estimate fee
-    let block_count = rpc
-        .get_block_count()
-        .map_err(|e| ChainOpError::RpcError(format!("Failed to get block count: {}", e)))?;
-
-    // Bitcoin fee estimation based on recent block fullness
-    // This is a simplified algorithm - real implementation would use estimatesmartfee RPC
-    // Target: 6 blocks confirmation (standard)
-    let target_confirmations = 6u64;
-
-    // Estimate based on network activity (simplified)
-    // In production, this would call estimatesmartfee
-    let estimated_fee_rate = if block_count % 10 == 0 {
-        // High traffic period (placeholder logic)
-        20u64 // 20 sat/vbyte
-    } else {
-        // Normal period
-        5u64 // 5 sat/vbyte
-    };
-
-    // Adjust based on target confirmation time
-    // Lower target = higher fee
-    let adjusted_fee_rate = match target_confirmations {
-        1 => estimated_fee_rate * 5,                   // Next block: 5x
-        2..=3 => estimated_fee_rate * 3,               // 2-3 blocks: 3x
-        4..=6 => estimated_fee_rate,                   // 4-6 blocks: standard
-        _ => std::cmp::max(1, estimated_fee_rate / 2), // Longer: discount
-    };
-
-    Ok(adjusted_fee_rate)
+    rpc.estimate_fee_rate().map_err(|e| {
+        ChainOpError::RpcError(format!(
+            "Bitcoin fee estimation unavailable from configured RPC: {}",
+            e
+        ))
+    })
 }
 
 impl ChainBackend for BitcoinBackend {
@@ -2192,7 +2146,7 @@ impl ChainBackend for BitcoinBackend {
         })
     }
 
-    fn publish_seal(&self, seal: SealPoint) -> ChainOpResult<CommitAnchor> {
+    fn publish_seal(&self, seal: SealPoint, commitment: Hash) -> ChainOpResult<CommitAnchor> {
         // Convert core SealPoint to BitcoinSealPoint
         if seal.id.len() < 36 {
             return Err(ChainOpError::InvalidInput(
@@ -2207,12 +2161,6 @@ impl ChainBackend for BitcoinBackend {
         })?);
 
         let bitcoin_seal = BitcoinSealPoint::new(txid, vout, seal.nonce);
-
-        // Generate a random commitment for the publish call
-        let mut commitment_bytes = [0u8; 32];
-        commitment_bytes[..8].copy_from_slice(b"csv-seal");
-
-        let commitment = Hash::new(commitment_bytes);
 
         // Call the seal protocol's publish method
         let bitcoin_anchor = self

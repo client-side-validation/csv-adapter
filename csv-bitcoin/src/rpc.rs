@@ -50,6 +50,21 @@ pub trait BitcoinRpc: Send + Sync {
         address: &str,
     ) -> Result<Vec<UtxoInfo>, Box<dyn std::error::Error + Send + Sync>>;
 
+    /// Build a transaction inclusion proof from real block transaction data.
+    fn get_inclusion_proof(
+        &self,
+        txid: [u8; 32],
+        block_hash: [u8; 32],
+    ) -> Result<crate::types::BitcoinInclusionProof, Box<dyn std::error::Error + Send + Sync>> {
+        let _ = (txid, block_hash);
+        Err("Bitcoin RPC implementation does not support merkle proof extraction".into())
+    }
+
+    /// Estimate fee rate in sat/vbyte from the backing node or fee API.
+    fn estimate_fee_rate(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+        Err("Bitcoin RPC implementation does not support fee estimation".into())
+    }
+
     /// Clone the RPC client into a new boxed trait object.
     /// Required for the runtime pattern to share RPC across operations.
     fn clone_boxed(&self) -> Box<dyn BitcoinRpc + Send + Sync>;

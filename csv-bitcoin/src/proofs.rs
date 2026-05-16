@@ -686,7 +686,7 @@ mod tests {
         proof_bytes.extend_from_slice(&5u64.to_le_bytes());
         proof_bytes.extend_from_slice(&100u64.to_le_bytes());
         let core_proof =
-            csv_core::InclusionProof::new(proof_bytes, CoreHash::new([1u8; 32]), 5).unwrap();
+            csv_core::InclusionProof::new(proof_bytes, CoreHash::new([1u8; 32]), 5, 100).unwrap();
         let bitcoin_proof = from_core_inclusion_proof(&core_proof);
         assert_eq!(bitcoin_proof.tx_index, 5);
         assert_eq!(bitcoin_proof.block_height, 100);

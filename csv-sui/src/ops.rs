@@ -1251,7 +1251,7 @@ impl ChainBackend for SuiBackend {
         })
     }
 
-    fn publish_seal(&self, seal: SealPoint) -> ChainOpResult<CommitAnchor> {
+    fn publish_seal(&self, seal: SealPoint, commitment: Hash) -> ChainOpResult<CommitAnchor> {
         // Convert core SealPoint to SuiSealPoint
         if seal.id.len() < 32 {
             return Err(ChainOpError::InvalidInput(
@@ -1264,11 +1264,6 @@ impl ChainBackend for SuiBackend {
 
         let nonce = seal.nonce.unwrap_or(0);
         let sui_seal = crate::types::SuiSealPoint::new(object_id, 0, nonce);
-
-        // Generate a random commitment for the publish call
-        let mut commitment_bytes = [0u8; 32];
-        commitment_bytes[..8].copy_from_slice(b"csv-seal");
-        let commitment = Hash::new(commitment_bytes);
 
         // Call the seal protocol's publish method
         let sui_anchor = self

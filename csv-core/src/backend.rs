@@ -540,11 +540,12 @@ pub trait ChainBackend:
     ///
     /// # Arguments
     /// * `seal` - The seal reference to use for publishing
+    /// * `commitment` - Domain-separated commitment hash for the state transition
     ///
     /// # Returns
     /// * `Ok(CommitAnchor)` - The anchor reference containing tx hash and block height
     /// * `Err` - If publication fails or seal already consumed
-    fn publish_seal(&self, seal: SealPoint) -> ChainOpResult<CommitAnchor>;
+    fn publish_seal(&self, seal: SealPoint, commitment: Hash) -> ChainOpResult<CommitAnchor>;
 }
 
 /// Chain capabilities that may not be available on all chains

@@ -106,10 +106,12 @@ impl SuiRpc for SuiNode {
         let data = &result["data"];
         let object_id = Self::parse_object_id_static(data["objectId"].as_str().unwrap_or(""))?;
         let version = data["version"].as_str().unwrap_or("0").parse()?;
+        let digest = Self::parse_digest_static(data["digest"].as_str().unwrap_or(""))?;
 
         Ok(Some(SuiObject {
             object_id,
             version,
+            digest,
             owner: data["owner"].to_string().into_bytes(),
             object_type: data["type"].as_str().unwrap_or("").to_string(),
             has_public_transfer: data["hasPublicTransfer"].as_bool().unwrap_or(false),
@@ -313,9 +315,14 @@ impl SuiRpc for SuiNode {
                         let object_id =
                             Self::parse_object_id_static(id_str.trim_start_matches("0x")).ok()?;
                         let version = coin.get("version")?.as_str()?.parse().ok()?;
+                        let digest = coin
+                            .get("digest")
+                            .and_then(|value| value.as_str())
+                            .and_then(|digest| Self::parse_digest_static(digest).ok())?;
                         Some(SuiObject {
                             object_id,
                             version,
+                            digest,
                             owner: owner.to_vec(),
                             object_type: "0x2::coin::Coin<0x2::sui::SUI>".to_string(),
                             has_public_transfer: true,

@@ -15,6 +15,8 @@ use std::sync::Mutex;
 
 #[cfg(feature = "rpc")]
 use crate::proofs::StateProofVerifier;
+#[cfg(feature = "rpc")]
+use tokio::runtime::Handle;
 
 use csv_core::Hash;
 use csv_core::SealProtocol;
@@ -184,10 +186,11 @@ impl AptosSealProtocol {
                 "{}::csv_seal::{}",
                 self.config.seal_contract.module_address, self.config.seal_contract.seal_resource
             );
+            let account_address = seal.account_address;
             let rpc = self.rpc.clone_boxed();
             spawn_blocking_async(async move {
                 StateProofVerifier::verify_resource_exists_async(
-                    seal.account_address,
+                    account_address,
                     &resource_type,
                     rpc.as_ref(),
                 )

@@ -1479,7 +1479,7 @@ impl ChainBackend for EthereumBackend {
         })
     }
 
-    fn publish_seal(&self, seal: SealPoint) -> ChainOpResult<CommitAnchor> {
+    fn publish_seal(&self, seal: SealPoint, commitment: Hash) -> ChainOpResult<CommitAnchor> {
         // Convert core SealPoint to EthereumSealPoint
         if seal.id.len() < 28 {
             return Err(ChainOpError::InvalidInput(
@@ -1494,11 +1494,6 @@ impl ChainBackend for EthereumBackend {
         let nonce = seal.nonce.unwrap_or(0);
         let ethereum_seal =
             crate::types::EthereumSealPoint::new(contract_address, slot_index, nonce);
-
-        // Generate a random commitment for the publish call
-        let mut commitment_bytes = [0u8; 32];
-        commitment_bytes[..8].copy_from_slice(b"csv-seal");
-        let commitment = Hash::new(commitment_bytes);
 
         // Call the seal protocol's publish method
         let ethereum_anchor = self

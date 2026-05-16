@@ -264,6 +264,25 @@ impl ChainQuery for SolanaBackend {
     }
 }
 
+fn keypair_from_hex_key_id(key_id: &str) -> ChainOpResult<solana_sdk::signature::Keypair> {
+    let key_bytes = hex::decode(key_id).map_err(|_| {
+        ChainOpError::SigningError(
+            "Invalid key_id format. Expected hex-encoded 32-byte Solana secret key.".to_string(),
+        )
+    })?;
+
+    if key_bytes.len() != 32 {
+        return Err(ChainOpError::SigningError(
+            "Invalid Solana key length. Expected 32 bytes.".to_string(),
+        ));
+    }
+
+    let secret_key: [u8; 32] = key_bytes
+        .try_into()
+        .map_err(|_| ChainOpError::SigningError("Invalid Solana secret key".to_string()))?;
+    Ok(solana_sdk::signature::Keypair::new_from_array(secret_key))
+}
+
 #[async_trait]
 impl ChainSigner for SolanaBackend {
     fn derive_address(&self, public_key: &[u8]) -> ChainOpResult<String> {
@@ -280,20 +299,29 @@ impl ChainSigner for SolanaBackend {
         Ok(pubkey.to_string())
     }
 
-    async fn sign_transaction(&self, _tx_data: &[u8], _key_id: &str) -> ChainOpResult<Vec<u8>> {
-        Err(ChainOpError::CapabilityUnavailable(
-            "Direct transaction signing not available. \
-             Use an external keystore with the key_id reference."
-                .to_string(),
-        ))
+    async fn sign_transaction(&self, tx_data: &[u8], key_id: &str) -> ChainOpResult<Vec<u8>> {
+        use solana_sdk::transaction::Transaction;
+
+        let keypair = keypair_from_hex_key_id(key_id)?;
+        let mut transaction: Transaction = bincode::deserialize(tx_data).map_err(|e| {
+            ChainOpError::InvalidInput(format!("Invalid Solana transaction: {}", e))
+        })?;
+        let recent_blockhash = transaction.message.recent_blockhash;
+
+        transaction
+            .try_sign(&[&keypair], recent_blockhash)
+            .map_err(|e| ChainOpError::SigningError(format!("Solana signing failed: {}", e)))?;
+
+        bincode::serialize(&transaction).map_err(|e| {
+            ChainOpError::SigningError(format!("Failed to serialize transaction: {}", e))
+        })
     }
 
-    async fn sign_message(&self, _message: &[u8], _key_id: &str) -> ChainOpResult<Vec<u8>> {
-        Err(ChainOpError::CapabilityUnavailable(
-            "Direct message signing not available. \
-             Use an external keystore with the key_id reference."
-                .to_string(),
-        ))
+    async fn sign_message(&self, message: &[u8], key_id: &str) -> ChainOpResult<Vec<u8>> {
+        use solana_sdk::signature::Signer;
+
+        let keypair = keypair_from_hex_key_id(key_id)?;
+        Ok(keypair.sign_message(message).as_ref().to_vec())
     }
 
     fn verify_signature(
@@ -748,6 +776,7 @@ impl ChainSanadOps for SolanaBackend {
                 "Owner key must be 32 bytes".to_string(),
             ));
         }
+        let _ = key_bytes;
 
         // Get the most recent seal from active seals
         let seal = self
@@ -761,81 +790,12 @@ impl ChainSanadOps for SolanaBackend {
                     hex::encode(sanad_id.as_bytes())
                 ))
             })?;
-
-        // Get the recent blockhash for the transaction
-        let blockhash = self.rpc.get_recent_blockhash().map_err(|e| {
-            ChainOpError::RpcError(format!("Failed to get recent blockhash: {}", e))
-        })?;
-
-        // Build a lock transaction that transfers the seal account authority
-        // The destination chain is encoded in the instruction data
-        let dest_chain_hash = {
-            use sha2::{Digest, Sha256};
-            let mut hasher = Sha256::new();
-            hasher.update(destination_chain.as_bytes());
-            hasher.finalize()
-        };
-
-        // Create a simple lock instruction: transfer seal authority to a lock program
-        // For now, we create a system program transfer with lock metadata
-        let lock_instruction = {
-            use solana_system_interface::instruction as system_instruction;
-            // The destination chain hash serves as the lock program ID for this transfer
-            let lock_program_id =
-                solana_sdk::pubkey::Pubkey::new_from_array(dest_chain_hash.into());
-
-            // Create an instruction that transfers the seal account to the lock program
-            system_instruction::transfer(
-                &seal.account,
-                &lock_program_id,
-                0, // No lamport transfer, just marking the account
-            )
-        };
-
-        // Create the transaction
-        use solana_sdk::{
-            message::Message,
-            signature::{Keypair, Signer},
-            transaction::Transaction,
-        };
-
-        // Solana Keypair is created from 32-byte secret key
-        let secret_key: [u8; 32] = key_bytes
-            .try_into()
-            .map_err(|_| ChainOpError::InvalidInput("Owner key must be 32 bytes".to_string()))?;
-        let keypair = Keypair::new_from_array(secret_key);
-
-        let message = Message::new(&[lock_instruction], Some(&keypair.pubkey()));
-        let transaction = Transaction::new(&[&keypair], message, blockhash);
-
-        // Send the transaction
-        let signature = self.rpc.send_transaction(&transaction).map_err(|e| {
-            ChainOpError::TransactionError(format!("Failed to send lock transaction: {}", e))
-        })?;
-
-        // Wait for confirmation
-        self.rpc.wait_for_confirmation(&signature).map_err(|e| {
-            ChainOpError::TransactionError(format!("Transaction confirmation failed: {}", e))
-        })?;
-
-        // Get the current slot as block height
-        let slot = self
-            .rpc
-            .get_latest_slot()
-            .map_err(|e| ChainOpError::RpcError(format!("Failed to get current slot: {}", e)))?;
-
-        Ok(SanadOperationResult {
-            sanad_id: sanad_id.clone(),
-            operation: csv_core::backend::SanadOperation::Lock,
-            transaction_hash: hex::encode(signature.as_ref()),
-            block_height: slot,
-            chain_id: "solana".to_string(),
-            metadata: serde_json::json!({
-                "destination_chain": destination_chain,
-                "lock_type": "authority_transfer",
-                "seal_account": hex::encode(seal.account.to_bytes()),
-            }),
-        })
+        Err(ChainOpError::CapabilityUnavailable(format!(
+            "Solana lock_sanad for {} to {} requires the typed Anchor csv-seal lock_sanad instruction; refusing to use a system-program placeholder for seal {}",
+            hex::encode(sanad_id.as_bytes()),
+            destination_chain,
+            seal.account,
+        )))
     }
 
     async fn mint_sanad(
@@ -863,86 +823,15 @@ impl ChainSanadOps for SolanaBackend {
             ));
         }
 
-        // Parse new owner as Solana pubkey
-        let owner_pubkey = solana_sdk::pubkey::Pubkey::from_str(new_owner)
+        // Parse new owner as Solana pubkey before failing closed so callers get
+        // deterministic input validation even while typed minting is unavailable.
+        let _owner_pubkey = solana_sdk::pubkey::Pubkey::from_str(new_owner)
             .map_err(|e| ChainOpError::InvalidInput(format!("Invalid owner pubkey: {}", e)))?;
 
-        // Get the recent blockhash for the transaction
-        let blockhash = self.rpc.get_recent_blockhash().map_err(|e| {
-            ChainOpError::RpcError(format!("Failed to get recent blockhash: {}", e))
-        })?;
-
-        // Build a mint instruction: create a new mint account for the sanad
-        // The destination chain is used to derive the mint account seed
-        let dest_chain_hash = {
-            use sha2::{Digest, Sha256};
-            let mut hasher = Sha256::new();
-            hasher.update(source_chain.as_bytes());
-            hasher.finalize()
-        };
-
-        // Create mint instruction — derives a program-derived address for the minted sanad
-        let mint_instruction = {
-            use solana_system_interface::instruction as system_instruction;
-            let mint_program_id =
-                solana_sdk::pubkey::Pubkey::new_from_array(dest_chain_hash.into());
-
-            // Minimal instruction: create a new account via system program
-            system_instruction::create_account(
-                &owner_pubkey,
-                &mint_program_id,
-                0, // No lamports transferred
-                0, // Zero space (marker account)
-                &mint_program_id,
-            )
-        };
-
-        // Build the transaction
-        use solana_sdk::{message::Message, transaction::Transaction};
-
-        // We need a keypair to sign — derive one deterministically from the sanad_id
-        // In production, this would use the wallet's signing key
-        let seed_bytes: [u8; 32] = {
-            let mut seed = [0u8; 32];
-            let sanad_bytes = source_sanad_id.as_bytes();
-            let copy_len = sanad_bytes.len().min(32);
-            seed[..copy_len].copy_from_slice(&sanad_bytes[..copy_len]);
-            seed
-        };
-        let mint_keypair = solana_sdk::signature::Keypair::new_from_array(seed_bytes);
-
-        let message = Message::new(&[mint_instruction], Some(&owner_pubkey));
-        let transaction = Transaction::new(&[&mint_keypair], message, blockhash);
-
-        // Send the transaction
-        let signature = self.rpc.send_transaction(&transaction).map_err(|e| {
-            ChainOpError::TransactionError(format!("Failed to send mint transaction: {}", e))
-        })?;
-
-        // Wait for confirmation
-        self.rpc.wait_for_confirmation(&signature).map_err(|e| {
-            ChainOpError::TransactionError(format!("Mint transaction confirmation failed: {}", e))
-        })?;
-
-        // Get the current slot as block height
-        let slot = self
-            .rpc
-            .get_latest_slot()
-            .map_err(|e| ChainOpError::RpcError(format!("Failed to get current slot: {}", e)))?;
-
-        Ok(SanadOperationResult {
-            sanad_id: source_sanad_id.clone(),
-            operation: csv_core::backend::SanadOperation::Mint,
-            transaction_hash: hex::encode(signature.as_ref()),
-            block_height: slot,
-            chain_id: "solana".to_string(),
-            metadata: serde_json::json!({
-                "source_chain": source_chain,
-                "mint_type": "account_mint",
-                "new_owner": new_owner,
-                "proof_block_hash": hex::encode(lock_proof.block_hash.as_bytes()),
-            }),
-        })
+        Err(ChainOpError::CapabilityUnavailable(format!(
+            "Solana mint_sanad for {} requires typed Anchor csv-seal mint_sanad instruction wiring and a real mint authority signer; refusing to derive a signing key from the sanad id",
+            hex::encode(source_sanad_id.as_bytes())
+        )))
     }
 
     async fn refund_sanad(
@@ -1044,7 +933,7 @@ impl ChainBackend for SolanaBackend {
         })
     }
 
-    fn publish_seal(&self, seal: SealPoint) -> ChainOpResult<CommitAnchor> {
+    fn publish_seal(&self, seal: SealPoint, commitment: Hash) -> ChainOpResult<CommitAnchor> {
         // Convert core SealPoint to SolanaSealPoint
         if seal.id.len() < 32 {
             return Err(ChainOpError::InvalidInput(
@@ -1063,11 +952,6 @@ impl ChainBackend for SolanaBackend {
             seed: None,
         };
 
-        // Generate a random commitment for the publish call
-        let mut commitment_bytes = [0u8; 32];
-        commitment_bytes[..8].copy_from_slice(b"csv-seal");
-        let commitment = Hash::new(commitment_bytes);
-
         // Call the seal protocol's publish method
         let solana_anchor = self
             .seal_protocol
@@ -1085,10 +969,32 @@ impl ChainBackend for SolanaBackend {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     #[test]
     fn test_solana_address_validation() {
         // Can't easily test without test RPC, but we can test address validation
         // This is a basic test - real tests would use MockSolanaRpc
+    }
+
+    #[test]
+    fn keypair_from_hex_key_id_accepts_32_byte_secret() {
+        use solana_sdk::signature::Signer;
+
+        let secret = [7u8; 32];
+        let key_id = hex::encode(secret);
+        let keypair = keypair_from_hex_key_id(&key_id).expect("valid keypair");
+
+        let signature = keypair.sign_message(b"csv-solana-signing-test");
+        assert_eq!(signature.as_ref().len(), 64);
+    }
+
+    #[test]
+    fn keypair_from_hex_key_id_rejects_invalid_length() {
+        let err = match keypair_from_hex_key_id("abcd") {
+            Ok(_) => panic!("short key should be rejected"),
+            Err(err) => err,
+        };
+        assert!(matches!(err, ChainOpError::SigningError(_)));
     }
 }

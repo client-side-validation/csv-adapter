@@ -509,7 +509,7 @@ pub fn create_sui_adapter(config: &ChainConfig) -> ChainResult<SuiSealProtocol> 
     #[cfg(all(not(test), feature = "rpc"))]
     {
         use crate::node::SuiNode;
-        let rpc_url = _config
+        let rpc_url = config
             .rpc_endpoints
             .first()
             .ok_or_else(|| ChainError::InvalidInput("RPC endpoint required".to_string()))?;

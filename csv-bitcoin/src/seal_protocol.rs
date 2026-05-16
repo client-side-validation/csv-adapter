@@ -89,10 +89,9 @@ impl BitcoinSealProtocol {
                     BitcoinError::RpcError(format!("Wallet creation from xpub failed: {}", e))
                 })?,
             None => {
-                // Generate random wallet for testing/signet scenarios
-                // Production usage should always provide xpub
-                log::warn!("No xpub provided, generating random wallet (not for production)");
-                SealWallet::generate_random(config.network.to_bitcoin_network())
+                return Err(BitcoinError::RpcError(
+                    "BitcoinSealProtocol::from_config requires xpub; refusing to generate a random production wallet".to_string(),
+                ));
             }
         };
 

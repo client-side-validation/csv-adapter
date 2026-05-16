@@ -311,6 +311,7 @@ mod tests {
         rpc.add_object(SuiObject {
             object_id: [1u8; 32],
             version: 1,
+            digest: [1u8; 32],
             owner: vec![2, 3],
             object_type: "CSV::Seal".to_string(),
             has_public_transfer: false,

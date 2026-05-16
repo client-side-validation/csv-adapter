@@ -770,6 +770,7 @@ impl ChainSanadOps for AptosBackend {
         let owner_address: [u8; 32] = owner_bytes
             .try_into()
             .map_err(|_| ChainOpError::InvalidInput("Invalid owner address format".to_string()))?;
+        let _ = owner_address;
 
         // Find the seal resource for this sanad from active seals
         let seal = self
@@ -783,46 +784,12 @@ impl ChainSanadOps for AptosBackend {
                     hex::encode(sanad_id.as_bytes())
                 ))
             })?;
-
-        // Build the lock transaction bytes
-        // Format: [owner_address: 32 bytes][seal_account_address: 32 bytes][resource_type_len:4][resource_type]
-        let mut tx_bytes = Vec::new();
-        tx_bytes.extend_from_slice(&owner_address);
-        tx_bytes.extend_from_slice(&seal.account_address);
-        let resource_type_bytes = seal.resource_type.as_bytes();
-        tx_bytes.extend_from_slice(&(resource_type_bytes.len() as u32).to_le_bytes());
-        tx_bytes.extend_from_slice(resource_type_bytes);
-
-        // Submit the transaction
-        let digest = self.rpc.submit_transaction(tx_bytes).await.map_err(|e| {
-            ChainOpError::TransactionError(format!("Failed to submit lock tx: {}", e))
-        })?;
-
-        // Wait for transaction confirmation
-        self.rpc.wait_for_transaction(digest).await.map_err(|e| {
-            ChainOpError::TransactionError(format!("Transaction confirmation failed: {}", e))
-        })?;
-
-        // Get the ledger info as block height
-        let ledger_info = self
-            .rpc
-            .get_ledger_info()
-            .await
-            .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger info: {}", e)))?;
-
-        Ok(SanadOperationResult {
-            sanad_id: sanad_id.clone(),
-            operation: csv_core::backend::SanadOperation::Lock,
-            transaction_hash: format!("0x{}", hex::encode(digest)),
-            block_height: ledger_info.ledger_version,
-            chain_id: "aptos".to_string(),
-            metadata: serde_json::json!({
-                "destination_chain": destination_chain,
-                "lock_type": "resource_lock",
-                "seal_account": hex::encode(seal.account_address),
-                "resource_type": seal.resource_type,
-            }),
-        })
+        Err(ChainOpError::CapabilityUnavailable(format!(
+            "Aptos lock_sanad for {} requires a signed EntryFunction payload to csv_seal::lock_sanad; refusing to submit untyped bytes for seal {} ({})",
+            hex::encode(sanad_id.as_bytes()),
+            hex::encode(seal.account_address),
+            seal.resource_type,
+        )))
     }
 
     async fn mint_sanad(
@@ -850,6 +817,7 @@ impl ChainSanadOps for AptosBackend {
         let owner_address: [u8; 32] = owner_bytes
             .try_into()
             .map_err(|_| ChainOpError::InvalidInput("Invalid owner address array".to_string()))?;
+        let _ = owner_address;
 
         // Verify the lock proof has valid structure
         if lock_proof.proof_bytes.is_empty() {
@@ -864,45 +832,11 @@ impl ChainSanadOps for AptosBackend {
             ));
         }
 
-        // Build the mint transaction bytes
-        // Format: [source_chain_len:4][source_chain][sanad_id:32][proof_hash:32][owner_address:32]
-        let mut tx_bytes = Vec::new();
-        tx_bytes.extend_from_slice(&(source_chain.len() as u32).to_le_bytes());
-        tx_bytes.extend_from_slice(source_chain.as_bytes());
-        tx_bytes.extend_from_slice(source_sanad_id.as_bytes());
-        tx_bytes.extend_from_slice(lock_proof.block_hash.as_bytes());
-        tx_bytes.extend_from_slice(&owner_address);
-
-        // Submit the mint transaction via RPC
-        let digest = self.rpc.submit_transaction(tx_bytes).await.map_err(|e| {
-            ChainOpError::TransactionError(format!("Failed to submit mint tx: {}", e))
-        })?;
-
-        // Wait for transaction confirmation
-        self.rpc.wait_for_transaction(digest).await.map_err(|e| {
-            ChainOpError::TransactionError(format!("Mint tx confirmation failed: {}", e))
-        })?;
-
-        // Get the ledger info as block height
-        let ledger_info = self
-            .rpc
-            .get_ledger_info()
-            .await
-            .map_err(|e| ChainOpError::RpcError(format!("Failed to get ledger info: {}", e)))?;
-
-        Ok(SanadOperationResult {
-            sanad_id: source_sanad_id.clone(),
-            operation: csv_core::backend::SanadOperation::Mint,
-            transaction_hash: format!("0x{}", hex::encode(digest)),
-            block_height: ledger_info.ledger_version,
-            chain_id: "aptos".to_string(),
-            metadata: serde_json::json!({
-                "source_chain": source_chain,
-                "mint_type": "resource_mint",
-                "new_owner": new_owner,
-                "proof_block_hash": hex::encode(lock_proof.block_hash.as_bytes()),
-            }),
-        })
+        Err(ChainOpError::CapabilityUnavailable(format!(
+            "Aptos mint_sanad for {} from {} requires a signed EntryFunction payload to csv_seal::mint_sanad; refusing to submit untyped bytes",
+            hex::encode(source_sanad_id.as_bytes()),
+            source_chain,
+        )))
     }
 
     async fn refund_sanad(
@@ -1012,7 +946,7 @@ impl ChainBackend for AptosBackend {
         })
     }
 
-    fn publish_seal(&self, seal: SealPoint) -> ChainOpResult<CommitAnchor> {
+    fn publish_seal(&self, seal: SealPoint, commitment: Hash) -> ChainOpResult<CommitAnchor> {
         // Convert core SealPoint to AptosSealPoint
         if seal.id.len() < 32 {
             return Err(ChainOpError::InvalidInput(
@@ -1026,11 +960,6 @@ impl ChainBackend for AptosBackend {
         let nonce = seal.nonce.unwrap_or(0);
         let aptos_seal =
             crate::types::AptosSealPoint::new(account_address, String::from("csv_seal"), nonce);
-
-        // Generate a random commitment for the publish call
-        let mut commitment_bytes = [0u8; 32];
-        commitment_bytes[..8].copy_from_slice(b"csv-seal");
-        let commitment = Hash::new(commitment_bytes);
 
         // Call the seal protocol's publish method
         let aptos_anchor = self

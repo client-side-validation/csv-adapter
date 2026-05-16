@@ -233,19 +233,9 @@ impl ChainDriver for BitcoinSealProtocol {
     }
 
     async fn create_wallet(&self, _config: &ChainConfig) -> ChainResult<Box<dyn Wallet>> {
-        // Get the first derived address from the wallet
-        let address = self
-            .wallet
-            .get_funding_address(0, 0)
-            .map(|k| k.address.to_string())
-            .map_err(|e| ChainError::WalletError(format!("Failed to derive address: {}", e)))?;
-
-        Ok(Box::new(BitcoinWallet::from_seal_wallet(
-            // Note: We can't clone SealWallet, so this creates a temporary
-            // In production, this would create from seed/xpub
-            SealWallet::generate_random(bitcoin::Network::Bitcoin),
-            address,
-        )))
+        Err(ChainError::WalletError(
+            "Bitcoin wallet export through ChainDriver is disabled: refusing to create a random replacement wallet. Use BitcoinSealProtocol directly with configured wallet material.".to_string(),
+        ))
     }
 
     fn csv_program_id(&self) -> Option<&'static str> {
@@ -274,15 +264,32 @@ pub fn create_bitcoin_adapter(config: &ChainConfig) -> ChainResult<BitcoinSealPr
         _ => Network::Signet,
     };
 
+    let xpub = config
+        .custom_settings
+        .get("xpub")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| {
+            ChainError::WalletError(
+                "Bitcoin adapter creation requires custom_settings.xpub; refusing to generate a throwaway wallet".to_string(),
+            )
+        })?
+        .to_string();
+
     let btc_config = BitcoinConfig {
         network,
         finality_depth: config.capabilities.confirmation_blocks as u32,
+        xpub: Some(xpub),
         ..Default::default()
     };
 
-    // Generate a random wallet for now
-    // In production, this would load from config or derive from master key
-    let wallet = SealWallet::generate_random(network.to_bitcoin_network());
+    let wallet = SealWallet::from_xpub(
+        btc_config
+            .xpub
+            .as_deref()
+            .ok_or_else(|| ChainError::WalletError("Missing Bitcoin xpub".to_string()))?,
+        network.to_bitcoin_network(),
+    )
+    .map_err(|e| ChainError::WalletError(format!("Failed to create wallet from xpub: {}", e)))?;
 
     BitcoinSealProtocol::with_wallet(btc_config, wallet)
         .map_err(|e| ChainError::WalletError(format!("Failed to create wallet: {}", e)))
@@ -331,6 +338,6 @@ mod tests {
         };
 
         let adapter = create_bitcoin_adapter(&config);
-        assert!(adapter.is_ok());
+        assert!(adapter.is_err());
     }
 }

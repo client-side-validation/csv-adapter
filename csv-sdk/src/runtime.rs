@@ -370,12 +370,13 @@ impl ChainRuntime {
         &self,
         chain: ChainId,
         seal: csv_core::SealPoint,
+        commitment: csv_core::Hash,
     ) -> Result<csv_core::CommitAnchor, CsvError> {
         let adapter = self.get_adapter(chain.clone()).await?;
 
         // Delegate to the adapter's publish_seal method
         adapter
-            .publish_seal(seal)
+            .publish_seal(seal, commitment)
             .map_err(|e| CsvError::ProtocolError {
                 chain: chain.clone(),
                 message: format!("Seal publishing failed: {}", e),

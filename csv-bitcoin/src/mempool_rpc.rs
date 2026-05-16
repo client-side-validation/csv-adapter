@@ -368,6 +368,20 @@ impl BitcoinRpc for MempoolSignetRpc {
         }
     }
 
+    fn get_inclusion_proof(
+        &self,
+        txid: [u8; 32],
+        block_hash: [u8; 32],
+    ) -> Result<BitcoinInclusionProof, Box<dyn std::error::Error + Send + Sync>> {
+        self.extract_merkle_proof(txid, block_hash)
+    }
+
+    fn estimate_fee_rate(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+        let url = format!("{}/v1/fees/recommended", self.base_url);
+        let fees: RecommendedFees = self.get_with_retry(&url)?;
+        Ok(fees.half_hour_fee.max(fees.fastest_fee).max(1).min(10_000))
+    }
+
     fn clone_boxed(&self) -> Box<dyn BitcoinRpc + Send + Sync> {
         Box::new(MempoolSignetRpc {
             client: self.client.clone(),
@@ -514,6 +528,15 @@ pub struct AddressUtxo {
     pub vout: u32,
     pub value: u64,
     pub status: TxStatus,
+}
+
+/// Recommended fee response from mempool.space.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct RecommendedFees {
+    #[serde(rename = "fastestFee")]
+    pub fastest_fee: u64,
+    #[serde(rename = "halfHourFee")]
+    pub half_hour_fee: u64,
 }
 
 #[cfg(test)]

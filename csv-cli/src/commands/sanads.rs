@@ -106,7 +106,7 @@ async fn cmd_create(
 
     // Step 2: Publish the commitment under the seal
     let anchor = runtime
-        .publish_seal(core_chain.clone(), seal.clone())
+        .publish_seal(core_chain.clone(), seal.clone(), commitment)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to publish seal: {}", e))?;
 

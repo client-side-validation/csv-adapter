@@ -88,6 +88,7 @@ pub trait SuiRpc: Send + Sync + 'static {
 pub struct SuiObject {
     pub object_id: [u8; 32],
     pub version: u64,
+    pub digest: [u8; 32],
     pub owner: Vec<u8>,
     pub object_type: String,
     pub has_public_transfer: bool,
@@ -107,6 +108,7 @@ impl SuiObject {
         Self {
             object_id,
             version,
+            digest: [0u8; 32],
             owner,
             object_type,
             has_public_transfer,
@@ -314,6 +316,7 @@ impl SuiRpc for MockSuiRpc {
         Ok(vec![SuiObject {
             object_id: [0x01; 32],
             version: 1,
+            digest: [0x01; 32],
             owner: self.test_address.to_vec(),
             object_type: "0x2::coin::Coin<0x2::sui::SUI>".to_string(),
             has_public_transfer: true,
@@ -382,6 +385,7 @@ mod tests {
         let obj = SuiObject {
             object_id: [1u8; 32],
             version: 1,
+            digest: [1u8; 32],
             owner: vec![2, 3],
             object_type: "CSV::Seal".to_string(),
             has_public_transfer: false,
