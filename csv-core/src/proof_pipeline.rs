@@ -788,12 +788,19 @@ mod tests {
             vec![vec![]],
             vec![],
         );
+
+        // Compute the correct block_hash that matches the domain-separated hash
+        // of the proof_bytes, so domain validation passes
+        let proof_bytes = vec![1, 2, 3];
+        let correct_block_hash =
+            DomainSeparatedHash::<ProofBundleDomain>::hash(&proof_bytes);
+
         let bundle = ProofBundle {
             transition_dag: DAGSegment::new(vec![node], Hash::new([9u8; 32])),
             signatures: vec![vec![1, 2, 3]],
             seal_ref: SealPoint::new(vec![0xAA], Some(1)).unwrap(),
             anchor_ref: CommitAnchor::new(vec![0xBB; 32], 1, vec![0xCC]).unwrap(),
-            inclusion_proof: InclusionProof::new(vec![1, 2, 3], Hash::new([1u8; 32]), 1, 0)
+            inclusion_proof: InclusionProof::new(proof_bytes, correct_block_hash, 1, 0)
                 .unwrap(),
             finality_proof: FinalityProof::new(vec![4, 5, 6], 6, true).unwrap(),
         };

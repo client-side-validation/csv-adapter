@@ -716,12 +716,13 @@ pub mod pedersen {
     }
 }
 
+/// Tests for Pedersen commitment operations.
 #[cfg(test)]
 mod pedersen_tests {
     #[cfg(feature = "zk")]
     mod zk_tests {
-        use super::pedersen::*;
         use curve25519_dalek::scalar::Scalar;
+        use crate::zk_proof::pedersen::*;
 
         #[test]
         fn test_commit_and_verify() {

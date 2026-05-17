@@ -14,6 +14,12 @@ pub fn format_address(addr: [u8; 32]) -> String {
 /// Short forms are left-padded with zeros to 32 bytes.
 pub fn parse_aptos_address(s: &str) -> Result<[u8; 32], String> {
     let hex_str = s.trim_start_matches("0x");
+    
+    // Reject addresses longer than 32 bytes (64 hex chars)
+    if hex_str.len() > 64 {
+        return Err(format!("Address too long: {} hex chars (max 64)", hex_str.len()));
+    }
+    
     let mut padded = String::new();
     
     // Left-pad with zeros to ensure 32-byte length

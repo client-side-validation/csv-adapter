@@ -622,11 +622,21 @@ impl<B: RecoveryStorageBackend> RecoveryEngine<B> {
     }
 
     /// Get last known block height for a chain
+    ///
+    /// Returns the height from the in-memory cache if available (after startup),
+    /// otherwise falls back to the backend storage.
     pub fn get_last_known_height(&self, chain: &str) -> Option<u64> {
-        self.last_known_heights
+        // First check in-memory cache (populated during startup_sequence)
+        if let Some(height) = self
+            .last_known_heights
             .iter()
             .find(|(c, _)| c == chain)
             .map(|(_, h)| *h)
+        {
+            return Some(height);
+        }
+        // Fall back to backend
+        self.backend.get_last_known_height(chain)
     }
 
     /// Set last known block height for a chain
@@ -671,6 +681,12 @@ pub struct RecoveryResult {
 /// - Last known block heights (for chain finality verification)
 /// - Reorg events (for rollback detection)
 pub trait RecoveryStorageBackend: Clone + Send + Sync + 'static {
+    /// Get last known block height for a specific chain
+    fn get_last_known_height(
+        &self,
+        chain: &str,
+    ) -> Option<u64>;
+
     /// Load last known block heights for all tracked chains
     fn load_last_known_heights(
         &self,
@@ -771,6 +787,15 @@ mod tests {
     }
 
     impl RecoveryStorageBackend for MockBackend {
+        fn get_last_known_height(&self, chain: &str) -> Option<u64> {
+            self.last_known_heights
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|(c, _)| c == chain)
+                .map(|(_, h)| *h)
+        }
+
         fn load_last_known_heights(
             &self,
         ) -> impl core::future::Future<Output = Result<Vec<(String, u64)>>> + Send {

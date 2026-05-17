@@ -680,6 +680,18 @@ pub fn build_solana_transaction_with_blockhash(
 
 /// Fetch recent blockhash from Solana RPC
 pub async fn fetch_solana_blockhash(rpc_url: &str) -> Result<SolanaBlockhash, BlockchainError> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = rpc_url;
+        return Err(BlockchainError {
+            message: "Solana RPC queries not supported in WASM build".to_string(),
+            chain: Some(ChainId::new("solana")),
+            code: Some(501),
+        });
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
     let request = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,
@@ -687,7 +699,6 @@ pub async fn fetch_solana_blockhash(rpc_url: &str) -> Result<SolanaBlockhash, Bl
         "params": [{"commitment": "finalized"}]
     });
 
-    #[cfg(not(target_arch = "wasm32"))]
     let response = reqwest::Client::new()
         .post(rpc_url)
         .header("Content-Type", "application/json")
@@ -740,6 +751,7 @@ pub async fn fetch_solana_blockhash(rpc_url: &str) -> Result<SolanaBlockhash, Bl
         slot,
         estimated_expiration: std::time::Instant::now(),
     })
+    }
 }
 
 /// Solana instruction for transaction building
@@ -970,88 +982,100 @@ async fn discover_ethereum_contracts(
 ) -> Result<Vec<crate::services::blockchain::ContractDeployment>, BlockchainError> {
     use crate::services::blockchain::{ContractDeployment, ContractType};
 
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = (address, api_url, filter);
+        return Err(BlockchainError {
+            message: "Ethereum RPC queries not supported in WASM build".to_string(),
+            chain: Some(ChainId::new("ethereum")),
+            code: Some(501),
+        });
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
-    let client = reqwest::Client::new();
-    let scan_blocks = 100u64; // Scan last 100 blocks
+    {
+        let client = reqwest::Client::new();
+        let scan_blocks = 100u64; // Scan last 100 blocks
 
-    // Get current block number
-    let block_number_payload = serde_json::json!({
-        "jsonrpc": "2.0",
-        "method": "eth_blockNumber",
-        "params": [],
-        "id": 1
-    });
+        // Get current block number
+        let block_number_payload = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "eth_blockNumber",
+            "params": [],
+            "id": 1
+        });
 
-    let response = client
-        .post(api_url)
-        .json(&block_number_payload)
-        .send()
-        .await
-        .map_err(|e| BlockchainError {
-            message: format!("Failed to query block number: {}", e),
+        let response = client
+            .post(api_url)
+            .json(&block_number_payload)
+            .send()
+            .await
+            .map_err(|e| BlockchainError {
+                message: format!("Failed to query block number: {}", e),
+                chain: Some(ChainId::new("ethereum")),
+                code: Some(500),
+            })?;
+
+        let result: serde_json::Value = response.json().await.map_err(|e| BlockchainError {
+            message: format!("Failed to parse response: {}", e),
             chain: Some(ChainId::new("ethereum")),
             code: Some(500),
         })?;
 
-    let result: serde_json::Value = response.json().await.map_err(|e| BlockchainError {
-        message: format!("Failed to parse response: {}", e),
-        chain: Some(ChainId::new("ethereum")),
-        code: Some(500),
-    })?;
+        let current_block = u64::from_str_radix(
+            result["result"]
+                .as_str()
+                .unwrap_or("0x0")
+                .trim_start_matches("0x"),
+            16,
+        )
+        .unwrap_or(0);
 
-    let current_block = u64::from_str_radix(
-        result["result"]
-            .as_str()
-            .unwrap_or("0x0")
-            .trim_start_matches("0x"),
-        16,
-    )
-    .unwrap_or(0);
-
-    let default_filter_type = filter.map(|f| match f.to_lowercase().as_str() {
-        "registry" => ContractType::Registry,
-        "bridge" => ContractType::Bridge,
-        "lock" => ContractType::Lock,
-        _ => ContractType::Registry,
-    });
-
-    let mut deployments = Vec::new();
-    let start_block = current_block.saturating_sub(scan_blocks);
-
-    // Scan recent blocks for deployment transactions
-    for block_num in start_block..=current_block {
-        let block_hex = format!("0x{:x}", block_num);
-        let block_payload = serde_json::json!({
-            "jsonrpc": "2.0",
-            "method": "eth_getBlockByNumber",
-            "params": [block_hex, true],
-            "id": 1
+        let default_filter_type = filter.map(|f| match f.to_lowercase().as_str() {
+            "registry" => ContractType::Registry,
+            "bridge" => ContractType::Bridge,
+            "lock" => ContractType::Lock,
+            _ => ContractType::Registry,
         });
 
-        if let Ok(response) = client.post(api_url).json(&block_payload).send().await {
-            if let Ok(result) = response.json::<serde_json::Value>().await {
-                if let Some(txs) = result["result"]["transactions"].as_array() {
-                    for tx in txs {
-                        // Check if this is a deployment (contract creation has no to address)
-                        if tx["from"].as_str() == Some(address) && tx["to"].is_null() {
-                            if let Some(tx_hash) = tx["hash"].as_str() {
-                                if let Some(contract_addr) = tx["contractAddress"].as_str() {
-                                    // Use filter type or default to Registry
-                                    let contract_type =
-                                        default_filter_type.unwrap_or(ContractType::Registry);
+        let mut deployments = Vec::new();
+        let start_block = current_block.saturating_sub(scan_blocks);
 
-                                    deployments.push(ContractDeployment {
-                                        address: contract_addr.to_string(),
-                                        chain: Some(ChainId::new("ethereum")),
-                                        contract_address: contract_addr.to_string(),
-                                        contract_type,
-                                        deployed_at: block_num,
-                                        tx_hash: tx_hash.to_string(),
-                                    });
+        // Scan recent blocks for deployment transactions
+        for block_num in start_block..=current_block {
+            let block_hex = format!("0x{:x}", block_num);
+            let block_payload = serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "eth_getBlockByNumber",
+                "params": [block_hex, true],
+                "id": 1
+            });
 
-                                    // Limit results
-                                    if deployments.len() >= 10 {
-                                        break;
+            if let Ok(response) = client.post(api_url).json(&block_payload).send().await {
+                if let Ok(result) = response.json::<serde_json::Value>().await {
+                    if let Some(txs) = result["result"]["transactions"].as_array() {
+                        for tx in txs {
+                            // Check if this is a deployment (contract creation has no to address)
+                            if tx["from"].as_str() == Some(address) && tx["to"].is_null() {
+                                if let Some(tx_hash) = tx["hash"].as_str() {
+                                    if let Some(contract_addr) = tx["contractAddress"].as_str() {
+                                        // Use filter type or default to Registry
+                                        let contract_type =
+                                            default_filter_type.unwrap_or(ContractType::Registry);
+
+                                        deployments.push(ContractDeployment {
+                                            address: contract_addr.to_string(),
+                                            chain: Some(ChainId::new("ethereum")),
+                                            contract_address: contract_addr.to_string(),
+                                            contract_type,
+                                            deployed_at: block_num,
+                                            tx_hash: tx_hash.to_string(),
+                                        });
+
+                                        // Limit results
+                                        if deployments.len() >= 10 {
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -1059,15 +1083,15 @@ async fn discover_ethereum_contracts(
                     }
                 }
             }
+
+            // Early exit if we have enough results
+            if deployments.len() >= 10 {
+                break;
+            }
         }
 
-        // Early exit if we have enough results
-        if deployments.len() >= 10 {
-            break;
-        }
+        Ok(deployments)
     }
-
-    Ok(deployments)
 }
 
 /// Discover Solana programs owned by an address
@@ -1237,9 +1261,73 @@ async fn discover_aptos_modules(
     address: &str,
     api_url: &str,
     filter: Option<&str>,
-) -> Result<Vec<String>, BlockchainError> {
-    // Implementation for native targets
-    Ok(Vec::new())
+) -> Result<Vec<crate::services::blockchain::ContractDeployment>, BlockchainError> {
+    use crate::services::blockchain::ContractType;
+
+    let client = reqwest::Client::new();
+
+    // Query the Aptos REST API for modules at the account address
+    let payload = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "aptos_getAccountModules",
+        "params": [address],
+        "id": 1
+    });
+
+    let response = client
+        .post(api_url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| BlockchainError {
+            message: format!("Failed to query Aptos modules: {}", e),
+            chain: Some(ChainId::new("aptos")),
+            code: Some(500),
+        })?;
+
+    let result: serde_json::Value = response.json().await.map_err(|e| BlockchainError {
+        message: format!("Failed to parse Aptos module response: {}", e),
+        chain: Some(ChainId::new("aptos")),
+        code: Some(500),
+    })?;
+
+    let default_contract_type = filter
+        .map(|f| match f.to_lowercase().as_str() {
+            "registry" => ContractType::Registry,
+            "bridge" => ContractType::Bridge,
+            "lock" => ContractType::Lock,
+            _ => ContractType::Registry,
+        })
+        .unwrap_or(ContractType::Registry);
+
+    // Parse modules from the response
+    let modules = result
+        .get("result")
+        .and_then(|r| r.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|m| {
+                    let module_name = m.get("abi")
+                        .and_then(|abi| abi.get("name"))
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("");
+                    if module_name.is_empty() {
+                        return None;
+                    }
+                    Some(crate::services::blockchain::ContractDeployment {
+                        address: format!("{address}::{module_name}"),
+                        chain: Some(ChainId::new("aptos")),
+                        contract_address: format!("{address}::{module_name}"),
+                        contract_type: default_contract_type,
+                        deployed_at: 0,
+                        tx_hash: "unknown".to_string(),
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    Ok(modules)
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -1247,7 +1335,7 @@ async fn discover_aptos_modules(
     _address: &str,
     _api_url: &str,
     _filter: Option<&str>,
-) -> Result<Vec<String>, BlockchainError> {
+) -> Result<Vec<crate::services::blockchain::ContractDeployment>, BlockchainError> {
     Err(BlockchainError {
         message: "Aptos REST API queries not supported in WASM build".to_string(),
         chain: Some(ChainId::new("aptos")),

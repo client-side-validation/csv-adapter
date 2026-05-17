@@ -97,9 +97,10 @@ impl SlotProof {
         proof_data.extend_from_slice(commitment.as_bytes());
         proof_data.extend_from_slice(self.instruction_data_hash.as_bytes());
 
-        InclusionProof::new(proof_data, self.block_hash, self.slot, 0).unwrap_or_else(|e| {
+        // Position equals slot for Solana slot-based proofs
+        InclusionProof::new(proof_data, self.block_hash, self.slot, self.slot).unwrap_or_else(|e| {
             tracing::error!("Failed to create inclusion proof: {}", e);
-            unsafe { InclusionProof::new_unchecked(vec![], self.block_hash, self.slot, 0) }
+            unsafe { InclusionProof::new_unchecked(vec![], self.block_hash, self.slot, self.slot) }
         })
     }
 

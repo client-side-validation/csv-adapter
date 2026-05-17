@@ -81,9 +81,9 @@ impl<D: Domain> DomainSeparatedHash<D> {
 
     /// Compute a domain-separated hash of multiple payloads
     ///
-    /// Concatenates all payloads with domain separation:
+    /// Concatenates all payloads with separator bytes between them:
     /// ```text
-    /// hash = SHA256(DOMAIN || payload1 || payload2 || ...)
+    /// hash = SHA256(DOMAIN || payload1 || 0x00 || payload2 || 0x00 || ...)
     /// ```
     ///
     /// ## Arguments
@@ -92,15 +92,20 @@ impl<D: Domain> DomainSeparatedHash<D> {
     ///
     /// ## Returns
     ///
-    /// SHA256 hash of `DOMAIN || payload1 || payload2 || ...`
+    /// SHA256 hash of `DOMAIN || payload1 || 0x00 || payload2 || 0x00 || ...`
     pub fn hash_multiple<'a, I>(payloads: I) -> Hash
     where
         I: IntoIterator<Item = &'a [u8]>,
     {
         let mut hasher = Sha256::new();
         hasher.update(D::DOMAIN);
-        for payload in payloads {
+        let payloads: Vec<&[u8]> = payloads.into_iter().collect();
+        for (i, payload) in payloads.iter().enumerate() {
             hasher.update(payload);
+            // Add separator between payloads to prevent ambiguity
+            if i < payloads.len() - 1 {
+                hasher.update(b"\x00");
+            }
         }
         let result = hasher.finalize();
 

@@ -11,9 +11,6 @@
 
 use bitcoin_hashes::Hash as _;
 
-use csv_core::domain_hash::DomainSeparatedHash;
-use csv_core::domains::BitcoinSealDomain;
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Pure-Rust Merkle Tree Implementation (no `bitcoin` crate dependency)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,17 +37,25 @@ use bitcoin::{Txid, blockdata::block::Header, merkle_tree::PartialMerkleTree};
 use csv_core::Hash as CoreHash;
 
 /// Double-SHA256 hash of two 32-byte inputs (Bitcoin Merkle node hash).
-/// Uses domain-separated hashing to prevent cross-chain replay attacks.
+/// Uses raw double-SHA256 (SHA256(SHA256(left || right))) as per Bitcoin protocol.
 #[inline]
 fn double_sha256(left: &[u8; 32], sanad: &[u8; 32]) -> [u8; 32] {
-    // Build the payload with domain separation
-    let mut payload = Vec::with_capacity(64);
-    payload.extend_from_slice(left);
-    payload.extend_from_slice(sanad);
+    use sha2::{Digest, Sha256};
 
-    // Use domain-separated hash with Bitcoin seal domain
-    let hash = DomainSeparatedHash::<BitcoinSealDomain>::hash(&payload);
-    hash.as_bytes().to_vec().try_into().unwrap_or([0u8; 32])
+    // First SHA256
+    let mut hasher1 = Sha256::new();
+    hasher1.update(left);
+    hasher1.update(sanad);
+    let first = hasher1.finalize();
+
+    // Second SHA256 (double)
+    let mut hasher2 = Sha256::new();
+    hasher2.update(first.as_slice());
+    let result = hasher2.finalize();
+
+    let mut bytes = [0u8; 32];
+    bytes.copy_from_slice(&result);
+    bytes
 }
 
 /// Compute the Merkle root from a set of transaction IDs.
@@ -751,7 +756,18 @@ mod tests {
     fn test_consistency_pure_vs_rust_bitcoin_merkle_root() {
         let txids_raw = [[1u8; 32], [2u8; 32], [3u8; 32], [4u8; 32]];
         let pure_root = compute_merkle_root(&txids_raw).unwrap();
-        let rust_txids: Vec<Txid> = txids_raw.iter().map(|t| bytes_to_txid(*t)).collect();
+
+        // rust-bitcoin Txid uses reversed byte order internally.
+        // We need to reverse the display-order bytes before creating Txids
+        // so that the merkle tree is built on the same logical values.
+        let rust_txids: Vec<Txid> = txids_raw
+            .iter()
+            .map(|t| {
+                let mut reversed = *t;
+                reversed.reverse();
+                bytes_to_txid(reversed)
+            })
+            .collect();
         let rust_root = compute_merkle_root_rust_bitcoin(&rust_txids).unwrap();
         assert_eq!(
             pure_root, rust_root,

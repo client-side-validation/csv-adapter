@@ -1289,7 +1289,8 @@ mod tests {
     #[test]
     fn test_sui_chain_operations_creation() {
         let rpc = Box::new(MockSuiRpc::new(1));
-        let config = SuiConfig::new(SuiNetwork::Testnet);
+        let mut config = SuiConfig::new(SuiNetwork::Testnet);
+        config.seal_contract.package_id = Some("0x0000000000000000000000000000000000000000000000000000000000000001".to_string());
         let ops = SuiBackend::new(rpc, config);
         assert_eq!(ops.config.network, SuiNetwork::Testnet);
     }
@@ -1297,7 +1298,8 @@ mod tests {
     #[test]
     fn test_address_validation() {
         let rpc = Box::new(MockSuiRpc::new(1));
-        let config = SuiConfig::new(SuiNetwork::Testnet);
+        let mut config = SuiConfig::new(SuiNetwork::Testnet);
+        config.seal_contract.package_id = Some("0x0000000000000000000000000000000000000000000000000000000000000001".to_string());
         let ops = SuiBackend::new(rpc, config);
 
         // Valid address
@@ -1315,7 +1317,8 @@ mod tests {
     #[test]
     fn test_signature_verification() {
         let rpc = Box::new(MockSuiRpc::new(1));
-        let config = SuiConfig::new(SuiNetwork::Testnet);
+        let mut config = SuiConfig::new(SuiNetwork::Testnet);
+        config.seal_contract.package_id = Some("0x0000000000000000000000000000000000000000000000000000000000000001".to_string());
         let ops = SuiBackend::new(rpc, config);
 
         // Generate a keypair

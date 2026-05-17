@@ -286,6 +286,7 @@ impl BlockchainService {
 /// Wallet connection utilities.
 pub mod wallet_connection {
     use super::{ChainId, NativeWallet, WalletType};
+    use wasm_bindgen::JsCast;
     use wasm_bindgen::JsValue;
     use wasm_bindgen_futures::JsFuture;
     use web_sys::window;
@@ -342,9 +343,11 @@ pub mod wallet_connection {
         )
         .map_err(|_| "Failed to set request params")?;
 
-        let promise = request_fn
+        let promise_value = request_fn
             .call1(&ethereum, &request_params)
             .map_err(|_| "Failed to call request")?;
+
+        let promise = promise_value.unchecked_into::<js_sys::Promise>();
 
         let result = JsFuture::from(promise)
             .await

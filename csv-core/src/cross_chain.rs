@@ -517,13 +517,18 @@ impl<'a> StandardTransferVerifier<'a> {
         // This prevents attackers from specifying an insecure scheme
         let scheme = signature_scheme_for_chain(source_chain)?;
         
-        Signature::new(
+        let sig = Signature::new(
             proof.proof.clone(),
             proof.owner.clone(),
             commitment.as_bytes().to_vec(),
-        )
-        .verify(scheme)
-        .map_err(|_| CrossChainError::InvalidOwnership)?;
+        );
+        
+        sig.verify(scheme)
+            .map_err(|e| {
+                eprintln!("Signature verification failed: {:?}", e);
+                eprintln!("Signature len: {}, Owner len: {}", proof.proof.len(), proof.owner.len());
+                CrossChainError::InvalidOwnership
+            })?;
 
         Ok(())
     }
@@ -885,24 +890,42 @@ mod tests {
         assert!(registry.is_sanad_transferred(&Hash::new([0xAB; 32])));
     }
 
-    fn ownership_proof_for(commitment: Hash) -> SanadOwnershipProof {
-        use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
+    fn ownership_proof_for(commitment: Hash, chain: &ChainId) -> SanadOwnershipProof {
+        match chain.to_string().as_str() {
+            "bitcoin" | "ethereum" => {
+                use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
+                let secp = Secp256k1::new();
+                let secret_key = SecretKey::from_slice(&[7u8; 32]).unwrap();
+                let public_key = PublicKey::from_secret_key(&secp, &secret_key)
+                    .serialize()
+                    .to_vec();
+                let message = Message::from_digest_slice(commitment.as_bytes()).unwrap();
+                let signature = secp
+                    .sign_ecdsa(&message, &secret_key)
+                    .serialize_compact()
+                    .to_vec();
 
-        let secp = Secp256k1::new();
-        let secret_key = SecretKey::from_slice(&[7u8; 32]).unwrap();
-        let public_key = PublicKey::from_secret_key(&secp, &secret_key)
-            .serialize()
-            .to_vec();
-        let message = Message::from_digest_slice(commitment.as_bytes()).unwrap();
-        let signature = secp
-            .sign_ecdsa(&message, &secret_key)
-            .serialize_compact()
-            .to_vec();
+                SanadOwnershipProof {
+                    proof: signature,
+                    owner: public_key,
+                    scheme: Some(SignatureScheme::Secp256k1),
+                }
+            }
+            "solana" | "aptos" | "sui" => {
+                use ed25519_dalek::{Signer, SigningKey};
+                let mut csprng = rand::thread_rng();
+                let signing_key = SigningKey::generate(&mut csprng);
+                let verifying_key = signing_key.verifying_key();
+                let message: [u8; 32] = *commitment.as_bytes();
+                let signature = signing_key.sign(&message);
 
-        SanadOwnershipProof {
-            proof: signature,
-            owner: public_key,
-            scheme: Some(SignatureScheme::Secp256k1),
+                SanadOwnershipProof {
+                    proof: signature.to_bytes().to_vec(),
+                    owner: verifying_key.to_bytes().to_vec(),
+                    scheme: Some(SignatureScheme::Ed25519),
+                }
+            }
+            _ => panic!("Unsupported chain for test"),
         }
     }
 
@@ -923,10 +946,10 @@ mod tests {
             lock_event: CrossChainLockEvent {
                 sanad_id: Hash::new([0x01; 32]),
                 commitment,
-                owner: ownership_proof_for(commitment),
+                owner: ownership_proof_for(commitment, &source_chain),
                 source_chain: source_chain.clone(),
                 destination_chain: ChainId::new("sui"),
-                destination_owner: ownership_proof_for(commitment),
+                destination_owner: ownership_proof_for(commitment, &ChainId::new("sui")),
                 source_seal: SealPoint::new(vec![0xAA, 0xBB], Some(42)).unwrap(),
                 source_tx_hash: Hash::new([0x02; 32]),
                 source_block_height: 100,
@@ -949,11 +972,12 @@ mod tests {
     fn test_standard_verifier_accepts_matching_chain_and_hash_algorithm() {
         let registry = CrossChainRegistry::new();
         let verifier = StandardTransferVerifier::new(&registry);
-        assert!(
-            verifier
-                .verify_transfer_proof(&sample_transfer_proof())
-                .is_ok()
-        );
+        let proof = sample_transfer_proof();
+        let result = verifier.verify_transfer_proof(&proof);
+        if let Err(e) = &result {
+            eprintln!("Verification failed: {:?}", e);
+        }
+        assert!(result.is_ok(), "Expected Ok, got: {:?}", result);
     }
 
     #[test]

@@ -485,15 +485,25 @@ mod tests {
 
     #[test]
     fn test_state_proof_verification_valid() {
+        // Create a valid state proof with proper structure:
+        // [num_siblings (4 bytes LE)] [sibling_hashes...] [leaf_data...]
+        // 0 siblings means just leaf data
+        let mut state_proof = Vec::new();
+        state_proof.extend_from_slice(&0u32.to_le_bytes()); // 0 siblings
+        state_proof.extend_from_slice(&[1u8; 32]); // leaf data (32 bytes)
+
         let proof = StateProof::new(
             [1u8; 32],
             "CSV::Seal".to_string(),
             true,
             Some(vec![1, 2, 3]),
-            vec![0xAB; 64],
+            state_proof.clone(),
             100,
         );
-        assert!(StateProofVerifier::verify(&proof, &[0u8; 32]));
+
+        // Compute the expected root (leaf hash for 0-sibling proof)
+        let expected_root = proof.leaf_hash();
+        assert!(StateProofVerifier::verify(&proof, &expected_root));
     }
 
     #[test]
