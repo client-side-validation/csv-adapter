@@ -32,7 +32,7 @@ pub enum ProofPhase {
 /// Every transfer MUST derive a ReplayId before any state transition.
 /// The replay database is append-only; a ReplayId already present means
 /// the transfer has been seen before.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ReplayId([u8; 32]);
 
 impl ReplayId {

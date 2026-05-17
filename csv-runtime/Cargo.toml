@@ -1,0 +1,19 @@
+[package]
+name = "csv-runtime"
+version = "0.1.0"
+edition = "2021"
+description = "CSV Protocol runtime orchestration engine"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+csv-core = { path = "../csv-core" }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "1"
+tracing = "0.1"
+async-trait = "0.1"
+rocksdb = { version = "0.21", optional = true }
+
+[features]
+default = ["persistent"]
+persistent = ["dep:rocksdb"]
