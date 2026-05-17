@@ -271,6 +271,7 @@ struct VerificationResult {
     success: bool,
     steps: Vec<VerificationStep>,
     summary: String,
+    bundle: Option<ProofBundle>,
 }
 
 /// Individual verification step
@@ -311,6 +312,7 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
             success: false,
             steps,
             summary: "Verification failed: Invalid proof bundle format".to_string(),
+            bundle: None,
         };
     }
 
@@ -338,9 +340,12 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
     });
 
     // Step 3: Cryptographic verification using csv-adapter-core
+    // Note: In offline mode, we cannot check the on-chain seal registry.
+    // The seal registry callback returns false (not consumed) for all seals.
+    // This means double-spend detection is NOT available in offline mode.
     let verification_result = verify_proof(
         &bundle,
-        |_seal_id| false, // Local seal registry check
+        |_seal_id| false, // Offline: cannot check seal registry
         SignatureScheme::Secp256k1,
     );
 
@@ -349,7 +354,7 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
         name: "Cryptographic Verification".to_string(),
         passed: crypto_valid,
         details: if crypto_valid {
-            "All cryptographic checks passed: signatures valid, seal unused, inclusion verified, finality confirmed".to_string()
+            "All cryptographic checks passed: signatures valid, inclusion verified, finality confirmed".to_string()
         } else {
             format!("Cryptographic verification failed: {}", verification_result.err().map(|e| e.to_string()).unwrap_or_default())
         },
@@ -442,10 +447,18 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
         )
     };
 
+    // Add warning about offline seal registry limitation
+    steps.push(VerificationStep {
+        name: "Seal Registry Check".to_string(),
+        passed: false,
+        details: "OFFLINE MODE: Cannot verify seal consumption without network access. This proof bundle has NOT been checked for double-spends. Always verify seal status on-chain when possible.".to_string(),
+    });
+
     VerificationResult {
         success: all_passed,
         steps,
         summary,
+        bundle: Some(bundle),
     }
 }
 
