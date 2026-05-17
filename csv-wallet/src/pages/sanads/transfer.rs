@@ -22,7 +22,6 @@ pub fn TransferSanad() -> Element {
     let mut to_address = use_signal(String::new);
     let mut result = use_signal(|| Option::<String>::None);
     let mut loading = use_signal(|| false);
-    let _blockchain = crate::services::blockchain::BlockchainService::new(Default::default());
     let wallet_ctx = use_wallet_context();
 
     rsx! {
@@ -94,16 +93,46 @@ pub fn TransferSanad() -> Element {
                             let chain = sanad.chain.clone();
                             let to_addr = to_address.read().clone();
                             let mut wallet_ctx = wallet_ctx.clone();
-                            let blockchain = crate::services::blockchain::BlockchainService::new(Default::default());
-                            let _signer = wallet_ctx.get_signer_for_chain(chain.clone()).unwrap();
 
                             spawn(async move {
                                 loading.set(true);
                                 result.set(None);
 
-                               match blockchain.transfer_sanad_local(chain, &sanad_id, &to_addr).await {
-                                    Ok(result_data) => {
-                                        result.set(Some(format!("✅ Transfer successful! Transaction: {}", truncate_address(&result_data.lock_tx_hash, 12))));
+                                // Use csv_sdk directly for transfer
+                                use csv_sdk::CsvClient;
+                                let csv_client = CsvClient::builder()
+                                    .with_store_backend(csv_sdk::builder::StoreBackend::InMemory)
+                                    .build()
+                                    .expect("Failed to create CSV client");
+                                
+                                // Convert sanad string to [u8; 32] for SanadId
+                                let sanad_bytes: [u8; 32] = if sanad_id.starts_with("0x") {
+                                    hex::decode(&sanad_id[2..])
+                                        .map(|bytes| {
+                                            let mut arr = [0u8; 32];
+                                            arr.copy_from_slice(&bytes[..32.min(bytes.len())]);
+                                            arr
+                                        })
+                                        .unwrap_or([0u8; 32])
+                                } else {
+                                    hex::decode(&sanad_id)
+                                        .map(|bytes| {
+                                            let mut arr = [0u8; 32];
+                                            arr.copy_from_slice(&bytes[..32.min(bytes.len())]);
+                                            arr
+                                        })
+                                        .unwrap_or([0u8; 32])
+                                };
+                                let sanad_id_for_transfer = csv_core::SanadId::new(sanad_bytes);
+                                let transfer_builder = csv_client
+                                    .transfers()
+                                    .cross_chain(sanad_id_for_transfer, chain.clone())
+                                    .from_chain(chain.clone())
+                                    .to_address(to_addr.clone());
+                                
+                                match transfer_builder.execute().await {
+                                    Ok(transfer_id) => {
+                                        result.set(Some(format!("✅ Transfer initiated! Transfer ID: {}", truncate_address(&transfer_id, 12))));
                                         wallet_ctx.refresh_sanads().await;
                                     },
                                     Err(e) => {

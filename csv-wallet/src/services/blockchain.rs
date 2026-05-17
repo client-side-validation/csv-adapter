@@ -117,61 +117,6 @@ impl BlockchainService {
         Self { client }
     }
 
-    /// Transfer sanad locally within the same chain.
-    pub async fn transfer_sanad_local(
-        &self,
-        chain: ChainId,
-        sanad_id: &str,
-        to: &str,
-    ) -> Result<TransferResult, BlockchainError> {
-        // Hash the sanad_id string to create a SanadId
-        let mut hasher = Sha256::new();
-        hasher.update(sanad_id.as_bytes());
-        let hash_result = hasher.finalize();
-        let mut hash_bytes = [0u8; 32];
-        hash_bytes.copy_from_slice(&hash_result);
-        let _sanad_id_hash = csv_core::SanadId::new(hash_bytes);
-
-        // Create transfer via sdk
-        let _transfer_manager = self.client.transfers();
-
-        // Return success with placeholder (actual implementation would use sdk)
-        Ok(TransferResult {
-            transfer_id: format!("local-{}-{}-to-{}", chain, sanad_id, to),
-            source_fee: "0".to_string(),
-            dest_fee: "0".to_string(),
-            lock_tx_hash: "pending".to_string(),
-            mint_tx_hash: "pending".to_string(),
-        })
-    }
-
-    /// Execute cross-chain transfer.
-    pub async fn execute_cross_chain_transfer(
-        &self,
-        from_chain: ChainId,
-        to_chain: ChainId,
-        sanad_id: &str,
-        to_address: &str,
-        _contracts: &std::collections::HashMap<ChainId, ContractDeployment>,
-        _signer: &NativeWallet,
-    ) -> Result<TransferResult, BlockchainError> {
-        // Use csv-sdk cross-chain transfer functionality via transfers manager
-        // The cross_chain method would be called like:
-        // transfers.cross_chain(sanad_id, to_chain).execute()
-        // For now, we just reference the transfers manager
-
-        // Create cross-chain transfer via sdk
-        Ok(TransferResult {
-            transfer_id: format!(
-                "xchain-{}-{}-to-{}-{}",
-                from_chain, sanad_id, to_chain, to_address
-            ),
-            source_fee: "0".to_string(),
-            dest_fee: "0".to_string(),
-            lock_tx_hash: "pending".to_string(),
-            mint_tx_hash: "pending".to_string(),
-        })
-    }
 }
 
 impl Clone for BlockchainService {

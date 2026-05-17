@@ -335,5 +335,6 @@ fn verify_zk_proof(input: &str) -> Result<(ZkSealProof, bool), String> {
         }
     };
 
+    #[allow(unreachable_code)]
     Ok((proof, valid))
 }
