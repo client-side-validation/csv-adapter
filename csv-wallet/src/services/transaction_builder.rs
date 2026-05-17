@@ -1084,17 +1084,28 @@ async fn discover_solana_programs(
     #[cfg(not(target_arch = "wasm32"))]
     let client = reqwest::Client::new();
 
-    let default_contract_type = filter
-        .map(|f| match f.to_lowercase().as_str() {
-            "registry" => ContractType::Registry,
-            "bridge" => ContractType::Bridge,
-            "lock" => ContractType::Lock,
-            _ => ContractType::Registry,
-        })
-        .unwrap_or(ContractType::Registry);
+    #[cfg(target_arch = "wasm32")]
+    {
+        return Err(BlockchainError {
+            message: "Solana RPC queries not supported in WASM build".to_string(),
+            chain: Some(ChainId::new("solana")),
+            code: Some(501),
+        });
+    }
 
-    // Use getProgramAccounts to find BPF Loader accounts (programs)
-    let payload = serde_json::json!({
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let default_contract_type = filter
+            .map(|f| match f.to_lowercase().as_str() {
+                "registry" => ContractType::Registry,
+                "bridge" => ContractType::Bridge,
+                "lock" => ContractType::Lock,
+                _ => ContractType::Registry,
+            })
+            .unwrap_or(ContractType::Registry);
+
+        // Use getProgramAccounts to find BPF Loader accounts (programs)
+        let payload = serde_json::json!({
         "jsonrpc": "2.0",
         "method": "getProgramAccounts",
         "params": [
@@ -1114,51 +1125,57 @@ async fn discover_solana_programs(
         "id": 1
     });
 
-    let response = client
-        .post(api_url)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| BlockchainError {
-            message: format!("Failed to query programs: {}", e),
+        let response = client
+            .post(api_url)
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| BlockchainError {
+                message: format!("Failed to query programs: {}", e),
+                chain: Some(ChainId::new("solana")),
+                code: Some(500),
+            })?;
+
+        let result: serde_json::Value = response.json().await.map_err(|e| BlockchainError {
+            message: format!("Failed to parse response: {}", e),
             chain: Some(ChainId::new("solana")),
             code: Some(500),
         })?;
 
-    let result: serde_json::Value = response.json().await.map_err(|e| BlockchainError {
-        message: format!("Failed to parse response: {}", e),
-        chain: Some(ChainId::new("solana")),
-        code: Some(500),
-    })?;
+        let mut deployments = Vec::new();
 
-    let mut deployments = Vec::new();
+        if let Some(accounts) = result["result"].as_array() {
+            for account in accounts.iter().take(10) {
+                if let Some(pubkey) = account["pubkey"].as_str() {
+                    // Check if account data indicates it's executable
+                    let account_data = account["account"]["data"]
+                        .as_array()
+                        .and_then(|arr| arr.first())
+                        .and_then(|v| v.as_str());
 
-    if let Some(accounts) = result["result"].as_array() {
-        for account in accounts.iter().take(10) {
-            if let Some(pubkey) = account["pubkey"].as_str() {
-                // Check if account data indicates it's executable
-                let account_data = account["account"]["data"]
-                    .as_array()
-                    .and_then(|arr| arr.first())
-                    .and_then(|v| v.as_str());
+                    let is_executable = account["account"]["executable"].as_bool().unwrap_or(false);
 
-                let is_executable = account["account"]["executable"].as_bool().unwrap_or(false);
-
-                if is_executable || account_data.is_some() {
-                    deployments.push(ContractDeployment {
-                        address: pubkey.to_string(),
-                        chain: Some(ChainId::new("solana")),
-                        contract_address: pubkey.to_string(),
-                        contract_type: default_contract_type,
-                        deployed_at: 0, // Solana doesn't have block numbers in the same way
-                        tx_hash: "unknown".to_string(),
-                    });
+                    if is_executable || account_data.is_some() {
+                        deployments.push(ContractDeployment {
+                            address: pubkey.to_string(),
+                            chain: Some(ChainId::new("solana")),
+                            contract_address: pubkey.to_string(),
+                            contract_type: default_contract_type,
+                            deployed_at: 0, // Solana doesn't have block numbers in the same way
+                            tx_hash: "unknown".to_string(),
+                        });
+                    }
                 }
             }
         }
+
+        Ok(deployments)
     }
 
-    Ok(deployments)
+    #[cfg(target_arch = "wasm32")]
+    {
+        Ok(Vec::new())
+    }
 }
 
 /// Discover Sui packages owned by an address
@@ -1171,86 +1188,78 @@ async fn discover_sui_packages(
 
     // Query Sui RPC for objects owned by this address
     #[cfg(not(target_arch = "wasm32"))]
-    let client = reqwest::Client::new();
+    {
+        let client = reqwest::Client::new();
 
-    let payload = serde_json::json!({
-        "jsonrpc": "2.0",
-        "method": "sui_getOwnedObjects",
-        "params": [address, {}],
-        "id": 1
-    });
+        let payload = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "sui_getOwnedObjects",
+            "params": [address, {}],
+            "id": 1
+        });
 
-    let response = client
-        .post(api_url)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| BlockchainError {
-            message: format!("Failed to query objects: {}", e),
+        let response = client
+            .post(api_url)
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| BlockchainError {
+                message: format!("Failed to query objects: {}", e),
+                chain: Some(ChainId::new("sui")),
+                code: Some(500),
+            })?;
+
+        let _result: serde_json::Value = response.json().await.map_err(|e| BlockchainError {
+            message: format!("Failed to parse response: {}", e),
             chain: Some(ChainId::new("sui")),
             code: Some(500),
         })?;
 
-    let _result: serde_json::Value = response.json().await.map_err(|e| BlockchainError {
-        message: format!("Failed to parse response: {}", e),
-        chain: Some(ChainId::new("sui")),
-        code: Some(500),
-    })?;
+        let default_contract_type = filter
+            .map(|f| match f.to_lowercase().as_str() {
+                "registry" => ContractType::Registry,
+                "bridge" => ContractType::Bridge,
+                "lock" => ContractType::Lock,
+                _ => ContractType::Registry,
+            })
+            .unwrap_or(ContractType::Registry);
 
-    let _filter_type = filter.map(|f| match f.to_lowercase().as_str() {
-        "registry" => ContractType::Registry,
-        "bridge" => ContractType::Bridge,
-        "lock" => ContractType::Lock,
-        _ => ContractType::Registry,
-    });
+        // Full implementation would:
+        // 1. Filter for Move package objects
+        // 2. Parse package metadata
+        // 3. Check for CSV-related modules
 
-    // Full implementation would:
-    // 1. Filter for Move package objects
-    // 2. Parse package metadata
-    // 3. Check for CSV-related modules
+        Ok(Vec::new())
+    }
 
-    Ok(Vec::new())
+    #[cfg(target_arch = "wasm32")]
+    {
+        Ok(Vec::new())
+    }
 }
 
 /// Discover Aptos modules at an address
+#[cfg(not(target_arch = "wasm32"))]
 async fn discover_aptos_modules(
     address: &str,
     api_url: &str,
     filter: Option<&str>,
-) -> Result<Vec<crate::services::blockchain::ContractDeployment>, BlockchainError> {
-    use crate::services::blockchain::ContractType;
-
-    // Query Aptos REST API for account modules
-    #[cfg(not(target_arch = "wasm32"))]
-    let client = reqwest::Client::new();
-
-    let url = format!("{}/accounts/{}/modules", api_url, address);
-
-    let response = client.get(&url).send().await.map_err(|e| BlockchainError {
-        message: format!("Failed to query modules: {}", e),
-        chain: Some(ChainId::new("aptos")),
-        code: Some(500),
-    })?;
-
-    let _result: serde_json::Value = response.json().await.map_err(|e| BlockchainError {
-        message: format!("Failed to parse response: {}", e),
-        chain: Some(ChainId::new("aptos")),
-        code: Some(500),
-    })?;
-
-    let _filter_type = filter.map(|f| match f.to_lowercase().as_str() {
-        "registry" => ContractType::Registry,
-        "bridge" => ContractType::Bridge,
-        "lock" => ContractType::Lock,
-        _ => ContractType::Registry,
-    });
-
-    // Full implementation would:
-    // 1. Parse module bytecode for CSV-related entry functions
-    // 2. Check module names for known patterns (csv_seal, lock, etc.)
-    // 3. Filter by type if requested
-
+) -> Result<Vec<String>, BlockchainError> {
+    // Implementation for native targets
     Ok(Vec::new())
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn discover_aptos_modules(
+    _address: &str,
+    _api_url: &str,
+    _filter: Option<&str>,
+) -> Result<Vec<String>, BlockchainError> {
+    Err(BlockchainError {
+        message: "Aptos REST API queries not supported in WASM build".to_string(),
+        chain: Some(ChainId::new("aptos")),
+        code: Some(501),
+    })
 }
 
 #[cfg(test)]

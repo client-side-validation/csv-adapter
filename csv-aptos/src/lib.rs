@@ -51,6 +51,7 @@ pub mod types;
 pub mod verifier;
 
 #[cfg(feature = "rpc")]
+#[cfg(feature = "rpc")]
 pub mod node;
 
 pub use seal_protocol::AptosSealProtocol;

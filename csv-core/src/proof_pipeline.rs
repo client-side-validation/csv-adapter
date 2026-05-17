@@ -735,7 +735,6 @@ async fn validate_signature(bundle: &ProofBundle, verifier: &dyn ChainVerifier) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::replay_registry::ReplayRegistry;
 
     struct MockVerifier;
 
@@ -779,11 +778,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_validate_proof_bundle_success() {
-        use crate::dag::DAGSegment;
+        use crate::dag::{DAGNode, DAGSegment};
         use crate::seal::{CommitAnchor, SealPoint};
 
+        let node = DAGNode::new(
+            Hash::new([1u8; 32]),
+            vec![1u8; 32],
+            vec![vec![1, 2, 3]],
+            vec![vec![]],
+            vec![],
+        );
         let bundle = ProofBundle {
-            transition_dag: DAGSegment::new(vec![1u8; 32], Hash::new([9u8; 32])),
+            transition_dag: DAGSegment::new(vec![node], Hash::new([9u8; 32])),
             signatures: vec![vec![1, 2, 3]],
             seal_ref: SealPoint::new(vec![0xAA], Some(1)).unwrap(),
             anchor_ref: CommitAnchor::new(vec![0xBB; 32], 1, vec![0xCC]).unwrap(),

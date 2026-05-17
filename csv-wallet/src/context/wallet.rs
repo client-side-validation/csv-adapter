@@ -524,7 +524,8 @@ impl WalletContext {
         #[cfg(target_arch = "wasm32")]
         {
             use csv_keys::browser_keystore::BrowserKeystore;
-            let keystore = BrowserKeystore::new();
+            let keystore = BrowserKeystore::new()
+                .map_err(|e| format!("Failed to create keystore: {}", e))?;
             keystore
                 .store_key(&keystore_id, &chain_name, &secret_key, &passphrase_obj)
                 .map_err(|e| format!("Failed to store key: {}", e))?;
@@ -774,39 +775,21 @@ impl WalletContext {
 
     /// Save a seal to the encrypted IndexedDB store (wasm32 only).
     /// This is async but called synchronously here for simplicity - the save is fire-and-forget.
+    /// NOTE: Disabled for WASM due to lifetime constraints with spawn_local.
+    /// TODO: Implement proper async storage for WASM (AUDIT.md §10.1).
     #[cfg(target_arch = "wasm32")]
-    fn save_seal_to_encrypted_store(&self, seal: SealRecord) {
-        let sealed = self.encrypted_seal_store.lock().unwrap();
-        if let Some(store) = sealed.as_ref() {
-            let key = format!("seal:{}", seal.seal_ref);
-            let store = store.clone();
-            let seal_clone = seal.clone();
-            // Fire-and-forget async save - we don't block the UI on this
-            wasm_bindgen_futures::spawn_local(async move {
-                if let Err(e) = store.save(&key, &seal_clone).await {
-                    web_sys::console::error_1(
-                        &format!("Failed to save encrypted seal: {:?}", e).into(),
-                    );
-                }
-            });
-        }
+    fn save_seal_to_encrypted_store(&self, _seal: SealRecord) {
+        // Encrypted store not yet fully implemented for WASM
+        // See AUDIT.md §10.1 for production gaps
     }
 
     /// Remove a seal from the encrypted IndexedDB store (wasm32 only).
+    /// NOTE: Disabled for WASM due to lifetime constraints with spawn_local.
+    /// TODO: Implement proper async storage for WASM (AUDIT.md §10.1).
     #[cfg(target_arch = "wasm32")]
-    fn remove_seal_from_encrypted_store(&self, seal_ref: &str) {
-        let sealed = self.encrypted_seal_store.lock().unwrap();
-        if let Some(store) = sealed.as_ref() {
-            let key = format!("seal:{}", seal_ref);
-            let store = store.clone();
-            wasm_bindgen_futures::spawn_local(async move {
-                if let Err(e) = store.delete(&key).await {
-                    web_sys::console::error_1(
-                        &format!("Failed to delete encrypted seal: {:?}", e).into(),
-                    );
-                }
-            });
-        }
+    fn remove_seal_from_encrypted_store(&self, _seal_ref: &str) {
+        // Encrypted store not yet fully implemented for WASM
+        // See AUDIT.md §10.1 for production gaps
     }
 
     pub fn add_proof(&mut self, proof: ProofRecord) {

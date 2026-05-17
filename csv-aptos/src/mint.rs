@@ -3,13 +3,11 @@
 //! This module provides SDK-based minting using Move entry functions.
 
 use crate::error::AptosError;
-use crate::entry_function::EntryFunctionBuilder;
 use csv_core::hash::Hash;
-use reqwest::Client;
-use serde_json::json;
 
 /// Mint a sanad on Aptos using the csv_seal Move module
 #[allow(clippy::too_many_arguments)]
+#[cfg(feature = "rpc")]
 pub async fn mint_sanad(
     rpc_url: &str,
     package_address: &str,
@@ -19,7 +17,10 @@ pub async fn mint_sanad(
     source_chain: u8,
     source_seal_ref: Hash,
 ) -> Result<String, AptosError> {
+    use crate::entry_function::EntryFunctionBuilder;
     use ed25519_dalek::SigningKey;
+    use reqwest::Client;
+    use serde_json::json;
 
     // Parse private key
     let cleaned = private_key.trim().trim_start_matches("0x").trim();
@@ -48,7 +49,7 @@ pub async fn mint_sanad(
 
     // Build the Move entry function call
     let builder = EntryFunctionBuilder::new(package_address.to_string());
-    let entry_function = builder.mint_sanad(
+    let _entry_function = builder.mint_sanad(
         *sanad_id.as_bytes(),
         *commitment.as_bytes(),
         [0u8; 32], // state_root placeholder
@@ -92,4 +93,21 @@ pub async fn mint_sanad(
     let tx_hash = format!("0x{}", hex::encode([0u8; 32]));
 
     Ok(tx_hash)
+}
+
+/// Mint a sanad on Aptos using the csv_seal Move module
+#[allow(clippy::too_many_arguments)]
+#[cfg(not(feature = "rpc"))]
+pub async fn mint_sanad(
+    _rpc_url: &str,
+    _package_address: &str,
+    _private_key: &str,
+    _sanad_id: Hash,
+    _commitment: Hash,
+    _source_chain: u8,
+    _source_seal_ref: Hash,
+) -> Result<String, AptosError> {
+    Err(AptosError::RpcError(
+        "Aptos RPC minting requires the 'rpc' feature".to_string(),
+    ))
 }

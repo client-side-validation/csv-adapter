@@ -137,6 +137,9 @@ pub mod validator;
 // Chain configuration system
 pub mod chain_config;
 
+// Multi-dimensional verification result types (Phase 1)
+pub mod verified;
+
 // RGB protocol compatibility (Sprint 5) - 🧪 EXPERIMENTAL
 #[cfg(feature = "experimental")]
 pub mod rgb;
@@ -172,11 +175,13 @@ pub use commitment::Commitment;
 pub use hash::Hash;
 pub use sanad::{OwnershipProof, Sanad, SanadError, SanadId};
 pub use seal::{CommitAnchor, SealPoint};
-pub use signature::{Signature, SignatureScheme, parse_signatures_from_bytes, verify_signatures};
+pub use signature::{
+    Signature, SignatureScheme, parse_signatures_from_bytes, verify_signatures, PQ_DEFAULT_SCHEME,
+};
 
 // DAG and proofs
 pub use dag::{DAGNode, DAGSegment};
-pub use proof::{FinalityProof, InclusionProof, ProofBundle};
+pub use proof::{FinalityProof, InclusionProof, ProofBundle, ProofPhase, ReplayId};
 pub use verifier::verify_proof;
 
 // Errors and traits
@@ -241,6 +246,9 @@ pub use schema::{
 pub use state::{GlobalState, Metadata, OwnedState, StateAssignment, StateRef, StateTypeId};
 pub use transition::Transition;
 
+// Finality (Phase 1 - FinalityVerifier trait)
+pub use finality::{FinalityEvidence, FinalityProof as FinalityVerifierProof, FinalityVerifier};
+
 // Cross-cutting (Phase 10)
 pub use monitor::{PendingPublication, PublicationTracker, ReorgEvent, ReorgMonitor};
 pub use performance::{
@@ -252,7 +260,16 @@ pub use store::{
 };
 
 // Chain configuration system (Beta API)
-pub use chain_config::{AccountModel, ChainCapabilities, ChainConfig, ChainConfigLoader};
+pub use chain_config::{
+    ChainCapabilities, ChainConfig, ChainConfigLoader, ChainRole, FinalityModel, ProofModel,
+    ReplayProtectionModel, ReorgRisk, StateModel,
+};
+
+// Verification result types (Phase 1)
+pub use verified::{
+    FinalityStrength, InclusionStrength, VerificationAssurance, VerificationFailure,
+    VerifiedComponents,
+};
 
 // ===========================================================================
 // Re-exports: Experimental API (feature-gated, may change)

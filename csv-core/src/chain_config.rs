@@ -1,43 +1,321 @@
 //! Chain configuration system for dynamic chain loading.
+//!
+//! Security-relevant chain capabilities that drive transfer authorization logic.
+
+#![allow(missing_docs)]
 
 use crate::collections::HashMap;
+use crate::verified::{FinalityStrength, InclusionStrength};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-/// Chain-specific capabilities and features
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ChainCapabilities {
-    /// Whether this chain supports NFTs
-    pub supports_nfts: bool,
-    /// Whether this chain supports smart contracts
-    pub supports_smart_contracts: bool,
-    /// Account model used by this chain
-    pub account_model: AccountModel,
-    /// Number of blocks needed for finality
-    pub confirmation_blocks: u64,
-    /// Maximum batch size for operations
-    pub max_batch_size: usize,
-    /// Supported networks for this chain
-    pub supported_networks: Vec<String>,
-    /// Whether chain supports cross-chain transfers
-    pub supports_cross_chain: bool,
-    /// Chain-specific features
-    #[serde(default)]
-    pub custom_features: HashMap<String, serde_json::Value>,
+/// State model used by a chain
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum StateModel {
+    /// UTXO-based model (Bitcoin)
+    Utxo,
+    /// Account-based model (Ethereum)
+    Account,
+    /// Object-based model (Sui)
+    Object,
+    /// Resource-based model (Aptos Move resources)
+    Resource,
+    /// Data blob model (Celestia)
+    DataBlob,
 }
 
-/// Account model types
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AccountModel {
-    /// UTXO-based model (Bitcoin-like)
-    UTXO,
-    /// Account-based model (Ethereum-like)
-    Account,
-    /// Object-based model (Sui-like)
-    Object,
-    /// Hybrid model (mixed approaches)
-    #[default]
-    Hybrid,
+/// Finality model for a chain
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum FinalityModel {
+    /// Proof of work with N confirmations (Bitcoin)
+    ProofOfWork { confirmations: u64 },
+    /// Finalized checkpoint (Ethereum post-merge)
+    FinalizedCheckpoint,
+    /// BFT instant finality (Aptos HotStuff, Sui Narwhal)
+    BftInstant,
+    /// Optimistic with slot expiry (Solana)
+    OptimisticWithSlotExpiry { slots: u64 },
+    /// Data availability header (Celestia)
+    DataAvailabilityHeader,
+}
+
+/// Proof model used by a chain
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ProofModel {
+    /// SPV Merkle branch + header PoW (Bitcoin)
+    SpvMerkle,
+    /// Merkle Patricia trie storage/receipt proof (Ethereum)
+    MerklePatricia,
+    /// Sparse Merkle accumulator (Aptos)
+    AccumulatorPath,
+    /// Checkpoint Merkle path (Sui)
+    CheckpointMerkle,
+    /// Slot-based ledger proof (Solana)
+    SlotConfirmation,
+    /// Namespace Merkle proof (Celestia)
+    DaNamespace,
+}
+
+/// Replay protection model for a chain
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ReplayProtectionModel {
+    /// UTXO is spent = consumed (Bitcoin)
+    UtxoSpentCheck,
+    /// Nullifier mapping in contract (Ethereum)
+    SmartContractNullifier,
+    /// Account closed = consumed (Solana PDA)
+    PdaClosed,
+    /// Move resource moved away (Aptos)
+    ResourceDeleted,
+    /// Object deleted = consumed (Sui)
+    ObjectDeleted,
+}
+
+/// Reorg risk level for a chain
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ReorgRisk {
+    /// Rare but deep reorgs possible (Bitcoin)
+    High,
+    /// Finalized checkpoints, but pre-finality risk (Ethereum)
+    Medium,
+    /// BFT or near-instant finality (Solana, Aptos, Sui)
+    Low,
+    /// DA only (Celestia)
+    None,
+}
+
+/// A chain's role in the CSV protocol architecture.
+/// Celestia is DA, not Settlement. This distinction must be enforced.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ChainRole {
+    /// Can hold and transfer value: BTC, ETH, SOL, APT, SUI
+    Settlement,
+    /// Can post commitment data: Celestia
+    DataAvailability,
+    /// Can verify proofs on-chain
+    Verification,
+}
+
+/// Security-relevant capabilities of a chain adapter.
+/// Transfer logic MUST depend on these capabilities, NOT on chain names.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChainCapabilities {
+    // --- State model ---
+    pub state_model: StateModel,
+
+    // --- Finality model ---
+    pub finality_model: FinalityModel,
+    /// Blocks/slots/checkpoints required for probabilistic finality
+    pub finality_depth: u64,
+    /// Whether finality is deterministic (BFT) vs probabilistic (PoW/PoS)
+    pub deterministic_finality: bool,
+
+    // --- Proof model ---
+    pub proof_model: ProofModel,
+
+    // --- Replay protection ---
+    pub replay_protection: ReplayProtectionModel,
+    /// Whether the chain supports atomic single-use seal semantics natively
+    pub native_single_use_semantics: bool,
+
+    // --- Reorg characteristics ---
+    pub reorg_risk: ReorgRisk,
+    /// Maximum reorg depth the adapter is designed to handle safely
+    pub max_safe_reorg_depth: u64,
+
+    // --- Verification capabilities ---
+    pub supports_light_client_proofs: bool,
+    pub supports_state_proofs: bool,
+    pub supports_transaction_inclusion_proofs: bool,
+    pub supports_offline_verification: bool,
+    pub supports_zk_proofs: bool,
+
+    // --- DA role ---
+    pub chain_role: ChainRole,
+}
+
+impl ChainCapabilities {
+    /// Returns true if the observed inclusion strength meets this chain's minimum.
+    pub fn inclusion_threshold_met(&self, observed: &InclusionStrength) -> bool {
+        match self.proof_model {
+            ProofModel::SpvMerkle => matches!(
+                observed,
+                InclusionStrength::MerklePath | InclusionStrength::AnchoredMerklePath
+            ),
+            ProofModel::MerklePatricia => matches!(
+                observed,
+                InclusionStrength::MerklePath | InclusionStrength::AnchoredMerklePath
+            ),
+            ProofModel::AccumulatorPath | ProofModel::CheckpointMerkle => matches!(
+                observed,
+                InclusionStrength::MerklePath | InclusionStrength::AnchoredMerklePath
+            ),
+            ProofModel::SlotConfirmation => matches!(
+                observed,
+                InclusionStrength::Checksum | InclusionStrength::MerklePath
+            ),
+            ProofModel::DaNamespace => matches!(
+                observed,
+                InclusionStrength::MerklePath | InclusionStrength::AnchoredMerklePath
+            ),
+        }
+    }
+
+    /// Returns true if the observed finality strength meets this chain's minimum.
+    pub fn finality_threshold_met(&self, observed: &FinalityStrength) -> bool {
+        // Deterministic finality is always sufficient regardless of chain model
+        if matches!(observed, FinalityStrength::Deterministic) {
+            return true;
+        }
+        match (&self.finality_model, observed) {
+            (
+                FinalityModel::ProofOfWork { confirmations },
+                FinalityStrength::Probabilistic { confirmations: obs },
+            ) => obs >= confirmations,
+            (
+                FinalityModel::OptimisticWithSlotExpiry { slots },
+                FinalityStrength::Probabilistic { confirmations: obs },
+            ) => obs >= slots,
+            _ => false,
+        }
+    }
+
+    /// Bitcoin chain capabilities.
+    pub fn bitcoin() -> Self {
+        Self {
+            state_model: StateModel::Utxo,
+            finality_model: FinalityModel::ProofOfWork { confirmations: 6 },
+            finality_depth: 6,
+            deterministic_finality: false,
+            proof_model: ProofModel::SpvMerkle,
+            replay_protection: ReplayProtectionModel::UtxoSpentCheck,
+            native_single_use_semantics: true,
+            reorg_risk: ReorgRisk::High,
+            max_safe_reorg_depth: 6,
+            supports_light_client_proofs: true,
+            supports_state_proofs: false,
+            supports_transaction_inclusion_proofs: true,
+            supports_offline_verification: true,
+            supports_zk_proofs: false,
+            chain_role: ChainRole::Settlement,
+        }
+    }
+
+    /// Ethereum chain capabilities.
+    pub fn ethereum() -> Self {
+        Self {
+            state_model: StateModel::Account,
+            finality_model: FinalityModel::FinalizedCheckpoint,
+            finality_depth: 2,
+            deterministic_finality: true,
+            proof_model: ProofModel::MerklePatricia,
+            replay_protection: ReplayProtectionModel::SmartContractNullifier,
+            native_single_use_semantics: false,
+            reorg_risk: ReorgRisk::Medium,
+            max_safe_reorg_depth: 12,
+            supports_light_client_proofs: true,
+            supports_state_proofs: true,
+            supports_transaction_inclusion_proofs: true,
+            supports_offline_verification: true,
+            supports_zk_proofs: true,
+            chain_role: ChainRole::Settlement,
+        }
+    }
+
+    /// Solana chain capabilities.
+    pub fn solana() -> Self {
+        Self {
+            state_model: StateModel::Account,
+            finality_model: FinalityModel::OptimisticWithSlotExpiry { slots: 32 },
+            finality_depth: 32,
+            deterministic_finality: false,
+            proof_model: ProofModel::SlotConfirmation,
+            replay_protection: ReplayProtectionModel::PdaClosed,
+            native_single_use_semantics: true,
+            reorg_risk: ReorgRisk::Low,
+            max_safe_reorg_depth: 32,
+            supports_light_client_proofs: false,
+            supports_state_proofs: false,
+            supports_transaction_inclusion_proofs: true,
+            supports_offline_verification: false,
+            supports_zk_proofs: false,
+            chain_role: ChainRole::Settlement,
+        }
+    }
+
+    /// Aptos chain capabilities.
+    pub fn aptos() -> Self {
+        Self {
+            state_model: StateModel::Resource,
+            finality_model: FinalityModel::BftInstant,
+            finality_depth: 1,
+            deterministic_finality: true,
+            proof_model: ProofModel::AccumulatorPath,
+            replay_protection: ReplayProtectionModel::ResourceDeleted,
+            native_single_use_semantics: true,
+            reorg_risk: ReorgRisk::Low,
+            max_safe_reorg_depth: 0,
+            supports_light_client_proofs: true,
+            supports_state_proofs: true,
+            supports_transaction_inclusion_proofs: true,
+            supports_offline_verification: true,
+            supports_zk_proofs: false,
+            chain_role: ChainRole::Settlement,
+        }
+    }
+
+    /// Sui chain capabilities.
+    pub fn sui() -> Self {
+        Self {
+            state_model: StateModel::Object,
+            finality_model: FinalityModel::BftInstant,
+            finality_depth: 1,
+            deterministic_finality: true,
+            proof_model: ProofModel::CheckpointMerkle,
+            replay_protection: ReplayProtectionModel::ObjectDeleted,
+            native_single_use_semantics: true,
+            reorg_risk: ReorgRisk::Low,
+            max_safe_reorg_depth: 0,
+            supports_light_client_proofs: true,
+            supports_state_proofs: true,
+            supports_transaction_inclusion_proofs: true,
+            supports_offline_verification: true,
+            supports_zk_proofs: false,
+            chain_role: ChainRole::Settlement,
+        }
+    }
+
+    /// Celestia chain capabilities (DA only, not Settlement).
+    pub fn celestia() -> Self {
+        Self {
+            state_model: StateModel::DataBlob,
+            finality_model: FinalityModel::DataAvailabilityHeader,
+            finality_depth: 1,
+            deterministic_finality: true,
+            proof_model: ProofModel::DaNamespace,
+            replay_protection: ReplayProtectionModel::SmartContractNullifier,
+            native_single_use_semantics: false,
+            reorg_risk: ReorgRisk::None,
+            max_safe_reorg_depth: 0,
+            supports_light_client_proofs: true,
+            supports_state_proofs: false,
+            supports_transaction_inclusion_proofs: false,
+            supports_offline_verification: false,
+            supports_zk_proofs: false,
+            chain_role: ChainRole::DataAvailability,
+        }
+    }
+
+    /// Returns true if this chain may authorize a mint operation.
+    /// DA-only chains (Celestia) may never mint.
+    pub fn can_authorize_mint(&self) -> bool {
+        self.chain_role == ChainRole::Settlement
+    }
+
+    /// Returns true if a proof from this chain supports full offline verification.
+    pub fn supports_offline(&self) -> bool {
+        self.supports_offline_verification && self.supports_transaction_inclusion_proofs
+    }
 }
 
 /// Chain-specific configuration
@@ -60,7 +338,8 @@ pub struct ChainConfig {
     pub start_block: u64,
     /// Chain capabilities
     pub capabilities: ChainCapabilities,
-    /// Chain-specific settings
+    /// Chain-specific settings (legacy fields stored here for backward compatibility)
+    #[serde(default)]
     pub custom_settings: HashMap<String, serde_json::Value>,
 }
 
@@ -189,16 +468,7 @@ mod tests {
             program_id: Some("TestProgram11111111111111111111111111111".to_string()),
             block_explorer_urls: vec!["https://test-explorer.example.com".to_string()],
             start_block: 0,
-            capabilities: ChainCapabilities {
-                supports_nfts: true,
-                supports_smart_contracts: true,
-                account_model: AccountModel::Account,
-                confirmation_blocks: 12,
-                max_batch_size: 100,
-                supported_networks: vec!["mainnet".to_string(), "testnet".to_string()],
-                supports_cross_chain: true,
-                custom_features: HashMap::new(),
-            },
+            capabilities: ChainCapabilities::bitcoin(),
             custom_settings: HashMap::new(),
         };
 
@@ -207,5 +477,106 @@ mod tests {
         let retrieved = loader.get_config("test-chain");
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().chain_id, "test-chain");
+    }
+
+    #[test]
+    fn test_bitcoin_capabilities() {
+        let caps = ChainCapabilities::bitcoin();
+        assert_eq!(caps.state_model, StateModel::Utxo);
+        assert_eq!(caps.finality_depth, 6);
+        assert!(!caps.deterministic_finality);
+        assert!(caps.native_single_use_semantics);
+        assert!(caps.can_authorize_mint());
+        assert!(caps.supports_offline());
+    }
+
+    #[test]
+    fn test_ethereum_capabilities() {
+        let caps = ChainCapabilities::ethereum();
+        assert_eq!(caps.state_model, StateModel::Account);
+        assert!(caps.deterministic_finality);
+        assert!(!caps.native_single_use_semantics);
+        assert!(caps.supports_zk_proofs);
+        assert!(caps.can_authorize_mint());
+    }
+
+    #[test]
+    fn test_celestia_da_only() {
+        let caps = ChainCapabilities::celestia();
+        assert_eq!(caps.chain_role, ChainRole::DataAvailability);
+        assert!(!caps.can_authorize_mint());
+        assert_eq!(caps.state_model, StateModel::DataBlob);
+    }
+
+    #[test]
+    fn test_solana_capabilities() {
+        let caps = ChainCapabilities::solana();
+        assert_eq!(
+            caps.finality_model,
+            FinalityModel::OptimisticWithSlotExpiry { slots: 32 }
+        );
+        assert_eq!(caps.finality_depth, 32);
+        assert!(!caps.deterministic_finality);
+        assert!(!caps.supports_light_client_proofs);
+    }
+
+    #[test]
+    fn test_aptos_capabilities() {
+        let caps = ChainCapabilities::aptos();
+        assert_eq!(caps.state_model, StateModel::Resource);
+        assert_eq!(caps.finality_model, FinalityModel::BftInstant);
+        assert!(caps.deterministic_finality);
+        assert!(caps.native_single_use_semantics);
+    }
+
+    #[test]
+    fn test_sui_capabilities() {
+        let caps = ChainCapabilities::sui();
+        assert_eq!(caps.state_model, StateModel::Object);
+        assert_eq!(caps.finality_model, FinalityModel::BftInstant);
+        assert!(caps.deterministic_finality);
+        assert_eq!(caps.proof_model, ProofModel::CheckpointMerkle);
+    }
+
+    #[test]
+    fn test_inclusion_thresholds() {
+        let btc = ChainCapabilities::bitcoin();
+        assert!(btc.inclusion_threshold_met(&InclusionStrength::MerklePath));
+        assert!(btc
+            .inclusion_threshold_met(&InclusionStrength::AnchoredMerklePath));
+        assert!(!btc.inclusion_threshold_met(&InclusionStrength::None));
+        assert!(!btc.inclusion_threshold_met(&InclusionStrength::Checksum));
+
+        let sol = ChainCapabilities::solana();
+        // Solana: SlotConfirmation accepts Checksum and MerklePath
+        assert!(sol.inclusion_threshold_met(&InclusionStrength::Checksum));
+        assert!(sol.inclusion_threshold_met(&InclusionStrength::MerklePath));
+        assert!(!sol.inclusion_threshold_met(&InclusionStrength::None));
+    }
+
+    #[test]
+    fn test_finality_thresholds() {
+        let btc = ChainCapabilities::bitcoin();
+        // Bitcoin needs 6 confirmations
+        assert!(btc.finality_threshold_met(&FinalityStrength::Probabilistic {
+            confirmations: 6
+        }));
+        assert!(btc.finality_threshold_met(&FinalityStrength::Probabilistic {
+            confirmations: 10
+        }));
+        assert!(!btc.finality_threshold_met(&FinalityStrength::Probabilistic {
+            confirmations: 5
+        }));
+        assert!(btc.finality_threshold_met(&FinalityStrength::Deterministic));
+        assert!(!btc.finality_threshold_met(&FinalityStrength::None));
+
+        let eth = ChainCapabilities::ethereum();
+        // Ethereum: FinalizedCheckpoint accepts Deterministic
+        assert!(eth.finality_threshold_met(&FinalityStrength::Deterministic));
+        assert!(!eth.finality_threshold_met(&FinalityStrength::None));
+
+        let apt = ChainCapabilities::aptos();
+        // Aptos: BftInstant accepts Deterministic
+        assert!(apt.finality_threshold_met(&FinalityStrength::Deterministic));
     }
 }

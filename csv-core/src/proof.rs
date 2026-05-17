@@ -2,12 +2,141 @@
 //!
 //! Proof bundles are exchanged between peers for verification.
 
+#![allow(missing_docs)]
+
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::dag::DAGSegment;
 use crate::hash::Hash;
 use crate::seal::{CommitAnchor, SealPoint};
+
+/// Explicit proof lifecycle stages. A proof may only advance forward.
+/// No transfer may mint unless the phase reaches `ConsensusBound`.
+/// Authorization for mint is determined by `VerificationResult::meets_chain_thresholds`,
+/// not by comparing this enum to `ConsensusBound` directly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum ProofPhase {
+    Constructed = 0,
+    StructuralValidated = 1,
+    CryptographicallyValidated = 2,
+    FinalityValidated = 3,
+    ReplayChecked = 4,
+    ConsensusBound = 5,
+}
+
+/// Globally unique transfer identity. Prevents replay across process restarts
+/// and across chain reorganizations.
+///
+/// Every transfer MUST derive a ReplayId before any state transition.
+/// The replay database is append-only; a ReplayId already present means
+/// the transfer has been seen before.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ReplayId([u8; 32]);
+
+impl ReplayId {
+    /// Derive a ReplayId from all inputs that uniquely identify a transfer.
+    /// The hash binds together source chain, transaction, seal, transition,
+    /// and destination chain so that no two legitimate transfers share an ID.
+    pub fn derive(
+        source_chain: &str,
+        source_txid: &[u8],
+        source_output_index: u32,
+        seal_id: &[u8],
+        transition_id: &[u8],
+        destination_chain: &str,
+    ) -> Self {
+        let mut h = Sha256::new();
+        // Domain separation prefix
+        h.update(b"CSV_REPLAY_ID_V1\x00");
+        // Encode each field with length prefix to prevent collisions
+        let encode = |h: &mut Sha256, s: &[u8]| {
+            h.update(&(s.len() as u32).to_le_bytes());
+            h.update(s);
+        };
+        encode(&mut h, source_chain.as_bytes());
+        encode(&mut h, source_txid);
+        h.update(source_output_index.to_le_bytes());
+        encode(&mut h, seal_id);
+        encode(&mut h, transition_id);
+        encode(&mut h, destination_chain.as_bytes());
+        ReplayId(h.finalize().into())
+    }
+
+    /// Return the raw 32-byte replay ID.
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+#[cfg(test)]
+mod replay_id_tests {
+    use super::*;
+
+    #[test]
+    fn test_replay_id_determinism() {
+        let id1 = ReplayId::derive(
+            "bitcoin",
+            &[1u8; 32],
+            0,
+            &[2u8; 32],
+            &[3u8; 32],
+            "ethereum",
+        );
+        let id2 = ReplayId::derive(
+            "bitcoin",
+            &[1u8; 32],
+            0,
+            &[2u8; 32],
+            &[3u8; 32],
+            "ethereum",
+        );
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn test_replay_id_uniqueness() {
+        let id1 = ReplayId::derive(
+            "bitcoin",
+            &[1u8; 32],
+            0,
+            &[2u8; 32],
+            &[3u8; 32],
+            "ethereum",
+        );
+        let id2 = ReplayId::derive(
+            "bitcoin",
+            &[1u8; 32],
+            0,
+            &[2u8; 32],
+            &[3u8; 32],
+            "solana", // different destination
+        );
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn test_replay_id_different_txid() {
+        let id1 = ReplayId::derive(
+            "bitcoin",
+            &[1u8; 32],
+            0,
+            &[2u8; 32],
+            &[3u8; 32],
+            "ethereum",
+        );
+        let id2 = ReplayId::derive(
+            "bitcoin",
+            &[9u8; 32],
+            0,
+            &[2u8; 32],
+            &[3u8; 32],
+            "ethereum",
+        );
+        assert_ne!(id1, id2);
+    }
+}
 
 /// Maximum allowed size for proof bytes (64KB)
 pub const MAX_PROOF_BYTES: usize = 64 * 1024;

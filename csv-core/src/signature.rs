@@ -34,12 +34,17 @@ pub enum SignatureScheme {
 }
 
 impl Default for SignatureScheme {
-    /// Post-quantum default from genesis (Decision D-1).
-    /// All new proof bundles should use ML-DSA-65.
+    /// Secp256k1 is the runtime default. ML-DSA-65 is an opt-in per-chain
+    /// configuration. See PROTOCOL_INVARIANTS.md for signature scheme derivation.
     fn default() -> Self {
-        SignatureScheme::MlDsa65
+        SignatureScheme::Secp256k1
     }
 }
+
+/// The intended post-quantum default signature scheme.
+/// Not yet the runtime default — requires the `pq` feature and explicit
+/// per-seal configuration. See PLAN.md for details.
+pub const PQ_DEFAULT_SCHEME: SignatureScheme = SignatureScheme::MlDsa65;
 
 /// A signature with its associated public key
 #[derive(Clone, Debug)]

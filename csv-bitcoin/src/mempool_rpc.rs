@@ -9,8 +9,10 @@
 use bitcoin::{OutPoint, Txid};
 use bitcoin_hashes::Hash as BitcoinHash;
 use reqwest::Client;
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
 
 use crate::proofs::extract_merkle_proof_from_block;
 use crate::rpc::BitcoinRpc;
@@ -38,13 +40,21 @@ impl MempoolSignetRpc {
 
     /// Create with a custom base URL (for self-hosted mempool instances)
     pub fn with_url(base_url: String) -> Self {
+        #[cfg(not(target_arch = "wasm32"))]
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
             .expect("Failed to create HTTP client");
+
+        #[cfg(target_arch = "wasm32")]
+        let client = Client::builder()
+            .build()
+            .expect("Failed to create HTTP client");
+
         Self { client, base_url }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn run_http<T, F>(future: F) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
     where
         T: Send + 'static,
@@ -52,7 +62,7 @@ impl MempoolSignetRpc {
             + Send
             + 'static,
     {
-        thread::spawn(move || {
+        std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
@@ -64,7 +74,22 @@ impl MempoolSignetRpc {
         .and_then(|result| result)
     }
 
+    #[cfg(target_arch = "wasm32")]
+    fn run_http<T, F>(_future: F) -> Result<T, Box<dyn std::error::Error + Send + Sync>>
+    where
+        T: 'static,
+        F: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>>
+            + 'static,
+    {
+        // In WASM, we cannot block on async operations
+        // The BitcoinRpc trait is synchronous by design, which is incompatible with WASM
+        // This implementation is intentionally disabled for WASM targets
+        // Use a different RPC implementation for WASM (e.g., browser-native fetch)
+        Err("MempoolSignetRpc is not supported on WASM - use a WASM-compatible RPC implementation".into())
+    }
+
     /// HTTP GET with automatic retry and exponential backoff
+    #[cfg(not(target_arch = "wasm32"))]
     fn get_with_retry<T: serde::de::DeserializeOwned + Send + 'static>(
         &self,
         url: &str,
@@ -106,7 +131,16 @@ impl MempoolSignetRpc {
         })
     }
 
+    #[cfg(target_arch = "wasm32")]
+    fn get_with_retry<T: serde::de::DeserializeOwned + 'static>(
+        &self,
+        _url: &str,
+    ) -> Result<T, Box<dyn std::error::Error + Send + Sync>> {
+        Err("MempoolSignetRpc is not supported on WASM".into())
+    }
+
     /// HTTP GET text with retry
+    #[cfg(not(target_arch = "wasm32"))]
     fn get_text_with_retry(
         &self,
         url: &str,
@@ -141,7 +175,16 @@ impl MempoolSignetRpc {
         })
     }
 
+    #[cfg(target_arch = "wasm32")]
+    fn get_text_with_retry(
+        &self,
+        _url: &str,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        Err("MempoolSignetRpc is not supported on WASM".into())
+    }
+
     /// HTTP POST text with retry
+    #[cfg(not(target_arch = "wasm32"))]
     fn post_text_with_retry(
         &self,
         url: &str,
@@ -184,6 +227,15 @@ impl MempoolSignetRpc {
 
             Err(last_err.unwrap_or_else(|| "Max retries exceeded".into()))
         })
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn post_text_with_retry(
+        &self,
+        _url: &str,
+        _body: String,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        Err("MempoolSignetRpc is not supported on WASM".into())
     }
 
     /// Get block info (height, tx count, etc.)
@@ -229,6 +281,7 @@ impl MempoolSignetRpc {
     }
 
     /// Wait for transaction to reach required confirmations
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn wait_for_confirmation(
         &self,
         txid: [u8; 32],
@@ -268,8 +321,18 @@ impl MempoolSignetRpc {
                 }
             }
 
-            thread::sleep(poll_interval);
+            std::thread::sleep(poll_interval);
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn wait_for_confirmation(
+        &self,
+        _txid: [u8; 32],
+        _required_confirmations: u64,
+        _timeout_secs: u64,
+    ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+        Err("MempoolSignetRpc is not supported on WASM".into())
     }
 
     /// Extract Merkle proof for a transaction from its containing block

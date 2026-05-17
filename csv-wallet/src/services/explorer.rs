@@ -73,11 +73,13 @@ impl Default for ExplorerConfig {
 }
 
 /// Explorer service for querying on-chain data.
+#[cfg(not(target_arch = "wasm32"))]
 pub struct ExplorerService {
     client: Client,
     config: ExplorerConfig,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl ExplorerService {
     /// Create new explorer service.
     pub fn new(config: ExplorerConfig) -> Self {
@@ -88,6 +90,7 @@ impl ExplorerService {
     }
 
     /// Get sanad details by ID.
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get_sanad(&self, sanad_id: &str) -> Result<SanadInfo, String> {
         let url = format!("{}/api/sanads/{}", self.config.base_url, sanad_id);
 
@@ -102,6 +105,7 @@ impl ExplorerService {
     }
 
     /// Get seals by owner address.
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get_seals_by_owner(&self, address: &str) -> Result<Vec<SealInfo>, String> {
         let url = format!("{}/api/seals?owner={}", self.config.base_url, address);
 
@@ -116,6 +120,7 @@ impl ExplorerService {
     }
 
     /// Get transfer history.
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get_transfers(&self, address: &str) -> Result<Vec<TransferInfo>, String> {
         let url = format!("{}/api/transfers?address={}", self.config.base_url, address);
 
@@ -134,6 +139,7 @@ impl ExplorerService {
     // -----------------------------------------------------------------------
 
     /// Register an address for priority indexing.
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn register_priority_address(
         &self,
         address: &str,
@@ -164,6 +170,7 @@ impl ExplorerService {
     }
 
     /// Unregister an address from priority indexing.
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn unregister_priority_address(
         &self,
         address: &str,
@@ -192,6 +199,7 @@ impl ExplorerService {
     }
 
     /// Get all registered addresses for a wallet.
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get_wallet_addresses(
         &self,
         wallet_id: &str,
@@ -215,6 +223,7 @@ impl ExplorerService {
     }
 
     /// Get complete data for an address (sanads, seals, transfers).
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get_address_data(&self, address: &str) -> Result<AddressDataResponse, String> {
         let url = format!(
             "{}/api/v1/wallet/address/{}/data",

@@ -523,16 +523,9 @@ fn verification_result_section(
                             onclick: move |_| {
                                 #[cfg(target_arch = "wasm32")]
                                 {
-                                    use wasm_bindgen::JsCast;
-                                    if let Some(window) = web_sys::window() {
-                                        if let Some(ref vr) = verification_result.read().as_ref() {
-                                            let share_data = js_sys::Object::new();
-                                            js_sys::Reflect::set(&share_data, &"text".into(), &vr.summary.clone().into()).ok();
-                                            if let Some(nav) = window.navigator().dyn_ref::<web_sys::Navigator>() {
-                                                let _ = nav.share_with_data(&share_data);
-                                            }
-                                        }
-                                    }
+                                    // Web Share API not available in web-sys - disabled for WASM
+                                    // TODO: Implement share using clipboard API or external library
+                                    web_sys::console::log_1(&"Share not yet implemented for WASM".into());
                                 }
                                 web_sys::console::log_1(&"Share triggered".into());
                             },

@@ -350,6 +350,8 @@ pub enum ZkError {
 /// In production, verifier keys must be loaded from on-chain verifier contracts
 /// or other trusted sources at runtime.
 pub fn default_verifier_registry() -> ZkVerifierRegistry {
+    use crate::protocol_version::builtin;
+
     let mut registry = ZkVerifierRegistry::new();
 
     // Register placeholder verifiers for common chains

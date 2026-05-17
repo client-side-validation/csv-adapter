@@ -6,6 +6,9 @@
 use csv_sdk::{client::NetworkType, CsvClient};
 use csv_core::{ChainId, SanadId};
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsCast;
+
 #[cfg(feature = "cross-chain-persist")]
 use csv_sdk::cross_chain::PersistentTransferRegistry;
 #[cfg(feature = "cross-chain-persist")]
