@@ -1079,13 +1079,9 @@ async fn discover_solana_programs(
     api_url: &str,
     filter: Option<&str>,
 ) -> Result<Vec<crate::services::blockchain::ContractDeployment>, BlockchainError> {
-    use crate::services::blockchain::{ContractDeployment, ContractType};
-
-    #[cfg(not(target_arch = "wasm32"))]
-    let client = reqwest::Client::new();
-
     #[cfg(target_arch = "wasm32")]
     {
+        let _ = (address, api_url, filter);
         return Err(BlockchainError {
             message: "Solana RPC queries not supported in WASM build".to_string(),
             chain: Some(ChainId::new("solana")),
@@ -1095,6 +1091,8 @@ async fn discover_solana_programs(
 
     #[cfg(not(target_arch = "wasm32"))]
     {
+        use crate::services::blockchain::{ContractDeployment, ContractType};
+        let client = reqwest::Client::new();
         let default_contract_type = filter
             .map(|f| match f.to_lowercase().as_str() {
                 "registry" => ContractType::Registry,
@@ -1170,11 +1168,6 @@ async fn discover_solana_programs(
         }
 
         Ok(deployments)
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    {
-        Ok(Vec::new())
     }
 }
 

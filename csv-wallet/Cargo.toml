@@ -77,7 +77,7 @@ gloo-timers = { workspace = true, features = ["futures"] }
 serde-wasm-bindgen = "0.6"
 
 # HTTP for wasm - reqwest not compatible with WASM, use browser fetch API instead
-# reqwest = { version = "0.12.12", default-features = false, features = ["json"] }
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
 
 # BCS encoding (used by both Sui and Aptos)
 bcs = "0.1"
@@ -92,8 +92,9 @@ wasm-bindgen-test = "0.3"
 serial_test = "3.0"
 
 [features]
-default = ["csv-bitcoin"]
+default = ["csv-bitcoin", "native"]
 solana = ["dep:csv-solana"]
 csv-bitcoin = ["dep:csv-bitcoin", "csv-sdk/bitcoin"]
 csv-ethereum = ["dep:csv-ethereum", "csv-sdk/ethereum"]
 cross-chain-persist = ["csv-sdk/cross-chain-persist", "dep:sqlx"]
+native = ["dep:reqwest"]
