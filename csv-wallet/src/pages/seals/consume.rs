@@ -7,7 +7,7 @@ use dioxus::prelude::*;
 
 #[component]
 pub fn ConsumeSeal(seal_ref: Option<String>) -> Element {
-    let mut wallet_ctx = use_wallet_context();
+    let wallet_ctx = use_wallet_context();
     let seals = wallet_ctx.seals();
 
     // Get available (unconsumed) seals
@@ -35,14 +35,15 @@ pub fn ConsumeSeal(seal_ref: Option<String>) -> Element {
     let mut is_seal_already_consumed = use_signal(|| false);
 
     // Check if selected seal is already consumed on-chain when selection changes
+    let wallet_ctx_for_effect = wallet_ctx.clone();
     use_effect(move || {
         let seal_ref_val = selected_seal_ref.read().clone();
         if !seal_ref_val.is_empty() {
-            let wallet_ctx = wallet_ctx.clone();
+            let wallet_ctx_clone = wallet_ctx_for_effect.clone();
             spawn(async move {
                 // Check on-chain seal registry to prevent double-spend
                 // This is a UI guard - disable button if seal is already consumed on-chain
-                let consumed = wallet_ctx.is_seal_consumed(&seal_ref_val);
+                let consumed = wallet_ctx_clone.is_seal_consumed(&seal_ref_val);
                 is_seal_already_consumed.set(consumed);
             });
         }
@@ -125,15 +126,16 @@ pub fn ConsumeSeal(seal_ref: Option<String>) -> Element {
 
                 button {
                     onclick: move |_| {
+                        let mut wallet_ctx_btn = wallet_ctx.clone();
                         let seal_ref_val = selected_seal_ref.read().clone();
                         if seal_ref_val.is_empty() {
                             error.set(Some("Please select a seal to consume.".to_string()));
                             return;
                         }
-                        if wallet_ctx.is_seal_consumed(&seal_ref_val) {
+                        if wallet_ctx_btn.is_seal_consumed(&seal_ref_val) {
                             error.set(Some("Seal replay detected: this seal has already been consumed.".to_string()));
                         } else {
-                            wallet_ctx.consume_seal(&seal_ref_val);
+                            wallet_ctx_btn.consume_seal(&seal_ref_val);
                             result.set(Some(format!("Seal {} consumed successfully.", truncate_address(&seal_ref_val, 12))));
                             // Refresh the list by clearing selection
                             selected_seal_ref.set(String::new());

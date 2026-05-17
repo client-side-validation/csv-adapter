@@ -596,23 +596,20 @@ impl BitcoinIndexer {
 
         Some(TransferRecord {
             id: transfer_id,
-            chain: "bitcoin".to_string(),
+            sanad_id: format!("btc-{}-sanad", tx.txid),
             from_chain: source_chain.to_string(),
             to_chain: "ethereum".to_string(), // Default target, would be parsed from payload
-            sanad_id: format!("btc-{}-sanad", tx.txid),
-            seal_id: format!("{}:0", tx.txid),
-            from_address,
-            to_address: "csv-lock-contract".to_string(),
-            amount: vout.value.unwrap_or(0),
-            status: "pending".to_string(),
+            from_owner: from_address,
+            to_owner: "csv-lock-contract".to_string(),
+            lock_tx: tx.txid.clone(),
+            mint_tx: None,
+            proof_ref: None,
+            status: csv_explorer_shared::types::TransferStatus::Initiated,
             created_at: chrono::Utc::now(),
-            created_tx: tx.txid.clone(),
-            block_height: block,
-            metadata: Some(serde_json::json!({
-                "protocol_id": "csv-btc-transfer",
-                "source_chain": source_chain,
-                "inclusion_proof": "merkle",
-            })),
+            completed_at: None,
+            duration_ms: None,
+            lock_tx_explorer_url: None,
+            mint_tx_explorer_url: None,
         })
     }
 }

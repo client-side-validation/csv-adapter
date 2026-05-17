@@ -69,7 +69,7 @@ blake2 = { version = "0.10", optional = true }
 ed25519-dalek = { version = "2.0", features = ["rand_core"], optional = true }
 
 # Browser support (optional)
-web-sys = { version = "0.3", features = ["Window", "Storage"], optional = true }
+web-sys = { workspace = true, features = ["Window", "Storage"], optional = true }
 js-sys = { version = "0.3", optional = true }
 
 # Error handling

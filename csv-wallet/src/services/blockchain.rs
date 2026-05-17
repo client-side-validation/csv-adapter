@@ -163,7 +163,7 @@ impl Clone for BlockchainService {
         Self {
             client,
             #[cfg(feature = "cross-chain-persist")]
-            transfer_registry: self.transfer_registry.clone(),
+            transfer_registry: None,
         }
     }
 }
@@ -196,7 +196,7 @@ impl BlockchainService {
         #[cfg(feature = "cross-chain-persist")]
         if let Some(registry) = &self.transfer_registry {
             // Double-spend check: verify sanad hasn't been transferred already
-            let sanad_id_str = sanad_id.to_string();
+            let sanad_id_str = hex::encode(sanad_id.0.as_bytes());
             if registry
                 .is_transferred(&sanad_id_str)
                 .await
@@ -214,23 +214,21 @@ impl BlockchainService {
             }
         }
 
-        let mut client = self.client.clone();
-
-        client
+        self.client
             .init_adapters(NetworkType::Testnet)
             .await
             .map_err(BlockchainError::from)?;
 
-        let transfer_id = client
+        let transfer_id = self.client
             .transfers()
-            .cross_chain(sanad_id, to_chain.clone())
+            .cross_chain(sanad_id.clone(), to_chain.clone())
             .from_chain(from_chain.clone())
             .to_address(destination_address)
             .execute()
             .await
             .map_err(BlockchainError::from)?;
 
-        let details = client
+        let details = self.client
             .transfers()
             .details(&transfer_id)
             .map_err(BlockchainError::from)?;
@@ -238,7 +236,7 @@ impl BlockchainService {
         #[cfg(feature = "cross-chain-persist")]
         if let Some(registry) = &self.transfer_registry {
             // Record the completed transfer for double-spend protection
-            let sanad_id_str = sanad_id.to_string();
+            let sanad_id_str = hex::encode(sanad_id.0.as_bytes());
             let from_chain_str = from_chain.as_str();
             let to_chain_str = to_chain.as_str();
             let lock_tx = details.lock_tx_hash.as_deref().unwrap_or("");

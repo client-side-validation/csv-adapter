@@ -776,6 +776,8 @@ impl ChainBroadcaster for EthereumBackend {
         #[cfg(feature = "rpc")]
         {
             use alloy_consensus::TxEnvelope;
+            use alloy::rlp::Decodable;
+            use alloy_consensus::transaction::SignerRecoverable;
 
             // Decode the transaction using alloy's TxEnvelope
             let tx_envelope = match TxEnvelope::decode(&mut &tx_data[..]) {
@@ -805,12 +807,6 @@ impl ChainBroadcaster for EthereumBackend {
                     "Invalid signer address (zero address)".to_string(),
                 ));
             }
-
-            // Extract transaction fields for additional validation
-            let tx = tx_envelope.tx();
-            let _nonce = tx.nonce();
-            let _gas_limit = tx.gas_limit();
-            let _value = tx.value();
 
             // Signature validation is now complete via recover_signer
             // The recovered signer can be used for further validation if needed

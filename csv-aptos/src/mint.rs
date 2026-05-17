@@ -3,7 +3,7 @@
 //! This module provides SDK-based minting using Move entry functions.
 
 use crate::error::AptosError;
-use crate::entry_function::EntryFunction;
+use crate::entry_function::EntryFunctionBuilder;
 use csv_core::hash::Hash;
 use reqwest::Client;
 use serde_json::json;
@@ -24,10 +24,10 @@ pub async fn mint_sanad(
     // Parse private key
     let cleaned = private_key.trim().trim_start_matches("0x").trim();
     let key_bytes = hex::decode(cleaned)
-        .map_err(|e| AptosError::Serialization(format!("Invalid hex key: {}", e)))?;
+        .map_err(|e| AptosError::SerializationError(format!("Invalid hex key: {}", e)))?;
 
     if key_bytes.len() != 32 {
-        return Err(AptosError::Serialization(format!(
+        return Err(AptosError::SerializationError(format!(
             "Invalid key length: expected 32, got {}",
             key_bytes.len()
         )));
@@ -36,7 +36,7 @@ pub async fn mint_sanad(
     // Create signing key
     let key_array: [u8; 32] = key_bytes
         .try_into()
-        .map_err(|_| AptosError::Serialization("Invalid key length".to_string()))?;
+        .map_err(|_| AptosError::SerializationError("Invalid key length".to_string()))?;
     let signing_key = SigningKey::from_bytes(&key_array);
     let public_key = signing_key.verifying_key();
     let sender_address = format!("0x{}", hex::encode(public_key.as_bytes()));
@@ -47,16 +47,16 @@ pub async fn mint_sanad(
     let source_seal_hex = format!("0x{}", hex::encode(source_seal_ref.as_bytes()));
 
     // Build the Move entry function call
-    let entry_function = EntryFunction::new(
-        package_address.to_string(),
-        "csv_seal".to_string(),
-        "mint_sanad".to_string(),
-        vec![
-            sanad_id_hex.clone(),
-            commitment_hex.clone(),
-            source_chain.to_string(),
-            source_seal_hex.clone(),
-        ],
+    let builder = EntryFunctionBuilder::new(package_address.to_string());
+    let entry_function = builder.mint_sanad(
+        *sanad_id.as_bytes(),
+        *commitment.as_bytes(),
+        [0u8; 32], // state_root placeholder
+        source_chain,
+        *source_seal_ref.as_bytes(),
+        vec![], // proof placeholder
+        [0u8; 32], // proof_root placeholder
+        0, // leaf_position placeholder
     );
 
     // Get account sequence number via RPC
@@ -71,18 +71,18 @@ pub async fn mint_sanad(
         }))
         .send()
         .await
-        .map_err(|e| AptosError::Rpc(format!("Failed to get account: {}", e)))?;
+        .map_err(|e| AptosError::RpcError(format!("Failed to get account: {}", e)))?;
 
     let account_data: serde_json::Value = sequence_resp
         .json()
         .await
-        .map_err(|e| AptosError::Rpc(format!("Failed to parse account: {}", e)))?;
+        .map_err(|e| AptosError::RpcError(format!("Failed to parse account: {}", e)))?;
 
     let _sequence_number = account_data
         .get("result")
         .and_then(|r| r.get("sequence_number"))
         .and_then(|s| s.as_str())
-        .ok_or_else(|| AptosError::Rpc("Missing sequence number in response".to_string()))?;
+        .ok_or_else(|| AptosError::RpcError("Missing sequence number in response".to_string()))?;
 
     // For now, return a placeholder transaction hash
     // In a full implementation, we would:

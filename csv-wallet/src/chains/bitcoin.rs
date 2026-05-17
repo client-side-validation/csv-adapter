@@ -2,7 +2,8 @@
 //!
 //! Handles Bitcoin wallet operations and address derivation.
 
-use bitcoin::{Address, Network, TweakedPublicKey, XOnlyPublicKey};
+use bitcoin::{Address, Network, XOnlyPublicKey};
+use bitcoin::key::TweakedPublicKey;
 use csv_core::ChainId;
 
 /// Get Bitcoin address format using proper Taproot (P2TR) encoding.

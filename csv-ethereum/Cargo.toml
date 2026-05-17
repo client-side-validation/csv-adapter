@@ -34,6 +34,7 @@ log = "0.4"
 alloy-primitives = "1.5"
 alloy-rlp = "0.3"
 alloy-trie = "0.8"
+alloy-consensus = "1.8"
 
 # Official Ethereum implementations for maximum compatibility
 alloy = { version = "1.8", features = ["full"], optional = true }

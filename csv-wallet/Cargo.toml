@@ -23,6 +23,7 @@ csv-keys = { path = "../csv-keys", features = ["wasm", "production"] }
 csv-solana = { path = "../csv-solana", optional = true }
 csv-bitcoin = { path = "../csv-bitcoin", optional = true }
 csv-ethereum = { path = "../csv-ethereum", optional = true }
+sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio"], optional = true }
 
 # Dioxus 0.7
 dioxus = { version = "0.7", features = ["web", "router"] }
@@ -68,7 +69,7 @@ dirs = "5.0"
 
 # Web/wasm
 console_error_panic_hook = "0.1"
-web-sys = { version = "0.3.70", features = ["Window", "Storage", "Document", "Element", "HtmlInputElement", "FileReader", "Blob", "BlobPropertyBag", "Url", "HtmlAnchorElement", "File", "FileList", "ProgressEvent", "Clipboard", "ClipboardEvent", "Navigator", "DataTransfer", "Event", "DragEvent", "Ethereum"] }
+web-sys = { workspace = true, features = ["Window", "Storage", "Document", "Element", "HtmlInputElement", "FileReader", "Blob", "BlobPropertyBag", "Url", "HtmlAnchorElement", "File", "FileList", "ProgressEvent", "Navigator", "DataTransfer", "Event", "DragEvent", "Clipboard"] }
 wasm-bindgen = "0.2.93"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3.70"
@@ -95,3 +96,4 @@ default = ["csv-bitcoin"]
 solana = ["dep:csv-solana"]
 csv-bitcoin = ["dep:csv-bitcoin", "csv-sdk/bitcoin"]
 csv-ethereum = ["dep:csv-ethereum", "csv-sdk/ethereum"]
+cross-chain-persist = ["csv-sdk/cross-chain-persist", "dep:sqlx"]
