@@ -13,6 +13,7 @@ pub mod contract_bytecode;
 pub mod error;
 pub mod finality;
 pub mod mpt;
+pub mod mint;
 pub mod ops;
 pub mod proofs;
 pub mod rpc;

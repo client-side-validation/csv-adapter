@@ -11,6 +11,7 @@ pub mod bip341;
 pub mod config;
 pub mod error;
 pub mod mpc_batch;
+pub mod mint;
 pub mod node;
 pub mod ops;
 pub mod proofs;

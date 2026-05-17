@@ -10,6 +10,9 @@ contract CSVLock {
     uint8 public constant ASSET_CLASS_PROOF_SANAD = 3;
     uint8 public constant PROOF_SYSTEM_UNSPECIFIED = 0;
 
+    /// @notice Contract owner - can call owner-only functions
+    address public owner;
+
     /// @notice Tracks consumed nullifiers (seal single-use)
     mapping(bytes32 => bool) public usedSeals;
 
@@ -41,6 +44,15 @@ contract CSVLock {
     /// @notice Address of the CSVMint contract (to verify no mint happened)
     /// @dev Immutable - set at deployment and cannot be changed
     address public immutable mintContract;
+
+    /// @notice Emitted when ownership is transferred
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    /// @notice Modifier to restrict function access to only the owner
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
 
     /// @notice Emitted when a Sanad is locked for cross-chain transfer
     event CrossChainLock(
@@ -84,12 +96,24 @@ contract CSVLock {
     error RefundAlreadyClaimed();
     error InvalidMintContract();
     error InvalidSanadMetadata();
+    error NotOwner();
+    error ZeroAddress();
 
-    /// @notice Constructor to set immutable mint contract address
+    /// @notice Constructor to set immutable mint contract address and initialize owner
     /// @param _mintContract Address of the CSVMint contract
     constructor(address _mintContract) {
         require(_mintContract != address(0), "Invalid mint contract address");
         mintContract = _mintContract;
+        owner = msg.sender;
+        emit OwnershipTransferred(address(0), msg.sender);
+    }
+
+    /// @notice Transfer ownership of the contract to a new address
+    /// @param newOwner The address to transfer ownership to
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "New owner cannot be zero address");
+        emit OwnershipTransferred(owner, newOwner);
+        owner = newOwner;
     }
 
     /// @notice Lock a Sanad for cross-chain transfer
@@ -209,9 +233,10 @@ contract CSVLock {
     }
 
     /// @notice Register a nullifier (consume seal without cross-chain transfer)
+    /// @dev Only owner can call this function to prevent unauthorized seal consumption
     /// @param sealId Seal identifier
     /// @param commitment Commitment hash
-    function markSealUsed(bytes32 sealId, bytes32 commitment) external {
+    function markSealUsed(bytes32 sealId, bytes32 commitment) external onlyOwner {
         if (usedSeals[sealId]) {
             revert SanadAlreadyConsumed();
         }

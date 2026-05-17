@@ -50,43 +50,26 @@ impl ChainVerifier for BitcoinVerifier {
         proof: &InclusionProof,
         expected_root: Hash,
     ) -> csv_core::Result<bool> {
-        use bitcoin_hashes::{Hash as BitcoinHash, sha256d};
+        use crate::proofs::{from_core_inclusion_proof, verify_merkle_proof};
 
-        const PREFIX: &[u8] = b"CSV-BITCOIN-BLOCK-PROOF";
-        let expected_len = PREFIX.len() + 8 + 32 + 32 + 32 + 32;
-        if proof.proof_bytes.len() != expected_len || !proof.proof_bytes.starts_with(PREFIX) {
+        // Convert core inclusion proof to Bitcoin-specific type
+        let bitcoin_proof = from_core_inclusion_proof(proof);
+
+        // Extract txid from the proof (first 32 bytes of proof_bytes)
+        if proof.proof_bytes.len() < 32 {
             return Ok(false);
         }
+        let mut txid = [0u8; 32];
+        txid.copy_from_slice(&proof.proof_bytes[..32]);
 
-        let mut offset = PREFIX.len();
-        let height = u64::from_le_bytes(proof.proof_bytes[offset..offset + 8].try_into().map_err(
-            |_| csv_core::ProtocolError::InvalidInput("Invalid Bitcoin proof height".to_string()),
-        )?);
-        offset += 8;
-        let txid = &proof.proof_bytes[offset..offset + 32];
-        offset += 32;
-        let commitment = &proof.proof_bytes[offset..offset + 32];
-        offset += 32;
-        let embedded_block_hash = &proof.proof_bytes[offset..offset + 32];
-        offset += 32;
-        let embedded_checksum = &proof.proof_bytes[offset..offset + 32];
+        // Use proper Merkle proof verification instead of checksum
+        let merkle_root = if expected_root != Hash::zero() {
+            expected_root.as_bytes()
+        } else {
+            proof.block_hash.as_bytes()
+        };
 
-        if height != proof.block_number
-            || height != proof.position
-            || embedded_block_hash != proof.block_hash.as_bytes()
-            || (expected_root != Hash::zero() && expected_root != proof.block_hash)
-        {
-            return Ok(false);
-        }
-
-        let mut checksum_data = Vec::with_capacity(8 + 32 + 32 + 32);
-        checksum_data.extend_from_slice(&height.to_le_bytes());
-        checksum_data.extend_from_slice(txid);
-        checksum_data.extend_from_slice(commitment);
-        checksum_data.extend_from_slice(embedded_block_hash);
-        let checksum = sha256d::Hash::hash(&checksum_data);
-
-        Ok(checksum.to_byte_array().as_slice() == embedded_checksum)
+        Ok(verify_merkle_proof(&txid, merkle_root, &bitcoin_proof))
     }
 
     /// Verify finality proof for a Bitcoin block

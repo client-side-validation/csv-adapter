@@ -40,6 +40,7 @@ pub mod config;
 pub mod entry_function;
 pub mod error;
 pub mod merkle;
+pub mod mint;
 pub mod ops;
 pub mod proofs;
 pub mod rpc;

@@ -775,28 +775,45 @@ impl ChainBroadcaster for EthereumBackend {
 
         #[cfg(feature = "rpc")]
         {
-            use alloy_rlp::Decodable;
+            use alloy_consensus::TxEnvelope;
 
-            // Decode the transaction using alloy's RLP decoder
-            let tx: alloy::consensus::TxLegacy = match Decodable::decode(&mut &tx_data[..]) {
+            // Decode the transaction using alloy's TxEnvelope
+            let tx_envelope = match TxEnvelope::decode(&mut &tx_data[..]) {
                 Ok(tx) => tx,
                 Err(e) => {
                     return Err(ChainOpError::InvalidInput(format!(
-                        "Failed to RLP decode transaction: {}",
+                        "Failed to decode transaction: {}",
                         e
                     )));
                 }
             };
 
-            // Extract transaction fields
-            let _nonce = tx.nonce;
-            let _gas_price = tx.gas_price;
-            let _gas_limit = tx.gas_limit;
-            let _value = tx.value;
+            // Recover the signer from the transaction signature
+            let recovered_signer = match tx_envelope.recover_signer() {
+                Ok(signer) => signer,
+                Err(e) => {
+                    return Err(ChainOpError::InvalidInput(format!(
+                        "Failed to recover signer: {}",
+                        e
+                    )));
+                }
+            };
 
-            // For now, skip signature validation as the API has changed
-            // Focus on basic validation that doesn't require signature parsing
-            // TODO: Fix signature validation once Alloy API is stable
+            // Validate that the recovered signer is a valid address
+            if recovered_signer == alloy_primitives::Address::ZERO {
+                return Err(ChainOpError::InvalidInput(
+                    "Invalid signer address (zero address)".to_string(),
+                ));
+            }
+
+            // Extract transaction fields for additional validation
+            let tx = tx_envelope.tx();
+            let _nonce = tx.nonce();
+            let _gas_limit = tx.gas_limit();
+            let _value = tx.value();
+
+            // Signature validation is now complete via recover_signer
+            // The recovered signer can be used for further validation if needed
         }
 
         #[cfg(not(feature = "rpc"))]

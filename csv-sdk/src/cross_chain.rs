@@ -448,6 +448,104 @@ pub async fn mint_sanad_on_chain(
             ))
         }
 
+        #[cfg(feature = "bitcoin")]
+        "bitcoin" => {
+            use csv_bitcoin::mint::mint_sanad;
+
+            mint_sanad(
+                rpc_url,
+                private_key,
+                sanad_id,
+                commitment,
+                source_chain,
+                source_seal_ref,
+            )
+            .await
+            .map_err(|e| CrossChainError::ProtocolError(format!("{:?}", e)))
+        }
+
+        #[cfg(not(feature = "bitcoin"))]
+        "bitcoin" => {
+            let _ = (
+                rpc_url,
+                contract,
+                private_key,
+                sanad_id,
+                commitment,
+                source_chain,
+                source_seal_ref,
+            );
+            Err(CrossChainError::FeatureNotEnabled(
+                "Bitcoin cross-chain mint requires 'bitcoin' feature.".to_string(),
+            ))
+        }
+
+        #[cfg(feature = "ethereum")]
+        "ethereum" => {
+            use csv_ethereum::mint::mint_sanad;
+
+            mint_sanad(
+                rpc_url,
+                contract,
+                private_key,
+                sanad_id,
+                commitment,
+                source_chain,
+                source_seal_ref,
+            )
+            .await
+            .map_err(|e| CrossChainError::ProtocolError(format!("{:?}", e)))
+        }
+
+        #[cfg(not(feature = "ethereum"))]
+        "ethereum" => {
+            let _ = (
+                rpc_url,
+                contract,
+                private_key,
+                sanad_id,
+                commitment,
+                source_chain,
+                source_seal_ref,
+            );
+            Err(CrossChainError::FeatureNotEnabled(
+                "Ethereum cross-chain mint requires 'ethereum' feature.".to_string(),
+            ))
+        }
+
+        #[cfg(feature = "aptos")]
+        "aptos" => {
+            use csv_aptos::mint::mint_sanad;
+
+            mint_sanad(
+                rpc_url,
+                contract,
+                private_key,
+                sanad_id,
+                commitment,
+                source_chain,
+                source_seal_ref,
+            )
+            .await
+            .map_err(|e| CrossChainError::ProtocolError(format!("{:?}", e)))
+        }
+
+        #[cfg(not(feature = "aptos"))]
+        "aptos" => {
+            let _ = (
+                rpc_url,
+                contract,
+                private_key,
+                sanad_id,
+                commitment,
+                source_chain,
+                source_seal_ref,
+            );
+            Err(CrossChainError::FeatureNotEnabled(
+                "Aptos cross-chain mint requires 'aptos' feature.".to_string(),
+            ))
+        }
+
         _ => {
             let _ = (
                 rpc_url,
@@ -473,6 +571,12 @@ pub fn is_mint_supported(chain: ChainId) -> bool {
         "sui" => true,
         #[cfg(feature = "solana")]
         "solana" => true,
+        #[cfg(feature = "bitcoin")]
+        "bitcoin" => true,
+        #[cfg(feature = "ethereum")]
+        "ethereum" => true,
+        #[cfg(feature = "aptos")]
+        "aptos" => true,
         _ => false,
     }
 }

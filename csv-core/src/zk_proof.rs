@@ -29,7 +29,6 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::hash::Hash;
-use crate::protocol_version::builtin;
 use crate::seal::SealPoint;
 
 /// Maximum ZK proof size (1MB)
@@ -344,10 +343,12 @@ pub enum ZkError {
     BackendError(String),
 }
 
+#[cfg(test)]
 /// Create a default ZkVerifierRegistry with common chains
 ///
-/// This is a convenience function that registers placeholder verifiers.
-/// In production, these would be loaded from on-chain verifier contracts.
+/// This is a convenience function for testing only.
+/// In production, verifier keys must be loaded from on-chain verifier contracts
+/// or other trusted sources at runtime.
 pub fn default_verifier_registry() -> ZkVerifierRegistry {
     let mut registry = ZkVerifierRegistry::new();
 
@@ -374,6 +375,7 @@ pub fn default_verifier_registry() -> ZkVerifierRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol_version::builtin;
 
     #[test]
     fn test_verifier_key_hash() {
