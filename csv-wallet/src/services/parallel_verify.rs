@@ -293,17 +293,24 @@ impl ParallelVerifyService {
             #[cfg(not(target_arch = "wasm32"))]
             {
                 use tokio::runtime::Handle;
-                let handle = Handle::current();
-                let result = handle.block_on(verifier.verify_seal_registry(seal_hash));
-                // Return true if seal is consumed (verification returns false)
-                result.unwrap_or(true) == false
+                match Handle::try_current() {
+                    Ok(handle) => match handle.block_on(verifier.verify_seal_registry(seal_hash)) {
+                        Ok(available) => !available,
+                        Err(e) => {
+                            warn!("Seal registry lookup failed: {}", e);
+                            true // Fail closed: treat unresolved seal as consumed
+                        }
+                    },
+                    Err(e) => {
+                        warn!("Unable to access current Tokio runtime: {}", e);
+                        true // Fail closed if runtime is unavailable
+                    }
+                }
             }
             #[cfg(target_arch = "wasm32")]
             {
-                // In WASM, we can't block, so we need a different approach
-                // For now, return false (seal not consumed) to allow verification
-                // TODO: Implement async seal registry for WASM
-                false
+                warn!("Seal registry unavailable in WebAssembly; failing proof verification safely");
+                true // Fail closed in WASM when registry lookup cannot be performed
             }
         };
 

@@ -21,8 +21,12 @@
 use bitcoin::hashes::Hash as BitcoinHash;
 use csv_core::protocol_version::builtin;
 use csv_core::seal::SealPoint;
+#[cfg(test)]
+use csv_core::Hash;
+#[cfg(test)]
+use csv_core::zk_proof::{VerifierKey, ZkPublicInputs};
 use csv_core::zk_proof::{
-    ChainWitness, ProofSystem, VerifierKey, ZkError, ZkProver, ZkPublicInputs, ZkSealProof,
+    ChainWitness, ProofSystem, ZkError, ZkProver, ZkSealProof,
 };
 
 /// Bitcoin SPV ZK Prover using SP1
@@ -133,58 +137,29 @@ impl ZkProver for BitcoinSpvProver {
             ));
         }
 
-        // If SP1 is available, generate real ZK proof
-        if self.sp1_available && self.prover_key.is_some() {
-            // In production with SP1 available:
-            // 1. Load SP1 guest program (ELF)
-            // 2. Prepare inputs: tx_data, inclusion_proof, block_header
-            // 3. Execute in SP1 zkVM
-            // 4. Extract proof and public outputs
-            //
-            // For now, we generate a structured placeholder that includes
-            // all necessary data for verification
+        // SP1 ZK proof generation
+        // In production, real SP1 proving requires:
+        //   1. SP1_PROVER_KEY env var
+        //   2. SP1 guest program (ELF) loaded at runtime
+        //   3. sp1_sdk::ProverClient::prove(elf, stdin)
+        //
+        // Until the full SP1 pipeline is integrated, always return a hard error
+        // in production builds. This prevents silent deployment of fake proofs.
+        // The test path uses generate_mock_proof for unit testing only.
+        #[cfg(not(test))]
+        {
+            let _ = (seal, witness);
+            return Err(ZkError::VerificationFailed(
+                "Real SP1 proving pipeline not yet integrated. \
+                 Set SP1_PROVER_KEY and use sp1_sdk::ProverClient for production proofs. \
+                 See csv-bitcoin/src/sp1_guest/spv.rs for the guest program."
+                    .to_string(),
+            ));
+        }
 
-            let verifier_key = VerifierKey::new(
-                builtin::BITCOIN.clone(),
-                self.prover_key.clone().unwrap_or_default(),
-                ProofSystem::SP1,
-                1,
-            );
-
-            // Create a structured proof that includes the witness hash
-            // In real SP1, this would be the SNARK proof
-            let mut proof_data = Vec::new();
-            proof_data.extend_from_slice(b"SP1_BTC_SPV_");
-            proof_data.extend_from_slice(witness.hash().as_bytes());
-            proof_data.extend_from_slice(&witness.inclusion_proof);
-
-            let public_inputs = ZkPublicInputs {
-                seal_ref: seal.clone(),
-                block_hash: witness.block_hash,
-                commitment: witness.hash(),
-                source_chain: builtin::BITCOIN.clone(),
-                block_height: witness.block_height,
-                timestamp: witness.timestamp,
-            };
-
-            ZkSealProof::new(proof_data, verifier_key, public_inputs)
-                .map_err(|e| ZkError::GenerationFailed(e.to_string()))
-        } else {
-            // SP1 not available - fail loudly in production
-            // In test builds, use generate_mock_proof instead
-            #[cfg(not(test))]
-            {
-                return Err(ZkError::VerificationFailed(
-                    "SP1 prover key not configured. Set SP1_PROVER_KEY environment variable. \
-                     SP1 is required for Bitcoin ZK proof generation in production."
-                        .to_string(),
-                ));
-            }
-
-            #[cfg(test)]
-            {
-                self.generate_mock_proof(seal, witness)
-            }
+        #[cfg(test)]
+        {
+            self.generate_mock_proof(seal, witness)
         }
     }
 

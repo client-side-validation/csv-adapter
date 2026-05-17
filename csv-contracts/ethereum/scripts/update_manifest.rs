@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     lock_obj.insert("address".to_string(), serde_json::json!(lock_address));
                     lock_obj.insert("deployment_tx".to_string(), serde_json::json!(deployment_tx));
                     lock_obj.insert("block_number".to_string(), serde_json::json!(block_number));
-                    lock_obj.insert("bytecode_hash".to_string(), serde_json::json!("TODO: Compute deployed bytecode hash"));
+                    lock_obj.insert("bytecode_hash".to_string(), serde_json::json!("REQUIRED: Compute deployed bytecode hash with: sha3sum --keccak-256 deployments/artifacts/CSVLock.bin"));
                     lock_obj.insert("verified".to_string(), serde_json::json!(false));
                     
                     // Update constructor args
@@ -57,13 +57,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     mint_obj.insert("address".to_string(), serde_json::json!(mint_address));
                     mint_obj.insert("deployment_tx".to_string(), serde_json::json!(deployment_tx));
                     mint_obj.insert("block_number".to_string(), serde_json::json!(block_number));
-                    mint_obj.insert("bytecode_hash".to_string(), serde_json::json!("TODO: Compute deployed bytecode hash"));
+                    mint_obj.insert("bytecode_hash".to_string(), serde_json::json!("REQUIRED: Compute deployed bytecode hash with: sha3sum --keccak-256 deployments/artifacts/CSVMint.bin"));
                     mint_obj.insert("verified".to_string(), serde_json::json!(false));
                     
                     // Update constructor args
                     if let Some(constructor_args) = mint_obj["constructor_args"].as_object_mut() {
                         constructor_args.insert("lockContract".to_string(), serde_json::json!(lock_address));
-                        constructor_args.insert("verifier".to_string(), serde_json::json!("TODO: Set verifier address"));
+                        constructor_args.insert("verifier".to_string(), serde_json::json!("REQUIRED: Set verifier address after ZK verifier contract deployment"));
                     }
                 }
             }

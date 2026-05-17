@@ -5,12 +5,32 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use rand::Rng;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
 
-use super::chain_indexer::ChainIndexer;
-use csv_explorer_shared::{ChainConfig, ChainInfo, ChainStatus, ExplorerError, IndexerStatus};
+use super::chain_indexer::{AddressIndexingResult, BlockIndexResult, ChainIndexer, ChainResult};
+use csv_explorer_shared::{
+    ChainConfig,
+    ChainInfo,
+    ChainStatus,
+    CommitmentScheme,
+    CsvContract,
+    CsvEvent,
+    EnhancedSanadRecord,
+    EnhancedSealRecord,
+    EnhancedTransferRecord,
+    FinalityProofType,
+    InclusionProofType,
+    ExplorerError,
+    IndexerStatus,
+    Network,
+    PriorityLevel,
+    SanadRecord,
+    SealRecord,
+    TransferRecord,
+};
 
 use csv_explorer_storage::repositories::{
     AdvancedProofRepository, ContractsRepository, SanadsRepository, SealsRepository,
@@ -67,6 +87,104 @@ struct ChainSyncState {
     network: String,
 }
 
+#[derive(Clone)]
+struct SyncedChainIndexer {
+    inner: Arc<dyn ChainIndexer>,
+    sync_repo: SyncRepository,
+}
+
+#[async_trait]
+impl ChainIndexer for SyncedChainIndexer {
+    fn chain_id(&self) -> &str {
+        self.inner.chain_id()
+    }
+
+    fn chain_name(&self) -> &str {
+        self.inner.chain_name()
+    }
+
+    async fn initialize(&self) -> ChainResult<()> {
+        self.inner.initialize().await
+    }
+
+    async fn get_chain_tip(&self) -> ChainResult<u64> {
+        self.inner.get_chain_tip().await
+    }
+
+    async fn get_latest_synced_block(&self) -> ChainResult<u64> {
+        Ok(self.sync_repo.get_latest_block(self.chain_id()).await?.unwrap_or(0))
+    }
+
+    async fn index_sanads(&self, block: u64) -> ChainResult<Vec<SanadRecord>> {
+        self.inner.index_sanads(block).await
+    }
+
+    async fn index_seals(&self, block: u64) -> ChainResult<Vec<SealRecord>> {
+        self.inner.index_seals(block).await
+    }
+
+    async fn index_transfers(&self, block: u64) -> ChainResult<Vec<TransferRecord>> {
+        self.inner.index_transfers(block).await
+    }
+
+    async fn index_contracts(&self, block: u64) -> ChainResult<Vec<CsvContract>> {
+        self.inner.index_contracts(block).await
+    }
+
+    async fn index_csv_events(&self, block: u64) -> ChainResult<Vec<CsvEvent>> {
+        self.inner.index_csv_events(block).await
+    }
+
+    async fn process_block(&self, block: u64) -> ChainResult<BlockIndexResult> {
+        self.inner.process_block(block).await
+    }
+
+    async fn index_enhanced_sanads(&self, block: u64) -> ChainResult<Vec<EnhancedSanadRecord>> {
+        self.inner.index_enhanced_sanads(block).await
+    }
+
+    async fn index_enhanced_seals(&self, block: u64) -> ChainResult<Vec<EnhancedSealRecord>> {
+        self.inner.index_enhanced_seals(block).await
+    }
+
+    async fn index_enhanced_transfers(&self, block: u64) -> ChainResult<Vec<EnhancedTransferRecord>> {
+        self.inner.index_enhanced_transfers(block).await
+    }
+
+    async fn index_sanads_by_address(&self, address: &str) -> ChainResult<Vec<SanadRecord>> {
+        self.inner.index_sanads_by_address(address).await
+    }
+
+    async fn index_seals_by_address(&self, address: &str) -> ChainResult<Vec<SealRecord>> {
+        self.inner.index_seals_by_address(address).await
+    }
+
+    async fn index_transfers_by_address(&self, address: &str) -> ChainResult<Vec<TransferRecord>> {
+        self.inner.index_transfers_by_address(address).await
+    }
+
+    async fn index_addresses_with_priority(
+        &self,
+        addresses: &[String],
+        priority: PriorityLevel,
+        network: Network,
+    ) -> ChainResult<AddressIndexingResult> {
+        self.inner.index_addresses_with_priority(addresses, priority, network).await
+    }
+
+    fn detect_commitment_scheme(&self, data: &[u8]) -> Option<CommitmentScheme> {
+        self.inner.detect_commitment_scheme(data)
+    }
+
+    fn detect_inclusion_proof_type(&self) -> InclusionProofType {
+        self.inner.detect_inclusion_proof_type()
+    }
+
+    fn detect_finality_proof_type(&self) -> FinalityProofType {
+        self.inner.detect_finality_proof_type()
+    }
+}
+
 impl SyncCoordinator {
     /// Create a new sync coordinator.
     pub fn new(
@@ -101,10 +219,21 @@ impl SyncCoordinator {
             })
             .collect();
 
+        let sync_repo = SyncRepository::new(pool.clone());
+        let indexers = indexers
+            .into_iter()
+            .map(|inner| {
+                Arc::new(SyncedChainIndexer {
+                    inner,
+                    sync_repo: sync_repo.clone(),
+                }) as Arc<dyn ChainIndexer>
+            })
+            .collect();
+
         Self {
             indexers,
             pool: pool.clone(),
-            sync_repo: SyncRepository::new(pool.clone()),
+            sync_repo,
             sanads_repo: SanadsRepository::new(pool.clone()),
             seals_repo: SealsRepository::new(pool.clone()),
             transfers_repo: TransfersRepository::new(pool.clone()),

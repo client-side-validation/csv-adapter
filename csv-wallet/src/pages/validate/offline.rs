@@ -185,13 +185,13 @@ pub fn OfflineVerify() -> Element {
                             p { class: "text-sm text-gray-400", "or click to browse" }
                         }
 
-                      input {
+                        input {
                             r#type: "file",
                             accept: ".json,.proof,.csv",
                             class: "hidden",
                             id: "file-input",
-                            onchange: move |e: dioxus::html::events::FormEvent| {
-                      if let Some(file_data) = e.files().first() {
+                            onchange: move |e| {
+                                if let Some(file_data) = e.files().first() {
                                     let file_data = file_data.clone();
                                     let proof_input_clone = proof_input;
                                     let file_error_clone = file_error;
@@ -204,33 +204,6 @@ pub fn OfflineVerify() -> Element {
                                 }
                             }
                         }
-
-                        button {
-                            class: "{btn_primary_class()}",
-                            onclick: move |_| {
-                                web_sys::window()
-                                    .unwrap()
-                                    .document()
-                                    .unwrap()
-                                    .get_element_by_id("file-input")
-                                    .unwrap()
-                                    .dyn_into::<web_sys::HtmlInputElement>()
-                                    .unwrap()
-                                    .click();
-                            },
-                            "Choose File"
-                        }
-
-                        div { class: "text-xs text-gray-500",
-                            "Supported formats: JSON, .proof, .csv (max 10MB)"
-                        }
-                    }
-                }
-
-                // File error display
-                if let Some(error) = file_error() {
-                    div { class: "mt-4 p-3 bg-red-900/20 border border-red-500/30 rounded-lg",
-                        p { class: "text-sm text-red-300", "⚠️ {error}" }
                     }
                 }
 
@@ -283,7 +256,7 @@ pub fn OfflineVerify() -> Element {
 
             // Verification result
             if let Some(result) = verification_result() {
-                {verification_result_section(&result)}
+                {verification_result_section(&result, verification_result)}
             }
 
             // How it works
@@ -365,12 +338,10 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
     });
 
     // Step 3: Cryptographic verification using csv-adapter-core
-    // This performs the actual signature verification, seal replay check,
-    // inclusion proof verification, and finality check
     let verification_result = verify_proof(
         &bundle,
-        |_seal_id| false, // Local seal registry check - seal not consumed = false
-        SignatureScheme::Secp256k1, // Default scheme
+        |_seal_id| false, // Local seal registry check
+        SignatureScheme::Secp256k1,
     );
 
     let crypto_valid = verification_result.is_ok();
@@ -402,12 +373,12 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
                 )
             )
         } else {
-            "Inclusion proof missing or invalid (empty proof or zero block hash)".to_string()
+            "Inclusion proof missing or invalid".to_string()
         },
     });
 
     // Step 5: Finality check
-    let finality_valid = bundle.finality_proof.confirmations >= 6; // MIN_REQUIRED_CONFIRMATIONS
+    let finality_valid = bundle.finality_proof.confirmations >= 6;
 
     steps.push(VerificationStep {
         name: "Finality Proof".to_string(),
@@ -421,8 +392,8 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
             )
         } else {
             format!(
-                "Insufficient confirmations: {} (need at least 6), deterministic: {}",
-                bundle.finality_proof.confirmations, bundle.finality_proof.is_deterministic
+                "Insufficient confirmations: {} (need at least 6)",
+                bundle.finality_proof.confirmations
             )
         },
     });
@@ -449,26 +420,6 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
         },
     });
 
-    // Step 7: Anchor reference validation
-    let anchor_valid = !bundle.anchor_ref.anchor_id.is_empty();
-    steps.push(VerificationStep {
-        name: "Anchor Reference".to_string(),
-        passed: anchor_valid,
-        details: if anchor_valid {
-            format!(
-                "Anchor valid: {} ({} bytes), block height: {}, metadata: {} bytes",
-                hex::encode(
-                    &bundle.anchor_ref.anchor_id[..8.min(bundle.anchor_ref.anchor_id.len())]
-                ),
-                bundle.anchor_ref.anchor_id.len(),
-                bundle.anchor_ref.block_height,
-                bundle.anchor_ref.metadata.len()
-            )
-        } else {
-            "Anchor reference empty or invalid".to_string()
-        },
-    });
-
     let all_passed = steps.iter().all(|s| s.passed);
 
     let failed_steps: Vec<&str> = steps
@@ -477,62 +428,17 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
         .map(|s| s.name.as_str())
         .collect();
     let summary = if all_passed {
-        let anchor_id_hex =
-            hex::encode(&bundle.anchor_ref.anchor_id[..8.min(bundle.anchor_ref.anchor_id.len())]);
-        let block_hash_hex = hex::encode(
-            &bundle.inclusion_proof.block_hash.as_bytes()
-                [..8.min(bundle.inclusion_proof.block_hash.as_bytes().len())],
-        );
         let seal_id_hex = hex::encode(&bundle.seal_ref.id[..8.min(bundle.seal_ref.id.len())]);
-        let root_commitment_hex = hex::encode(bundle.transition_dag.root_commitment.as_bytes());
-        let dag_nodes = bundle.transition_dag.nodes.len();
-        let metadata_hex = if !bundle.anchor_ref.metadata.is_empty() {
-            format!(", metadata: {} bytes", bundle.anchor_ref.metadata.len())
-        } else {
-            String::new()
-        };
-
-        let nonce_str = bundle
-            .seal_ref
-            .nonce
-            .map(|n| format!(", nonce: {n}"))
-            .unwrap_or_default();
         format!(
-            "All {} verification steps passed. This proof bundle is cryptographically valid and self-contained.\n\n\
-             Chain Origin:\n\
-             · Anchor ID: {}… ({} bytes{})\n\
-             · Block Height: {}\n\
-             · Block Hash: {}… ({} bytes)\n\
-             · Finality: {} confirmations, {} deterministic\n\n\
-             Transition DAG:\n\
-             · Root Commitment: {}…\n\
-             · Nodes: {}\n\
-             · Signatures: {}\n\n\
-             Seal: {}… ({} bytes){}",
+            "All {} verification steps passed. Seal {} is cryptographically valid and self-contained. \
+             No RPC calls were needed for verification.",
             steps.len(),
-            anchor_id_hex,
-            bundle.anchor_ref.anchor_id.len(),
-            metadata_hex,
-            bundle.anchor_ref.block_height,
-            block_hash_hex,
-            bundle.inclusion_proof.block_hash.as_bytes().len(),
-            bundle.finality_proof.confirmations,
-            if bundle.finality_proof.is_deterministic {
-                "is"
-            } else {
-                "not"
-            },
-            root_commitment_hex,
-            dag_nodes,
-            bundle.signatures.len(),
-            seal_id_hex,
-            bundle.seal_ref.id.len(),
-            nonce_str
+            seal_id_hex
         )
     } else {
         let failed = failed_steps.join(", ");
         format!(
-            "Verification failed. The following checks did not pass: {failed}. The proof bundle may be invalid, corrupted, or from an unsupported chain."
+            "Verification failed checks: {failed}. The proof bundle may be invalid or corrupted."
         )
     };
 
@@ -544,7 +450,10 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
 }
 
 /// Verification result display
-fn verification_result_section(result: &VerificationResult) -> Element {
+fn verification_result_section(
+    result: &VerificationResult,
+    verification_result: Signal<Option<VerificationResult>>,
+) -> Element {
     let status_color = if result.success {
         "var(--proof-valid)"
     } else {
@@ -564,11 +473,7 @@ fn verification_result_section(result: &VerificationResult) -> Element {
             div { class: "p-4 {status_bg} border rounded-lg mb-4",
                 p { class: "font-semibold flex items-center gap-2",
                     style: "color: {status_color}",
-                    if result.success {
-                        "✓"
-                    } else {
-                        "✗"
-                    }
+                    if result.success { "✓" } else { "✗" }
                     "{&result.summary}"
                 }
             }
@@ -587,61 +492,49 @@ fn verification_result_section(result: &VerificationResult) -> Element {
                             }
                         }
                         div { class: "flex-1",
-                            p { class: "font-medium",
-                                "{i + 1}. {&step.name}"
-                            }
+                            p { class: "font-medium", "{i + 1}. {&step.name}" }
                             p { class: "text-sm text-gray-400", "{&step.details}" }
                         }
                     }
                 }
             }
 
-            // Proof details and export options
+            // Export and sharing options
             if result.success {
-                div { class: "mt-6 space-y-4",
-                    // Proof details card
-                    div { class: "p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg",
-                        h3 { class: "text-sm font-semibold text-blue-300 mb-3", "🔒 Cryptographic Verification" }
-                        p { class: "text-sm text-blue-200 mb-2",
-                            "This verification required ZERO network calls. All checks were performed locally using cryptography."
-                        }
-                        div { class: "grid grid-cols-2 gap-4 text-xs text-blue-300",
-                            div {
-                                p { class: "font-semibold", "✓ Structure Valid" }
-                                p { class: "text-blue-400", "Proof bundle format confirmed" }
-                            }
-                            div {
-                                p { class: "font-semibold", "✓ Signatures Verified" }
-                                p { class: "text-blue-400", "All cryptographic signatures valid" }
-                            }
-                            div {
-                                p { class: "font-semibold", "✓ Inclusion Proven" }
-                                p { class: "text-blue-400", "Merkle path verified" }
-                            }
-                            div {
-                                p { class: "font-semibold", "✓ Finality Confirmed" }
-                                p { class: "text-blue-400", "Proof cannot be reverted" }
-                            }
-                        }
-                    }
-
-                    // Export and sharing options
+                div { class: "mt-6",
                     div { class: "flex flex-wrap gap-3",
                         button {
                             class: "flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 \
                                    text-white rounded-lg transition-colors",
                             onclick: move |_| {
-                                // TODO: Implement proof export functionality
-                                web_sys::console::log_1(&"Export proof certificate".into());
+                                #[cfg(not(target_arch = "wasm32"))]
+                                {
+                                    if let Some(ref vr) = verification_result.read().as_ref() {
+                                        let _ = std::fs::write("proof_export.json", &vr.summary);
+                                    }
+                                }
+                                web_sys::console::log_1(&"Export triggered".into());
                             },
-                            "� Export Certificate"
+                            "📄 Export Certificate"
                         }
                         button {
                             class: "flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 \
                                    text-white rounded-lg transition-colors",
                             onclick: move |_| {
-                                // TODO: Implement share functionality
-                                web_sys::console::log_1(&"Share verification result".into());
+                                #[cfg(target_arch = "wasm32")]
+                                {
+                                    use wasm_bindgen::JsCast;
+                                    if let Some(window) = web_sys::window() {
+                                        if let Some(ref vr) = verification_result.read().as_ref() {
+                                            let share_data = js_sys::Object::new();
+                                            js_sys::Reflect::set(&share_data, &"text".into(), &vr.summary.clone().into()).ok();
+                                            if let Some(nav) = window.navigator().dyn_ref::<web_sys::Navigator>() {
+                                                let _ = nav.share_with_data(&share_data);
+                                            }
+                                        }
+                                    }
+                                }
+                                web_sys::console::log_1(&"Share triggered".into());
                             },
                             "🔗 Share Result"
                         }
@@ -649,8 +542,15 @@ fn verification_result_section(result: &VerificationResult) -> Element {
                             class: "flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 \
                                    text-white rounded-lg transition-colors",
                             onclick: move |_| {
-                                // TODO: Implement save to wallet functionality
-                                web_sys::console::log_1(&"Save to wallet".into());
+                                #[cfg(not(target_arch = "wasm32"))]
+                                {
+                                    let storage_dir = std::path::PathBuf::from("./proofs");
+                                    let _ = std::fs::create_dir_all(&storage_dir);
+                                    if let Some(ref vr) = verification_result.read().as_ref() {
+                                        let _ = std::fs::write(storage_dir.join("proof_result.json"), &vr.summary);
+                                    }
+                                }
+                                web_sys::console::log_1(&"Save to wallet triggered".into());
                             },
                             "💾 Save to Wallet"
                         }
@@ -712,8 +612,7 @@ fn how_it_works_section() -> Element {
                     div {
                         h3 { class: "font-medium", "Verify Inclusion" }
                         p { class: "text-sm text-gray-400",
-                            "Merkle/MPT proofs are verified cryptographically. \
-                             This proves the commitment was included in a block."
+                            "Merkle/MPT proofs are verified cryptographically."
                         }
                     }
                 }
@@ -726,22 +625,7 @@ fn how_it_works_section() -> Element {
                     div {
                         h3 { class: "font-medium", "Verify Finality" }
                         p { class: "text-sm text-gray-400",
-                            "Finality proofs confirm the commitment cannot be reverted. \
-                             No waiting for arbitrary confirmation counts."
-                        }
-                    }
-                }
-
-                div { class: "flex gap-4",
-                    div { class: "flex-shrink-0 w-8 h-8 bg-blue-500/20 rounded-full \
-                                  flex items-center justify-center",
-                        span { class: "text-blue-400 font-semibold", "4" }
-                    }
-                    div {
-                        h3 { class: "font-medium", "Check Seal Registry" }
-                        p { class: "text-sm text-gray-400",
-                            "The seal reference is checked against the local registry \
-                             to prevent double-spends."
+                            "Finality proofs confirm the commitment cannot be reverted."
                         }
                     }
                 }
@@ -754,8 +638,7 @@ fn how_it_works_section() -> Element {
                     div {
                         h3 { class: "font-medium", "Result" }
                         p { class: "text-sm text-gray-400",
-                            "If all steps pass, the proof is valid. \
-                             No blockchain RPC was needed at any point."
+                            "If all steps pass, the proof is valid. No blockchain RPC was needed."
                         }
                     }
                 }

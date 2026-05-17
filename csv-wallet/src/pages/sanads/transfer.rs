@@ -99,30 +99,50 @@ pub fn TransferSanad() -> Element {
                                 result.set(None);
 
                                 // Use csv_sdk directly for transfer
-                                use csv_sdk::CsvClient;
+                                use csv_sdk::{client::NetworkType, CsvClient};
                                 let csv_client = CsvClient::builder()
+                                    .with_chain(chain.clone())
                                     .with_store_backend(csv_sdk::builder::StoreBackend::InMemory)
-                                    .build()
-                                    .expect("Failed to create CSV client");
-                                
+                                    .build();
+
+                                let csv_client = match csv_client {
+                                    Ok(client) => client,
+                                    Err(e) => {
+                                        result.set(Some(format!("❌ CSV client initialization failed: {}", e)));
+                                        loading.set(false);
+                                        return;
+                                    }
+                                };
+
+                                if let Err(e) = csv_client.init_adapters(NetworkType::Testnet).await {
+                                    result.set(Some(format!("❌ CSV adapter initialization failed: {}", e)));
+                                    loading.set(false);
+                                    return;
+                                }
+
                                 // Convert sanad string to [u8; 32] for SanadId
-                                let sanad_bytes: [u8; 32] = if sanad_id.starts_with("0x") {
+                                let sanad_bytes = match if sanad_id.starts_with("0x") {
                                     hex::decode(&sanad_id[2..])
-                                        .map(|bytes| {
-                                            let mut arr = [0u8; 32];
-                                            arr.copy_from_slice(&bytes[..32.min(bytes.len())]);
-                                            arr
-                                        })
-                                        .unwrap_or([0u8; 32])
                                 } else {
                                     hex::decode(&sanad_id)
-                                        .map(|bytes| {
-                                            let mut arr = [0u8; 32];
-                                            arr.copy_from_slice(&bytes[..32.min(bytes.len())]);
-                                            arr
-                                        })
-                                        .unwrap_or([0u8; 32])
+                                } {
+                                    Ok(bytes) if bytes.len() == 32 => {
+                                        let mut arr = [0u8; 32];
+                                        arr.copy_from_slice(&bytes);
+                                        arr
+                                    }
+                                    Ok(_) => {
+                                        result.set(Some("❌ Invalid Sanad ID: expected 32 bytes".to_string()));
+                                        loading.set(false);
+                                        return;
+                                    }
+                                    Err(e) => {
+                                        result.set(Some(format!("❌ Invalid Sanad ID hex: {}", e)));
+                                        loading.set(false);
+                                        return;
+                                    }
                                 };
+
                                 let sanad_id_for_transfer = csv_core::SanadId::new(sanad_bytes);
                                 let transfer_builder = csv_client
                                     .transfers()

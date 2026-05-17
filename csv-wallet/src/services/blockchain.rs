@@ -3,9 +3,8 @@
 //! Provides blockchain operations by delegating to csv-sdk.
 //! Supports both native and browser wallet contexts.
 
-use csv_sdk::CsvClient;
-use csv_core::ChainId;
-use sha2::{Digest, Sha256};
+use csv_sdk::{client::NetworkType, CsvClient};
+use csv_core::{ChainId, SanadId};
 
 /// Blockchain error type.
 #[derive(Debug, Clone)]
@@ -121,7 +120,8 @@ impl BlockchainService {
 
 impl Clone for BlockchainService {
     fn clone(&self) -> Self {
-        // Create a new client instance for the clone
+        // Clone the client reference by re-creating a client with the same enabled chains.
+        // The runtime is stateless and the client builder is cheap for wallet contexts.
         let client = CsvClient::builder()
             .with_store_backend(csv_sdk::builder::StoreBackend::InMemory)
             .build()
@@ -131,20 +131,71 @@ impl Clone for BlockchainService {
     }
 }
 
-/// Blockchain configuration stub.
+/// Blockchain configuration.
 #[derive(Debug, Clone, Default)]
 pub struct BlockchainConfig {
     _private: (),
 }
 
-/// Transfer result stub.
+/// Transfer result returned by wallet transfer helpers.
 #[derive(Debug, Clone)]
 pub struct TransferResult {
     pub transfer_id: String,
-    pub source_fee: String,
-    pub dest_fee: String,
-    pub lock_tx_hash: String,
-    pub mint_tx_hash: String,
+    pub source_fee: Option<u64>,
+    pub dest_fee: Option<u64>,
+    pub lock_tx_hash: Option<String>,
+    pub mint_tx_hash: Option<String>,
+}
+
+impl BlockchainService {
+    /// Execute a cross-chain transfer through the CSV SDK transfer manager.
+    pub async fn execute_cross_chain_transfer(
+        &self,
+        sanad_id: SanadId,
+        from_chain: ChainId,
+        to_chain: ChainId,
+        destination_address: String,
+    ) -> Result<TransferResult, BlockchainError> {
+        let mut client = self.client.clone();
+
+        client
+            .init_adapters(NetworkType::Testnet)
+            .await
+            .map_err(BlockchainError::from)?;
+
+        let transfer_id = client
+            .transfers()
+            .cross_chain(sanad_id, to_chain.clone())
+            .from_chain(from_chain.clone())
+            .to_address(destination_address)
+            .execute()
+            .await
+            .map_err(BlockchainError::from)?;
+
+        let details = client
+            .transfers()
+            .details(&transfer_id)
+            .map_err(BlockchainError::from)?;
+
+        Ok(TransferResult {
+            transfer_id,
+            source_fee: None,
+            dest_fee: None,
+            lock_tx_hash: details.lock_tx_hash,
+            mint_tx_hash: None,
+        })
+    }
+
+    /// Execute a local transfer on the same source and destination chain.
+    pub async fn transfer_sanad_local(
+        &self,
+        sanad_id: SanadId,
+        chain: ChainId,
+        destination_address: String,
+    ) -> Result<TransferResult, BlockchainError> {
+        self.execute_cross_chain_transfer(sanad_id, chain.clone(), chain, destination_address)
+            .await
+    }
 }
 
 /// Wallet connection utilities stub.

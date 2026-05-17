@@ -99,14 +99,28 @@ fn read_program_bytecode(contracts_dir: &Path) -> String {
         }
     }
 
-    // CRITICAL FIX: Instead of panicking (which blocks `cargo check --workspace`),
-    // emit a placeholder and a warning. The program ID mismatch between Anchor.toml
-    // and source code has been resolved (both now use HzZ12WPJjDvZ8nCA9yjXgKAoJ8XV1386976Jwrm63RcD).
-    // Pre-compiled .so artifacts can be committed manually, or `anchor build` can be run.
-    println!("cargo:warning=Solana program bytecode not found under {:?} or {:?}.", deploy_dir, program_deploy_dir);
-    println!("cargo:warning=Run `anchor build` in contracts/ to compile programs.");
-    println!("cargo:warning=Using empty placeholder - runtime deployment will need actual bytecode.");
-    String::new() // Empty placeholder - callers must handle missing bytecode
+    // FAIL LOUDLY: Empty bytecode would cause silent deployment failures.
+    // This panic will fail at compile time with a clear message, preventing
+    // the production build from proceeding with missing bytecode.
+    //
+    // To fix this error:
+    //   1. Run `anchor build` in contracts/ to compile the Solana program
+    //   2. Verify the compiled .so file appears in target/deploy/
+    //   3. Re-run the build
+    //
+    // If compiling Anchor programs is not needed for the current build profile,
+    // run with: SKIP_SOLANA_BYTECODE=1 cargo build
+    if std::env::var("SKIP_SOLANA_BYTECODE").is_ok() {
+        println!("cargo:warning=SKIP_SOLANA_BYTECODE set - using empty placeholder bytecode");
+        String::new()
+    } else {
+        panic!(
+            "Solana program bytecode not found under {:?} or {:?}.\n\
+             Run `anchor build` in contracts/ to compile programs first.\n\
+             Alternatively, set SKIP_SOLANA_BYTECODE=1 to skip this check.",
+            deploy_dir, program_deploy_dir
+        );
+    }
 }
 
 fn bytes_to_array_literal(bytes: &[u8]) -> String {

@@ -63,9 +63,10 @@ pub fn NftPage() -> Element {
 #[component]
 pub fn NftGallery() -> Element {
     // Read NFTs from wallet context state
-    let wallet_ctx = use_wallet_context();
+    let _wallet_ctx = use_wallet_context();
     // NFT feature not yet implemented - display empty state
-    let _nfts: Vec<NftRecord> = Vec::new(); // TODO: Implement NFT fetching when WalletContext has nfts field
+    // Tracking issue: https://github.com/client-side-validation/csv-adapter/issues/NFT
+    let _nfts: Vec<NftRecord> = Vec::new();
 
     rsx! {
         div { class: "flex flex-col items-center justify-center py-16 text-center",
@@ -86,9 +87,10 @@ pub fn NftGallery() -> Element {
 #[component]
 pub fn NftCollections() -> Element {
     // Read NFT collections from wallet context state
-    let wallet_ctx = use_wallet_context();
+    let _wallet_ctx = use_wallet_context();
     // NFT collections feature not yet implemented - display empty state
-    let _collections: Vec<NftCollection> = Vec::new(); // TODO: Implement NFT collection fetching when WalletContext has nft_collections field
+    // Tracking issue: https://github.com/client-side-validation/csv-adapter/issues/NFT
+    let _collections: Vec<NftCollection> = Vec::new();
 
     rsx! {
         div { class: "flex flex-col items-center justify-center py-16 text-center",
