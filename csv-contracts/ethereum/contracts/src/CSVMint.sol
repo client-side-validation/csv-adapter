@@ -319,6 +319,8 @@ contract CSVMint {
         bytes32 proofRoot,
         uint256[] calldata leafPositions
     ) external {
+        if (msg.sender != verifier) revert Unauthorized();
+
         if (
             sanadIds.length != commitments.length ||
             sanadIds.length != stateRoots.length ||

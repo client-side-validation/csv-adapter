@@ -9,6 +9,7 @@ use csv_core::Hash;
 use csv_core::proof::{FinalityProof, InclusionProof};
 use csv_core::proof_pipeline::ChainVerifier;
 
+use crate::config::EthereumConfig;
 use crate::mpt::verify_storage_proof;
 use crate::rpc::EthereumRpc;
 use alloy_primitives::{B256, Bytes, U256};
@@ -19,14 +20,17 @@ pub struct EthereumVerifier {
     rpc: Box<dyn EthereumRpc>,
     /// CSVLock contract address
     csv_lock_address: [u8; 20],
+    /// Ethereum configuration
+    config: EthereumConfig,
 }
 
 impl EthereumVerifier {
     /// Create a new Ethereum verifier
-    pub fn new(rpc: Box<dyn EthereumRpc>, csv_lock_address: [u8; 20]) -> Self {
+    pub fn new(rpc: Box<dyn EthereumRpc>, csv_lock_address: [u8; 20], config: EthereumConfig) -> Self {
         Self {
             rpc,
             csv_lock_address,
+            config,
         }
     }
 }
@@ -96,8 +100,8 @@ impl ChainVerifier for EthereumVerifier {
     /// Verify finality proof for an Ethereum block
     async fn verify_finality(&self, proof: &FinalityProof) -> csv_core::Result<bool> {
         // Ethereum has probabilistic finality - check confirmations
-        // For now, we check if the required confirmations are met
-        let required_confirmations = 12; // Ethereum typically requires 12 confirmations for finality
+        // Use the configured finality_depth instead of hardcoded value
+        let required_confirmations = self.config.finality_depth;
         let is_finalized = proof.confirmations >= required_confirmations;
 
         Ok(is_finalized)

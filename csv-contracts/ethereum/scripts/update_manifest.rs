@@ -12,6 +12,8 @@
 use std::env;
 use std::fs;
 use std::path::Path;
+use sha3::{Digest, Keccak256};
+use hex;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
@@ -41,7 +43,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     lock_obj.insert("address".to_string(), serde_json::json!(lock_address));
                     lock_obj.insert("deployment_tx".to_string(), serde_json::json!(deployment_tx));
                     lock_obj.insert("block_number".to_string(), serde_json::json!(block_number));
-                    lock_obj.insert("bytecode_hash".to_string(), serde_json::json!("REQUIRED: Compute deployed bytecode hash with: sha3sum --keccak-256 deployments/artifacts/CSVLock.bin"));
+                    // Compute actual bytecode hash from deployed contract
+                    let bytecode_path = Path::new("deployments/artifacts/CSVLock.bin");
+                    if bytecode_path.exists() {
+                        let bytecode = fs::read(bytecode_path)?;
+                        let hash = sha3::Keccak256::digest(&bytecode);
+                        lock_obj.insert("bytecode_hash".to_string(), serde_json::json!(format!("0x{}", hex::encode(hash))));
+                    } else {
+                        return Err(Box::from(format!("Bytecode file not found: {:?}", bytecode_path)));
+                    }
                     lock_obj.insert("verified".to_string(), serde_json::json!(false));
                     
                     // Update constructor args
@@ -57,13 +67,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     mint_obj.insert("address".to_string(), serde_json::json!(mint_address));
                     mint_obj.insert("deployment_tx".to_string(), serde_json::json!(deployment_tx));
                     mint_obj.insert("block_number".to_string(), serde_json::json!(block_number));
-                    mint_obj.insert("bytecode_hash".to_string(), serde_json::json!("REQUIRED: Compute deployed bytecode hash with: sha3sum --keccak-256 deployments/artifacts/CSVMint.bin"));
+                    // Compute actual bytecode hash from deployed contract
+                    let bytecode_path = Path::new("deployments/artifacts/CSVMint.bin");
+                    if bytecode_path.exists() {
+                        let bytecode = fs::read(bytecode_path)?;
+                        let hash = sha3::Keccak256::digest(&bytecode);
+                        mint_obj.insert("bytecode_hash".to_string(), serde_json::json!(format!("0x{}", hex::encode(hash))));
+                    } else {
+                        return Err(Box::from(format!("Bytecode file not found: {:?}", bytecode_path)));
+                    }
                     mint_obj.insert("verified".to_string(), serde_json::json!(false));
                     
                     // Update constructor args
                     if let Some(constructor_args) = mint_obj["constructor_args"].as_object_mut() {
                         constructor_args.insert("lockContract".to_string(), serde_json::json!(lock_address));
-                        constructor_args.insert("verifier".to_string(), serde_json::json!("REQUIRED: Set verifier address after ZK verifier contract deployment"));
+                        // Verifier address must be set from deployment config
+                    let verifier_address = env::var("VERIFIER_ADDRESS")
+                        .map_err(|_| Box::from("VERIFIER_ADDRESS environment variable not set. Please set it to the deployed ZK verifier contract address."))?;
+                    constructor_args.insert("verifier".to_string(), serde_json::json!(verifier_address));
                     }
                 }
             }

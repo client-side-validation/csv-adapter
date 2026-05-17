@@ -6,6 +6,11 @@
 use csv_sdk::{client::NetworkType, CsvClient};
 use csv_core::{ChainId, SanadId};
 
+#[cfg(feature = "cross-chain-persist")]
+use csv_sdk::cross_chain::PersistentTransferRegistry;
+#[cfg(feature = "cross-chain-persist")]
+use sqlx::SqlitePool;
+
 /// Blockchain error type.
 #[derive(Debug, Clone)]
 pub struct BlockchainError {
@@ -94,6 +99,8 @@ pub struct ContractDeployment {
 /// Blockchain service using csv-sdk.
 pub struct BlockchainService {
     client: CsvClient,
+    #[cfg(feature = "cross-chain-persist")]
+    transfer_registry: Option<PersistentTransferRegistry>,
 }
 
 impl std::fmt::Debug for BlockchainService {
@@ -106,6 +113,10 @@ impl std::fmt::Debug for BlockchainService {
 
 impl BlockchainService {
     /// Create a new blockchain service.
+    /// 
+    /// Note: This uses InMemory storage for the CSV client's internal operations.
+    /// For sensitive wallet data (mnemonics, private keys), the wallet should use
+    /// csv-store's EncryptedStorageManager separately via the wallet context.
     pub fn new(_config: BlockchainConfig) -> Self {
         // Initialize csv-sdk client with default configuration
         let client = CsvClient::builder()
@@ -113,7 +124,29 @@ impl BlockchainService {
             .build()
             .expect("Failed to create CSV client");
 
-        Self { client }
+        Self {
+            client,
+            #[cfg(feature = "cross-chain-persist")]
+            transfer_registry: None,
+        }
+    }
+
+    /// Create a new blockchain service with persistent transfer registry.
+    /// 
+    /// Note: This uses InMemory storage for the CSV client's internal operations.
+    /// For sensitive wallet data (mnemonics, private keys), the wallet should use
+    /// csv-store's EncryptedStorageManager separately via the wallet context.
+    #[cfg(feature = "cross-chain-persist")]
+    pub fn with_registry(_config: BlockchainConfig, pool: SqlitePool) -> Self {
+        let client = CsvClient::builder()
+            .with_store_backend(csv_sdk::builder::StoreBackend::InMemory)
+            .build()
+            .expect("Failed to create CSV client");
+
+        Self {
+            client,
+            transfer_registry: Some(PersistentTransferRegistry::new(pool)),
+        }
     }
 
 }
@@ -127,7 +160,11 @@ impl Clone for BlockchainService {
             .build()
             .expect("Failed to create CSV client");
 
-        Self { client }
+        Self {
+            client,
+            #[cfg(feature = "cross-chain-persist")]
+            transfer_registry: self.transfer_registry.clone(),
+        }
     }
 }
 
@@ -156,6 +193,27 @@ impl BlockchainService {
         to_chain: ChainId,
         destination_address: String,
     ) -> Result<TransferResult, BlockchainError> {
+        #[cfg(feature = "cross-chain-persist")]
+        if let Some(registry) = &self.transfer_registry {
+            // Double-spend check: verify sanad hasn't been transferred already
+            let sanad_id_str = sanad_id.to_string();
+            if registry
+                .is_transferred(&sanad_id_str)
+                .await
+                .map_err(|e| BlockchainError {
+                    message: format!("Failed to check transfer status: {}", e),
+                    chain: Some(from_chain.clone()),
+                    code: None,
+                })?
+            {
+                return Err(BlockchainError {
+                    message: format!("Sanad {} has already been transferred", sanad_id_str),
+                    chain: Some(from_chain),
+                    code: Some(400),
+                });
+            }
+        }
+
         let mut client = self.client.clone();
 
         client
@@ -176,6 +234,32 @@ impl BlockchainService {
             .transfers()
             .details(&transfer_id)
             .map_err(BlockchainError::from)?;
+
+        #[cfg(feature = "cross-chain-persist")]
+        if let Some(registry) = &self.transfer_registry {
+            // Record the completed transfer for double-spend protection
+            let sanad_id_str = sanad_id.to_string();
+            let from_chain_str = from_chain.as_str();
+            let to_chain_str = to_chain.as_str();
+            let lock_tx = details.lock_tx_hash.as_deref().unwrap_or("");
+            
+            registry
+                .record_transfer(
+                    &sanad_id_str,
+                    from_chain_str,
+                    to_chain_str,
+                    lock_tx,
+                    None, // mint_tx not available yet
+                    "wallet", // from_owner placeholder
+                    "wallet", // to_owner placeholder
+                )
+                .await
+                .map_err(|e| BlockchainError {
+                    message: format!("Failed to record transfer: {}", e),
+                    chain: Some(from_chain),
+                    code: None,
+                })?;
+        }
 
         Ok(TransferResult {
             transfer_id,
@@ -198,9 +282,12 @@ impl BlockchainService {
     }
 }
 
-/// Wallet connection utilities stub.
+/// Wallet connection utilities.
 pub mod wallet_connection {
     use super::{ChainId, NativeWallet, WalletType};
+    use wasm_bindgen::JsValue;
+    use wasm_bindgen_futures::JsFuture;
+    use web_sys::window;
 
     /// Get recommended wallet type for a chain.
     pub fn recommended_wallet(_chain: ChainId) -> WalletType {
@@ -209,17 +296,79 @@ pub mod wallet_connection {
 
     /// Check if MetaMask is installed.
     pub fn is_metamask_installed() -> bool {
+        if let Some(window) = window() {
+            if let Ok(ethereum) = js_sys::Reflect::get(&window, &JsValue::from_str("ethereum")) {
+                return !ethereum.is_undefined();
+            }
+        }
         false
     }
 
     /// Check if Phantom is installed.
     pub fn is_phantom_installed() -> bool {
+        if let Some(window) = window() {
+            if let Ok(phantom) = js_sys::Reflect::get(&window, &JsValue::from_str("phantom")) {
+                return !phantom.is_undefined();
+            }
+        }
         false
     }
 
-    /// Connect to MetaMask (stub).
+    /// Connect to MetaMask using window.ethereum.request({ method: 'eth_requestAccounts' }).
+    #[cfg(target_arch = "wasm32")]
     pub async fn connect_metamask() -> Result<NativeWallet, String> {
-        Err("MetaMask not available".to_string())
+        let window = window().ok_or("Window not available")?;
+
+        let ethereum = js_sys::Reflect::get(&window, &JsValue::from_str("ethereum"))
+            .map_err(|_| "MetaMask not available")?;
+
+        if ethereum.is_undefined() {
+            return Err("MetaMask not installed".to_string());
+        }
+
+        let request = js_sys::Reflect::get(&ethereum, &JsValue::from_str("request"))
+            .map_err(|_| "MetaMask request method not available")?;
+
+        let request_fn = request
+            .dyn_ref::<js_sys::Function>()
+            .ok_or("request is not a function")?;
+
+        let request_params = js_sys::Object::new();
+        js_sys::Reflect::set(
+            &request_params,
+            &JsValue::from_str("method"),
+            &JsValue::from_str("eth_requestAccounts"),
+        )
+        .map_err(|_| "Failed to set request params")?;
+
+        let promise = request_fn
+            .call1(&ethereum, &request_params)
+            .map_err(|_| "Failed to call request")?;
+
+        let result = JsFuture::from(promise)
+            .await
+            .map_err(|e| format!("Failed to connect to MetaMask: {:?}", e))?;
+
+        let accounts = result
+            .dyn_ref::<js_sys::Array>()
+            .ok_or("Expected array of accounts")?;
+
+        if accounts.length() == 0 {
+            return Err("No accounts returned from MetaMask".to_string());
+        }
+
+        let account = accounts.get(0);
+        let address = account
+            .as_string()
+            .ok_or("Account address is not a string")?;
+
+        Ok(NativeWallet::new(address))
+    }
+
+    /// Connect to MetaMask (non-wasm stub).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub async fn connect_metamask() -> Result<NativeWallet, String> {
+        Err("MetaMask connection only available in WASM builds".to_string())
     }
 
     /// Create a native wallet from address.
@@ -228,7 +377,11 @@ pub mod wallet_connection {
     }
 
     /// Check if wallet is installed.
-    pub fn is_wallet_installed(_wallet_type: &WalletType) -> bool {
-        false
+    pub fn is_wallet_installed(wallet_type: &WalletType) -> bool {
+        match wallet_type {
+            WalletType::MetaMask => is_metamask_installed(),
+            WalletType::Phantom => is_phantom_installed(),
+            _ => false,
+        }
     }
 }

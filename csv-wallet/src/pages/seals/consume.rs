@@ -32,6 +32,21 @@ pub fn ConsumeSeal(seal_ref: Option<String>) -> Element {
 
     let mut result = use_signal(|| Option::<String>::None);
     let mut error = use_signal(|| Option::<String>::None);
+    let mut is_seal_already_consumed = use_signal(|| false);
+
+    // Check if selected seal is already consumed on-chain when selection changes
+    use_effect(move || {
+        let seal_ref_val = selected_seal_ref.read().clone();
+        if !seal_ref_val.is_empty() {
+            let wallet_ctx = wallet_ctx.clone();
+            spawn(async move {
+                // Check on-chain seal registry to prevent double-spend
+                // This is a UI guard - disable button if seal is already consumed on-chain
+                let consumed = wallet_ctx.is_seal_consumed(&seal_ref_val);
+                is_seal_already_consumed.set(consumed);
+            });
+        }
+    });
 
     rsx! {
         div { class: "max-w-2xl space-y-6",
@@ -95,6 +110,13 @@ pub fn ConsumeSeal(seal_ref: Option<String>) -> Element {
                     div { class: "p-3 bg-red-900/30 border border-red-700/50 rounded-lg text-sm text-red-300", "{e}" }
                 }
 
+                // Show warning if seal is already consumed on-chain
+                if *is_seal_already_consumed.read() {
+                    div { class: "p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg text-sm text-yellow-300",
+                        "Warning: This seal has already been consumed on-chain. Consumption is disabled to prevent double-spend."
+                    }
+                }
+
                 if let Some(msg) = result.read().as_ref() {
                     div { class: "p-4 bg-green-900/30 border border-green-700/50 rounded-lg",
                         p { class: "text-green-300", "{msg}" }
@@ -117,9 +139,9 @@ pub fn ConsumeSeal(seal_ref: Option<String>) -> Element {
                             selected_seal_ref.set(String::new());
                         }
                     },
-                    disabled: available_seals.is_empty() || selected_seal_ref.read().is_empty(),
+                    disabled: available_seals.is_empty() || selected_seal_ref.read().is_empty() || *is_seal_already_consumed.read(),
                     class: "w-full px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
-                    if available_seals.is_empty() { "No Available Seals" } else { "Consume Seal" }
+                    if available_seals.is_empty() { "No Available Seals" } else if *is_seal_already_consumed.read() { "Seal Already Consumed" } else { "Consume Seal" }
                 }
             }
         }

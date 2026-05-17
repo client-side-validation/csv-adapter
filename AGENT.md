@@ -182,7 +182,7 @@ When contributing, AI agents MUST obey these rules (from the Principal Engineer 
 
 #### 1. Zero-Placeholder Policy (ZPP)
 
-    The Rule: You are strictly forbidden from using todo!(), unimplemented!(), // FIXME, or empty/mock return values (Ok(vec![]), true) to resolve compilation errors in core, sdk, or adapter modules.
+    The Rule: You are strictly forbidden from using todo!(), unimplemented!(), // FIXME, or empty/mock return values (Ok(vec![]), true) to resolve compilation errors in core, sdk, or adapter modules. Also any synonym for these placeholders, such as "In production we should", " The proper Implementation should be done later", " Real implementation will be done later".
 
     The Constraint: If a logic block is too complex to pass the borrow checker or type system, you must refactor the architecture to accommodate the complexity rather than deleting the logic to satisfy the compiler.
 

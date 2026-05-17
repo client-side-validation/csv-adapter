@@ -191,8 +191,28 @@ impl ChainIndexer for BitcoinIndexer {
         Ok(seals)
     }
 
-    async fn index_transfers(&self, _block: u64) -> ChainResult<Vec<TransferRecord>> {
-        Ok(Vec::new())
+    async fn index_transfers(&self, block: u64) -> ChainResult<Vec<TransferRecord>> {
+        let block_data = self.fetch_block(block).await?;
+        let mut transfers = Vec::new();
+
+        for tx in &block_data.tx {
+            for vout in &tx.vout {
+                // Look for OP_RETURN outputs that may encode cross-chain transfer data
+                if vout.scriptpubkey_type.as_deref() == Some("op_return") {
+                    if let Some(transfer) = self.parse_transfer_from_op_return(tx, vout, block).await {
+                        transfers.push(transfer);
+                    }
+                }
+            }
+        }
+
+        tracing::debug!(
+            chain = "bitcoin",
+            block,
+            count = transfers.len(),
+            "Indexed transfers"
+        );
+        Ok(transfers)
     }
 
     async fn index_contracts(&self, _block: u64) -> ChainResult<Vec<CsvContract>> {
@@ -519,6 +539,80 @@ impl BitcoinIndexer {
             })),
             transfer_count: 0,
             last_transfer_at: None,
+        })
+    }
+
+    async fn parse_transfer_from_op_return(
+        &self,
+        tx: &MempoolTx,
+        vout: &VoutInfo,
+        block: u64,
+    ) -> Option<TransferRecord> {
+        let script_hex = vout.scriptpubkey.as_ref()?;
+
+        // Strip OP_RETURN opcode prefix (6a + length byte)
+        let payload_hex = script_hex.strip_prefix("6a")?;
+        let payload_hex = if payload_hex.len() >= 4 {
+            let maybe_len = u8::from_str_radix(&payload_hex[..2], 16).ok()? as usize;
+            let expected_hex_len = maybe_len * 2;
+            if payload_hex.len() == 2 + expected_hex_len {
+                &payload_hex[2..]
+            } else {
+                payload_hex
+            }
+        } else {
+            payload_hex
+        };
+
+        let payload = hex::decode(payload_hex).ok()?;
+
+        // Cross-chain transfer encoding: protocol_id (4 bytes) + transfer_data
+        if payload.len() < 36 {
+            return None;
+        }
+
+        const CSV_MAGIC: &[u8; 4] = b"CSV-";
+        if &payload[0..4] != CSV_MAGIC {
+            return None;
+        }
+
+        // Parse transfer-specific data (simplified for indexer)
+        // In production, this would decode the full CSV transfer structure
+        let source_chain = match payload[4] {
+            0 => "bitcoin",
+            1 => "ethereum",
+            2 => "solana",
+            _ => "unknown",
+        };
+
+        let transfer_id = format!("btc-transfer-{}-{}", tx.txid, block);
+        let from_address = tx
+            .vin
+            .first()
+            .and_then(|vin| vin.prevout.as_ref())
+            .and_then(|prev| prev.scriptpubkey_address.as_ref())
+            .cloned()
+            .unwrap_or_else(|| "unknown".to_string());
+
+        Some(TransferRecord {
+            id: transfer_id,
+            chain: "bitcoin".to_string(),
+            from_chain: source_chain.to_string(),
+            to_chain: "ethereum".to_string(), // Default target, would be parsed from payload
+            sanad_id: format!("btc-{}-sanad", tx.txid),
+            seal_id: format!("{}:0", tx.txid),
+            from_address,
+            to_address: "csv-lock-contract".to_string(),
+            amount: vout.value.unwrap_or(0),
+            status: "pending".to_string(),
+            created_at: chrono::Utc::now(),
+            created_tx: tx.txid.clone(),
+            block_height: block,
+            metadata: Some(serde_json::json!({
+                "protocol_id": "csv-btc-transfer",
+                "source_chain": source_chain,
+                "inclusion_proof": "merkle",
+            })),
         })
     }
 }

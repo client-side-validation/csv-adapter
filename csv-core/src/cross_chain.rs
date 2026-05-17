@@ -15,7 +15,7 @@ use crate::hash::Hash;
 use crate::mcp::ChainId;
 use crate::sanad::{OwnershipProof as SanadOwnershipProof, Sanad};
 use crate::seal::SealPoint;
-use crate::signature::Signature;
+use crate::signature::{Signature, SignatureScheme};
 
 /// Hash algorithm used by the source chain's proof model.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,7 +36,7 @@ impl CrossChainHashAlgorithm {
         match chain.to_string().as_str() {
             "bitcoin" => Ok(Self::DoubleSha256),
             "ethereum" => Ok(Self::Keccak256),
-            "solana" => Ok(Self::Keccak256),
+            "solana" => Ok(Self::Sha256),
             "aptos" => Ok(Self::Sha3_256),
             "sui" => Ok(Self::Sha256),
             _ => Err(CrossChainError::UnsupportedChainPair(
@@ -74,6 +74,21 @@ impl CrossChainHashAlgorithm {
                 Hash::new(hasher.finalize().into())
             }
         }
+    }
+}
+
+/// Return the canonical signature scheme for a given chain.
+fn signature_scheme_for_chain(chain: &ChainId) -> Result<SignatureScheme, CrossChainError> {
+    match chain.to_string().as_str() {
+        "bitcoin" => Ok(SignatureScheme::Secp256k1),
+        "ethereum" => Ok(SignatureScheme::Secp256k1),
+        "solana" => Ok(SignatureScheme::Ed25519),
+        "aptos" => Ok(SignatureScheme::Ed25519),
+        "sui" => Ok(SignatureScheme::Ed25519),
+        _ => Err(CrossChainError::UnsupportedChainPair(
+            chain.clone(),
+            chain.clone(),
+        )),
     }
 }
 
@@ -492,20 +507,23 @@ impl<'a> StandardTransferVerifier<'a> {
         &self,
         proof: &SanadOwnershipProof,
         commitment: Hash,
+        source_chain: &ChainId,
     ) -> Result<(), CrossChainError> {
         if proof.proof.is_empty() {
             return Err(CrossChainError::InvalidOwnership);
         }
 
-        if let Some(scheme) = proof.scheme {
-            Signature::new(
-                proof.proof.clone(),
-                proof.owner.clone(),
-                commitment.as_bytes().to_vec(),
-            )
-            .verify(scheme)
-            .map_err(|_| CrossChainError::InvalidOwnership)?;
-        }
+        // Use chain-canonical signature scheme instead of proof-payload field
+        // This prevents attackers from specifying an insecure scheme
+        let scheme = signature_scheme_for_chain(source_chain)?;
+        
+        Signature::new(
+            proof.proof.clone(),
+            proof.owner.clone(),
+            commitment.as_bytes().to_vec(),
+        )
+        .verify(scheme)
+        .map_err(|_| CrossChainError::InvalidOwnership)?;
 
         Ok(())
     }
@@ -571,10 +589,11 @@ impl<'a> StandardTransferVerifier<'a> {
             return Err(CrossChainError::LockEventMismatch);
         }
 
-        self.verify_ownership(&proof.lock_event.owner, proof.lock_event.commitment)?;
+        self.verify_ownership(&proof.lock_event.owner, proof.lock_event.commitment, &proof.lock_event.source_chain)?;
         self.verify_ownership(
             &proof.lock_event.destination_owner,
             proof.lock_event.commitment,
+            &proof.lock_event.destination_chain,
         )?;
 
         Ok(())
