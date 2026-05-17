@@ -5,7 +5,7 @@
 
 use crate::wallet::metadata::WalletMetadata;
 use csv_keys::bip39::{Mnemonic, MnemonicType};
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 

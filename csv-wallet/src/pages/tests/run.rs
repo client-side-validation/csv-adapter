@@ -3,7 +3,7 @@
 use crate::context::{TestResult, TestStatus, use_wallet_context};
 use crate::pages::common::*;
 use crate::routes::Route;
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use dioxus::prelude::*;
 use std::rc::Rc;
 

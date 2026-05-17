@@ -14,6 +14,7 @@ use csv_keys::{
     file_keystore::FileKeystore,
     memory::Passphrase,
 };
+use csv_core::ChainId;
 use csv_store::state::WalletAccount;
 
 /// Import wallet from mnemonic phrase.
@@ -71,12 +72,12 @@ pub fn cmd_import(
 
         // Store account
         let store_chain = match core_chain.to_string().as_str() {
-            "bitcoin" => csv_store::state::ChainId::new("bitcoin"),
-            "ethereum" => csv_store::state::ChainId::new("ethereum"),
-            "sui" => csv_store::state::ChainId::new("sui"),
-            "aptos" => csv_store::state::ChainId::new("aptos"),
-            "solana" => csv_store::state::ChainId::new("solana"),
-            _ => csv_store::state::ChainId::new("bitcoin"),
+            "bitcoin" => ChainId::new("bitcoin"),
+            "ethereum" => ChainId::new("ethereum"),
+            "sui" => ChainId::new("sui"),
+            "aptos" => ChainId::new("aptos"),
+            "solana" => ChainId::new("solana"),
+            _ => ChainId::new("bitcoin"),
         };
 
         // Store private key in encrypted file keystore

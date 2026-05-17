@@ -8,7 +8,7 @@ use crate::context::{ProofRecord, ProofStatus, use_wallet_context};
 use crate::pages::common::*;
 use crate::routes::Route;
 use csv_core::zk_proof::ZkSealProof;
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use dioxus::prelude::*;
 
 /// Generate ZK proof page

@@ -4,7 +4,7 @@
 //! Private keys are never stored in memory longer than necessary for signing.
 
 use csv_keys::bip44::derive_address_from_chain_id;
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

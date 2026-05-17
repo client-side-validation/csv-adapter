@@ -4,7 +4,7 @@
 //! intervals with ±20% jitter to avoid thundering herd problems.
 
 use super::manager::{SealRecord, SealStatus};
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use std::sync::Arc;
 use std::time::Duration;
 

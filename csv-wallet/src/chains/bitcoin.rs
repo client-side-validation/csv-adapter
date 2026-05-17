@@ -2,7 +2,7 @@
 //!
 //! Handles Bitcoin wallet operations and address derivation.
 
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 
 /// Get Bitcoin address format.
 pub fn format_address(pubkey_bytes: &[u8]) -> String {

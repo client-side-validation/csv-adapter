@@ -1,6 +1,6 @@
 //! Network configuration service.
 
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 
 /// Network type (testnet or mainnet).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

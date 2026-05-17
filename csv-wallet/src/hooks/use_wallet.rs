@@ -11,7 +11,7 @@ use csv_keys::{
     browser_keystore::BrowserKeystore,
     memory::Seed,
 };
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use dioxus::prelude::*;
 
 /// Wallet state.

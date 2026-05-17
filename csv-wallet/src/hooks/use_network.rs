@@ -2,7 +2,7 @@
 
 use crate::chains::supported_wallet_chains;
 use crate::services::network::NetworkType;
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use dioxus::prelude::*;
 
 /// Network state.

@@ -127,6 +127,18 @@ impl TransferManager {
         }
     }
 
+    /// Get detailed transfer information by ID.
+    pub fn details(&self, transfer_id: &str) -> Result<TransferRecord, CsvError> {
+        let transfers = self
+            .transfers
+            .lock()
+            .map_err(|e| CsvError::StoreError(e.to_string()))?;
+        transfers
+            .get(transfer_id)
+            .cloned()
+            .ok_or_else(|| CsvError::TransferNotFound(transfer_id.to_string()))
+    }
+
     /// List transfers matching the given filters.
     pub fn list(&self, filters: TransferFilters) -> Result<Vec<TransferRecord>, CsvError> {
         let transfers = self

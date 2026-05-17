@@ -4,7 +4,7 @@
 //! Supports both native and browser wallet contexts.
 
 use csv_sdk::CsvClient;
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use sha2::{Digest, Sha256};
 
 /// Blockchain error type.

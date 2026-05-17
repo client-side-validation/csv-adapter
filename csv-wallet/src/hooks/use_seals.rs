@@ -2,7 +2,7 @@
 
 use dioxus::prelude::*;
 use csv_store::state::domain::{SealRecord, SealStatus};
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 
 /// Seal state.
 #[derive(Clone, PartialEq)]

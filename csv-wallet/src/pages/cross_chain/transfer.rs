@@ -7,7 +7,7 @@ use crate::context::{
 use crate::pages::common::*;
 use crate::routes::Route;
 use crate::services::blockchain::{ContractDeployment, ContractType};
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use dioxus::prelude::*;
 use std::rc::Rc;
 
@@ -306,14 +306,29 @@ pub fn CrossChainTransfer() -> Element {
 
                 let from_for_exec = from.clone();
                 let to_for_exec = to.clone();
-                
+
                 // Use csv_sdk directly for cross-chain transfer
                 use csv_sdk::CsvClient;
+                use csv_sdk::client::NetworkType;
                 let csv_client = CsvClient::builder()
+                    .with_chain(from_for_exec.clone())
+                    .with_chain(to_for_exec.clone())
                     .with_store_backend(csv_sdk::builder::StoreBackend::InMemory)
-                    .build()
-                    .expect("Failed to create CSV client");
-                
+                    .build();
+
+                let csv_client = match csv_client {
+                    Ok(client) => client,
+                    Err(e) => {
+                        error.set(Some(format!("Failed to create CSV client: {}", e)));
+                        return;
+                    }
+                };
+
+                if let Err(e) = csv_client.init_adapters(NetworkType::Testnet).await {
+                    error.set(Some(format!("Failed to initialize chain adapters: {}", e)));
+                    return;
+                }
+
                 // Convert sanad string to [u8; 32] for SanadId
                 let sanad_bytes: [u8; 32] = if sanad.starts_with("0x") {
                     hex::decode(&sanad[2..])
@@ -338,7 +353,7 @@ pub fn CrossChainTransfer() -> Element {
                     .cross_chain(sanad_id_for_transfer, to_for_exec.clone())
                     .from_chain(from_for_exec.clone())
                     .to_address(dest_addr.clone());
-                
+
                 match transfer_builder.execute().await {
                     Ok(transfer_id) => {
                         step_signal.set(6); // Set beyond last step to show all completed
@@ -349,23 +364,19 @@ pub fn CrossChainTransfer() -> Element {
                             contracts.get(&from).map(|c| c.contract_address.clone());
                         let dest_contract = contracts.get(&to).map(|c| c.contract_address.clone());
 
-                        // Query transfer status to get lock_tx_hash and other details
-                        let lock_tx_hash = csv_client.transfers()
-                            .status(&transfer_id)
+                        // Query transfer details to get lock transaction hash and status
+                        let transfer_details = csv_client.transfers().details(&transfer_id);
+                        let lock_tx_hash = transfer_details
+                            .as_ref()
                             .ok()
-                            .and_then(|status| {
-                                // Try to extract lock_tx_hash from status if available
-                                // For now, use a placeholder
-                                None
-                            })
-                            .unwrap_or_else(|| format!("0x{}", hex::encode([0u8; 32])));
-                        let mint_tx_hash = format!("0x{}", hex::encode([0u8; 32])); // Placeholder
+                            .and_then(|details| details.lock_tx_hash.clone())
+                            .unwrap_or_else(|| "unknown".to_string());
 
                         // Fees are not returned by csv_sdk execute, set to 0 for now
                         let source_fee_str = Some(0u64);
                         let dest_fee_str = Some(0u64);
 
-                        // Create linked Seal record
+                        // Create linked Seal record for the source chain lock event
                         let seal_ref = format!("seal_{}", &transfer_id[..16]);
                         let seal_content = SealContent {
                             content_hash: format!("0x{}", &sanad[..40.min(sanad.len())]),
@@ -389,78 +400,7 @@ pub fn CrossChainTransfer() -> Element {
                         };
                         wallet_ctx.add_seal(seal);
 
-                        // Create linked Proof record
-                        let from_for_proof = from.clone();
-                        let proof_data = match from_for_proof.as_str() {
-                            "bitcoin" => ProofData::Merkle {
-                                root: format!("0x{}", &lock_tx_hash[..40]),
-                                path: vec![format!("0x{}", &sanad[..40])],
-                                leaf_index: 0,
-                            },
-                            "ethereum" => ProofData::Mpt {
-                                root: format!("0x{}", &lock_tx_hash[..40]),
-                                account_proof: vec![format!("0x{}", &sanad[..40])],
-                                storage_proof: vec![format!("0x{}", &transfer_id[..40])],
-                            },
-                            "sui" => ProofData::Checkpoint {
-                                sequence: now,
-                                digest: lock_tx_hash.clone(),
-                                signatures: vec![
-                                    "validator_1".to_string(),
-                                    "validator_2".to_string(),
-                                ],
-                            },
-                            "aptos" => ProofData::Ledger {
-                                version: now,
-                                proof: format!("0x{}", &lock_tx_hash[..40]),
-                            },
-                            "solana" => ProofData::Solana {
-                                slot: now,
-                                bank_hash: format!("0x{}", &lock_tx_hash[..40]),
-                                merkle_proof: vec![format!("0x{}", &sanad[..40])],
-                            },
-                            _ => ProofData::Merkle {
-                                root: format!("0x{}", &lock_tx_hash[..40]),
-                                path: vec![format!("0x{}", &sanad[..40])],
-                                leaf_index: 0,
-                            },
-                        };
-
-                        let proof_type = match from.as_str() {
-                            "bitcoin" => "merkle",
-                            "ethereum" => "mpt",
-                            "sui" => "checkpoint",
-                            "aptos" => "ledger",
-                            "solana" => "solana",
-                            _ => "merkle",
-                        };
-
-                        let proof = ProofRecord {
-                            chain: from.clone(),
-                            sanad_id: sanad.clone(),
-                            seal_ref: Some(seal_ref.clone()),
-                            proof_type: proof_type.to_string(),
-                            proof_system: None,
-                            verified: true,
-                            proof_data: Some(
-                                serde_json::to_string(&proof_data).unwrap_or_default(),
-                            ),
-                            block_height: None,
-                            created_at: now,
-                            verified_at: Some(now),
-                            status: ProofStatus::Verified,
-                            target_chain: Some(to.clone()),
-                            verification_tx_hash: Some(mint_tx_hash.clone()),
-                        };
-                        wallet_ctx.add_proof(proof);
-
-                        // Link proof to seal
-                        wallet_ctx.link_proof_to_seal(
-                            &seal_ref,
-                            &format!("proof_{}", &transfer_id[..16]),
-                        );
-
-                        // Record the transfer with full details
+                        // Record the transfer with available details
                         let from_for_transfer = from.clone();
                         let to_for_transfer = to.clone();
                         wallet_ctx.add_transfer(TrackedTransfer {
@@ -473,21 +413,22 @@ pub fn CrossChainTransfer() -> Element {
                             status: TransferStatus::Completed,
                             created_at: now,
                             source_tx_hash: Some(lock_tx_hash.clone()),
-                            dest_tx_hash: Some(mint_tx_hash.clone()),
+                            dest_tx_hash: None,
                             destination_contract: dest_contract,
                             source_fee: source_fee_str,
                             dest_fee: dest_fee_str,
                             proof: None,
-                            completed_at: None,
+                            completed_at: Some(now),
                         });
 
                         result_signal.set(Some(format!(
-                            "Transfer complete!\nTransfer ID: {}\nSanad {} moved from {:?} to {:?}\n\nSeal: {}\nProof: {}\nLock TX: {}\nMint TX: {}",
-                            transfer_id, sanad, from_for_transfer, to_for_transfer,
-                            truncate_address(&seal_ref, 12),
-                            proof_type,
+                            "Transfer complete!\nTransfer ID: {}\nSanad {} moved from {:?} to {:?}\n\nLock TX: {}\nDestination address: {}",
+                            transfer_id,
+                            sanad,
+                            from_for_transfer,
+                            to_for_transfer,
                             lock_tx_hash,
-                            mint_tx_hash
+                            dest_addr
                         )));
                     }
                     Err(e) => {

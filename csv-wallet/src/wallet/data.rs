@@ -1,7 +1,7 @@
 //! Wallet data - collection of per-chain accounts.
 
 use crate::wallet::account::ChainAccount;
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use serde::{Deserialize, Serialize};
 
 /// Complete wallet data — collection of per-chain accounts.

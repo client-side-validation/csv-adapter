@@ -5,7 +5,7 @@ use crate::components::{Card, ChainDisplay, all_chain_displays};
 use crate::context::{WalletContext, use_wallet_context};
 use crate::routes::Route;
 use crate::wallet_core::ChainAccount;
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use dioxus::prelude::*;
 use wasm_bindgen::prelude::*;
 

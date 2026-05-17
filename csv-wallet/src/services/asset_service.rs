@@ -4,7 +4,7 @@
 
 use chrono::{DateTime, Utc};
 use csv_core::mcp::{FixAction, HasErrorSuggestion, error_codes};
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use serde::{Deserialize, Serialize};
 
 use crate::storage::{LocalStorageManager, asset_storage};

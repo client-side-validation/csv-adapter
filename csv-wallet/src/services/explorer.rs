@@ -1,6 +1,6 @@
 //! Explorer integration service.
 
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 #[cfg(not(target_arch = "wasm32"))]
 use reqwest::Client;
 use serde::{Deserialize, Serialize};

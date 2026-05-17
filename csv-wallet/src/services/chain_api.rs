@@ -3,7 +3,7 @@
 //! Provides chain RPC operations using csv-sdk runtime.
 
 use csv_sdk::runtime::{ChainRuntime, RuntimeConfig, RuntimeManager};
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 
 /// Errors that can occur during chain API operations.
 #[derive(Debug, Clone)]

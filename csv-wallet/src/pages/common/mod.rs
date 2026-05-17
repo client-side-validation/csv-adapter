@@ -1,7 +1,7 @@
 //! Common UI helpers and styling functions for pages.
 
 use crate::context::types::{SanadStatus, SealStatus, TestStatus, TransferStatus};
-use csv_store::state::ChainId;
+use csv_core::ChainId;
 use dioxus::prelude::*;
 
 // ===== ChainId Styling Helpers =====
