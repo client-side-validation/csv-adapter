@@ -229,6 +229,72 @@ let commitment = hash(
 
 ---
 
+## RPC Trust Model
+
+**This section documents the explicit trust stance regarding RPC (Remote Procedure Call) nodes in the CSV protocol.**
+
+### Position
+
+The CSV protocol uses a **quorum RPC model** as its Stage 1 operational stance. This means:
+
+- **RPC-minimized, not RPC-free**: The protocol reduces trust surface compared to a single trusted node but does not eliminate RPC trust entirely.
+- **Quorum of independent nodes**: Multiple independent RPC providers are queried for the same evidence. Disagreement among providers causes rejection.
+- **Collusion risk**: A quorum of colluding or compromised RPC nodes can still deliver false finality evidence. This is an **accepted pragmatic position for Stage 1**, not a protocol violation.
+
+### Quorum Parameters
+
+The quorum model operates with the following parameters (configurable per chain):
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `min_providers` | 3 | Minimum number of independent RPC providers to query |
+| `agreement_threshold` | 2/3 | Fraction of providers that must agree |
+| `timeout_ms` | 5000 | Maximum time to wait for a single provider response |
+| `finality_confirmations` | Configurable per chain | Number of confirmations required before evidence is accepted |
+
+### Evidence Sources
+
+The protocol relies on RPC-delivered evidence for:
+
+1. **Inclusion proofs**: Merkle/MPT/checkpoint proofs delivered by RPC nodes
+2. **Finality evidence**: Finality proofs (PoW depth, BFT certificates, checkpoint hashes)
+3. **Seal registry status**: Whether a seal has been consumed on-chain
+4. **Transaction receipts**: Confirmation of mint transactions on destination chains
+
+### Light Client Roadmap (Stage 3)
+
+Truly trust-minimized verification requires embedded light clients per chain. These are multi-month engineering efforts and are **Stage 3 targets, not Stage 1 requirements**:
+
+| Chain | Light Client Type | Status |
+|-------|-------------------|--------|
+| Bitcoin | Header chain validator (cumulative PoW from genesis) | Roadmap |
+| Ethereum | Consensus layer client (BLS signatures from validator set) | Roadmap |
+| Solana | Ledger hash chain follower | Roadmap |
+| Aptos | BFT certificate validator (known validator set rotation) | Roadmap |
+| Sui | BFT certificate validator (known validator set rotation) | Roadmap |
+
+The `FinalityVerifier` trait in `csv-core` is the abstraction point for swapping in light client implementations as they become available — the coordinator does not need to change.
+
+### Invariant
+
+**The invariant that must hold regardless of RPC trust level:**
+
+> No transfer completes without an independent on-chain confirmation of the mint transaction that does not come from the same adapter instance that submitted it.
+
+This is the minimum bar even under the quorum model. It prevents Byzantine-destination attacks where a malicious destination adapter could fake mint confirmations.
+
+### Observability
+
+The observability stack tracks RPC trust metrics:
+
+- **RPC quorum disagreements**: Count of cases where providers returned divergent evidence
+- **Provider health**: Per-provider success rates, latency, and failure patterns
+- **Finality verification**: Whether finality evidence was accepted or rejected
+
+These metrics enable operators to detect when the quorum model is being abused and switch to fallback providers or light clients.
+
+---
+
 ## Audit Checklist for Code Reviews
 
 When reviewing code changes, verify:

@@ -84,11 +84,28 @@ fn read_move_bytecode(contracts_dir: &Path) -> String {
         return bytes_to_array_literal(&bytes);
     }
 
-    println!(
-        "cargo:warning=Sui Move bytecode not found under {:?}. Build contracts manually with `sui move build`.",
-        build_dir
-    );
-    String::new()
+    // FAIL LOUDLY: Empty bytecode would cause silent deployment failures.
+    // This panic will fail at compile time with a clear message, preventing
+    // the production build from proceeding with missing bytecode.
+    //
+    // To fix this error:
+    //   1. Run `sui move build` in contracts/ to compile the Move package
+    //   2. Verify the compiled .mv file appears in build/
+    //   3. Re-run the build
+    //
+    // If compiling Move packages is not needed for the current build profile,
+    // run with: SKIP_SUI_BYTECODE=1 cargo build
+    if std::env::var("SKIP_SUI_BYTECODE").is_ok() {
+        println!("cargo:warning=SKIP_SUI_BYTECODE set - using empty placeholder bytecode");
+        String::new()
+    } else {
+        panic!(
+            "Sui Move bytecode not found under {:?}.\n\
+             Run `sui move build` in contracts/ to compile packages first.\n\
+             Alternatively, set SKIP_SUI_BYTECODE=1 to skip this check.",
+            build_dir
+        );
+    }
 }
 
 fn find_first_file_with_extension(dir: &Path, extension: &str) -> Option<PathBuf> {

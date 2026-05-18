@@ -17,3 +17,4 @@ rocksdb = { version = "0.21", optional = true }
 [features]
 default = ["persistent"]
 persistent = ["dep:rocksdb"]
+serde = []
