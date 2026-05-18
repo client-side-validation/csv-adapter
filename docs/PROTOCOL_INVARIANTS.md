@@ -315,8 +315,7 @@ When reviewing code changes, verify:
 
 If you're unsure whether your change violates an invariant:
 
-1. Read the relevant section of `docs/ARCHITECTURE.md`
-2. Check `docs/BLUEPRINT.md` for detailed protocols
-3. Ask in #protocol-security channel before merging
+1. Read the relevant section of `docs/PLAN.md`
+2. Ask in #protocol-security channel before merging
 
 **When in doubt, ask. Security is everyone's responsibility.**

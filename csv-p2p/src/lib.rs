@@ -16,6 +16,7 @@ pub mod proof_delivery;
 
 #[cfg(feature = "ipfs")]
 pub use ipfs::IpfsTransport;
+#[cfg(feature = "nostr")]
 pub use nostr::NostrTransport;
 pub use proof_delivery::{ProofFilter, ProofRouter};
 
@@ -104,6 +105,7 @@ pub trait ProofTransport: Send + Sync {
     /// Returns a stream of `DeliveredProof` objects. The caller is responsible
     /// for consuming the stream; the transport will continue delivering proofs
     /// until the stream is dropped or the transport is stopped.
+    #[cfg(feature = "nostr")]
     async fn subscribe_proofs(
         &self,
         filter: ProofFilter,

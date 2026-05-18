@@ -103,6 +103,12 @@ pub trait ChainAdapter: Send + Sync {
         &self,
         seal_id: &[u8],
     ) -> Result<SealRegistryStatus, AdapterError>;
+
+    /// Get the balance for an address on this chain
+    async fn get_balance(
+        &self,
+        address: &str,
+    ) -> Result<String, AdapterError>;
 }
 
 /// Error type for adapter operations
@@ -208,6 +214,13 @@ pub trait AdapterRegistry: Send + Sync {
         chain_id: &str,
         block_height: u64,
     ) -> Result<FinalityVerifierProof, AdapterError>;
+
+    /// Get balance for an address on a chain
+    async fn get_balance(
+        &self,
+        chain_id: &str,
+        address: &str,
+    ) -> Result<String, AdapterError>;
 }
 
 #[async_trait::async_trait]
@@ -294,6 +307,21 @@ impl AdapterRegistry for AdapterRegistryImpl {
                 chain_id
             )))?;
         adapter.verify_finality(block_height).await
+    }
+
+    async fn get_balance(
+        &self,
+        chain_id: &str,
+        address: &str,
+    ) -> Result<String, AdapterError> {
+        let adapter = self
+            .adapters
+            .get(chain_id)
+            .ok_or(AdapterError::Generic(format!(
+                "Adapter not found for chain: {}",
+                chain_id
+            )))?;
+        adapter.get_balance(address).await
     }
 }
 

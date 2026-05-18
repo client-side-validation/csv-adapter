@@ -16,14 +16,15 @@ path = "src/main.rs"
 
 [dependencies]
 # Core CSV Protocol types
-csv-sdk = { path = "../csv-sdk", default-features = false, features = ["in-memory", "wallet", "tokio"] }
-csv-bitcoin = { path = "../csv-bitcoin", optional = true, default-features = false }
+csv-runtime = { path = "../csv-runtime" }
 csv-core = { path = "../csv-core", default-features = false, features = ["std"] }
 csv-store = { path = "../csv-store", default-features = false, features = ["browser-storage", "encrypted-storage"] }
 csv-keys = { path = "../csv-keys", features = ["wasm", "production"] }
-csv-solana = { path = "../csv-solana", optional = true }
+csv-sdk = { path = "../csv-sdk", features = ["bitcoin", "tokio", "wallet"] }
+
+# Chain adapters (accessed through csv-sdk::csv_bitcoin per Engineering Plan)
+csv-bitcoin = { path = "../csv-bitcoin", optional = true }
 csv-ethereum = { path = "../csv-ethereum", optional = true }
-sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio"], optional = true }
 
 # Dioxus 0.7
 dioxus = { version = "0.7", features = ["web", "router"] }
@@ -93,9 +94,7 @@ wasm-bindgen-test = "0.3"
 serial_test = "3.0"
 
 [features]
-default = ["csv-bitcoin", "native"]
-solana = ["dep:csv-solana"]
-csv-bitcoin = ["dep:csv-bitcoin", "csv-sdk/bitcoin"]
-csv-ethereum = ["dep:csv-ethereum", "csv-sdk/ethereum"]
-cross-chain-persist = ["csv-sdk/cross-chain-persist", "dep:sqlx"]
+default = ["native"]
 native = ["dep:reqwest"]
+csv-bitcoin = ["dep:csv-bitcoin"]
+csv-ethereum = ["dep:csv-ethereum"]

@@ -42,7 +42,7 @@ pub struct WalletContext {
     /// Adaptive poller for fallback HTTP polling
     adaptive_poller: Arc<AdaptivePoller>,
     /// Optional MPC batcher for Bitcoin commitment aggregation (90% fee savings)
-    bitcoin_batcher: Arc<std::sync::Mutex<Option<csv_bitcoin::mpc_batch::MpcBatcher>>>,
+    bitcoin_batcher: Arc<std::sync::Mutex<Option<csv_sdk::csv_bitcoin::mpc_batch::MpcBatcher>>>,
     #[cfg(target_arch = "wasm32")]
     encrypted_seal_store: std::sync::Arc<std::sync::Mutex<Option<EncryptedStorageManager>>>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -945,7 +945,7 @@ impl WalletContext {
     ///
     /// # Example
     /// ```rust,ignore
-    /// use csv_bitcoin::mpc_batch::MpcBatcher;
+    /// use csv_sdk::csv_bitcoin::mpc_batch::MpcBatcher;
     ///
     /// // Standard batcher: up to 10 seals, min 2, 5 min timeout
     /// wallet_ctx.enable_bitcoin_batcher(MpcBatcher::default());
@@ -953,7 +953,7 @@ impl WalletContext {
     /// // High-volume batcher: up to 50 seals, min 5, 10 min timeout
     /// wallet_ctx.enable_bitcoin_batcher(MpcBatcher::high_volume());
     /// ```
-    pub fn enable_bitcoin_batcher(&self, batcher: csv_bitcoin::mpc_batch::MpcBatcher) {
+    pub fn enable_bitcoin_batcher(&self, batcher: csv_sdk::csv_bitcoin::mpc_batch::MpcBatcher) {
         let mut guard = self.bitcoin_batcher.lock().unwrap();
         *guard = Some(batcher);
     }
@@ -987,7 +987,7 @@ impl WalletContext {
     pub fn queue_bitcoin_seal(
         &self,
         commitment: csv_core::hash::Hash,
-        seal: csv_bitcoin::types::BitcoinSealPoint,
+        seal: csv_sdk::csv_bitcoin::types::BitcoinSealPoint,
         request_id: String,
     ) -> Result<bool, String> {
         let guard = self.bitcoin_batcher.lock().unwrap();
@@ -1025,7 +1025,7 @@ impl WalletContext {
     ) -> Result<
         (
             csv_core::commit_mux::CommitMux,
-            Vec<csv_bitcoin::mpc_batch::PendingCommitment>,
+            Vec<csv_sdk::csv_bitcoin::mpc_batch::PendingCommitment>,
         ),
         String,
     > {
@@ -1043,7 +1043,7 @@ impl WalletContext {
     pub fn generate_bitcoin_batch_proofs(
         &self,
         tree: &csv_core::commit_mux::CommitMux,
-        commitments: &[csv_bitcoin::mpc_batch::PendingCommitment],
+        commitments: &[csv_sdk::csv_bitcoin::mpc_batch::PendingCommitment],
     ) -> Result<Vec<(String, csv_core::commit_mux::MuxProof)>, String> {
         let guard = self.bitcoin_batcher.lock().unwrap();
         let batcher = guard.as_ref().ok_or("Bitcoin MPC batcher not enabled.")?;
@@ -1054,7 +1054,7 @@ impl WalletContext {
     }
 
     /// Peek at pending Bitcoin seals without consuming them.
-    pub fn peek_pending_bitcoin_seals(&self) -> Vec<csv_bitcoin::mpc_batch::PendingCommitment> {
+    pub fn peek_pending_bitcoin_seals(&self) -> Vec<csv_sdk::csv_bitcoin::mpc_batch::PendingCommitment> {
         let guard = self.bitcoin_batcher.lock().unwrap();
         guard.as_ref().map(|b| b.peek_pending()).unwrap_or_default()
     }

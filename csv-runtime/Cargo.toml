@@ -7,13 +7,20 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 csv-core = { path = "../csv-core" }
-tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 thiserror = "1"
 tracing = "0.1"
 async-trait = "0.1"
 rocksdb = { version = "0.21", optional = true }
 hakari = { version = "0.1", path = "../hakari" }
+
+# Native: full tokio (net, fs, io-util, etc.)
+# WASM: rt + macros + sync + time only (no net — mio is unsupported on wasm32)
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1", features = ["full"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+tokio = { version = "1", features = ["rt", "macros", "sync", "time"] }
 
 [features]
 default = ["persistent"]

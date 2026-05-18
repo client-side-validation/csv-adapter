@@ -138,7 +138,6 @@ Currently only step 1 (lock_sanad) is implemented.
 
 **3. TypeScript SDK npm publish**  
 Package: `@csv-protocol/sdk`  
-Fix WASM chain_id bug first (SV-04, already in progress). Publish to npm with readme and code examples.
 
 **4. 3 agent examples**  
 GitHub repo: `csv-protocol/agent-examples`  
@@ -147,8 +146,6 @@ LangChain, Claude tool-use, Python REST. Each must run with `npm install && node
 **5. Explorer live at public URL**  
 Deploy to testnet. Wire WebSocket transfer status notifications.  
 Link from wallet on every transfer status update.
-
-*Note: The following items have been completed: SV-01b fix, P2P proof delivery (Nostr), offline verification UX, desktop filesystem keystore, MCP server with 7 tools and input validation.*
 
 ---
 
@@ -234,7 +231,6 @@ Link from wallet on every transfer status update.
 - Ethereum deployment works on Sepolia
 - P2P proof delivery (Nostr) completes a real cross-chain transfer
 - Offline verification UX is wired end-to-end
-- SV-01b is fixed
 
 ---
 

@@ -249,7 +249,7 @@ struct ZkResult {
 /// Generate a Bitcoin SPV ZK proof using SP1
 #[cfg(feature = "csv-bitcoin")]
 fn generate_bitcoin_zk_proof(seal_ref: &str, sanad_id: &str) -> Result<ZkSealProof, String> {
-    use csv_bitcoin::zk_prover::BitcoinSpvProver;
+    use csv_sdk::csv_bitcoin::zk_prover::BitcoinSpvProver;
     use csv_core::hash::Hash;
     use csv_core::seal::SealPoint;
     use csv_core::zk_proof::{ChainWitness, ZkProver};

@@ -289,7 +289,7 @@ fn verify_zk_proof(input: &str) -> Result<(ZkSealProof, bool), String> {
             // Bitcoin SPV proofs
             #[cfg(feature = "csv-bitcoin")]
             {
-                use csv_bitcoin::zk_prover::BitcoinSpvProver;
+                use csv_sdk::csv_bitcoin::zk_prover::BitcoinSpvProver;
                 use csv_core::zk_proof::ZkProver;
                 // BitcoinSpvProver is for proof generation, not verification
                 // Verification requires a separate verifier implementation
@@ -310,7 +310,7 @@ fn verify_zk_proof(input: &str) -> Result<(ZkSealProof, bool), String> {
             #[cfg(feature = "csv-ethereum")]
             {
                 use csv_core::zk_proof::ZkVerifier;
-                use csv_ethereum::zk_verifier::EthereumGroth16Verifier;
+                use csv_sdk::csv_ethereum::zk_verifier::EthereumGroth16Verifier;
                 // Use Ethereum Groth16 verifier
                 let verifier = EthereumGroth16Verifier::new();
                 let _public_inputs = verifier.verify(&proof)

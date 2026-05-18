@@ -105,7 +105,7 @@ jobs:
       - name: Check CLI for direct adapter imports
         run: |
           # Check if CLI imports chain adapters directly (should only use csv-adapter runtime)
-          DIRECT_IMPORTS=$(rg "csv_adapter_(bitcoin|ethereum|sui|aptos|solana)" csv-cli/src --glob '*.rs' || true)
+          DIRECT_IMPORTS=$(rg "csv_(bitcoin|ethereum|sui|aptos|solana)" csv-cli/src --glob '*.rs' || true)
           if [ -n "$DIRECT_IMPORTS" ]; then
             echo "ERROR: csv-cli contains direct adapter imports:"
             echo "$DIRECT_IMPORTS"
@@ -116,7 +116,7 @@ jobs:
       - name: Check Wallet for direct adapter imports
         run: |
           # Check if wallet imports chain adapters directly
-          DIRECT_IMPORTS=$(rg "csv_adapter_(bitcoin|ethereum|sui|aptos|solana)" csv-wallet/src --glob '*.rs' || true)
+          DIRECT_IMPORTS=$(rg "csv_(bitcoin|ethereum|sui|aptos|solana)" csv-wallet/src --glob '*.rs' || true)
           if [ -n "$DIRECT_IMPORTS" ]; then
             echo "ERROR: csv-wallet contains direct adapter imports:"
             echo "$DIRECT_IMPORTS"

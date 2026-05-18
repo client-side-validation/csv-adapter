@@ -15,13 +15,13 @@ use csv_core::dag::DAGSegment;
 use csv_core::error::ProtocolError;
 use csv_core::error::Result as CoreResult;
 use csv_core::proof::{FinalityProof, ProofBundle};
+use csv_core::proof_pipeline::ChainVerifier;
 use csv_core::seal::CommitAnchor as CoreCommitAnchor;
 use csv_core::seal::SealPoint as CoreSealPoint;
-// use csv_core::proof_pipeline::ChainVerifier;
 
 use crate::config::EthereumConfig;
 use crate::error::{EthereumError, EthereumResult};
-use crate::finality::FinalityChecker;
+use crate::finality::{FinalityChecker, FinalityCheckerTrait};
 use crate::rpc::EthereumRpc;
 use crate::seal::SealRegistry;
 use crate::types::{
@@ -420,7 +420,7 @@ impl SealProtocol for EthereumSealProtocol {
                         ))
                     })?;
 
-                if is_used_on_chain {
+                if !is_used_on_chain.valid {
                     return Err(ProtocolError::SealReplay(format!(
                         "Seal {:?} already used in CSVLock contract on-chain",
                         seal
