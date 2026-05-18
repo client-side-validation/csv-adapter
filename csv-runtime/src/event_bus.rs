@@ -1,12 +1,13 @@
-//! Event bus for structured transfer lifecycle events
+//! Event bus for structured transfer lifecycle events.
 
 #![allow(missing_docs)]
 
 use csv_core::verified::VerificationAssurance;
 use std::string::String;
 use std::sync::Arc;
+use std::time::SystemTime;
 
-use crate::event_envelope::RuntimeEventEnvelope;
+use crate::event_envelope::{EventType, RuntimeEventEnvelope};
 use crate::event_store::EventStore;
 
 /// Structured events emitted during transfer execution
@@ -73,22 +74,50 @@ impl EventBus {
         self.subscribers.push(subscriber);
     }
 
-    /// Emit an event to all subscribers
+    /// Emit an event to all subscribers.
     pub fn emit(&self, event: TransferEvent) {
         // Persist before publish when store is configured
         if let Some(store) = &self.store {
             // Create a simple envelope; correlation/causation left empty for now
-            let envelope = RuntimeEventEnvelope {
-                event_id: uuid::Uuid::new_v4(),
-                transfer_id: csv_core::SanadId::new([0u8; 32]),
-                causation_id: None,
-                correlation_id: uuid::Uuid::new_v4(),
-                event: format!("{:?}", event),
-                timestamp: std::time::SystemTime::now(),
-                runtime_id: uuid::Uuid::new_v4(),
+            let transfer_id = csv_core::SanadId::new([0u8; 32]);
+            let event_type = match &event {
+                TransferEvent::Locking { .. } => EventType::from_static(EventType::TRANSFER_LOCKED),
+                TransferEvent::AwaitingFinality { .. } => {
+                    EventType::from_static(EventType::TRANSFER_FINALITY_AWAITED)
+                }
+                TransferEvent::BuildingProof { .. } => {
+                    EventType::from_static(EventType::TRANSFER_PROOF_BUILT)
+                }
+                TransferEvent::ProofReady { .. } => {
+                    EventType::from_static(EventType::TRANSFER_PROOF_VERIFIED)
+                }
+                TransferEvent::Minting { .. } => EventType::from_static(EventType::TRANSFER_MINTED),
+                TransferEvent::Complete { .. } => {
+                    EventType::from_static(EventType::TRANSFER_COMPLETE)
+                }
+                TransferEvent::RollbackTriggered { .. } => {
+                    EventType::from_static(EventType::TRANSFER_ROLLBACK_TRIGGERED)
+                }
+                TransferEvent::ReplayDetected { .. } => {
+                    EventType::from_static(EventType::TRANSFER_REPLAY_DETECTED)
+                }
+                TransferEvent::VerificationDowngraded { .. } => {
+                    EventType::from_static(EventType::TRANSFER_VERIFICATION_DOWNGRADED)
+                }
             };
 
-            let _ = store.persist(&envelope);
+            let envelope = RuntimeEventEnvelope::new(
+                transfer_id,
+                event_type,
+                0,
+                format!("{:?}", event),
+                None,
+                uuid::Uuid::new_v4(),
+                uuid::Uuid::new_v4(),
+                SystemTime::now(),
+            );
+
+            let _ = store.append(&envelope);
         }
 
         for subscriber in &self.subscribers {

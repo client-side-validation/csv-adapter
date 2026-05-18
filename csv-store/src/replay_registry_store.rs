@@ -48,47 +48,46 @@ impl ReplayRegistryStore {
         Ok(Self { db })
     }
 
-    /// Record a proof in the persistent replay registry
+    /// Record a proof in the persistent replay registry using atomic consume-if-unconsumed semantics.
     ///
-    /// Returns true if this is the first time seeing this proof,
-    /// false if it's a replay attempt.
+    /// This is an atomic operation that prevents race conditions. It uses INSERT OR IGNORE
+    /// to ensure that concurrent attempts to insert the same key cannot succeed.
+    ///
+    /// Returns true if this is the first time seeing this proof (insert succeeded).
+    /// Returns false if it's a replay attempt (key already exists).
     pub fn record_proof(&self, key: ReplayKey, timestamp: u64) -> RusqliteResult<bool> {
         let key_hash = key.hash();
 
-        // Check if already exists
-        let count: i64 = self.db.query_row(
-            "SELECT COUNT(*) FROM replay_registry WHERE key_hash = ?",
-            [key_hash.as_bytes()],
-            |row| row.get(0),
+        // Atomic insert-or-ignore: if key exists, this does nothing
+        let rows_affected = self.db.execute(
+            r#"
+            INSERT OR IGNORE INTO replay_registry (
+                key_hash, proof_hash, seal_id, commitment_hash,
+                source_chain, destination_chain, first_seen_at, replay_attempts, accepted
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 0)
+            "#,
+            params![
+                key_hash.as_bytes(),
+                key.proof_hash.as_bytes(),
+                key.seal_id.as_bytes(),
+                key.commitment_hash.as_bytes(),
+                key.source_chain.as_str(),
+                key.destination_chain.as_str(),
+                timestamp as i64,
+            ],
         )?;
 
-        if count > 0 {
-            // Replay attempt - increment counter
+        // If rows_affected > 0, the insert succeeded (first time)
+        // If rows_affected == 0, the key already existed (replay attempt)
+        if rows_affected > 0 {
+            Ok(true)
+        } else {
+            // Replay attempt - increment counter atomically
             self.db.execute(
                 "UPDATE replay_registry SET replay_attempts = replay_attempts + 1 WHERE key_hash = ?",
                 [key_hash.as_bytes()],
             )?;
             Ok(false)
-        } else {
-            // First time - insert new entry
-            self.db.execute(
-                r#"
-                INSERT INTO replay_registry (
-                    key_hash, proof_hash, seal_id, commitment_hash,
-                    source_chain, destination_chain, first_seen_at, replay_attempts, accepted
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 0)
-                "#,
-                params![
-                    key_hash.as_bytes(),
-                    key.proof_hash.as_bytes(),
-                    key.seal_id.as_bytes(),
-                    key.commitment_hash.as_bytes(),
-                    key.source_chain.as_str(),
-                    key.destination_chain.as_str(),
-                    timestamp as i64,
-                ],
-            )?;
-            Ok(true)
         }
     }
 
@@ -169,5 +168,56 @@ impl ReplayRegistryStore {
             |row| row.get(0),
         )?;
         Ok(total.unwrap_or(0) as u64)
+    }
+
+    /// Idempotent consume-if-unconsumed operation using atomic SQL.
+    ///
+    /// This uses INSERT OR IGNORE to ensure atomic semantics, preventing
+    /// race conditions between concurrent consumers.
+    ///
+    /// Returns Ok(true) if the seal was successfully consumed.
+    /// Returns Ok(false) if the seal was already consumed (idempotent).
+    /// Returns Err if the operation failed due to a database error.
+    pub fn consume_if_unconsumed(&self, key: ReplayKey, timestamp: u64) -> RusqliteResult<bool> {
+        let key_hash = key.hash();
+
+        // Atomic insert-or-ignore with accepted = 1
+        let rows_affected = self.db.execute(
+            r#"
+            INSERT OR IGNORE INTO replay_registry (
+                key_hash, proof_hash, seal_id, commitment_hash,
+                source_chain, destination_chain, first_seen_at, replay_attempts, accepted
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 1)
+            "#,
+            params![
+                key_hash.as_bytes(),
+                key.proof_hash.as_bytes(),
+                key.seal_id.as_bytes(),
+                key.commitment_hash.as_bytes(),
+                key.source_chain.as_str(),
+                key.destination_chain.as_str(),
+                timestamp as i64,
+            ],
+        )?;
+
+        // If rows_affected > 0, the insert succeeded (first time)
+        // If rows_affected == 0, the key already existed
+        if rows_affected > 0 {
+            Ok(true)
+        } else {
+            // Check if already accepted (idempotent) or replay attack
+            let accepted: i64 = self.db.query_row(
+                "SELECT accepted FROM replay_registry WHERE key_hash = ?",
+                [key_hash.as_bytes()],
+                |row| row.get(0),
+            )?;
+
+            if accepted == 1 {
+                Ok(false) // Already consumed - idempotent
+            } else {
+                // Entry exists but not accepted - replay attack
+                Err(rusqlite::Error::QueryReturnedNoRows)
+            }
+        }
     }
 }

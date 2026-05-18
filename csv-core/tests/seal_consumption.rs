@@ -14,11 +14,11 @@ mod tests {
     #[test]
     fn test_seal_consumption_idempotency() {
         let mut registry = ReplayRegistry::new();
-        
+
         // Create a seal point
-        let seal_point = SealPoint::new(vec![1u8; 16], Some(1)).unwrap();
+        let _seal_point = SealPoint::new(vec![1u8; 16], Some(1)).unwrap();
         let seal_id = Hash::new([1u8; 32]);
-        
+
         // Create a replay key for this seal
         let replay_key = ReplayKey::new(
             seal_id,
@@ -27,23 +27,20 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
+
         // First consumption should succeed (seal not yet consumed)
-        let is_consumed = registry.is_replay(&replay_key).unwrap();
+        let is_consumed = registry.has_been_seen(&replay_key);
         assert!(!is_consumed, "Seal should not be consumed initially");
-        
-        // Record the consumption
-        registry.record_proof(
-            seal_id,
-            seal_id, // seal_id
-            seal_id, // commitment_hash
-            ChainId::new("bitcoin"),
-            ChainId::new("ethereum"),
-        ).unwrap();
-        
-        // Second consumption attempt should fail (seal already consumed)
-        let is_consumed_after = registry.is_replay(&replay_key).unwrap();
-        assert!(is_consumed_after, "Seal should be consumed after recording");
+
+        // Consume the seal using atomic consume_if_unconsumed
+        let result = registry.consume_if_unconsumed(replay_key.clone(), 1000);
+        assert!(result.is_ok(), "First consumption should succeed");
+        assert!(result.unwrap(), "First consumption should return true");
+
+        // Second consumption attempt should be idempotent (return false, not error)
+        let result_2 = registry.consume_if_unconsumed(replay_key.clone(), 2000);
+        assert!(result_2.is_ok(), "Second consumption should not error");
+        assert!(!result_2.unwrap(), "Second consumption should return false (idempotent)");
     }
 
     /// Property: Each seal has a unique identifier
@@ -59,10 +56,10 @@ mod tests {
     #[test]
     fn test_seal_consumption_tracking() {
         let mut registry = ReplayRegistry::new();
-        
+
         let seal_id = Hash::new([1u8; 32]);
         let commitment_hash = Hash::new([2u8; 32]);
-        
+
         // Create replay key
         let replay_key = ReplayKey::new(
             seal_id,
@@ -71,24 +68,18 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
+
         // Initially, no replay detected
-        assert!(!registry.is_replay(&replay_key).unwrap());
-        
-        // Record the proof (consumes the seal)
-        registry.record_proof(
-            seal_id,
-            seal_id, // seal_id
-            commitment_hash,
-            ChainId::new("bitcoin"),
-            ChainId::new("ethereum"),
-        ).unwrap();
-        
+        assert!(!registry.has_been_seen(&replay_key));
+
+        // Consume the seal using atomic consume_if_unconsumed
+        registry.consume_if_unconsumed(replay_key.clone(), 1000).unwrap();
+
         // Now replay should be detected
-        assert!(registry.is_replay(&replay_key).unwrap());
-        
+        assert!(registry.has_been_seen(&replay_key));
+
         // Verify the nullifier is registered
-        let entries = registry.list_entries().unwrap();
+        let entries = registry.entries();
         assert!(!entries.is_empty(), "Replay registry should have entries after consumption");
     }
 
@@ -96,10 +87,10 @@ mod tests {
     #[test]
     fn test_cross_chain_seal_independence() {
         let mut registry = ReplayRegistry::new();
-        
+
         let seal_id = Hash::new([1u8; 32]);
         let commitment_hash = Hash::new([2u8; 32]);
-        
+
         // Consume seal on Bitcoin -> Ethereum
         let replay_key_1 = ReplayKey::new(
             seal_id,
@@ -108,15 +99,9 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
-        registry.record_proof(
-            seal_id,
-            seal_id,
-            commitment_hash,
-            ChainId::new("bitcoin"),
-            ChainId::new("ethereum"),
-        ).unwrap();
-        
+
+        registry.consume_if_unconsumed(replay_key_1, 1000).unwrap();
+
         // Same seal on different destination chain should be considered different
         let replay_key_2 = ReplayKey::new(
             seal_id,
@@ -125,9 +110,9 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("solana"), // Different destination
         );
-        
+
         // Should not be a replay since destination chain is different
-        assert!(!registry.is_replay(&replay_key_2).unwrap());
+        assert!(!registry.has_been_seen(&replay_key_2));
     }
 
     /// Property: Different commitment hashes create different replay keys
@@ -161,10 +146,10 @@ mod tests {
     #[test]
     fn test_double_spend_prevention() {
         let mut registry = ReplayRegistry::new();
-        
+
         let seal_id = Hash::new([1u8; 32]);
         let commitment_hash = Hash::new([2u8; 32]);
-        
+
         let replay_key = ReplayKey::new(
             seal_id,
             seal_id,
@@ -172,23 +157,20 @@ mod tests {
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
         );
-        
+
         // First attempt - should succeed
-        let result_1 = registry.record_proof(
-            seal_id,
-            seal_id,
-            commitment_hash,
-            ChainId::new("bitcoin"),
-            ChainId::new("ethereum"),
-        );
+        let result_1 = registry.consume_if_unconsumed(replay_key.clone(), 1000);
         assert!(result_1.is_ok(), "First consumption should succeed");
-        
-        // Second attempt - should detect replay
-        let is_replay = registry.is_replay(&replay_key).unwrap();
-        assert!(is_replay, "Second consumption should be detected as replay");
-        
-        // Third attempt - should also detect replay
-        let is_replay_2 = registry.is_replay(&replay_key).unwrap();
-        assert!(is_replay_2, "Third consumption should also be detected as replay");
+        assert!(result_1.unwrap(), "First consumption should return true");
+
+        // Second attempt - should be idempotent (return false, not error)
+        let result_2 = registry.consume_if_unconsumed(replay_key.clone(), 2000);
+        assert!(result_2.is_ok(), "Second consumption should not error");
+        assert!(!result_2.unwrap(), "Second consumption should return false (idempotent)");
+
+        // Third attempt - should also be idempotent
+        let result_3 = registry.consume_if_unconsumed(replay_key.clone(), 3000);
+        assert!(result_3.is_ok(), "Third consumption should not error");
+        assert!(!result_3.unwrap(), "Third consumption should return false (idempotent)");
     }
 }

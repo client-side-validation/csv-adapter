@@ -113,6 +113,11 @@ pub mod verifier;
 /// Trust package primitives for offline verification bootstrapping.
 pub mod trust_package;
 
+// Trust package re-exports
+pub use trust_package::{
+    OfflineVerificationContext, TrustPackage, TrustPackageError,
+};
+
 /// Proof provenance metadata for forensic and deterministic verification.
 pub mod proof_provenance;
 

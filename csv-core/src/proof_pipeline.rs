@@ -201,7 +201,9 @@ fn merge_verification_results(results: &[VerificationResult]) -> VerificationRes
     let has_failure = results.iter().any(|r| !r.valid);
     if has_failure {
         // Return the first invalid result
-        return results.iter().find(|r| !r.valid).cloned().unwrap();
+        if let Some(first_invalid) = results.iter().find(|r| !r.valid).cloned() {
+            return first_invalid;
+        }
     }
 
     // Merge components: take the strongest non-default value for each field
@@ -444,7 +446,9 @@ pub async fn validate_proof_bundle(
                 timestamp - 3600, // Original timestamp (1 hour ago for example)
                 timestamp,
             );
-            let _ = registry.lock().unwrap().emit(event);
+            if let Ok(guard) = registry.lock() {
+                let _ = guard.emit(event);
+            }
         }
 
         return ValidationResult {
@@ -587,7 +591,9 @@ pub async fn validate_proof_bundle(
             proof_hash,
             "proof_pipeline",
         );
-        let _ = registry.lock().unwrap().emit(event);
+        if let Ok(guard) = registry.lock() {
+            let _ = guard.emit(event);
+        }
     }
 
     ValidationResult {
@@ -619,7 +625,9 @@ async fn emit_proof_rejected_event(
             proof_hash,
             error.unwrap_or("validation failed"),
         );
-        let _ = registry.lock().unwrap().emit(event).await;
+        if let Ok(guard) = registry.lock() {
+            let _ = guard.emit(event).await;
+        }
     }
 }
 
@@ -853,31 +861,23 @@ async fn validate_replay(
         ChainId::new("destination"),       // Would be actual destination chain from bundle
     );
 
-    // Check persistent replay registry first if available
+    // Use atomic consume-if-unconsumed pattern for replay protection
     if let Some(registry) = replay_registry {
-        match registry.has_been_seen(&replay_key).await {
-            Ok(true) => {
-                // This proof has been seen before - replay attempt
-                return ValidationStep {
-                    name: "replay_validation",
-                    passed: false,
-                    error: Some("Replay attack detected: proof has been seen before".to_string()),
-                };
-            }
-            Ok(false) => {
-                // First time seeing this proof - record it
-                let timestamp = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs();
-                let _ = registry.record_proof(replay_key, timestamp).await;
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        match registry.consume_if_unconsumed(replay_key, timestamp).await {
+            Ok(_) => {
+                // Successfully consumed (or already consumed - idempotent)
+                // Continue with validation
             }
             Err(e) => {
-                // Registry error - fail closed (reject the proof)
+                // Replay attack or registry error - fail closed
                 return ValidationStep {
                     name: "replay_validation",
                     passed: false,
-                    error: Some(format!("Replay registry error: {}", e)),
+                    error: Some(format!("Replay protection failed: {}", e)),
                 };
             }
         }

@@ -87,7 +87,9 @@ impl ReorgDetector {
                             height,
                             depth,
                         );
-                        let _ = registry.lock().unwrap().emit(csv_event);
+                        if let Ok(guard) = registry.lock() {
+                            let _ = guard.emit(csv_event);
+                        }
                     }
 
                     Some(event)
@@ -117,7 +119,9 @@ impl ReorgDetector {
                             height,
                             0,
                         );
-                        let _ = registry.lock().unwrap().emit(csv_event);
+                        if let Ok(guard) = registry.lock() {
+                            let _ = guard.emit(csv_event);
+                        }
                     }
 
                     Some(event)

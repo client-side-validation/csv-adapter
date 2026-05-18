@@ -11,6 +11,9 @@ fn smoke_types_exist() {
         generated_at: Utc::now(),
         expires_at: Utc::now(),
         package_signature: vec![],
+        signature_scheme: csv_core::SignatureScheme::default(),
+        generation_epoch: 0,
+        revoked: false,
     };
 
     let _ = ProofProvenance {

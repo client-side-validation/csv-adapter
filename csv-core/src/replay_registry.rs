@@ -177,6 +177,43 @@ impl ReplayRegistry {
     pub fn total_replay_attempts(&self) -> u64 {
         self.entries.values().map(|e| e.replay_attempts).sum()
     }
+
+    /// Idempotent consume-if-unconsumed operation.
+    ///
+    /// This is the ONLY safe way to consume a seal. It uses atomic
+    /// compare-and-swap semantics to prevent double-consume races.
+    ///
+    /// Returns Ok(true) if the seal was successfully consumed.
+    /// Returns Ok(false) if the seal was already consumed (idempotent).
+    /// Returns Err if the operation failed due to a replay attack.
+    pub fn consume_if_unconsumed(&mut self, key: ReplayKey, timestamp: u64) -> Result<bool, String> {
+        let key_hash = key.hash();
+
+        match self.entries.get(&key_hash) {
+            Some(entry) => {
+                if entry.accepted {
+                    // Seal already consumed - idempotent success
+                    Ok(false)
+                } else {
+                    // Entry exists but not yet accepted - replay attempt
+                    Err(format!(
+                        "Replay attack detected: proof key already exists but not accepted"
+                    ))
+                }
+            }
+            None => {
+                // First time seeing this proof - consume it
+                let entry = ReplayEntry {
+                    key,
+                    first_seen_at: timestamp,
+                    replay_attempts: 0,
+                    accepted: true,
+                };
+                self.entries.insert(key_hash, entry);
+                Ok(true)
+            }
+        }
+    }
 }
 
 /// Persistent replay registry backend trait
@@ -217,6 +254,20 @@ pub trait ReplayRegistryBackend: Send + Sync + 'static {
     async fn total_replay_attempts(
         &self,
     ) -> crate::error::Result<u64>;
+
+    /// Idempotent consume-if-unconsumed operation.
+    ///
+    /// This is the ONLY safe way to consume a seal. It uses atomic
+    /// compare-and-swap semantics to prevent double-consume races.
+    ///
+    /// Returns Ok(true) if the seal was successfully consumed.
+    /// Returns Ok(false) if the seal was already consumed (idempotent).
+    /// Returns Err if the operation failed due to a database error or replay attack.
+    async fn consume_if_unconsumed(
+        &self,
+        key: ReplayKey,
+        timestamp: u64,
+    ) -> crate::error::Result<bool>;
 }
 
 #[cfg(test)]
@@ -342,5 +393,63 @@ mod tests {
         registry.mark_accepted(&key);
 
         assert!(registry.entries()[0].accepted);
+    }
+
+    #[test]
+    fn test_consume_if_unconsumed_first_time() {
+        let mut registry = ReplayRegistry::new();
+        let key = ReplayKey::new(
+            Hash::new([1u8; 32]),
+            Hash::new([2u8; 32]),
+            Hash::new([3u8; 32]),
+            ChainId::new("bitcoin"),
+            ChainId::new("ethereum"),
+        );
+
+        let result = registry.consume_if_unconsumed(key.clone(), 1000);
+        assert!(result.is_ok());
+        assert!(result.unwrap(), "First consumption should succeed");
+        assert_eq!(registry.total_proofs(), 1);
+    }
+
+    #[test]
+    fn test_consume_if_unconsumed_idempotent() {
+        let mut registry = ReplayRegistry::new();
+        let key = ReplayKey::new(
+            Hash::new([1u8; 32]),
+            Hash::new([2u8; 32]),
+            Hash::new([3u8; 32]),
+            ChainId::new("bitcoin"),
+            ChainId::new("ethereum"),
+        );
+
+        // First consumption
+        let result1 = registry.consume_if_unconsumed(key.clone(), 1000);
+        assert!(result1.is_ok());
+        assert!(result1.unwrap(), "First consumption should succeed");
+
+        // Second consumption - should be idempotent
+        let result2 = registry.consume_if_unconsumed(key.clone(), 2000);
+        assert!(result2.is_ok());
+        assert!(!result2.unwrap(), "Second consumption should return false (idempotent)");
+    }
+
+    #[test]
+    fn test_consume_if_unconsumed_replay_attack() {
+        let mut registry = ReplayRegistry::new();
+        let key = ReplayKey::new(
+            Hash::new([1u8; 32]),
+            Hash::new([2u8; 32]),
+            Hash::new([3u8; 32]),
+            ChainId::new("bitcoin"),
+            ChainId::new("ethereum"),
+        );
+
+        // Record proof but don't mark as accepted
+        registry.record_proof(key.clone(), 1000);
+
+        // Attempt to consume - should detect replay attack
+        let result = registry.consume_if_unconsumed(key.clone(), 2000);
+        assert!(result.is_err(), "Should detect replay attack");
     }
 }

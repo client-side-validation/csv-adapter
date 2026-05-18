@@ -29,5 +29,9 @@ pub use adapter_registry::{AdapterRegistryImpl, ChainAdapter};
 pub use deployment_profile::DeploymentProfile;
 pub use error::{RuntimeError, TransferCoordinatorError};
 pub use event_bus::{EventBus, TransferEvent};
+pub use lease::{
+    DEFAULT_LEASE_DURATION_SECS, LeaseValidationError, RuntimeExecutionContext, RuntimeId,
+    TransferLease, MAX_LEASE_DURATION_SECS,
+};
 pub use replay_db::{ReplayDatabase, ReplayDbError, ReplayEntryState};
 pub use transfer_coordinator::TransferCoordinator;

@@ -300,8 +300,9 @@ impl QuorumClient {
                         if !status.is_success() {
                             #[cfg(feature = "observability")]
                             {
-                                let mut m = metrics.lock().unwrap();
-                                m.record_failure(&url);
+                                if let Ok(mut m) = metrics.lock() {
+                                    m.record_failure(&url);
+                                }
                             }
                             return RpcResponse {
                                 provider: url,
@@ -322,8 +323,9 @@ impl QuorumClient {
                             Err(e) => {
                                 #[cfg(feature = "observability")]
                                 {
-                                    let mut m = metrics.lock().unwrap();
-                                    m.record_failure(&url);
+                                    if let Ok(mut m) = metrics.lock() {
+                                        m.record_failure(&url);
+                                    }
                                 }
                                 return RpcResponse {
                                     provider: url.clone(),
@@ -349,8 +351,9 @@ impl QuorumClient {
                                 if let Some(ref err) = inner.error {
                                     #[cfg(feature = "observability")]
                                     {
-                                        let mut m = metrics.lock().unwrap();
-                                        m.record_failure(&url);
+                                        if let Ok(mut m) = metrics.lock() {
+                                            m.record_failure(&url);
+                                        }
                                     }
                                     RpcResponse {
                                         provider: url,
@@ -370,8 +373,9 @@ impl QuorumClient {
                                         Err(e) => {
                                             #[cfg(feature = "observability")]
                                             {
-                                                let mut m = metrics.lock().unwrap();
-                                                m.record_failure(&url);
+                                                if let Ok(mut m) = metrics.lock() {
+                                                    m.record_failure(&url);
+                                                }
                                             }
                                             return RpcResponse {
                                                 provider: url,
@@ -392,8 +396,9 @@ impl QuorumClient {
                                     };
                                     #[cfg(feature = "observability")]
                                     {
-                                        let mut m = metrics.lock().unwrap();
-                                        m.record_success(&url, latency_ms);
+                                        if let Ok(mut m) = metrics.lock() {
+                                            m.record_success(&url, latency_ms);
+                                        }
                                     }
                                     RpcResponse {
                                         provider: url,
@@ -410,8 +415,9 @@ impl QuorumClient {
                                 } else {
                                     #[cfg(feature = "observability")]
                                     {
-                                        let mut m = metrics.lock().unwrap();
-                                        m.record_failure(&url);
+                                        if let Ok(mut m) = metrics.lock() {
+                                            m.record_failure(&url);
+                                        }
                                     }
                                     RpcResponse {
                                         provider: url,
@@ -430,8 +436,9 @@ impl QuorumClient {
                             Err(e) => {
                                 #[cfg(feature = "observability")]
                                 {
-                                    let mut m = metrics.lock().unwrap();
-                                    m.record_failure(&url);
+                                    if let Ok(mut m) = metrics.lock() {
+                                        m.record_failure(&url);
+                                    }
                                 }
                                 RpcResponse {
                                     provider: url,
@@ -451,11 +458,12 @@ impl QuorumClient {
                     Err(e) => {
                         #[cfg(feature = "observability")]
                         {
-                            let mut m = metrics.lock().unwrap();
-                            if e.is_timeout() {
-                                m.record_timeout(&url);
-                            } else {
-                                m.record_failure(&url);
+                            if let Ok(mut m) = metrics.lock() {
+                                if e.is_timeout() {
+                                    m.record_timeout(&url);
+                                } else {
+                                    m.record_failure(&url);
+                                }
                             }
                         }
                         RpcResponse {
@@ -549,8 +557,9 @@ impl QuorumClient {
                 );
                 #[cfg(feature = "observability")]
                 {
-                    let mut m = self.metrics.lock().unwrap();
-                    m.record_disagreement();
+                    if let Ok(mut m) = self.metrics.lock() {
+                        m.record_disagreement();
+                    }
                 }
                 return None;
             }

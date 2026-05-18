@@ -229,12 +229,16 @@ fn verify_ed25519(signature: &[u8], public_key: &[u8], message: &[u8]) -> Result
     }
 
     // Parse public key
-    let verifying_key = VerifyingKey::from_bytes(public_key.try_into().unwrap()).map_err(|e| {
+    let verifying_key = VerifyingKey::from_bytes(public_key.try_into().map_err(|_| {
+        ProtocolError::SignatureVerificationFailed("Invalid Ed25519 public key length".to_string())
+    })?).map_err(|e| {
         ProtocolError::SignatureVerificationFailed(format!("Invalid Ed25519 public key: {}", e))
     })?;
 
     // Parse signature
-    let sig_bytes_arr: [u8; 64] = signature.try_into().unwrap();
+    let sig_bytes_arr: [u8; 64] = signature.try_into().map_err(|_| {
+        ProtocolError::SignatureVerificationFailed("Invalid Ed25519 signature length".to_string())
+    })?;
     let sig = Signature::from_bytes(&sig_bytes_arr);
 
     // Perform actual cryptographic verification

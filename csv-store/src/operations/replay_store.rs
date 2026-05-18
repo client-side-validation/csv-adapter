@@ -42,7 +42,13 @@ impl ReplayStore {
         Ok(Self { db })
     }
 
-    /// Record a proof in the replay registry
+    /// Record a proof in the replay registry using atomic consume-if-unconsumed semantics.
+    ///
+    /// This is an atomic operation that prevents race conditions. It uses INSERT OR IGNORE
+    /// to ensure that concurrent attempts to insert the same key cannot succeed.
+    ///
+    /// Returns true if this is the first time seeing this proof (insert succeeded).
+    /// Returns false if it's a replay attempt (key already exists).
     pub async fn record_proof(
         &self,
         key_hash: Hash,
@@ -53,16 +59,31 @@ impl ReplayStore {
         destination_chain: &str,
         timestamp: u64,
     ) -> Result<bool, sqlx::Error> {
-        // Check if already exists
-        let existing = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM replay_entries WHERE key_hash = ?"
+        // Atomic insert-or-ignore: if key exists, this does nothing
+        let result = sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO replay_entries (
+                key_hash, proof_hash, seal_id, commitment_hash,
+                source_chain, destination_chain, first_seen_at, replay_attempts, accepted
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, FALSE)
+            "#
         )
         .bind(key_hash.as_bytes())
-        .fetch_one(&self.db)
+        .bind(proof_hash.as_bytes())
+        .bind(seal_id.as_bytes())
+        .bind(commitment_hash.as_bytes())
+        .bind(source_chain)
+        .bind(destination_chain)
+        .bind(timestamp as i64)
+        .execute(&self.db)
         .await?;
-        
-        if existing > 0 {
-            // Replay attempt - increment counter
+
+        // If rows_affected > 0, the insert succeeded (first time)
+        // If rows_affected == 0, the key already existed (replay attempt)
+        if result.rows_affected() > 0 {
+            Ok(true)
+        } else {
+            // Replay attempt - increment counter atomically
             sqlx::query(
                 "UPDATE replay_entries SET replay_attempts = replay_attempts + 1 WHERE key_hash = ?"
             )
@@ -70,26 +91,6 @@ impl ReplayStore {
             .execute(&self.db)
             .await?;
             Ok(false)
-        } else {
-            // First time - insert new entry
-            sqlx::query(
-                r#"
-                INSERT INTO replay_entries (
-                    key_hash, proof_hash, seal_id, commitment_hash,
-                    source_chain, destination_chain, first_seen_at, replay_attempts, accepted
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, FALSE)
-                "#
-            )
-            .bind(key_hash.as_bytes())
-            .bind(proof_hash.as_bytes())
-            .bind(seal_id.as_bytes())
-            .bind(commitment_hash.as_bytes())
-            .bind(source_chain)
-            .bind(destination_chain)
-            .bind(timestamp as i64)
-            .execute(&self.db)
-            .await?;
-            Ok(true)
         }
     }
 
@@ -110,5 +111,64 @@ impl ReplayStore {
             .fetch_one(&self.db)
             .await?;
         Ok(total as u64)
+    }
+
+    /// Idempotent consume-if-unconsumed operation using atomic SQL.
+    ///
+    /// This uses INSERT OR IGNORE to ensure atomic semantics, preventing
+    /// race conditions between concurrent consumers.
+    ///
+    /// Returns Ok(true) if the seal was successfully consumed.
+    /// Returns Ok(false) if the seal was already consumed (idempotent).
+    /// Returns Err if the operation failed due to a database error.
+    pub async fn consume_if_unconsumed(
+        &self,
+        key_hash: Hash,
+        proof_hash: Hash,
+        seal_id: Hash,
+        commitment_hash: Hash,
+        source_chain: &str,
+        destination_chain: &str,
+        timestamp: u64,
+    ) -> Result<bool, sqlx::Error> {
+        // Atomic insert-or-ignore with accepted = TRUE
+        let result = sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO replay_entries (
+                key_hash, proof_hash, seal_id, commitment_hash,
+                source_chain, destination_chain, first_seen_at, replay_attempts, accepted
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, TRUE)
+            "#
+        )
+        .bind(key_hash.as_bytes())
+        .bind(proof_hash.as_bytes())
+        .bind(seal_id.as_bytes())
+        .bind(commitment_hash.as_bytes())
+        .bind(source_chain)
+        .bind(destination_chain)
+        .bind(timestamp as i64)
+        .execute(&self.db)
+        .await?;
+
+        // If rows_affected > 0, the insert succeeded (first time)
+        // If rows_affected == 0, the key already existed
+        if result.rows_affected() > 0 {
+            Ok(true)
+        } else {
+            // Check if already accepted (idempotent) or replay attack
+            let accepted: bool = sqlx::query_scalar::<_, bool>(
+                "SELECT accepted FROM replay_entries WHERE key_hash = ?"
+            )
+            .bind(key_hash.as_bytes())
+            .fetch_one(&self.db)
+            .await?;
+
+            if accepted {
+                Ok(false) // Already consumed - idempotent
+            } else {
+                // Entry exists but not accepted - replay attack
+                Err(sqlx::Error::RowNotFound)
+            }
+        }
     }
 }
