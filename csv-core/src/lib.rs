@@ -110,6 +110,41 @@ pub mod proof;
 pub mod proof_pipeline;
 pub mod signature;
 pub mod verifier;
+/// Trust package primitives for offline verification bootstrapping.
+pub mod trust_package;
+
+/// Proof provenance metadata for forensic and deterministic verification.
+pub mod proof_provenance;
+
+/// Global replay registry record types.
+pub mod replay_record;
+
+/// Startup-time config validation helpers to assert capability alignment.
+pub mod config_validation;
+
+/// Runtime health and degraded-mode types used by runtime orchestration.
+pub mod runtime_health;
+
+/// Restart-safe finality anchoring — canonical chain snapshot persistence.
+pub mod finality_anchor;
+
+/// Protocol version compatibility matrix for version negotiation.
+pub mod compatibility;
+
+/// Chain-specific finality grades (SolanaCommitmentGrade, EthereumFinalityStage).
+pub mod chain_specific;
+
+/// Data authority tags — prevent explorer-authoritative state interpretation.
+pub mod data_authority;
+
+/// Persisted state transitions — atomic coupling of proofs and state changes.
+pub mod persisted_transition;
+
+/// Proof material provider trait — adapters become pure data providers.
+pub mod proof_material;
+
+/// Wallet capability separation and signing provider abstraction.
+pub mod wallet_types;
 
 // Error handling and traits - 🔒 STABLE
 pub mod error;

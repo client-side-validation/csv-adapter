@@ -117,7 +117,8 @@ impl ChainVerifier for BitcoinVerifier {
     /// Verify finality proof for a Bitcoin block
     async fn verify_finality(&self, proof: &FinalityProof) -> csv_core::Result<VerificationResult> {
         let confirmations = proof.confirmations;
-        let required = 6;
+        // Use ChainCapabilities for finality depth - policy belongs to core, not adapter
+        let required = csv_core::chain_config::ChainCapabilities::bitcoin().finality_depth;
 
         if confirmations < required {
             return Ok(VerificationResult {

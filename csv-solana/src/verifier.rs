@@ -79,7 +79,8 @@ impl ChainVerifier for SolanaVerifier {
     /// Verify finality proof for a Solana block
     async fn verify_finality(&self, proof: &FinalityProof) -> csv_core::Result<VerificationResult> {
         // Solana has probabilistic finality - check confirmations
-        let required_confirmations = 32;
+        // Use ChainCapabilities for finality depth - policy belongs to core, not adapter
+        let required_confirmations = csv_core::chain_config::ChainCapabilities::solana().finality_depth;
 
         if proof.confirmations >= required_confirmations {
             if proof.finality_data.is_empty() {

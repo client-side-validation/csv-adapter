@@ -126,3 +126,47 @@ jobs:
           cargo fuzz run finality_parser -- -max_total_time=60 fuzz_targets/finality_parser/corpus || true
           cargo fuzz run abi_decoder -- -max_total_time=60 fuzz_targets/abi_decoder/corpus || true
           cargo fuzz run rpc_parser -- -max_total_time=60 fuzz_targets/rpc_parser/corpus || true
+
+  # ── Architectural Boundary Enforcement ──────────────────────────
+  # Enforces AGENT.md rules: no unwrap/expect/unsafe in critical paths,
+  # no direct adapter calls from core, no fake crypto, no fallback logic
+  architectural-checks:
+    name: Architectural Boundary Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for unwrap() in csv-core (forbidden in production code)
+        run: |
+          ! grep -r "\.unwrap()" csv-core/src/ --include="*.rs" || exit 1
+        continue-on-error: false
+
+      - name: Check for expect() in csv-core (forbidden in production code)
+        run: |
+          ! grep -r "\.expect(" csv-core/src/ --include="*.rs" || exit 1
+        continue-on-error: false
+
+      - name: Check for unsafe blocks in csv-core (forbidden except in crypto primitives)
+        run: |
+          ! grep -r "unsafe {" csv-core/src/ --include="*.rs" || exit 1
+        continue-on-error: false
+
+      - name: Check for direct adapter imports in csv-core (architectural boundary violation)
+        run: |
+          ! grep -r "csv-bitcoin\|csv-ethereum\|csv-solana\|csv-aptos\|csv-sui\|csv-celestia" csv-core/src/ --include="*.rs" || exit 1
+        continue-on-error: false
+
+      - name: Check for TODO/FIXME placeholders (forbidden in production code)
+        run: |
+          ! grep -r "TODO\|FIXME" csv-core/src/ --include="*.rs" || exit 1
+        continue-on-error: false
+
+      - name: Check for fake crypto patterns (forbidden)
+        run: |
+          ! grep -r "fake\|placeholder\|stub.*crypto\|mock.*proof" csv-core/src/ --include="*.rs" || exit 1
+        continue-on-error: false
+
+      - name: Check for fallback logic in adapters (forbidden per AUDIT.md)
+        run: |
+          ! grep -r "fallback\|retry.*different\|alternative.*rpc" csv-bitcoin/src/ csv-ethereum/src/ csv-solana/src/ --include="*.rs" || exit 1
+        continue-on-error: false

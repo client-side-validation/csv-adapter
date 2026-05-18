@@ -4,6 +4,8 @@
 //! consensus to prevent single-point-of-failure or malicious provider attacks.
 
 pub mod quorum_client;
+pub mod quorum_types;
 
 // Re-exports
 pub use quorum_client::{QuorumClient, QuorumConfig, RpcProvider};
+pub use quorum_types::{FinalityGrade, QuorumDecision, RpcObservation};

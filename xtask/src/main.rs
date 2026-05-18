@@ -215,3 +215,83 @@ fn verify_aptos_bindings() -> anyhow::Result<()> {
     println!("  ✓ Aptos contracts compile successfully");
     Ok(())
 }
+
+#[cfg(test)]
+mod ci_checks {
+    use std::fs;
+    use std::path::Path;
+
+    // Forbidden patterns per .agents/AGENT.md
+    const FORBIDDEN_PATTERNS: &[(&str, &str)] = &[
+        ("todo", "todo!() or TODO comments"),
+        ("unimplemented!()", "unimplemented!()"),
+        ("unwrap()", "unwrap()"),
+        ("expect()", "expect()"),
+        ("unsafe ", "unsafe keyword"),
+        ("new_unchecked", "new_unchecked()"),
+        ("Ok(true)", "Ok(true) in verification paths"),
+        ("Ok(Default::default())", "Ok(Default::default())"),
+        ("assert!(true)", "assert!(true)"),
+        ("Sha256::digest", "raw Sha256::digest"),
+        ("Keccak256::digest", "raw Keccak256::digest"),
+        ("blake3::hash", "raw blake3::hash"),
+    ];
+
+    fn is_exempt_path(path: &Path) -> bool {
+        let s = path.to_string_lossy();
+        // Allow these directories for tests/fuzz/benches
+        if s.contains("/tests/") || s.contains("/fuzz/") || s.contains("/benches/") {
+            return true;
+        }
+        // Allow files under crates' tests directories
+        if s.ends_with("_test.rs") || s.ends_with("mod_test.rs") {
+            return true;
+        }
+        false
+    }
+
+    #[test]
+    fn forbidden_patterns_not_present_in_production() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
+        let mut violations = Vec::new();
+
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(p) = stack.pop() {
+            let md = match fs::metadata(&p) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            if md.is_dir() {
+                if p.ends_with("target") || p.ends_with(".git") {
+                    continue;
+                }
+                for entry in fs::read_dir(&p).unwrap().flatten() {
+                    stack.push(entry.path());
+                }
+            } else if md.is_file() {
+                if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
+                    if ext == "rs" {
+                        if is_exempt_path(&p) {
+                            continue;
+                        }
+                        if let Ok(text) = fs::read_to_string(&p) {
+                            for (pat, desc) in FORBIDDEN_PATTERNS.iter() {
+                                if text.contains(pat) {
+                                    violations.push(format!("{}: {} ({})", p.display(), pat, desc));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if !violations.is_empty() {
+            eprintln!("Forbidden patterns detected:");
+            for v in &violations {
+                eprintln!(" - {}", v);
+            }
+            panic!("CI check failed: forbidden patterns present in production code");
+        }
+    }
+}

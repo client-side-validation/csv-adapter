@@ -20,11 +20,11 @@ The single demo that no competitor can replicate, that requires no whitepaper to
 
 **"Turn off your WiFi. Scan this QR code."**
 
-The result appears: ✅ Valid — Bitcoin → Solana — 2026-05-12 — Sealed.
+The result appears: ✅ Valid — Bitcoin → Solana — 2026-06-12 — Sealed.
 
 This is the offline verification demo. It runs on a phone with no internet connection. It verifies a cross-chain proof bundle in under 200ms. It demonstrates the entire protocol value proposition in one gesture.
 
-**Current status**: The cryptographic backend works. The wallet has a verification screen. The file import → verify → display flow is not wired. Estimated time to demo-ready: 2–3 weeks of focused engineering.
+**Current status**: The proof pipeline skeleton is in place; cryptographic correctness is Phase 3. The wallet has a verification screen. The file import → verify → display flow is not wired. AUDIT.md §3.1 documents that Bitcoin SPV Merkle verification is currently broken (self-computed checksum only, no Merkle branch → `merkle_root` comparison). Ethereum Groth16 verification checks structure but not the pairing equation. Estimated time to demo-ready: 2–3 weeks of focused engineering after Phase 1–3 security fixes.
 
 **This demo, filmed and posted to GitHub, is the launch. Everything else is secondary.**
 
@@ -126,7 +126,8 @@ These items must be complete before any public marketing. They are ordered by pr
 **1. Implement Ethereum contract deployment**  
 File: `csv-ethereum/src/backend.rs` → `deploy_lock_contract`  
 Currently returns `CapabilityUnavailable`. Deploy CSVLock.sol to Sepolia testnet.  
-Estimated: 3–5 days.  
+**Prerequisite**: Complete Ethereum verifier security work - mock Groth16 verification must be replaced with actual pairing equation check, ECDSA signature recovery must be implemented, manual ABI encoding must be replaced with proper library. Deploying on a broken verifier is worse than no deployment — it would surface as a false security signal.  
+Estimated: 3–5 days for deployment + verifier work.  
 This is existential. Without Ethereum, CSV is a 4-chain protocol, and 70% of the developer market is unreachable.
 
 **2. Complete transfer pipeline**  
@@ -207,6 +208,12 @@ Link from wallet on every transfer status update.
 ### Stage 1 — Developer Alpha (Now → MVP)
 
 **Goal**: 50 developers running real proof operations on testnet. One integration partner in conversation.
+
+**Prerequisites**:
+
+- Phase 1 (csv-core security): `VerificationResult::meets_chain_thresholds()` mint gate, `ReplayDatabase` CAS semantics, signature scheme derivation
+- Phase 2 (csv-runtime creation): Proper replay database with pending state and recovery protocol
+- Phase 3 (chain-specific fixes): Bitcoin SPV Merkle verification, Ethereum Groth16 pairing equation check, ECDSA signature recovery
 
 **Ships**:
 

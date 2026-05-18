@@ -392,6 +392,10 @@ mod tests {
         async fn verify_seal_registry(&self, _seal_id: &[u8]) -> Result<SealRegistryStatus, AdapterError> {
             Ok(SealRegistryStatus::Available)
         }
+
+        async fn get_balance(&self, _address: &str) -> Result<String, AdapterError> {
+            Ok("0".to_string())
+        }
     }
 
     #[tokio::test]

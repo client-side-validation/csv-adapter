@@ -8,6 +8,8 @@
 
 use alloc::vec::Vec;
 use serde_json;
+#[cfg(feature = "quorum")]
+use std::collections::HashMap;
 
 use crate::error::Result;
 
@@ -152,6 +154,79 @@ pub struct QuorumClient {
     http_client: reqwest::Client,
     #[cfg(feature = "observability")]
     metrics: Arc<Mutex<RpcMetrics>>,
+}
+
+/// Result of a quorum decision.
+#[cfg(feature = "quorum")]
+#[derive(Clone, Debug)]
+pub enum QuorumDecision {
+    /// A decisive consensus on a single response
+    Consensus {
+        /// The consensus data bytes
+        data: Vec<u8>,
+        /// Total weight supporting this consensus
+        weight: f64,
+        /// Providers that contributed to this consensus
+        supporting_providers: Vec<String>,
+    },
+    /// No single response reached quorum; includes grouping info for diagnostics
+    NoConsensus {
+        /// Groups of conflicting responses with their weights and providers
+        groups: Vec<(Vec<u8>, f64, usize, Vec<String>)>,
+        /// Total weight across all providers
+        total_weight: f64,
+    },
+}
+
+#[cfg(feature = "quorum")]
+impl QuorumClient {
+    /// Compute a weighted quorum decision from provider responses.
+    fn compute_quorum_decision(&self, responses: &[RpcResponse]) -> QuorumDecision {
+        // Map provider URL to configured weight
+        let mut weight_map: HashMap<String, f64> = HashMap::new();
+        let mut total_weight = 0.0f64;
+        for p in &self.providers {
+            weight_map.insert(p.url.clone(), p.weight);
+            total_weight += p.weight;
+        }
+
+        // Group responses by data bytes and sum weights
+        let mut groups: HashMap<Vec<u8>, (f64, Vec<String>)> = HashMap::new();
+        for r in responses.iter().filter(|r| r.success) {
+            let w = *weight_map.get(&r.provider).unwrap_or(&1.0);
+            let entry = groups.entry(r.data.clone()).or_insert((0.0f64, Vec::new()));
+            entry.0 += w;
+            entry.1.push(r.provider.clone());
+        }
+
+        // Build vector of groups
+        let mut group_vec: Vec<(Vec<u8>, f64, usize, Vec<String>)> = groups
+            .into_iter()
+            .map(|(data, (weight, providers))| (data, weight, providers.len(), providers))
+            .collect();
+
+        // Sort by descending weight
+        group_vec.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        if group_vec.is_empty() {
+            return QuorumDecision::NoConsensus { groups: vec![], total_weight };
+        }
+
+        let best = &group_vec[0];
+        // Check quorum thresholds
+        let meets_weight = best.1 >= (self.config.min_percentage * total_weight);
+        let meets_count = best.2 >= self.config.min_quorum;
+
+        if meets_weight && meets_count {
+            QuorumDecision::Consensus {
+                data: best.0.clone(),
+                weight: best.1,
+                supporting_providers: best.3.clone(),
+            }
+        } else {
+            QuorumDecision::NoConsensus { groups: group_vec, total_weight }
+        }
+    }
 }
 
 #[cfg(feature = "quorum")]
@@ -434,37 +509,29 @@ impl QuorumClient {
     ) -> Result<Vec<u8>> {
         let responses = self.query_all(method, params).await;
 
-        // Count successful responses
-        let successful: Vec<_> = responses.iter().filter(|r| r.success).collect();
-
-        let count = successful.len();
-        let total = self.providers.len();
-        let percentage = count as f64 / total as f64;
-
-        if count >= self.config.min_quorum && percentage >= self.config.min_percentage {
-            // Verify that all successful responses agree on the data
-            if let Some(consensus_data) = self.verify_consensus(&successful) {
-                Ok(consensus_data)
-            } else {
-                Err(crate::error::ProtocolError::RpcQuorumFailed(
-                    "RPC providers returned inconsistent responses".to_string(),
-                ))
+        // Compute weighted quorum decision
+        let decision = self.compute_quorum_decision(&responses);
+        match decision {
+            QuorumDecision::Consensus { data, .. } => Ok(data),
+            QuorumDecision::NoConsensus { groups, total_weight } => {
+                // Build diagnostic message
+                let mut msg = format!("Quorum not reached. total_weight={:.2}", total_weight);
+                for (i, (_d, w, cnt, providers)) in groups.iter().enumerate() {
+                    let provs = providers.join(",");
+                    msg.push_str(&format!("; group{} weight={:.2} count={} providers=[{}]", i, w, cnt, provs));
+                    if i >= 5 {
+                        break;
+                    }
+                }
+                Err(crate::error::ProtocolError::RpcQuorumFailed(msg))
             }
-        } else {
-            Err(crate::error::ProtocolError::RpcQuorumFailed(format!(
-                "Quorum not reached: {}/{} providers ({:.0}%), required: {} providers ({:.0}%)",
-                count,
-                total,
-                percentage * 100.0,
-                self.config.min_quorum,
-                self.config.min_percentage * 100.0
-            )))
         }
     }
 
     /// Verify that all successful responses agree on the data.
     ///
     /// Returns the consensus data if all responses match, None otherwise.
+    #[allow(dead_code)]
     fn verify_consensus(&self, responses: &[&RpcResponse]) -> Option<Vec<u8>> {
         if responses.is_empty() {
             return None;

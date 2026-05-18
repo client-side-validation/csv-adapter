@@ -39,6 +39,32 @@ pub enum FinalityModel {
     DataAvailabilityHeader,
 }
 
+/// Solana commitment grade - explicit distinction for finality stages.
+/// Never collapse these into u64 confirmations - that is semantically wrong.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SolanaCommitmentGrade {
+    /// Transaction processed but not confirmed
+    Processed,
+    /// Transaction confirmed by at least one leader
+    Confirmed,
+    /// Transaction finalized by cluster consensus
+    Finalized,
+}
+
+/// Ethereum finality stage - explicit distinction for checkpoint progression.
+/// Safe head, justified, and finalized are operationally different.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EthereumFinalityStage {
+    /// Unsafe head - latest block, may be reorged
+    UnsafeHead,
+    /// Safe head - block that is unlikely to be reorged
+    SafeHead,
+    /// Justified checkpoint - attested by 2/3 of validators
+    Justified,
+    /// Finalized checkpoint - cannot be reorged
+    Finalized,
+}
+
 /// Proof model used by a chain
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ProofModel {

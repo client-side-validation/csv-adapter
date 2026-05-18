@@ -80,6 +80,13 @@ pub trait ReplayDatabase: Send + Sync {
         state: ReplayEntryState,
     ) -> Result<(), ReplayDbError>;
 
+    /// Idempotent consume-if-unconsumed semantic.
+    ///
+    /// - If the entry does not exist: insert a `Pending` entry and return Ok(()).
+    /// - If the entry exists and is `Consumed`: return Ok(()) (idempotent).
+    /// - If the entry exists and is `Pending` or `RolledBack`: return Err(AlreadyExists).
+    async fn consume_if_unconsumed(&self, id: &ReplayId) -> Result<(), ReplayDbError>;
+
     /// Promote a `Pending` entry to `Consumed` after mint is confirmed on-chain.
     async fn confirm_consumed(&self, id: &ReplayId) -> Result<(), ReplayDbError>;
 
@@ -130,16 +137,34 @@ impl ReplayDatabase for InMemoryReplayDb {
         Ok(())
     }
 
+    async fn consume_if_unconsumed(&self, id: &ReplayId) -> Result<(), ReplayDbError> {
+        let mut entries = self.entries.write().unwrap();
+        match entries.get(id) {
+            None => {
+                entries.insert(*id, ReplayEntryState::Pending);
+                Ok(())
+            }
+            Some(ReplayEntryState::Consumed) => Ok(()),
+            Some(_) => Err(ReplayDbError::AlreadyExists),
+        }
+    }
+
     async fn confirm_consumed(&self, id: &ReplayId) -> Result<(), ReplayDbError> {
         let mut entries = self.entries.write().unwrap();
         match entries.get_mut(id) {
-            Some(current) if *current == ReplayEntryState::Pending => {
-                *current = ReplayEntryState::Consumed;
-                Ok(())
+            Some(current) => {
+                // Idempotent: already Consumed is fine.
+                if *current == ReplayEntryState::Pending {
+                    *current = ReplayEntryState::Consumed;
+                    Ok(())
+                } else if *current == ReplayEntryState::Consumed {
+                    Ok(())
+                } else {
+                    Err(ReplayDbError::Storage(
+                        "Entry is not in Pending or Consumed state".to_string(),
+                    ))
+                }
             }
-            Some(_) => Err(ReplayDbError::Storage(
-                "Entry is not in Pending state".to_string(),
-            )),
             None => Err(ReplayDbError::Storage(
                 "Entry not found".to_string(),
             )),

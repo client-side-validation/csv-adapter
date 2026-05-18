@@ -116,8 +116,10 @@ pub struct ChainAccount {
     pub balance_raw: u64,
 }
 
-// Display conversion happens only at UI layer
-let display = format!("{:.8} BTC", balance_raw as f64 / 100_000_000.0);
+// Display conversion uses integer arithmetic only
+let whole = balance_raw / 100_000_000;
+let fractional = balance_raw % 100_000_000;
+let display = format!("{}.{} BTC", whole, fractional);
 ```
 
 **Security Impact:** Floating point rounding errors and precision loss can be exploited for value manipulation (e.g., 0.1 + 0.2 != 0.3 bugs).
@@ -129,12 +131,12 @@ let display = format!("{:.8} BTC", balance_raw as f64 / 100_000_000.0);
 **Rule:** All cross-chain transfers must progress through the `TransferState` machine states in order:
 
 ```
-Locked → AwaitingFinality → BuildingProof → ProofReady → Minting → Complete
+Locking → AwaitingFinality → BuildingProof → ProofReady → Minting → Complete
 ```
 
 **Prohibited:**
 
-- Never skip from `Locked` directly to `Minting`
+- Never skip from `Locking` directly to `Minting`
 - Never build proofs before finality is reached
 - Never retry a failed transfer without checking `recoverable` flag
 
@@ -143,11 +145,11 @@ Locked → AwaitingFinality → BuildingProof → ProofReady → Minting → Com
 ```rust
 // Drive the state machine forward
 match transfer.state {
-    TransferState::Locked { source_tx, lock_height } => {
+    TransferState::Locking { source_tx, lock_height } => {
         // Check confirmations
         let confirmations = chain.get_confirmations(source_tx).await?;
         if confirmations >= REQUIRED_CONFIRMATIONS {
-            transfer.state = TransferState::AwaitFinality {
+            transfer.state = TransferState::AwaitingFinality {
                 confirmations_needed: REQUIRED_CONFIRMATIONS,
                 confirmations_have: confirmations,
             };
@@ -229,6 +231,129 @@ let commitment = hash(
 
 ---
 
+## Invariant 8: Mint Authorization MUST Use VerificationResult::meets_chain_thresholds()
+
+**Rule:** Mint authorization MUST use `VerificationResult::meets_chain_thresholds(&caps)`, never a scalar enum comparison. `VerificationAssurance` is a display signal only.
+
+**Prohibited:**
+
+- Never use `assurance >= ConsensusBound` or similar scalar comparisons for mint gates
+- Never bypass `VerificationResult::meets_chain_thresholds()` for "fast path" optimizations
+- Never treat `VerificationAssurance` as a security-critical value
+
+**Correct Pattern:**
+
+```rust
+// CORRECT: Use the typed verification result
+let result = verifier.verify_proof_bundle(&bundle)?;
+if result.meets_chain_thresholds(&chain_capabilities) {
+    mint_sanad(result)?;
+}
+
+// PROHIBITED: Scalar enum comparison
+if result.assurance >= VerificationAssurance::ConsensusBound {
+    mint_sanad(result)?; // This bypasses chain-specific threshold checks
+}
+```
+
+**Security Impact:** Scalar enum comparison is the root cause of silent verification bypass. The `VerificationResult` type encodes chain-specific threshold logic that scalar enums cannot represent.
+
+---
+
+## Invariant 9: ReplayDatabase Insert-Before-Mint with Compare-and-Swap
+
+**Rule:** `ReplayDatabase::insert_if_absent()` MUST succeed with compare-and-swap semantics before `mint_sanad()` is called. A `contains()` check alone is not sufficient.
+
+**Prohibited:**
+
+- Never call `mint_sanad()` before `insert_if_absent()` succeeds
+- Never use a blind `contains()` check followed by insert (race condition under concurrent coordinators)
+- Never skip replay database insertion for "trusted" sources
+
+**Correct Pattern:**
+
+```rust
+// CORRECT: CAS insert before mint
+let replay_id = ReplayId::from_transfer_inputs(&transfer);
+match replay_db.insert_if_absent(&replay_id) {
+    Ok(Inserted) => {
+        // Safe to proceed with mint
+        mint_sanad(sanad)?;
+    }
+    Ok(AlreadyExists) => {
+        return Err(Error::ReplayAttackDetected);
+    }
+    Err(e) => {
+        return Err(e);
+    }
+}
+
+// PROHIBITED: Blind contains check
+if !replay_db.contains(&replay_id) {
+    replay_db.insert(&replay_id); // Race condition here
+    mint_sanad(sanad)?; // May mint duplicate under concurrent coordinators
+}
+```
+
+**Security Impact:** Without CAS semantics, concurrent coordinators can both pass the `contains()` check and mint the same transfer, enabling double-mint attacks.
+
+---
+
+## Invariant 10: Signature Scheme MUST Be Derived From Chain, Not Payload
+
+**Rule:** The scheme used to verify ownership MUST be derived from `CrossChainHashAlgorithm::for_chain(&source_chain)`, NOT from the `scheme` field inside the proof payload. A malicious actor can omit or forge the payload field.
+
+**Prohibited:**
+
+- Never trust the `scheme` field in proof payloads for signature verification
+- Never allow the sender to specify which signature scheme to use
+- Never skip scheme derivation from chain configuration
+
+**Correct Pattern:**
+
+```rust
+// CORRECT: Derive scheme from chain configuration
+let expected_scheme = CrossChainHashAlgorithm::for_chain(&source_chain);
+let verifier = SignatureVerifier::new(expected_scheme);
+verifier.verify_ownership(&proof.ownership_signature, &public_key)?;
+
+// PROHIBITED: Trust payload field
+let verifier = SignatureVerifier::new(proof.scheme); // Malicious sender can forge this
+verifier.verify_ownership(&proof.ownership_signature, &public_key)?;
+```
+
+**Security Impact:** A malicious actor can omit the signature scheme field or specify a weak scheme, bypassing verification entirely.
+
+---
+
+## Invariant 11: ZkVerifierRegistry Must Use Real Chain-Anchored Keys
+
+**Rule:** `ZkVerifierRegistry` must be initialized from real chain-anchored keys. `default_verifier_registry()` is test-only and must never appear in production code paths.
+
+**Prohibited:**
+
+- Never use `default_verifier_registry()` in production code
+- Never initialize verifier registries with empty or placeholder keys
+- Never skip verifier key validation in production paths
+
+**Correct Pattern:**
+
+```rust
+// CORRECT: Initialize from real chain-anchored keys
+#[cfg(not(test))]
+let registry = ZkVerifierRegistry::from_chain_config(&chain_config)?;
+
+#[cfg(test)]
+let registry = default_verifier_registry(); // Test-only
+
+// PROHIBITED: Using test registry in production
+let registry = default_verifier_registry(); // Zero-length keys, no security
+```
+
+**Security Impact:** Placeholder verifier keys provide no security. Any proof can verify against an empty registry, enabling complete bypass of ZK verification.
+
+---
+
 ## RPC Trust Model
 
 **This section documents the explicit trust stance regarding RPC (Remote Procedure Call) nodes in the CSV protocol.**
@@ -275,13 +400,19 @@ Truly trust-minimized verification requires embedded light clients per chain. Th
 
 The `FinalityVerifier` trait in `csv-core` is the abstraction point for swapping in light client implementations as they become available — the coordinator does not need to change.
 
-### Invariant
+### Invariant (Target Model, Stage 3)
 
-**The invariant that must hold regardless of RPC trust level:**
+**The invariant that must hold in the target model (Stage 3):**
 
 > No transfer completes without an independent on-chain confirmation of the mint transaction that does not come from the same adapter instance that submitted it.
 
-This is the minimum bar even under the quorum model. It prevents Byzantine-destination attacks where a malicious destination adapter could fake mint confirmations.
+**Current Status (Stage 1):** This is an **unresolved problem**
+This prevents Byzantine-destination attacks where a malicious destination adapter could fake mint confirmations.
+
+**Byzantine destination adapter:** The destination chain adapter
+returns a `MintReceipt` claiming success. The coordinator currently trusts this. Before marking a transfer complete, the coordinator must independently verify the mint transaction is present on-chain — not via the same adapter instance that performed the mint, but via a quorum verification call against independent RPC nodes.
+The coordinator currently trusts the adapter's `MintReceipt`. This invariant is presented as the target security model, not current behavior.
+
 
 ### Observability
 
@@ -306,6 +437,12 @@ When reviewing code changes, verify:
 - [ ] TransferState machine is not skipped
 - [ ] SealRegistry check runs before transfer acceptance
 - [ ] Domain separation is used for all hashes
+- [ ] No `Result<bool>` returns from verifier functions (use `VerificationResult`)
+- [ ] `SignatureScheme::default()` returns `Secp256k1` (not `MlDsa65`)
+- [ ] `default_verifier_registry()` absent from non-test scope
+- [ ] `VerificationResult::meets_chain_thresholds()` used for mint gate
+- [ ] `ReplayDatabase::insert_if_absent()` called with CAS before mint
+- [ ] Signature scheme derived from chain, not payload
 
 **Violations of any of these invariants must block the PR.**
 

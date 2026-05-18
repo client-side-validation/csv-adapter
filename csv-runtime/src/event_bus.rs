@@ -3,6 +3,11 @@
 #![allow(missing_docs)]
 
 use csv_core::verified::VerificationAssurance;
+use std::string::String;
+use std::sync::Arc;
+
+use crate::event_envelope::RuntimeEventEnvelope;
+use crate::event_store::EventStore;
 
 /// Structured events emitted during transfer execution
 #[derive(Debug, Clone)]
@@ -43,6 +48,7 @@ pub type EventSubscriber = Box<dyn Fn(TransferEvent) + Send + Sync>;
 /// to update UI, metrics, and logs. The coordinator never calls UI directly.
 pub struct EventBus {
     subscribers: Vec<EventSubscriber>,
+    store: Option<Arc<dyn EventStore>>,
 }
 
 impl EventBus {
@@ -50,6 +56,15 @@ impl EventBus {
     pub fn new() -> Self {
         Self {
             subscribers: Vec::new(),
+            store: None,
+        }
+    }
+
+    /// Create an event bus with a backing event store (persist before publish)
+    pub fn with_store(store: Arc<dyn EventStore>) -> Self {
+        Self {
+            subscribers: Vec::new(),
+            store: Some(store),
         }
     }
 
@@ -60,6 +75,22 @@ impl EventBus {
 
     /// Emit an event to all subscribers
     pub fn emit(&self, event: TransferEvent) {
+        // Persist before publish when store is configured
+        if let Some(store) = &self.store {
+            // Create a simple envelope; correlation/causation left empty for now
+            let envelope = RuntimeEventEnvelope {
+                event_id: uuid::Uuid::new_v4(),
+                transfer_id: csv_core::SanadId::new([0u8; 32]),
+                causation_id: None,
+                correlation_id: uuid::Uuid::new_v4(),
+                event: format!("{:?}", event),
+                timestamp: std::time::SystemTime::now(),
+                runtime_id: uuid::Uuid::new_v4(),
+            };
+
+            let _ = store.persist(&envelope);
+        }
+
         for subscriber in &self.subscribers {
             subscriber(event.clone());
         }

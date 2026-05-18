@@ -73,15 +73,27 @@ The protocol utilizes Proof Bundles. A bundle contains the entire cryptographic 
     Header Chain: A sequence of block headers reaching a "Trusted Checkpoint."
     An offline device checks the math of the Merkle path against a trusted header. If the math checks out, the state is valid.
 
+**Current Status (Stage 1):** Offline verification is the target model, but chain-specific verifiers have known security holes that are being fixed in Phase 3 (see AUDIT.md §3.1). For example, Bitcoin SPV Merkle verification currently validates a self-computed checksum but does not verify the Merkle branch against the block header's `merkle_root`. Production-grade offline verification will be available after Phase 3 completion.
+
 ### How do we prevent Double-Spending if validation is client-side?
 
-Double-spending is prevented by the Single-Use Seal on the L1. Even if a client "validates" a fake state, they cannot spend it unless they can produce a witness that the L1 seal was closed. Since the L1 (e.g., Bitcoin) enforces that a UTXO can only be spent once, the "Truth" is anchored in the hardware-backed consensus of the L1.
+Double-spending is prevented by the Single-Use Seal on the L1 and the programmatic `ReplayDatabase` mechanism. Even if a client "validates" a fake state, they cannot spend it unless they can produce a witness that the L1 seal was closed. Since the L1 (e.g., Bitcoin) enforces that a UTXO can only be spent once, the "Truth" is anchored in the hardware-backed consensus of the L1.
+
+**Implementation:** The coordinator derives a `ReplayId` from all transfer inputs and checks it via `ReplayDatabase::insert_if_absent()` with compare-and-swap semantics before minting. This prevents concurrent coordinators from minting the same transfer (see PROTOCOL_INVARIANTS.md Invariant 9).
 
 ### What happens during a Chain Reorg?
 
 This is the "Causal Invalidation" problem. If Chain A reorgs, the seal that anchored a transfer to Chain B might disappear.
 
-    We implement Finality Thresholds. A Proof Bundle is not "Final" until it reaches a depth (e.g., 6 blocks on BTC). If a reorg occurs deeper than our threshold, our SyncCoordinator triggers a protocol-level rollback, marking the destination asset as "Orphaned" until a new anchor is found.
+    We implement Finality Thresholds. A Proof Bundle is not "Final" until it reaches a depth (e.g., 6 blocks on BTC). If a reorg occurs deeper than our threshold, the protocol would trigger a protocol-level rollback, marking the destination asset as "Orphaned" until a new anchor is found.
+
+**Current Status (Stage 1):** The rollback mechanism is planned behavior but not yet implemented. We identifiesd this as "Unresolved problem  — partial failure between insert and mint" with no recovery protocol yet designed. This is a target feature for Phase 2/3. The coordinator inserts the ReplayId before minting (intentionally — to block duplicate mints on retry).
+If the mint then fails, the transfer is permanently poisoned with no recovery path. The rollback protocol for this case requires:
+(a) a separate `pending` state before `consumed`, 
+(b) a timeout-based expiry for `pending` entries, 
+(c) a recovery coordinator that can promote `pending` → `consumed` after verifying the mint on-chain, or demote `pending` → `available` after confirming the mint never landed. 
+This protocol is not specified here and must be designed before production.
+
 
 ## 3. Competitive Comparison
 

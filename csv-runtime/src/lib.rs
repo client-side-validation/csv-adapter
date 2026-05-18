@@ -16,6 +16,11 @@ pub mod adapter_registry;
 pub mod deployment_profile;
 pub mod error;
 pub mod event_bus;
+pub mod event_envelope;
+pub mod event_store;
+pub mod lease;
+#[cfg(feature = "postgres")]
+pub mod postgres_store;
 pub mod replay_db;
 pub mod transfer_coordinator;
 

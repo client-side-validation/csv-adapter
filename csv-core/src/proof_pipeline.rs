@@ -31,6 +31,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use std::sync::Mutex;
 
+use crate::chain_config::{EthereumFinalityStage, SolanaCommitmentGrade};
 use crate::domain_hash::DomainSeparatedHash;
 use crate::domains::{ProofBundleDomain, ReplayRegistryDomain};
 use crate::error::Result;
@@ -40,6 +41,90 @@ use crate::proof::{FinalityProof, InclusionProof, ProofBundle};
 use crate::protocol_version::ChainId;
 use crate::replay_registry::{ReplayKey, ReplayRegistryBackend};
 use crate::verified::{FinalityStrength, InclusionStrength, VerificationAssurance, VerificationResult, VerifiedComponents};
+
+/// Proof material bundle - pure data from adapters without policy decisions.
+#[derive(Debug, Clone)]
+pub struct ProofMaterialBundle {
+    /// Raw inclusion proof bytes
+    pub inclusion_proof_bytes: Vec<u8>,
+    /// Raw finality proof bytes
+    pub finality_proof_bytes: Vec<u8>,
+    /// Raw ZK proof bytes (if applicable)
+    pub zk_proof_bytes: Vec<u8>,
+    /// Block header bytes
+    pub block_header: Vec<u8>,
+    /// State root bytes
+    pub state_root: Vec<u8>,
+    /// Additional chain-specific metadata
+    pub metadata: Vec<u8>,
+}
+
+/// Proof material provider trait - adapters become pure data providers.
+///
+/// Adapters should ONLY fetch proofs, headers, state roots, and chain metadata.
+/// Adapters should NOT decide final validity, authorize minting, determine
+/// assurance thresholds, determine replay status, or decide rollback necessity.
+/// Those policy decisions belong to core/runtime.
+#[async_trait::async_trait]
+pub trait ProofMaterialProvider {
+    /// Fetch proof material for a transaction.
+    ///
+    /// Returns raw proof data without any verification or policy decisions.
+    async fn fetch_proof_material(
+        &self,
+        tx_hash: Hash,
+        block_number: u64,
+    ) -> Result<ProofMaterialBundle>;
+
+    /// Fetch block header bytes.
+    async fn fetch_block_header(&self, block_number: u64) -> Result<Vec<u8>>;
+
+    /// Fetch state root for a block.
+    async fn fetch_state_root(&self, block_number: u64) -> Result<Hash>;
+
+    /// Fetch chain metadata (e.g., current height, latest hash).
+    async fn fetch_chain_metadata(&self) -> Result<ChainMetadata>;
+}
+
+/// Chain metadata fetched from adapters.
+#[derive(Debug, Clone)]
+pub struct ChainMetadata {
+    /// Current block height
+    pub current_height: u64,
+    /// Latest block hash
+    pub latest_hash: Hash,
+    /// Current finality information
+    pub finality_info: FinalityInfo,
+}
+
+/// Finality information for a chain.
+#[derive(Debug, Clone)]
+pub enum FinalityInfo {
+    /// Probabilistic finality with confirmations
+    Probabilistic {
+        /// Number of confirmations observed
+        confirmations: u64,
+    },
+    /// Deterministic finality with checkpoint
+    Deterministic {
+        /// Checkpoint hash for deterministic finality
+        checkpoint_hash: Hash,
+    },
+    /// Optimistic finality with slot
+    Optimistic {
+        /// Slot number
+        slot: u64,
+        /// Commitment grade for the slot
+        commitment: SolanaCommitmentGrade,
+    },
+    /// Ethereum-specific finality stages
+    Ethereum {
+        /// Finality stage (safe head, justified, or finalized)
+        stage: EthereumFinalityStage,
+        /// Checkpoint hash
+        checkpoint_hash: Hash,
+    },
+}
 
 /// Chain verifier trait that adapters must implement
 ///

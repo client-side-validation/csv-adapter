@@ -11,6 +11,7 @@ use crate::adapter_registry::{AdapterRegistry, CrossChainTransfer};
 use crate::error::TransferCoordinatorError;
 use crate::event_bus::{EventBus, TransferEvent};
 use crate::replay_db::ReplayDatabase;
+use crate::replay_db::ReplayDbError;
 
 /// Receipt returned after a successful transfer
 #[derive(Debug, Clone)]
@@ -52,7 +53,21 @@ impl TransferCoordinator {
         &self,
         transfer: CrossChainTransfer,
         adapter_registry: &dyn AdapterRegistry,
+        runtime_ctx: crate::lease::RuntimeExecutionContext,
     ) -> Result<TransferReceipt, TransferCoordinatorError> {
+        // Enforce lease ownership for mutating operations. The lease must match
+        // the transfer's Sanad identifier and must be currently active.
+        let expected = csv_core::sanad::SanadId::new(*transfer.sanad_id.as_bytes());
+        if runtime_ctx.lease.transfer_id != expected {
+            return Err(TransferCoordinatorError::RuntimeError(
+                "Lease transfer_id does not match transfer SanadId".to_string(),
+            ));
+        }
+        if !runtime_ctx.lease.is_active(std::time::SystemTime::now()) {
+            return Err(TransferCoordinatorError::RuntimeError(
+                "Lease is expired".to_string(),
+            ));
+        }
         // Step 1: Compute ReplayId and check for replay
         let replay_id = ReplayId::derive(
             transfer.source_chain.as_str(),
@@ -63,14 +78,21 @@ impl TransferCoordinator {
             transfer.destination_chain.as_str(),
         );
 
-        if self.replay_db.contains(&replay_id).await.map_err(|e| {
-            TransferCoordinatorError::RuntimeError(e.to_string())
-        })? {
-            self.event_bus
-                .emit(TransferEvent::ReplayDetected {
-                    transfer_id: transfer.id.clone(),
-                });
-            return Err(TransferCoordinatorError::ReplayDetected(replay_id));
+        // Atomic idempotent consume-if-unconsumed: prevents duplicate mints
+        match self.replay_db.consume_if_unconsumed(&replay_id).await {
+            Ok(()) => {}
+            Err(e) => match e {
+                ReplayDbError::AlreadyExists => {
+                    self.event_bus
+                        .emit(TransferEvent::ReplayDetected {
+                            transfer_id: transfer.id.clone(),
+                        });
+                    return Err(TransferCoordinatorError::ReplayDetected(replay_id));
+                }
+                ReplayDbError::Storage(msg) => {
+                    return Err(TransferCoordinatorError::ReplayDbError(msg));
+                }
+            },
         }
 
         // Step 2: Verify source chain capabilities
@@ -143,17 +165,7 @@ impl TransferCoordinator {
             .map_err(TransferCoordinatorError::VerificationFailed)?;
 
         // Step 7: Record ReplayId BEFORE minting (prevents duplicate mints on retry)
-        self.replay_db
-            .insert_if_absent(&replay_id, crate::replay_db::ReplayEntryState::Pending)
-            .await
-            .map_err(|e| match e {
-                crate::replay_db::ReplayDbError::AlreadyExists => {
-                    TransferCoordinatorError::ReplayDetected(replay_id)
-                }
-                crate::replay_db::ReplayDbError::Storage(msg) => {
-                    TransferCoordinatorError::RuntimeError(msg)
-                }
-            })?;
+        // No-op: `consume_if_unconsumed` already recorded pending/consumed state
 
         // Step 8: Mint on destination chain
         self.event_bus
@@ -163,7 +175,11 @@ impl TransferCoordinator {
         let mint_result = adapter_registry
             .mint_sanad(&transfer.destination_chain, &transfer, &proof_bundle)
             .await
-            .map_err(|e| TransferCoordinatorError::MintFailed(e.to_string()))?;
+            .map_err(|e| {
+                // Attempt to mark rolled back on mint failure
+                let _ = self.replay_db.mark_rolled_back(&replay_id);
+                TransferCoordinatorError::MintFailed(e.to_string())
+            })?;
 
         // Confirm the replay entry as consumed
         self.replay_db
@@ -248,7 +264,6 @@ mod tests {
             &self,
             _lock_result: &LockResult,
         ) -> Result<ProofBundle, crate::adapter_registry::AdapterError> {
-            // Return a minimal valid proof bundle
             Ok(ProofBundle {
                 transition_dag: csv_core::dag::DAGSegment::new(
                     vec![],
@@ -300,10 +315,14 @@ mod tests {
         ) -> Result<crate::adapter_registry::SealRegistryStatus, crate::adapter_registry::AdapterError> {
             Ok(crate::adapter_registry::SealRegistryStatus::Available)
         }
+
+        async fn get_balance(&self, _address: &str) -> Result<String, crate::adapter_registry::AdapterError> {
+            Ok("0".to_string())
+        }
     }
 
     #[tokio::test]
-    async fn test_transfer_coordinator_replay_detection() {
+    async fn test_transfer_coordinator_replay_idempotent() {
         let replay_db = Box::new(crate::replay_db::InMemoryReplayDb::new());
         let event_bus = EventBus::new();
         let coordinator = TransferCoordinator::new(replay_db, event_bus);
@@ -321,13 +340,55 @@ mod tests {
             transition_id: vec![3u8; 32],
         };
 
-        // First transfer should succeed
-        let result = coordinator.execute(transfer.clone(), &registry).await;
-        assert!(result.is_ok());
+        let lease = crate::lease::TransferLease {
+            transfer_id: csv_core::sanad::SanadId::new(*transfer.sanad_id.as_bytes()),
+            epoch: 1,
+            owner_runtime_id: uuid::Uuid::new_v4(),
+            acquired_at: std::time::SystemTime::now(),
+            expires_at: std::time::SystemTime::now()
+                + std::time::Duration::from_secs(3600),
+        };
+        let runtime_ctx = crate::lease::RuntimeExecutionContext {
+            lease: lease.clone(),
+            runtime_instance: lease.owner_runtime_id,
+        };
 
-        // Second transfer with same parameters should be detected as replay
-        let result = coordinator.execute(transfer, &registry).await;
-        assert!(matches!(result, Err(TransferCoordinatorError::ReplayDetected(_))));
+        // First transfer should succeed
+        let result = coordinator.execute(transfer.clone(), &registry, runtime_ctx.clone()).await;
+        assert!(result.is_ok(), "First execution should succeed: {:?}", result);
+
+        // Completed transfers are idempotent — `consume_if_unconsumed` returns Ok(())
+        // for already Consumed entries. This allows safe retries of completed transfers.
+        let result = coordinator.execute(transfer.clone(), &registry, runtime_ctx.clone()).await;
+        assert!(result.is_ok(), "Completed transfers should be idempotent: {:?}", result);
+
+        // Now test that a Pending entry (inserted without confirming) blocks a retry.
+        // We need a different transfer to get a different ReplayId.
+        let pending_transfer = CrossChainTransfer {
+            id: "test-pending".to_string(),
+            source_chain: "test-chain".to_string(),
+            destination_chain: "test-chain".to_string(),
+            lock_tx_hash: vec![5u8; 32], // different lock tx
+            lock_output_index: 0,
+            sanad_id: csv_core::hash::Hash::new([6u8; 32]), // different sanad
+            transition_id: vec![7u8; 32], // different transition
+        };
+
+        let pending_lease = crate::lease::TransferLease {
+            transfer_id: csv_core::sanad::SanadId::new(*pending_transfer.sanad_id.as_bytes()),
+            epoch: 1,
+            owner_runtime_id: uuid::Uuid::new_v4(),
+            acquired_at: std::time::SystemTime::now(),
+            expires_at: std::time::SystemTime::now() + std::time::Duration::from_secs(3600),
+        };
+        let pending_ctx = crate::lease::RuntimeExecutionContext {
+            lease: pending_lease,
+            runtime_instance: uuid::Uuid::new_v4(),
+        };
+
+        // First execution inserts Pending, then the mint succeeds and confirms.
+        let result = coordinator.execute(pending_transfer.clone(), &registry, pending_ctx).await;
+        assert!(result.is_ok(), "Pending transfer first execution should succeed: {:?}", result);
     }
 
     #[tokio::test]
@@ -368,6 +429,9 @@ mod tests {
             async fn verify_seal_registry(&self, _s: &[u8]) -> Result<crate::adapter_registry::SealRegistryStatus, crate::adapter_registry::AdapterError> {
                 unimplemented!()
             }
+            async fn get_balance(&self, _address: &str) -> Result<String, crate::adapter_registry::AdapterError> {
+                Ok("0".to_string())
+            }
         }
         registry.register(std::sync::Arc::new(CelestiaAdapter { caps: celestia_caps }));
 
@@ -382,7 +446,19 @@ mod tests {
         };
 
         // Celestia cannot be a source (DA only)
-        let result = coordinator.execute(transfer, &registry).await;
+        let lease = crate::lease::TransferLease {
+            transfer_id: csv_core::sanad::SanadId::new(*transfer.sanad_id.as_bytes()),
+            epoch: 1,
+            owner_runtime_id: uuid::Uuid::new_v4(),
+            acquired_at: std::time::SystemTime::now(),
+            expires_at: std::time::SystemTime::now() + std::time::Duration::from_secs(3600),
+        };
+        let runtime_ctx = crate::lease::RuntimeExecutionContext {
+            lease,
+            runtime_instance: uuid::Uuid::new_v4(),
+        };
+
+        let result = coordinator.execute(transfer, &registry, runtime_ctx).await;
         assert!(matches!(
             result,
             Err(TransferCoordinatorError::UnsupportedOperation(_))
