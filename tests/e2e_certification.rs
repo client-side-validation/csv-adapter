@@ -13,7 +13,7 @@
 //! routed through the canonical proof pipeline.
 
 use csv_core::{
-    ChainId,
+    chain_config::ChainCapabilities,
     dag::{DAGNode, DAGSegment},
     error::Result as CsvResult,
     hash::Hash,
@@ -21,6 +21,11 @@ use csv_core::{
     proof_pipeline::{ChainVerifier, ValidationResult, validate_proof_bundle},
     replay_registry::{ReplayKey, ReplayRegistry},
     seal::{CommitAnchor, SealPoint},
+    verified::{
+        FinalityStrength, InclusionStrength, VerificationAssurance, VerificationFailure,
+        VerificationResult, VerifiedComponents,
+    },
+    ChainId,
 };
 use csv_keys::{
     bip39::{Mnemonic, MnemonicType},
@@ -42,25 +47,65 @@ impl ChainVerifier for CryptoVerifier {
         &self,
         proof: &InclusionProof,
         expected_root: Hash,
-    ) -> CsvResult<bool> {
+    ) -> CsvResult<VerificationResult> {
         // Step 1: Reject empty proofs
         if proof.proof_bytes.is_empty() {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            });
         }
 
         // Step 2: Verify proof size is within bounds
         if proof.proof_bytes.len() > csv_core::proof::MAX_PROOF_BYTES {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            });
         }
 
         // Step 3: Verify block hash is non-zero (indicates real block reference)
         if proof.block_hash == Hash::zero() {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            });
         }
 
         // Step 4: Verify the block hash matches what we expect
         if proof.block_hash != expected_root {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            });
         }
 
         // Step 5: Verify the proof contains the expected Merkle path structure
@@ -71,48 +116,161 @@ impl ChainVerifier for CryptoVerifier {
             .windows(proof.block_hash.as_bytes().len())
             .any(|window| window == proof.block_hash.as_bytes());
 
-        Ok(proof_contains_block_hash)
+        if proof_contains_block_hash {
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::AnchoredMerklePath,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: None,
+            })
+        } else {
+            Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            })
+        }
     }
 
-    async fn verify_finality(&self, proof: &FinalityProof) -> CsvResult<bool> {
+    async fn verify_finality(&self, proof: &FinalityProof) -> CsvResult<VerificationResult> {
         // Step 1: Reject insufficient confirmations
         if proof.confirmations < 6 {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::FinalityNotReached {
+                    required: 6,
+                    actual: proof.confirmations,
+                }),
+            });
         }
 
         // Step 2: Verify finality data is non-empty
         if proof.finality_data.is_empty() {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::MissingData(
+                    "Finality data is empty".to_string(),
+                )),
+            });
         }
 
         // Step 3: Verify finality data size is within bounds
         if proof.finality_data.len() > csv_core::proof::MAX_FINALITY_DATA {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::MissingData(
+                    "Finality data exceeds maximum size".to_string(),
+                )),
+            });
         }
 
-        Ok(true)
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::PartialCryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::Probabilistic {
+                    confirmations: proof.confirmations,
+                },
+                replay_checked: false,
+                ownership_signature: false,
+            },
+            error: None,
+        })
     }
 
-    async fn verify_zk(&self, _proof: &[u8]) -> CsvResult<bool> {
+    async fn verify_zk(&self, _proof: &[u8]) -> CsvResult<VerificationResult> {
         // ZK proofs are optional for basic certification flows.
         // If no ZK proof is provided, pass this step.
         if _proof.is_empty() {
-            return Ok(true);
+            return Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: None,
+            });
         }
         // If a ZK proof is provided, it must be structurally valid
-        Ok(!_proof.is_empty())
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::PartialCryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::None,
+                replay_checked: false,
+                ownership_signature: false,
+            },
+            error: None,
+        })
     }
 
-    async fn verify_seal_registry(&self, _seal_id: Hash) -> CsvResult<bool> {
+    async fn verify_seal_registry(&self, _seal_id: Hash) -> CsvResult<VerificationResult> {
         // For this test, the seal registry is checked separately
         // In production, this would query the on-chain seal registry
-        Ok(true)
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::PartialCryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::None,
+                replay_checked: true,
+                ownership_signature: false,
+            },
+            error: None,
+        })
     }
 
-    async fn verify_signature(&self, bundle: &ProofBundle) -> CsvResult<bool> {
+    async fn verify_signature(&self, bundle: &ProofBundle) -> CsvResult<VerificationResult> {
         // If no signatures are present, the proof is not authorized
         if bundle.signatures.is_empty() {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidOwnershipSignature),
+            });
         }
 
         // Verify each signature using Secp256k1
@@ -129,7 +287,17 @@ impl ChainVerifier for CryptoVerifier {
         for (i, sig_bytes) in bundle.signatures.iter().enumerate() {
             // Parse signature format: [pk_len (4 bytes LE)] [public_key] [signature_bytes]
             if sig_bytes.len() < 4 {
-                return Ok(false);
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                });
             }
 
             let pk_len =
@@ -137,7 +305,17 @@ impl ChainVerifier for CryptoVerifier {
                     as usize;
 
             if sig_bytes.len() < 4 + pk_len {
-                return Ok(false);
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                });
             }
 
             let pubkey = &sig_bytes[4..4 + pk_len];
@@ -153,22 +331,62 @@ impl ChainVerifier for CryptoVerifier {
                 })?,
             ) {
                 Ok(s) => s,
-                Err(_) => return Ok(false),
+                Err(_) => return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                }),
             };
 
             // Parse the public key
             let pk = match secp256k1::PublicKey::from_slice(pubkey) {
                 Ok(pk) => pk,
-                Err(_) => return Ok(false),
+                Err(_) => return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                }),
             };
 
             // Verify the signature cryptographically
             if secp.verify_ecdsa(&message, &sig, &pk).is_err() {
-                return Ok(false);
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                });
             }
         }
 
-        Ok(true)
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::PartialCryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::None,
+                replay_checked: false,
+                ownership_signature: true,
+            },
+            error: None,
+        })
     }
 }
 
@@ -261,11 +479,14 @@ mod e2e_certification_tests {
         // Step 5: Validate proof bundle through the canonical proof pipeline
         // using real cryptographic verification (not mocks)
         let verifier = CryptoVerifier;
+        let caps = ChainCapabilities::bitcoin();
         let result = validate_proof_bundle(
             &proof_bundle,
             &verifier,
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
+            caps,
+            None, // replay registry (optional)
             None, // event registry (optional)
         )
         .await;
@@ -397,11 +618,14 @@ mod e2e_certification_tests {
 
         let bundle = proof_bundle_res.unwrap();
         let verifier = CryptoVerifier;
+        let caps = ChainCapabilities::bitcoin();
         let result = validate_proof_bundle(
             &bundle,
             &verifier,
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
+            caps,
+            None,
             None,
         )
         .await;
@@ -574,11 +798,14 @@ mod e2e_certification_tests {
 
         let bundle = empty_sig_bundle.unwrap();
         let verifier = CryptoVerifier;
+        let caps = ChainCapabilities::bitcoin();
         let result = validate_proof_bundle(
             &bundle,
             &verifier,
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
+            caps,
+            None,
             None,
         )
         .await;
@@ -634,11 +861,14 @@ mod e2e_certification_tests {
         .unwrap();
 
         let verifier = CryptoVerifier;
+        let caps = ChainCapabilities::bitcoin();
         let result = validate_proof_bundle(
             &bundle,
             &verifier,
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
+            caps,
+            None,
             None,
         )
         .await;

@@ -12,6 +12,9 @@ use csv_core::proof_pipeline::ChainVerifier;
 use csv_core::hash::Hash;
 use csv_core::signature::SignatureScheme;
 use csv_core::verifier::verify_proof;
+use csv_core::verified::{
+    FinalityStrength, InclusionStrength, VerificationAssurance, VerifiedComponents,
+};
 use csv_core::CrossChainHashAlgorithm;
 use futures::future::{join_all, try_join_all};
 use serde::{Deserialize, Serialize};
@@ -244,11 +247,11 @@ impl ParallelVerifyService {
 
         // Call chain verifier to check seal registry
         match self.verifier.verify_seal_registry(seal_id).await {
-            Ok(true) => {
+            Ok(result) if result.valid => {
                 // Seal is available (not consumed)
                 Ok(())
             }
-            Ok(false) => {
+            Ok(_) => {
                 // Seal has been consumed - double-spend detected
                 Err(SealError::InvalidData(format!(
                     "Seal {} has already been consumed on chain {}",
@@ -295,7 +298,7 @@ impl ParallelVerifyService {
                 use tokio::runtime::Handle;
                 match Handle::try_current() {
                     Ok(handle) => match handle.block_on(verifier.verify_seal_registry(seal_hash)) {
-                        Ok(available) => !available,
+                        Ok(result) => !result.valid,
                         Err(e) => {
                             warn!("Seal registry lookup failed: {}", e);
                             true // Fail closed: treat unresolved seal as consumed
@@ -432,30 +435,64 @@ mod tests {
     /// Mock verifier for testing
     struct MockVerifier;
 
+    fn ok_result() -> csv_core::Result<VerificationResult> {
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::PartialCryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::None,
+                replay_checked: false,
+                ownership_signature: false,
+            },
+            error: None,
+        })
+    }
+
     #[async_trait::async_trait]
     impl ChainVerifier for MockVerifier {
         async fn verify_inclusion(
             &self,
             _proof: &csv_core::proof::InclusionProof,
             _expected_root: Hash,
-        ) -> csv_core::Result<bool> {
-            Ok(true)
+        ) -> csv_core::Result<VerificationResult> {
+            ok_result()
         }
 
-        async fn verify_finality(&self, _proof: &csv_core::proof::FinalityProof) -> csv_core::Result<bool> {
-            Ok(true)
+        async fn verify_finality(&self, _proof: &csv_core::proof::FinalityProof) -> csv_core::Result<VerificationResult> {
+            ok_result()
         }
 
-        async fn verify_zk(&self, _proof: &[u8]) -> csv_core::Result<bool> {
-            Ok(true)
+        async fn verify_zk(&self, _proof: &[u8]) -> csv_core::Result<VerificationResult> {
+            ok_result()
         }
 
-        async fn verify_seal_registry(&self, _seal_id: Hash) -> csv_core::Result<bool> {
-            Ok(true) // Seal is available (not consumed)
+        async fn verify_seal_registry(&self, _seal_id: Hash) -> csv_core::Result<VerificationResult> {
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: true,
+                    ownership_signature: false,
+                },
+                error: None,
+            })
         }
 
-        async fn verify_signature(&self, _bundle: &ProofBundle) -> csv_core::Result<bool> {
-            Ok(true)
+        async fn verify_signature(&self, _bundle: &ProofBundle) -> csv_core::Result<VerificationResult> {
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: true,
+                },
+                error: None,
+            })
         }
     }
 }

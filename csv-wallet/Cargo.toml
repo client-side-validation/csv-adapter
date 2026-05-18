@@ -84,6 +84,7 @@ bcs = "0.1"
 
 # Base64 for Solana transaction encoding
 base64 = "0.21"
+hakari = { version = "0.1", path = "../hakari" }
 
 [dev-dependencies]
 # Web testing

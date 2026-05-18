@@ -27,3 +27,4 @@ serde_json.workspace = true
 clap.workspace = true
 prometheus.workspace = true
 reqwest.workspace = true
+hakari = { version = "0.1", path = "../../hakari" }

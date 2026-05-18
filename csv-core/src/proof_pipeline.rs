@@ -39,27 +39,51 @@ use crate::hash::Hash;
 use crate::proof::{FinalityProof, InclusionProof, ProofBundle};
 use crate::protocol_version::ChainId;
 use crate::replay_registry::{ReplayKey, ReplayRegistryBackend};
+use crate::verified::{FinalityStrength, InclusionStrength, VerificationAssurance, VerificationResult, VerifiedComponents};
 
 /// Chain verifier trait that adapters must implement
 ///
 /// Adapters provide chain-specific verification logic through this trait,
 /// but the orchestration is handled by the canonical pipeline.
+///
+/// Every method returns a `VerificationResult` so the pipeline can inspect
+/// per-component strength (inclusion, finality, replay, signature) and
+/// enforce per-chain thresholds via `meets_chain_thresholds`.
 #[async_trait::async_trait]
 pub trait ChainVerifier {
-    /// Verify inclusion proof for a transaction on this chain
-    async fn verify_inclusion(&self, proof: &InclusionProof, expected_root: Hash) -> Result<bool>;
+    /// Verify inclusion proof for a transaction on this chain.
+    ///
+    /// Must return a `VerificationResult` with `verified_components.inclusion`
+    /// set to the appropriate `InclusionStrength` level.
+    async fn verify_inclusion(
+        &self,
+        proof: &InclusionProof,
+        expected_root: Hash,
+    ) -> Result<VerificationResult>;
 
-    /// Verify finality proof for a block on this chain
-    async fn verify_finality(&self, proof: &FinalityProof) -> Result<bool>;
+    /// Verify finality proof for a block on this chain.
+    ///
+    /// Must return a `VerificationResult` with `verified_components.finality`
+    /// set to the appropriate `FinalityStrength` level.
+    async fn verify_finality(&self, proof: &FinalityProof) -> Result<VerificationResult>;
 
-    /// Verify zero-knowledge proof (if applicable for this chain)
-    async fn verify_zk(&self, proof: &[u8]) -> Result<bool>;
+    /// Verify zero-knowledge proof (if applicable for this chain).
+    ///
+    /// Returns a `VerificationResult` indicating whether the ZK proof
+    /// was successfully verified.
+    async fn verify_zk(&self, proof: &[u8]) -> Result<VerificationResult>;
 
-    /// Verify seal registry (check if seal has been consumed)
-    async fn verify_seal_registry(&self, seal_id: Hash) -> Result<bool>;
+    /// Verify seal registry (check if seal has been consumed).
+    ///
+    /// Returns a `VerificationResult` with `verified_components.replay_checked`
+    /// set appropriately.
+    async fn verify_seal_registry(&self, seal_id: Hash) -> Result<VerificationResult>;
 
-    /// Verify signature on proof bundle
-    async fn verify_signature(&self, bundle: &ProofBundle) -> Result<bool>;
+    /// Verify signature on proof bundle.
+    ///
+    /// Returns a `VerificationResult` with `verified_components.ownership_signature`
+    /// set appropriately.
+    async fn verify_signature(&self, bundle: &ProofBundle) -> Result<VerificationResult>;
 }
 
 /// Validation step result
@@ -84,6 +108,89 @@ pub struct ValidationResult {
     pub error: Option<String>,
 }
 
+/// Merge multiple VerificationResult objects into a single one.
+///
+/// Takes the strongest (non-default) value for each component.
+/// If any result is invalid, the merged result is invalid.
+fn merge_verification_results(results: &[VerificationResult]) -> VerificationResult {
+    let has_failure = results.iter().any(|r| !r.valid);
+    if has_failure {
+        // Return the first invalid result
+        return results.iter().find(|r| !r.valid).cloned().unwrap();
+    }
+
+    // Merge components: take the strongest non-default value for each field
+    let mut best_inclusion = InclusionStrength::None;
+    let mut best_finality = FinalityStrength::None;
+    let mut replay_checked = false;
+    let mut ownership_signature = false;
+    let mut best_assurance = VerificationAssurance::Structural;
+    let mut error = None;
+
+    for result in results {
+        // Track the highest assurance level
+        if result.assurance as u8 > best_assurance as u8 {
+            best_assurance = result.assurance;
+        }
+
+        // Track the strongest inclusion strength
+        if is_stronger_inclusion(&result.verified_components.inclusion, &best_inclusion) {
+            best_inclusion = result.verified_components.inclusion;
+        }
+
+        // Track the strongest finality strength
+        if is_stronger_finality(&result.verified_components.finality, &best_finality) {
+            best_finality = result.verified_components.finality;
+        }
+
+        // Boolean fields: if any is true, the merged result is true
+        if result.verified_components.replay_checked {
+            replay_checked = true;
+        }
+        if result.verified_components.ownership_signature {
+            ownership_signature = true;
+        }
+
+        // Track error if present
+        if let Some(e) = &result.error {
+            error = Some(e.clone());
+        }
+    }
+
+    VerificationResult {
+        valid: true,
+        assurance: best_assurance,
+        verified_components: VerifiedComponents {
+            inclusion: best_inclusion,
+            finality: best_finality,
+            replay_checked,
+            ownership_signature,
+        },
+        error,
+    }
+}
+
+fn is_stronger_inclusion(a: &InclusionStrength, b: &InclusionStrength) -> bool {
+    use InclusionStrength::*;
+    matches!(
+        (a, b),
+        (AnchoredMerklePath, MerklePath | Checksum | None)
+            | (MerklePath, Checksum | None)
+            | (Checksum, None)
+    )
+}
+
+fn is_stronger_finality(a: &FinalityStrength, b: &FinalityStrength) -> bool {
+    use FinalityStrength::*;
+    match (a, b) {
+        (Deterministic, _) => true,
+        (_, Deterministic) => false,
+        (Probabilistic { confirmations: a_n }, Probabilistic { confirmations: b_n }) => a_n > b_n,
+        (Probabilistic { .. }, None) => true,
+        (None, _) => false,
+    }
+}
+
 /// Validate a proof bundle through the canonical pipeline
 ///
 /// This is the ONLY allowed proof validation entrypoint. All chain adapters
@@ -95,6 +202,7 @@ pub struct ValidationResult {
 /// * `verifier` - Chain-specific verifier implementation
 /// * `source_chain` - Source chain ID
 /// * `destination_chain` - Destination chain ID
+/// * `source_capabilities` - Chain capabilities for threshold checking
 /// * `replay_registry` - Optional replay registry for persistent replay detection
 /// * `event_registry` - Optional event registry for emitting events
 ///
@@ -106,10 +214,12 @@ pub async fn validate_proof_bundle(
     verifier: &dyn ChainVerifier,
     source_chain: ChainId,
     destination_chain: ChainId,
+    source_capabilities: crate::chain_config::ChainCapabilities,
     replay_registry: Option<Arc<dyn ReplayRegistryBackend>>,
     event_registry: Option<Arc<Mutex<EventIndexerRegistry>>>,
 ) -> ValidationResult {
     let mut steps = Vec::with_capacity(10);
+    let mut verification_results = Vec::with_capacity(5);
 
     // Step 1: Structural validation
     let step1 = validate_structural(bundle);
@@ -156,7 +266,7 @@ pub async fn validate_proof_bundle(
     }
 
     // Step 3: Inclusion proof validation
-    let step3 = validate_inclusion_proof(bundle, verifier).await;
+    let step3 = validate_inclusion_proof(bundle, verifier, &mut verification_results).await;
     steps.push(step3.clone());
     if !step3.passed {
         emit_proof_rejected_event(
@@ -178,7 +288,7 @@ pub async fn validate_proof_bundle(
     }
 
     // Step 4: ZK proof validation
-    let step4 = validate_zk_proof(bundle, verifier).await;
+    let step4 = validate_zk_proof(bundle, verifier, &mut verification_results).await;
     steps.push(step4.clone());
     if !step4.passed {
         emit_proof_rejected_event(
@@ -200,7 +310,7 @@ pub async fn validate_proof_bundle(
     }
 
     // Step 5: Finality validation
-    let step5 = validate_finality(bundle, verifier).await;
+    let step5 = validate_finality(bundle, verifier, &mut verification_results).await;
     steps.push(step5.clone());
     if !step5.passed {
         emit_proof_rejected_event(
@@ -264,7 +374,7 @@ pub async fn validate_proof_bundle(
     }
 
     // Step 7: Seal registry validation
-    let step7 = validate_seal_registry(bundle, verifier).await;
+    let step7 = validate_seal_registry(bundle, verifier, &mut verification_results).await;
     steps.push(step7.clone());
     if !step7.passed {
         emit_proof_rejected_event(
@@ -308,7 +418,7 @@ pub async fn validate_proof_bundle(
     }
 
     // Step 9: Signature validation
-    let step9 = validate_signature(bundle, verifier).await;
+    let step9 = validate_signature(bundle, verifier, &mut verification_results).await;
     steps.push(step9.clone());
     if !step9.passed {
         emit_proof_rejected_event(
@@ -329,13 +439,45 @@ pub async fn validate_proof_bundle(
         };
     }
 
-    // Step 10: Acceptance decision
-    let step10 = ValidationStep {
-        name: "acceptance_decision",
-        passed: true,
-        error: None,
+    // Step 10: Acceptance decision — enforce per-chain thresholds
+    // This is the production mint authorization gate. It checks each
+    // verified component against the per-chain minimums declared in
+    // ChainCapabilities, not against a scalar enum comparison.
+    let merged = merge_verification_results(&verification_results);
+    let step10 = match merged.meets_chain_thresholds(&source_capabilities) {
+        Ok(()) => ValidationStep {
+            name: "acceptance_decision",
+            passed: true,
+            error: None,
+        },
+        Err(e) => ValidationStep {
+            name: "acceptance_decision",
+            passed: false,
+            error: Some(format!(
+                "Chain thresholds not met: {}",
+                e.to_string()
+            )),
+        },
     };
-    steps.push(step10);
+    steps.push(step10.clone());
+    if !step10.passed {
+        emit_proof_rejected_event(
+            &event_registry,
+            &source_chain,
+            bundle,
+            step10.error.as_deref(),
+        )
+        .await;
+        return ValidationResult {
+            accepted: false,
+            steps,
+            error: Some(
+                step10
+                    .error
+                    .unwrap_or_else(|| "Acceptance decision failed".to_string()),
+            ),
+        };
+    }
 
     // Emit proof_accepted event
     let proof_hash =
@@ -491,21 +633,36 @@ fn validate_domain(
 async fn validate_inclusion_proof(
     bundle: &ProofBundle,
     verifier: &dyn ChainVerifier,
+    results: &mut Vec<VerificationResult>,
 ) -> ValidationStep {
     match verifier
         .verify_inclusion(&bundle.inclusion_proof, bundle.inclusion_proof.block_hash)
         .await
     {
-        Ok(true) => ValidationStep {
-            name: "inclusion_proof_validation",
-            passed: true,
-            error: None,
-        },
-        Ok(false) => ValidationStep {
-            name: "inclusion_proof_validation",
-            passed: false,
-            error: Some("Inclusion proof verification failed".to_string()),
-        },
+        Ok(result) if result.valid => {
+            results.push(result);
+            ValidationStep {
+                name: "inclusion_proof_validation",
+                passed: true,
+                error: None,
+            }
+        }
+        Ok(result) => {
+            let error_msg = result
+                .error
+                .as_ref()
+                .map(|e| e.to_string())
+                .unwrap_or_else(|| "unknown failure".to_string());
+            results.push(result);
+            ValidationStep {
+                name: "inclusion_proof_validation",
+                passed: false,
+                error: Some(format!(
+                    "Inclusion proof verification failed: {}",
+                    error_msg
+                )),
+            }
+        }
         Err(e) => ValidationStep {
             name: "inclusion_proof_validation",
             passed: false,
@@ -515,23 +672,41 @@ async fn validate_inclusion_proof(
 }
 
 /// Step 4: ZK proof validation
-async fn validate_zk_proof(bundle: &ProofBundle, verifier: &dyn ChainVerifier) -> ValidationStep {
+async fn validate_zk_proof(
+    bundle: &ProofBundle,
+    verifier: &dyn ChainVerifier,
+    results: &mut Vec<VerificationResult>,
+) -> ValidationStep {
     // Check if the bundle has ZK proof data in the finality proof's additional data
     // or somewhere else in the bundle structure
     let zk_proof_data = bundle.finality_proof.finality_data.as_slice();
 
     // Pass the actual proof data to the verifier, not an empty slice
     match verifier.verify_zk(zk_proof_data).await {
-        Ok(true) => ValidationStep {
-            name: "zk_proof_validation",
-            passed: true,
-            error: None,
-        },
-        Ok(false) => ValidationStep {
-            name: "zk_proof_validation",
-            passed: false,
-            error: Some("ZK proof verification failed".to_string()),
-        },
+        Ok(result) if result.valid => {
+            results.push(result);
+            ValidationStep {
+                name: "zk_proof_validation",
+                passed: true,
+                error: None,
+            }
+        }
+        Ok(result) => {
+            let error_msg = result
+                .error
+                .as_ref()
+                .map(|e| e.to_string())
+                .unwrap_or_else(|| "unknown failure".to_string());
+            results.push(result);
+            ValidationStep {
+                name: "zk_proof_validation",
+                passed: false,
+                error: Some(format!(
+                    "ZK proof verification failed: {}",
+                    error_msg
+                )),
+            }
+        }
         Err(e) => ValidationStep {
             name: "zk_proof_validation",
             passed: false,
@@ -541,18 +716,36 @@ async fn validate_zk_proof(bundle: &ProofBundle, verifier: &dyn ChainVerifier) -
 }
 
 /// Step 5: Finality validation
-async fn validate_finality(bundle: &ProofBundle, verifier: &dyn ChainVerifier) -> ValidationStep {
+async fn validate_finality(
+    bundle: &ProofBundle,
+    verifier: &dyn ChainVerifier,
+    results: &mut Vec<VerificationResult>,
+) -> ValidationStep {
     match verifier.verify_finality(&bundle.finality_proof).await {
-        Ok(true) => ValidationStep {
-            name: "finality_validation",
-            passed: true,
-            error: None,
-        },
-        Ok(false) => ValidationStep {
-            name: "finality_validation",
-            passed: false,
-            error: Some("Finality proof verification failed".to_string()),
-        },
+        Ok(result) if result.valid => {
+            results.push(result);
+            ValidationStep {
+                name: "finality_validation",
+                passed: true,
+                error: None,
+            }
+        }
+        Ok(result) => {
+            let error_msg = result
+                .error
+                .as_ref()
+                .map(|e| e.to_string())
+                .unwrap_or_else(|| "unknown failure".to_string());
+            results.push(result);
+            ValidationStep {
+                name: "finality_validation",
+                passed: false,
+                error: Some(format!(
+                    "Finality proof verification failed: {}",
+                    error_msg
+                )),
+            }
+        }
         Err(e) => ValidationStep {
             name: "finality_validation",
             passed: false,
@@ -628,6 +821,7 @@ async fn validate_replay(
 async fn validate_seal_registry(
     bundle: &ProofBundle,
     verifier: &dyn ChainVerifier,
+    results: &mut Vec<VerificationResult>,
 ) -> ValidationStep {
     // Verify that the seal has not been consumed before
     // This prevents double-spend attacks
@@ -636,16 +830,30 @@ async fn validate_seal_registry(
     let seal_id = bundle.inclusion_proof.block_hash;
 
     match verifier.verify_seal_registry(seal_id).await {
-        Ok(true) => ValidationStep {
-            name: "seal_registry_validation",
-            passed: true,
-            error: None,
-        },
-        Ok(false) => ValidationStep {
-            name: "seal_registry_validation",
-            passed: false,
-            error: Some("Seal has already been consumed - double-spend detected".to_string()),
-        },
+        Ok(result) if result.valid => {
+            results.push(result);
+            ValidationStep {
+                name: "seal_registry_validation",
+                passed: true,
+                error: None,
+            }
+        }
+        Ok(result) => {
+            let error_msg = result
+                .error
+                .as_ref()
+                .map(|e| e.to_string())
+                .unwrap_or_else(|| "unknown failure".to_string());
+            results.push(result);
+            ValidationStep {
+                name: "seal_registry_validation",
+                passed: false,
+                error: Some(format!(
+                    "Seal registry verification failed: {}",
+                    error_msg
+                )),
+            }
+        }
         Err(e) => ValidationStep {
             name: "seal_registry_validation",
             passed: false,
@@ -709,21 +917,39 @@ fn validate_transition_legality(bundle: &ProofBundle) -> ValidationStep {
 }
 
 /// Step 9: Signature validation
-async fn validate_signature(bundle: &ProofBundle, verifier: &dyn ChainVerifier) -> ValidationStep {
+async fn validate_signature(
+    bundle: &ProofBundle,
+    verifier: &dyn ChainVerifier,
+    results: &mut Vec<VerificationResult>,
+) -> ValidationStep {
     // Verify cryptographic signatures on the proof bundle
     // This ensures the proof was created by the legitimate owner
 
     match verifier.verify_signature(bundle).await {
-        Ok(true) => ValidationStep {
-            name: "signature_validation",
-            passed: true,
-            error: None,
-        },
-        Ok(false) => ValidationStep {
-            name: "signature_validation",
-            passed: false,
-            error: Some("Invalid signature - proof not authenticated".to_string()),
-        },
+        Ok(result) if result.valid => {
+            results.push(result);
+            ValidationStep {
+                name: "signature_validation",
+                passed: true,
+                error: None,
+            }
+        }
+        Ok(result) => {
+            let error_msg = result
+                .error
+                .as_ref()
+                .map(|e| e.to_string())
+                .unwrap_or_else(|| "unknown failure".to_string());
+            results.push(result);
+            ValidationStep {
+                name: "signature_validation",
+                passed: false,
+                error: Some(format!(
+                    "Signature verification failed: {}",
+                    error_msg
+                )),
+            }
+        }
         Err(e) => ValidationStep {
             name: "signature_validation",
             passed: false,
@@ -735,8 +961,26 @@ async fn validate_signature(bundle: &ProofBundle, verifier: &dyn ChainVerifier) 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chain_config::ChainCapabilities;
+    use crate::verified::{
+        FinalityStrength, InclusionStrength, VerificationAssurance, VerifiedComponents,
+    };
 
     struct MockVerifier;
+
+    fn ok_result() -> VerificationResult {
+        VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::Cryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::MerklePath,
+                finality: FinalityStrength::Probabilistic { confirmations: 6 },
+                replay_checked: true,
+                ownership_signature: true,
+            },
+            error: None,
+        }
+    }
 
     #[async_trait::async_trait]
     impl ChainVerifier for MockVerifier {
@@ -744,24 +988,24 @@ mod tests {
             &self,
             _proof: &InclusionProof,
             _expected_root: Hash,
-        ) -> Result<bool> {
-            Ok(true)
+        ) -> Result<VerificationResult> {
+            Ok(ok_result())
         }
 
-        async fn verify_finality(&self, _proof: &FinalityProof) -> Result<bool> {
-            Ok(true)
+        async fn verify_finality(&self, _proof: &FinalityProof) -> Result<VerificationResult> {
+            Ok(ok_result())
         }
 
-        async fn verify_zk(&self, _proof: &[u8]) -> Result<bool> {
-            Ok(true)
+        async fn verify_zk(&self, _proof: &[u8]) -> Result<VerificationResult> {
+            Ok(ok_result())
         }
 
-        async fn verify_seal_registry(&self, _seal_id: Hash) -> Result<bool> {
-            Ok(true)
+        async fn verify_seal_registry(&self, _seal_id: Hash) -> Result<VerificationResult> {
+            Ok(ok_result())
         }
 
-        async fn verify_signature(&self, _bundle: &ProofBundle) -> Result<bool> {
-            Ok(true)
+        async fn verify_signature(&self, _bundle: &ProofBundle) -> Result<VerificationResult> {
+            Ok(ok_result())
         }
     }
 
@@ -806,11 +1050,13 @@ mod tests {
         };
 
         let verifier = MockVerifier;
+        let caps = ChainCapabilities::bitcoin();
         let result = validate_proof_bundle(
             &bundle,
             &verifier,
             ChainId::new("bitcoin"),
             ChainId::new("ethereum"),
+            caps,
             None,
             None,
         )

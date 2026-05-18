@@ -8,6 +8,10 @@ use async_trait::async_trait;
 use csv_core::Hash;
 use csv_core::proof::{FinalityProof, InclusionProof};
 use csv_core::proof_pipeline::ChainVerifier;
+use csv_core::verified::{
+    FinalityStrength, InclusionStrength, VerificationAssurance, VerificationFailure,
+    VerificationResult, VerifiedComponents,
+};
 
 use crate::config::EthereumConfig;
 use crate::mpt::verify_storage_proof;
@@ -42,7 +46,7 @@ impl ChainVerifier for EthereumVerifier {
         &self,
         proof: &InclusionProof,
         _expected_root: Hash,
-    ) -> csv_core::Result<bool> {
+    ) -> csv_core::Result<VerificationResult> {
         // The proof now contains the block_number
         let block_number = proof.block_number;
         let block_hash_bytes = proof.block_hash.as_bytes();
@@ -94,33 +98,106 @@ impl ChainVerifier for EthereumVerifier {
 
         let result = verify_storage_proof(state_root, &account_proof, &storage_proof, storage_key);
 
-        Ok(result)
+        if result {
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::AnchoredMerklePath,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: None,
+            })
+        } else {
+            Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            })
+        }
     }
 
     /// Verify finality proof for an Ethereum block
-    async fn verify_finality(&self, proof: &FinalityProof) -> csv_core::Result<bool> {
+    async fn verify_finality(&self, proof: &FinalityProof) -> csv_core::Result<VerificationResult> {
         // Ethereum has probabilistic finality - check confirmations
         // Use the configured finality_depth instead of hardcoded value
         let required_confirmations = self.config.finality_depth;
         let is_finalized = proof.confirmations >= required_confirmations;
 
-        Ok(is_finalized)
+        if is_finalized {
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::Probabilistic {
+                        confirmations: proof.confirmations,
+                    },
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: None,
+            })
+        } else {
+            Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::FinalityNotReached {
+                    required: required_confirmations,
+                    actual: proof.confirmations,
+                }),
+            })
+        }
     }
 
     /// Verify zero-knowledge proof (if applicable)
-    async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<bool> {
+    async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<VerificationResult> {
         // Ethereum may use ZK proofs for certain operations
         // For now, return true if proof is empty, otherwise verify
         if proof.is_empty() {
-            Ok(true)
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: None,
+            })
         } else {
             // Placeholder - would implement actual ZK proof verification
-            Ok(true)
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: None,
+            })
         }
     }
 
     /// Verify seal registry (check if seal has been consumed)
-    async fn verify_seal_registry(&self, seal_id: Hash) -> csv_core::Result<bool> {
+    async fn verify_seal_registry(&self, seal_id: Hash) -> csv_core::Result<VerificationResult> {
         // Query the CSVLock contract to check if the seal has been used
         // The seal_id is a bytes32 value that maps to the usedSeals mapping
 
@@ -159,17 +236,71 @@ impl ChainVerifier for EthereumVerifier {
                     csv_core::ProtocolError::Generic("Invalid storage value length".to_string())
                 })?;
                 let value = alloy_primitives::U256::from_be_bytes(value_bytes);
-                Ok(value != alloy_primitives::U256::ZERO)
+                if value != alloy_primitives::U256::ZERO {
+                    Ok(VerificationResult {
+                        valid: false,
+                        assurance: VerificationAssurance::Structural,
+                        verified_components: VerifiedComponents {
+                            inclusion: InclusionStrength::None,
+                            finality: FinalityStrength::None,
+                            replay_checked: true,
+                            ownership_signature: false,
+                        },
+                        error: Some(VerificationFailure::ReplayDetected),
+                    })
+                } else {
+                    Ok(VerificationResult {
+                        valid: true,
+                        assurance: VerificationAssurance::PartialCryptographic,
+                        verified_components: VerifiedComponents {
+                            inclusion: InclusionStrength::None,
+                            finality: FinalityStrength::None,
+                            replay_checked: true,
+                            ownership_signature: false,
+                        },
+                        error: None,
+                    })
+                }
             } else if storage_entry.value.is_empty() {
                 // Empty value means not set (false)
-                Ok(false)
+                Ok(VerificationResult {
+                    valid: true,
+                    assurance: VerificationAssurance::PartialCryptographic,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: true,
+                        ownership_signature: false,
+                    },
+                    error: None,
+                })
             } else {
                 // Try to parse as RLP - for simplicity, treat non-empty as true
-                Ok(true)
+                Ok(VerificationResult {
+                    valid: true,
+                    assurance: VerificationAssurance::PartialCryptographic,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: true,
+                        ownership_signature: false,
+                    },
+                    error: None,
+                })
             }
         } else {
             // No proof returned - assume seal not used (conservative)
-            Ok(false)
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: true,
+                    ownership_signature: false,
+                },
+                error: None,
+            })
         }
     }
 
@@ -177,24 +308,40 @@ impl ChainVerifier for EthereumVerifier {
     async fn verify_signature(
         &self,
         bundle: &csv_core::proof::ProofBundle,
-    ) -> csv_core::Result<bool> {
+    ) -> csv_core::Result<VerificationResult> {
         use csv_core::signature::{Signature, SignatureScheme, verify_signatures};
 
         if bundle.signatures.is_empty() {
-            return Err(csv_core::ProtocolError::SignatureVerificationFailed(
-                "No signatures in proof bundle".to_string(),
-            ));
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidOwnershipSignature),
+            });
         }
 
         // Parse signatures from the bundle
         let mut signatures = Vec::with_capacity(bundle.signatures.len());
 
-        for (i, sig_bytes) in bundle.signatures.iter().enumerate() {
+        for sig_bytes in bundle.signatures.iter() {
             // Parse signature format: [pk_len (4 bytes LE)] [public_key] [signature]
             if sig_bytes.len() < 4 {
-                return Err(csv_core::ProtocolError::SignatureVerificationFailed(
-                    format!("Signature {} too short for header", i),
-                ));
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                });
             }
 
             let pk_len =
@@ -202,9 +349,17 @@ impl ChainVerifier for EthereumVerifier {
                     as usize;
 
             if sig_bytes.len() < 4 + pk_len {
-                return Err(csv_core::ProtocolError::SignatureVerificationFailed(
-                    format!("Signature {} too short for public key", i),
-                ));
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                });
             }
 
             let public_key = sig_bytes[4..4 + pk_len].to_vec();
@@ -220,6 +375,16 @@ impl ChainVerifier for EthereumVerifier {
         verify_signatures(&signatures, SignatureScheme::Secp256k1)
             .map_err(|e| csv_core::ProtocolError::SignatureVerificationFailed(e.to_string()))?;
 
-        Ok(true)
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::PartialCryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::None,
+                replay_checked: false,
+                ownership_signature: true,
+            },
+            error: None,
+        })
     }
 }

@@ -30,6 +30,7 @@ anyhow.workspace = true
 lazy_static.workspace = true
 sha3.workspace = true          # <-- keccak256 for Ethereum event signatures
 rand = "0.8"
+hakari = { version = "0.1", path = "../../hakari" }
 
 [features]
 default      = []

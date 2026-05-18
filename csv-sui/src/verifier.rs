@@ -8,6 +8,10 @@ use csv_core::proof::{FinalityProof, InclusionProof, ProofBundle};
 use csv_core::proof_pipeline::ChainVerifier;
 use csv_core::signature::{Signature, SignatureScheme, verify_signatures};
 use csv_core::Hash;
+use csv_core::verified::{
+    FinalityStrength, InclusionStrength, VerificationAssurance, VerificationFailure,
+    VerificationResult, VerifiedComponents,
+};
 
 use crate::rpc::SuiRpc;
 
@@ -35,9 +39,21 @@ impl ChainVerifier for SuiVerifier {
         &self,
         proof: &InclusionProof,
         expected_root: Hash,
-    ) -> csv_core::Result<bool> {
+    ) -> csv_core::Result<VerificationResult> {
         if proof.proof_bytes.is_empty() {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::MissingData(
+                    "Inclusion proof bytes are empty".to_string(),
+                )),
+            });
         }
 
         // Parse the Sui inclusion proof format:
@@ -46,7 +62,19 @@ impl ChainVerifier for SuiVerifier {
 
         let proof_bytes = &proof.proof_bytes;
         if proof_bytes.len() < 4 {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::MissingData(
+                    "Inclusion proof bytes too short".to_string(),
+                )),
+            });
         }
 
         let num_siblings = u32::from_le_bytes([
@@ -58,13 +86,33 @@ impl ChainVerifier for SuiVerifier {
 
         let siblings_section_end = 4 + num_siblings * 32;
         if proof_bytes.len() < siblings_section_end {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            });
         }
 
         // Extract the transaction digest (last 32 bytes after siblings)
         let tx_digest = &proof_bytes[siblings_section_end..siblings_section_end + 32];
         if tx_digest.len() < 32 {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            });
         }
 
         // Compute the leaf hash: H(tx_digest || block_number)
@@ -93,46 +141,125 @@ impl ChainVerifier for SuiVerifier {
 
         // The computed root should match the expected root
         let computed_root = Hash::new(current_hash.into());
-        Ok(computed_root == expected_root)
+        if computed_root == expected_root {
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::Cryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::MerklePath,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: None,
+            })
+        } else {
+            Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            })
+        }
     }
 
     /// Verify finality proof for a Sui block
     ///
     /// Sui has instant finality via Narwhal/Bullshark consensus.
     /// Check if the checkpoint has sufficient confirmations.
-    async fn verify_finality(&self, proof: &FinalityProof) -> csv_core::Result<bool> {
+    async fn verify_finality(&self, proof: &FinalityProof) -> csv_core::Result<VerificationResult> {
         // Sui has instant finality, so 1 confirmation is sufficient
         let required_confirmations = 1;
 
-        if proof.confirmations >= required_confirmations {
-            if proof.finality_data.is_empty() {
-                return Ok(false);
-            }
-            Ok(true)
-        } else {
-            Ok(false)
+        if proof.confirmations < required_confirmations {
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::FinalityNotReached {
+                    required: required_confirmations,
+                    actual: proof.confirmations,
+                }),
+            });
         }
+
+        if proof.finality_data.is_empty() {
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::MissingData(
+                    "Finality data is empty".to_string(),
+                )),
+            });
+        }
+
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::ConsensusBound,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::Deterministic,
+                replay_checked: false,
+                ownership_signature: false,
+            },
+            error: None,
+        })
     }
 
     /// Verify zero-knowledge proof (if applicable)
     ///
     /// Sui doesn't use ZK proofs for basic operations.
-    async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<bool> {
+    async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<VerificationResult> {
         if !proof.is_empty() {
-            return Err(csv_core::ProtocolError::VerificationFailed(
-                "ZK proofs are not supported for Sui operations. \
-                 Set zk_proof_data to empty for Sui transactions."
-                    .to_string(),
-            ));
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::UnsupportedCapability(
+                    "ZK proofs are not supported for Sui operations. Set zk_proof_data to empty for Sui transactions."
+                        .to_string(),
+                )),
+            });
         }
-        Ok(true)
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::PartialCryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::None,
+                replay_checked: false,
+                ownership_signature: false,
+            },
+            error: None,
+        })
     }
 
     /// Verify seal registry (check if seal has been consumed)
     ///
     /// Queries the Sui blockchain via RPC to check if the object
     /// associated with the seal_id has been deleted/consumed.
-    async fn verify_seal_registry(&self, seal_id: Hash) -> csv_core::Result<bool> {
+    async fn verify_seal_registry(&self, seal_id: Hash) -> csv_core::Result<VerificationResult> {
         // Convert seal_id to a Sui object ID (32 bytes)
         let object_id = seal_id.as_bytes();
 
@@ -149,10 +276,30 @@ impl ChainVerifier for SuiVerifier {
 
                 if is_consumed {
                     // Object has been consumed - seal is NOT available
-                    Ok(false)
+                    Ok(VerificationResult {
+                        valid: false,
+                        assurance: VerificationAssurance::Structural,
+                        verified_components: VerifiedComponents {
+                            inclusion: InclusionStrength::None,
+                            finality: FinalityStrength::None,
+                            replay_checked: true,
+                            ownership_signature: false,
+                        },
+                        error: Some(VerificationFailure::ReplayDetected),
+                    })
                 } else {
                     // Object exists and is not consumed - seal is available
-                    Ok(true)
+                    Ok(VerificationResult {
+                        valid: true,
+                        assurance: VerificationAssurance::PartialCryptographic,
+                        verified_components: VerifiedComponents {
+                            inclusion: InclusionStrength::None,
+                            finality: FinalityStrength::None,
+                            replay_checked: true,
+                            ownership_signature: false,
+                        },
+                        error: None,
+                    })
                 }
             }
             Ok(None) => {
@@ -161,7 +308,17 @@ impl ChainVerifier for SuiVerifier {
                     "Sui object not found: {}",
                     hex::encode(object_id)
                 );
-                Ok(false)
+                Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: true,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::ReplayDetected),
+                })
             }
             Err(e) => {
                 log::error!(
@@ -181,11 +338,19 @@ impl ChainVerifier for SuiVerifier {
     ///
     /// Parses signatures from the proof bundle and verifies them
     /// using the Sui Ed25519 signature scheme.
-    async fn verify_signature(&self, bundle: &ProofBundle) -> csv_core::Result<bool> {
+    async fn verify_signature(&self, bundle: &ProofBundle) -> csv_core::Result<VerificationResult> {
         if bundle.signatures.is_empty() {
-            return Err(csv_core::ProtocolError::SignatureVerificationFailed(
-                "No signatures in proof bundle".to_string(),
-            ));
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidOwnershipSignature),
+            });
         }
 
         // Parse signatures from the bundle
@@ -193,9 +358,17 @@ impl ChainVerifier for SuiVerifier {
 
         for (i, sig_bytes) in bundle.signatures.iter().enumerate() {
             if sig_bytes.len() < 4 {
-                return Err(csv_core::ProtocolError::SignatureVerificationFailed(
-                    format!("Signature {} too short for header", i),
-                ));
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                });
             }
 
             let pk_len =
@@ -203,9 +376,17 @@ impl ChainVerifier for SuiVerifier {
                     as usize;
 
             if sig_bytes.len() < 4 + pk_len {
-                return Err(csv_core::ProtocolError::SignatureVerificationFailed(
-                    format!("Signature {} too short for public key", i),
-                ));
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                });
             }
 
             let public_key = sig_bytes[4..4 + pk_len].to_vec();
@@ -221,6 +402,16 @@ impl ChainVerifier for SuiVerifier {
         verify_signatures(&signatures, SignatureScheme::Ed25519)
             .map_err(|e| csv_core::ProtocolError::SignatureVerificationFailed(e.to_string()))?;
 
-        Ok(true)
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::PartialCryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::None,
+                replay_checked: false,
+                ownership_signature: true,
+            },
+            error: None,
+        })
     }
 }

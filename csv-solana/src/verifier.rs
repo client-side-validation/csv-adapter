@@ -8,6 +8,10 @@ use csv_core::Hash;
 use csv_core::proof::{FinalityProof, InclusionProof, ProofBundle};
 use csv_core::proof_pipeline::ChainVerifier;
 use csv_core::signature::{Signature, SignatureScheme, verify_signatures};
+use csv_core::verified::{
+    FinalityStrength, InclusionStrength, VerificationAssurance, VerificationFailure,
+    VerificationResult, VerifiedComponents,
+};
 
 use crate::proofs::verify_inclusion_proof;
 use crate::rpc::SolanaRpc;
@@ -42,43 +46,124 @@ impl ChainVerifier for SolanaVerifier {
         &self,
         proof: &InclusionProof,
         expected_root: Hash,
-    ) -> csv_core::Result<bool> {
+    ) -> csv_core::Result<VerificationResult> {
         // Use the existing Solana slot proof verification logic
-        Ok(verify_inclusion_proof(proof, &expected_root))
+        let result = verify_inclusion_proof(proof, &expected_root);
+        if result {
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::AnchoredMerklePath,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: None,
+            })
+        } else {
+            Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            })
+        }
     }
 
     /// Verify finality proof for a Solana block
-    async fn verify_finality(&self, proof: &FinalityProof) -> csv_core::Result<bool> {
+    async fn verify_finality(&self, proof: &FinalityProof) -> csv_core::Result<VerificationResult> {
         // Solana has probabilistic finality - check confirmations
         let required_confirmations = 32;
 
         if proof.confirmations >= required_confirmations {
             if proof.finality_data.is_empty() {
-                return Ok(false);
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::MissingData(
+                        "Finality data is empty".to_string(),
+                    )),
+                });
             }
-            Ok(true)
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::Probabilistic {
+                        confirmations: proof.confirmations,
+                    },
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: None,
+            })
         } else {
-            Ok(false)
+            Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::FinalityNotReached {
+                    required: required_confirmations,
+                    actual: proof.confirmations,
+                }),
+            })
         }
     }
 
     /// Verify zero-knowledge proof (if applicable)
-    async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<bool> {
+    async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<VerificationResult> {
         if !proof.is_empty() {
-            return Err(csv_core::ProtocolError::VerificationError(
-                "ZK proofs are not supported for Solana operations. \
-                 Set zk_proof_data to empty for Solana transactions."
-                    .to_string(),
-            ));
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::UnsupportedCapability(
+                    "ZK proofs are not supported for Solana operations. Set zk_proof_data to empty for Solana transactions."
+                        .to_string(),
+                )),
+            });
         }
-        Ok(true)
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::PartialCryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::None,
+                replay_checked: false,
+                ownership_signature: false,
+            },
+            error: None,
+        })
     }
 
     /// Verify seal registry (check if seal has been consumed)
     ///
     /// Queries the Solana blockchain via RPC to check if the PDA account
     /// associated with the seal_id has been closed/consumed.
-    async fn verify_seal_registry(&self, seal_id: Hash) -> csv_core::Result<bool> {
+    async fn verify_seal_registry(&self, seal_id: Hash) -> csv_core::Result<VerificationResult> {
         // Convert the seal_id to a Pubkey (the PDA address of the seal)
         let pubkey = self.seal_id_to_pubkey(seal_id);
 
@@ -97,10 +182,30 @@ impl ChainVerifier for SolanaVerifier {
 
                 if is_consumed {
                     // Seal has been consumed - not available
-                    Ok(false)
+                    Ok(VerificationResult {
+                        valid: false,
+                        assurance: VerificationAssurance::Structural,
+                        verified_components: VerifiedComponents {
+                            inclusion: InclusionStrength::None,
+                            finality: FinalityStrength::None,
+                            replay_checked: true,
+                            ownership_signature: false,
+                        },
+                        error: Some(VerificationFailure::ReplayDetected),
+                    })
                 } else {
                     // Account exists with data - seal is available
-                    Ok(true)
+                    Ok(VerificationResult {
+                        valid: true,
+                        assurance: VerificationAssurance::PartialCryptographic,
+                        verified_components: VerifiedComponents {
+                            inclusion: InclusionStrength::None,
+                            finality: FinalityStrength::None,
+                            replay_checked: true,
+                            ownership_signature: false,
+                        },
+                        error: None,
+                    })
                 }
             }
             Err(e) => {
@@ -118,7 +223,17 @@ impl ChainVerifier for SolanaVerifier {
                         hex::encode(seal_id.as_bytes()),
                         e
                     );
-                    Ok(false)
+                    Ok(VerificationResult {
+                        valid: false,
+                        assurance: VerificationAssurance::Structural,
+                        verified_components: VerifiedComponents {
+                            inclusion: InclusionStrength::None,
+                            finality: FinalityStrength::None,
+                            replay_checked: true,
+                            ownership_signature: false,
+                        },
+                        error: Some(VerificationFailure::ReplayDetected),
+                    })
                 } else {
                     // Genuine RPC error — fail loudly rather than returning a silent false
                     log::error!(
@@ -142,21 +257,37 @@ impl ChainVerifier for SolanaVerifier {
     async fn verify_signature(
         &self,
         bundle: &ProofBundle,
-    ) -> csv_core::Result<bool> {
+    ) -> csv_core::Result<VerificationResult> {
         if bundle.signatures.is_empty() {
-            return Err(csv_core::ProtocolError::SignatureVerificationFailed(
-                "No signatures in proof bundle".to_string(),
-            ));
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidOwnershipSignature),
+            });
         }
 
         // Parse signatures from the bundle
         let mut signatures = Vec::with_capacity(bundle.signatures.len());
 
-        for (i, sig_bytes) in bundle.signatures.iter().enumerate() {
+        for sig_bytes in bundle.signatures.iter() {
             if sig_bytes.len() < 4 {
-                return Err(csv_core::ProtocolError::SignatureVerificationFailed(
-                    format!("Signature {} too short for header", i),
-                ));
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                });
             }
 
             let pk_len =
@@ -164,9 +295,17 @@ impl ChainVerifier for SolanaVerifier {
                     as usize;
 
             if sig_bytes.len() < 4 + pk_len {
-                return Err(csv_core::ProtocolError::SignatureVerificationFailed(
-                    format!("Signature {} too short for public key", i),
-                ));
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                });
             }
 
             let public_key = sig_bytes[4..4 + pk_len].to_vec();
@@ -180,6 +319,16 @@ impl ChainVerifier for SolanaVerifier {
         verify_signatures(&signatures, SignatureScheme::Ed25519)
             .map_err(|e| csv_core::ProtocolError::SignatureVerificationFailed(e.to_string()))?;
 
-        Ok(true)
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::PartialCryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::None,
+                replay_checked: false,
+                ownership_signature: true,
+            },
+            error: None,
+        })
     }
 }

@@ -60,6 +60,7 @@ base64 = "0.21"
 # HTTP client for RPC calls
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 thiserror = "1.0"
+hakari = { version = "0.1", path = "../hakari" }
 
 [dev-dependencies]
 tempfile = "3.0"

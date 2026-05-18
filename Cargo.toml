@@ -25,6 +25,7 @@ members = [
     "csv-explorer/storage",
     "csv-explorer/indexer",
     "csv-stark",
+    "hakari",
     "typescript-sdk/wasm",
     "xtask",
     "fuzz",
@@ -129,6 +130,9 @@ unused_mut = "deny"
 
 [patch.crates-io]
 solana-keypair = { path = "patches/solana-keypair" }
+
+[dependencies]
+hakari = { version = "0.1", path = "hakari" }
 
 [workspace.lints.clippy]
 needless_borrows_for_generic_args = "allow"

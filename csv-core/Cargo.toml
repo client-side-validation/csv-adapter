@@ -43,6 +43,7 @@ reqwest = { version = "0.11", features = ["json"], optional = true }
 url = { version = "2.5", optional = true }
 tokio = { version = "1", features = ["rt", "macros", "time"], optional = true }
 csv-observability = { path = "../csv-observability", optional = true }
+hakari = { version = "0.1", path = "../hakari" }
 
 [features]
 default = ["std", "pq"]

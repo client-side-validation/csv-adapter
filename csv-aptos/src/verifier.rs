@@ -8,6 +8,10 @@ use csv_core::Hash;
 use csv_core::proof::{FinalityProof, InclusionProof, ProofBundle};
 use csv_core::proof_pipeline::ChainVerifier;
 use csv_core::signature::{Signature, SignatureScheme, verify_signatures};
+use csv_core::verified::{
+    FinalityStrength, InclusionStrength, VerificationAssurance, VerificationFailure,
+    VerificationResult, VerifiedComponents,
+};
 
 use crate::proofs::StateProofVerifier;
 use crate::rpc::AptosRpc;
@@ -35,10 +39,20 @@ impl ChainVerifier for AptosVerifier {
         &self,
         proof: &InclusionProof,
         expected_root: Hash,
-    ) -> csv_core::Result<bool> {
+    ) -> csv_core::Result<VerificationResult> {
         // Validate proof bytes are present
         if proof.proof_bytes.is_empty() {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            });
         }
 
         // Compute the leaf hash from the proof data
@@ -48,7 +62,17 @@ impl ChainVerifier for AptosVerifier {
         // Parse proof structure
         let proof_bytes = &proof.proof_bytes;
         if proof_bytes.len() < 4 {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            });
         }
 
         let num_siblings = u32::from_le_bytes([
@@ -61,7 +85,17 @@ impl ChainVerifier for AptosVerifier {
         // Each sibling is 32 bytes (SHA-256 hash)
         let siblings_section_end = 4 + num_siblings * 32;
         if proof_bytes.len() < siblings_section_end {
-            return Ok(false);
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            });
         }
 
         // Extract leaf data (starting after siblings)
@@ -95,14 +129,38 @@ impl ChainVerifier for AptosVerifier {
 
         // The computed root should match the expected root
         let computed_root = Hash::new(current_hash.into());
-        Ok(computed_root == expected_root)
+        if computed_root == expected_root {
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::AnchoredMerklePath,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: None,
+            })
+        } else {
+            Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidMerklePath),
+            })
+        }
     }
 
     /// Verify finality proof for an Aptos block
     ///
     /// Aptos has instant finality via HotStuff consensus.
     /// For Aptos, any block that has >0 confirmations is considered finalized.
-    async fn verify_finality(&self, proof: &FinalityProof) -> csv_core::Result<bool> {
+    async fn verify_finality(&self, proof: &FinalityProof) -> csv_core::Result<VerificationResult> {
         // Aptos has instant finality via HotStuff consensus
         // Check that confirmations are above the required threshold
         // Aptos requires at least 1 confirmation (instant finality)
@@ -111,15 +169,52 @@ impl ChainVerifier for AptosVerifier {
         if proof.confirmations >= required_confirmations {
             // Verify finality data is present
             if proof.finality_data.is_empty() {
-                return Ok(false);
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::MissingData(
+                        "Finality data is empty".to_string(),
+                    )),
+                });
             }
 
             // In production, the finality_data would contain validator signatures
             // that prove the block was committed by the validator set.
             // For now, we trust the confirmation count + RPC proof.
-            Ok(true)
+            Ok(VerificationResult {
+                valid: true,
+                assurance: VerificationAssurance::PartialCryptographic,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::Probabilistic {
+                        confirmations: proof.confirmations,
+                    },
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: None,
+            })
         } else {
-            Ok(false)
+            Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::FinalityNotReached {
+                    required: required_confirmations,
+                    actual: proof.confirmations,
+                }),
+            })
         }
     }
 
@@ -128,19 +223,38 @@ impl ChainVerifier for AptosVerifier {
     /// Aptos doesn't use ZK proofs for basic operations by default.
     /// If proof data is non-empty, it means the caller is requesting
     /// ZK verification, which Aptos currently doesn't support.
-    async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<bool> {
+    async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<VerificationResult> {
         // Aptos doesn't use ZK proofs for basic operations
         // If ZK proof data is provided, return an error explaining this
         if !proof.is_empty() {
-            return Err(csv_core::ProtocolError::VerificationError(
-                "ZK proofs are not supported for Aptos operations. \
-                 Set zk_proof_data to empty for Aptos transactions."
-                    .to_string(),
-            ));
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::UnsupportedCapability(
+                    "ZK proofs are not supported for Aptos operations. Set zk_proof_data to empty for Aptos transactions."
+                        .to_string(),
+                )),
+            });
         }
 
         // No ZK proof needed for Aptos - pass through
-        Ok(true)
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::PartialCryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::None,
+                replay_checked: false,
+                ownership_signature: false,
+            },
+            error: None,
+        })
     }
 
     /// Verify seal registry (check if seal has been consumed)
@@ -148,7 +262,7 @@ impl ChainVerifier for AptosVerifier {
     /// Queries the Aptos blockchain via RPC to check if the resource
     /// associated with the seal_id has been consumed/destroyed.
     /// Uses StateProofVerifier::verify_resource_exists_async for the actual query.
-    async fn verify_seal_registry(&self, seal_id: Hash) -> csv_core::Result<bool> {
+    async fn verify_seal_registry(&self, seal_id: Hash) -> csv_core::Result<VerificationResult> {
         // Convert seal_id to an Aptos address (32 bytes)
         let address = {
             let mut addr = [0u8; 32];
@@ -176,11 +290,31 @@ impl ChainVerifier for AptosVerifier {
                         // Check if the resource data indicates consumption
                         // The CSV seal resource stores a consumed flag
                         // For now, if resource exists, the seal is unconsumed (available)
-                        Ok(true)
+                        Ok(VerificationResult {
+                            valid: true,
+                            assurance: VerificationAssurance::PartialCryptographic,
+                            verified_components: VerifiedComponents {
+                                inclusion: InclusionStrength::None,
+                                finality: FinalityStrength::None,
+                                replay_checked: true,
+                                ownership_signature: false,
+                            },
+                            error: None,
+                        })
                     }
                     Ok(None) => {
                         // Resource disappeared - must have been consumed
-                        Ok(false)
+                        Ok(VerificationResult {
+                            valid: false,
+                            assurance: VerificationAssurance::Structural,
+                            verified_components: VerifiedComponents {
+                                inclusion: InclusionStrength::None,
+                                finality: FinalityStrength::None,
+                                replay_checked: true,
+                                ownership_signature: false,
+                            },
+                            error: Some(VerificationFailure::ReplayDetected),
+                        })
                     }
                     Err(e) => {
                         log::error!("Failed to fetch Aptos seal resource details: {}", e);
@@ -198,7 +332,17 @@ impl ChainVerifier for AptosVerifier {
                     hex::encode(address),
                     resource_type
                 );
-                Ok(false)
+                Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: true,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::ReplayDetected),
+                })
             }
             Err(e) => {
                 // RPC error - fail closed (assume seal consumed to be safe)
@@ -219,11 +363,19 @@ impl ChainVerifier for AptosVerifier {
     ///
     /// Parses signatures from the proof bundle and verifies them
     /// using the Aptos Ed25519 signature scheme.
-    async fn verify_signature(&self, bundle: &ProofBundle) -> csv_core::Result<bool> {
+    async fn verify_signature(&self, bundle: &ProofBundle) -> csv_core::Result<VerificationResult> {
         if bundle.signatures.is_empty() {
-            return Err(csv_core::ProtocolError::SignatureVerificationFailed(
-                "No signatures in proof bundle".to_string(),
-            ));
+            return Ok(VerificationResult {
+                valid: false,
+                assurance: VerificationAssurance::Structural,
+                verified_components: VerifiedComponents {
+                    inclusion: InclusionStrength::None,
+                    finality: FinalityStrength::None,
+                    replay_checked: false,
+                    ownership_signature: false,
+                },
+                error: Some(VerificationFailure::InvalidOwnershipSignature),
+            });
         }
 
         // Parse signatures from the bundle
@@ -232,9 +384,17 @@ impl ChainVerifier for AptosVerifier {
         for (i, sig_bytes) in bundle.signatures.iter().enumerate() {
             // Parse signature format: [pk_len (4 bytes LE)] [public_key] [signature]
             if sig_bytes.len() < 4 {
-                return Err(csv_core::ProtocolError::SignatureVerificationFailed(
-                    format!("Signature {} too short for header", i),
-                ));
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                });
             }
 
             let pk_len =
@@ -242,9 +402,17 @@ impl ChainVerifier for AptosVerifier {
                     as usize;
 
             if sig_bytes.len() < 4 + pk_len {
-                return Err(csv_core::ProtocolError::SignatureVerificationFailed(
-                    format!("Signature {} too short for public key", i),
-                ));
+                return Ok(VerificationResult {
+                    valid: false,
+                    assurance: VerificationAssurance::Structural,
+                    verified_components: VerifiedComponents {
+                        inclusion: InclusionStrength::None,
+                        finality: FinalityStrength::None,
+                        replay_checked: false,
+                        ownership_signature: false,
+                    },
+                    error: Some(VerificationFailure::InvalidOwnershipSignature),
+                });
             }
 
             let public_key = sig_bytes[4..4 + pk_len].to_vec();
@@ -260,6 +428,16 @@ impl ChainVerifier for AptosVerifier {
         verify_signatures(&signatures, SignatureScheme::Ed25519)
             .map_err(|e| csv_core::ProtocolError::SignatureVerificationFailed(e.to_string()))?;
 
-        Ok(true)
+        Ok(VerificationResult {
+            valid: true,
+            assurance: VerificationAssurance::PartialCryptographic,
+            verified_components: VerifiedComponents {
+                inclusion: InclusionStrength::None,
+                finality: FinalityStrength::None,
+                replay_checked: false,
+                ownership_signature: true,
+            },
+            error: None,
+        })
     }
 }

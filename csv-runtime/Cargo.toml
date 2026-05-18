@@ -13,6 +13,7 @@ thiserror = "1"
 tracing = "0.1"
 async-trait = "0.1"
 rocksdb = { version = "0.21", optional = true }
+hakari = { version = "0.1", path = "../hakari" }
 
 [features]
 default = ["persistent"]
