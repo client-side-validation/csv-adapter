@@ -59,6 +59,7 @@ quorum = ["dep:reqwest", "dep:url", "dep:tokio"]
 observability = ["dep:csv-observability"]
 full = ["bitcoin", "solana", "aptos", "sui", "ethereum", "pq", "zk", "quorum", "observability"]
 experimental = []
+adversarial-tests = []
 
 [dev-dependencies]
 ed25519-dalek = { version = "2.0", features = ["rand_core"] }

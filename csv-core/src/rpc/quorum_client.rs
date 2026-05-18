@@ -649,6 +649,44 @@ impl QuorumClient {
     }
 }
 
+/// Fault injection modes for Byzantine RPC testing.
+///
+/// Used in adversarial tests to simulate malicious or misbehaving RPC providers.
+#[cfg(any(test, feature = "adversarial-tests"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FaultyRpcMode {
+    /// Returns a valid-looking but cryptographically invalid proof
+    InvalidProof,
+    /// Returns finality = true when block is not finalized
+    WrongFinality,
+    /// Returns partial/truncated state data
+    PartialState,
+    /// Returns Ok(vec![]) for all queries
+    EmptyResult,
+    /// Never responds (simulated via immediate error)
+    Timeout,
+    /// Returns a reorged chain view
+    Reorg,
+    /// Returns a receipt with wrong log data
+    FakeReceipt,
+}
+
+#[cfg(any(test, feature = "adversarial-tests"))]
+impl FaultyRpcMode {
+    /// Returns a human-readable description of this fault mode.
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::InvalidProof => "invalid proof",
+            Self::WrongFinality => "wrong finality",
+            Self::PartialState => "partial state",
+            Self::EmptyResult => "empty result",
+            Self::Timeout => "timeout",
+            Self::Reorg => "reorg",
+            Self::FakeReceipt => "fake receipt",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -680,5 +718,35 @@ mod tests {
 
         let client = QuorumClient::with_defaults(providers);
         assert_eq!(client.provider_count(), 2);
+    }
+
+    #[test]
+    fn test_faulty_rpc_mode_descriptions() {
+        use super::FaultyRpcMode;
+
+        assert_eq!(FaultyRpcMode::InvalidProof.description(), "invalid proof");
+        assert_eq!(FaultyRpcMode::WrongFinality.description(), "wrong finality");
+        assert_eq!(FaultyRpcMode::PartialState.description(), "partial state");
+        assert_eq!(FaultyRpcMode::EmptyResult.description(), "empty result");
+        assert_eq!(FaultyRpcMode::Timeout.description(), "timeout");
+        assert_eq!(FaultyRpcMode::Reorg.description(), "reorg");
+        assert_eq!(FaultyRpcMode::FakeReceipt.description(), "fake receipt");
+    }
+
+    #[test]
+    fn test_faulty_rpc_mode_equality() {
+        use super::FaultyRpcMode;
+
+        assert_eq!(FaultyRpcMode::InvalidProof, FaultyRpcMode::InvalidProof);
+        assert_ne!(FaultyRpcMode::InvalidProof, FaultyRpcMode::WrongFinality);
+    }
+
+    #[test]
+    fn test_faulty_rpc_mode_clone() {
+        use super::FaultyRpcMode;
+
+        let mode = FaultyRpcMode::Reorg;
+        let cloned = mode.clone();
+        assert_eq!(mode, cloned);
     }
 }
