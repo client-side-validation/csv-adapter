@@ -20,10 +20,11 @@
 //! 5. Sign certification with runtime identity
 
 use std::time::SystemTime;
+use std::hash::Hasher;
 use serde::{Deserialize, Serialize};
 
 /// Deterministic proof certification
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProofCertification {
     /// Certification version
     pub version: u32,
@@ -44,7 +45,7 @@ pub struct ProofCertification {
 }
 
 /// Verification inputs for deterministic certification
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VerificationInputs {
     /// Proof bundle bytes
     pub proof_bundle: Vec<u8>,
@@ -59,7 +60,7 @@ pub struct VerificationInputs {
 }
 
 /// Verification outputs from deterministic certification
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VerificationOutputs {
     /// Whether verification succeeded
     pub success: bool,
@@ -72,7 +73,7 @@ pub struct VerificationOutputs {
 }
 
 /// Intermediate verification state
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IntermediateState {
     /// Step name
     pub step: String,
@@ -85,7 +86,7 @@ pub struct IntermediateState {
 }
 
 /// Chain metadata for certification
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ChainMetadata {
     /// Chain ID
     pub chain_id: String,
@@ -98,7 +99,7 @@ pub struct ChainMetadata {
 }
 
 /// Runtime policy configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RuntimePolicyConfig {
     /// Finality depth
     pub finality_depth: u64,
@@ -111,7 +112,7 @@ pub struct RuntimePolicyConfig {
 }
 
 /// Verification strength metrics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VerificationStrength {
     /// Inclusion strength (0-100)
     pub inclusion_strength: u8,

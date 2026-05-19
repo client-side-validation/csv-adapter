@@ -315,7 +315,7 @@ impl ProofBundle {
         inclusion_proof: InclusionProof,
         finality_proof: FinalityProof,
     ) -> Result<Self, &'static str> {
-        Self::with_provenance(
+        Self::with_certification(
             transition_dag,
             signatures,
             seal_ref,

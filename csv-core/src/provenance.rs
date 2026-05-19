@@ -26,7 +26,7 @@ use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 
 /// Provenance metadata for a proof bundle
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProofProvenance {
     /// Chain where the proof originated
     pub origin_chain: String,
@@ -45,7 +45,7 @@ pub struct ProofProvenance {
 }
 
 /// A single step in the verification chain
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VerificationStep {
     /// Type of verification performed
     pub step_type: VerificationStepType,
@@ -62,7 +62,7 @@ pub struct VerificationStep {
 }
 
 /// Types of verification steps
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum VerificationStepType {
     /// Initial proof creation
     ProofCreation,
@@ -79,7 +79,7 @@ pub enum VerificationStepType {
 }
 
 /// Adapter signature for proof verification
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AdapterSignature {
     /// Adapter that signed the proof
     pub adapter_id: String,
