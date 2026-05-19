@@ -53,15 +53,17 @@ extern crate alloc;
 // No-std compatible collections
 pub mod collections;
 
-// Core types
-pub mod commitment;
-pub mod domain_hash;
-pub mod domains;
-pub mod hash;
-pub mod replay_registry;
-pub mod sanad;
-pub mod seal;
-pub mod tagged_hash; // Sanad/Title types (re-exported from title)
+// Re-exports
+pub use commitment::{Commitment, CommitmentScheme};
+pub use hash::Hash;
+pub use merkle::{MerkleProof, MerkleTree};
+pub use proof_pipeline::{ProofBundle, ProofPipeline, ValidationStep};
+pub use provenance::{AdapterSignature, ProofProvenance, VerificationStep, VerificationStepType};
+pub use certification::{ProofCertification, VerificationInputs, VerificationOutputs};
+pub use replay_record::{GlobalReplayRecord, ReplayState};
+pub use replay_registry::{ReplayEntry, ReplayKey, ReplayRegistry, ReplayRegistryBackend};
+pub use sanad::{Sanad, SanadId};
+pub use seal_protocol::{SealProtocol, SealStatus}; // Sanad/Title types (re-exported from title)
 
 // Advanced commitment types
 pub mod commitments_ext;
@@ -104,10 +106,21 @@ pub mod commit_mux;
 #[cfg(feature = "experimental")]
 pub mod vm;
 
+// Core types
+pub mod commitment;
+pub mod hash;
+pub mod merkle;
+pub mod proof_pipeline;
+pub mod provenance;
+pub mod certification;
+pub mod replay_record;
+pub mod replay_registry;
+pub mod sanad;
+pub mod seal_protocol;
+
 // DAG and proof types - 🔒 STABLE
 pub mod dag;
 pub mod proof;
-pub mod proof_pipeline;
 pub mod signature;
 pub mod verifier;
 /// Trust package primitives for offline verification bootstrapping.

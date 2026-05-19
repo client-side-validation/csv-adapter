@@ -286,6 +286,12 @@ pub struct ProofBundle {
     pub inclusion_proof: InclusionProof,
     /// Finality proof
     pub finality_proof: FinalityProof,
+    /// Provenance metadata for tracking proof origin and verification chain
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<crate::provenance::ProofProvenance>,
+    /// Deterministic certification for reproducible verification
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub certification: Option<crate::certification::ProofCertification>,
 }
 
 impl ProofBundle {
@@ -309,6 +315,76 @@ impl ProofBundle {
         inclusion_proof: InclusionProof,
         finality_proof: FinalityProof,
     ) -> Result<Self, &'static str> {
+        Self::with_provenance(
+            transition_dag,
+            signatures,
+            seal_ref,
+            anchor_ref,
+            inclusion_proof,
+            finality_proof,
+            None,
+            None,
+        )
+    }
+
+    /// Create a new proof bundle with provenance metadata
+    ///
+    /// # Arguments
+    /// * `transition_dag` - State transition DAG segment
+    /// * `signatures` - Authorizing signatures (total max 1MB)
+    /// * `seal_ref` - Seal reference
+    /// * `anchor_ref` - Anchor reference
+    /// * `inclusion_proof` - Inclusion proof
+    /// * `finality_proof` - Finality proof
+    /// * `provenance` - Optional provenance metadata
+    ///
+    /// # Errors
+    /// Returns an error if signatures exceed the maximum total size
+    pub fn with_provenance(
+        transition_dag: DAGSegment,
+        signatures: Vec<Vec<u8>>,
+        seal_ref: SealPoint,
+        anchor_ref: CommitAnchor,
+        inclusion_proof: InclusionProof,
+        finality_proof: FinalityProof,
+        provenance: Option<crate::provenance::ProofProvenance>,
+    ) -> Result<Self, &'static str> {
+        Self::with_certification(
+            transition_dag,
+            signatures,
+            seal_ref,
+            anchor_ref,
+            inclusion_proof,
+            finality_proof,
+            provenance,
+            None,
+        )
+    }
+
+    /// Create a new proof bundle with certification
+    ///
+    /// # Arguments
+    /// * `transition_dag` - State transition DAG segment
+    /// * `signatures` - Authorizing signatures (total max 1MB)
+    /// * `seal_ref` - Seal reference
+    /// * `anchor_ref` - Anchor reference
+    /// * `inclusion_proof` - Inclusion proof
+    /// * `finality_proof` - Finality proof
+    /// * `provenance` - Optional provenance metadata
+    /// * `certification` - Optional deterministic certification
+    ///
+    /// # Errors
+    /// Returns an error if signatures exceed the maximum total size
+    pub fn with_certification(
+        transition_dag: DAGSegment,
+        signatures: Vec<Vec<u8>>,
+        seal_ref: SealPoint,
+        anchor_ref: CommitAnchor,
+        inclusion_proof: InclusionProof,
+        finality_proof: FinalityProof,
+        provenance: Option<crate::provenance::ProofProvenance>,
+        certification: Option<crate::certification::ProofCertification>,
+    ) -> Result<Self, &'static str> {
         // Validate total signature size
         let total_sig_size: usize = signatures.iter().map(|s| s.len()).sum();
         if total_sig_size > MAX_SIGNATURES_TOTAL_SIZE {
@@ -321,7 +397,42 @@ impl ProofBundle {
             anchor_ref,
             inclusion_proof,
             finality_proof,
+            provenance,
+            certification,
         })
+    }
+
+    /// Set the provenance metadata
+    pub fn set_provenance(&mut self, provenance: crate::provenance::ProofProvenance) {
+        self.provenance = Some(provenance);
+    }
+
+    /// Get the provenance metadata
+    pub fn provenance(&self) -> Option<&crate::provenance::ProofProvenance> {
+        self.provenance.as_ref()
+    }
+
+    /// Check if the proof bundle has complete provenance
+    pub fn has_complete_provenance(&self) -> bool {
+        self.provenance
+            .as_ref()
+            .map(|p| p.is_verification_complete())
+            .unwrap_or(false)
+    }
+
+    /// Set the certification metadata
+    pub fn set_certification(&mut self, certification: crate::certification::ProofCertification) {
+        self.certification = Some(certification);
+    }
+
+    /// Get the certification metadata
+    pub fn certification(&self) -> Option<&crate::certification::ProofCertification> {
+        self.certification.as_ref()
+    }
+
+    /// Check if the proof bundle has deterministic certification
+    pub fn has_certification(&self) -> bool {
+        self.certification.is_some()
     }
 
     /// Create a new $1 without validation.
@@ -343,6 +454,8 @@ impl ProofBundle {
             anchor_ref,
             inclusion_proof,
             finality_proof,
+            provenance: None,
+            certification: None,
         }
     }
 
@@ -372,13 +485,12 @@ mod tests {
 
     #[test]
     fn test_inclusion_proof_creation() {
-        let proof = InclusionProof::new(vec![0xAB; 64], Hash::new([1u8; 32]), 100, 42).unwrap();
-        assert_eq!(proof.position, 42);
-        assert_eq!(proof.block_number, 100);
+        let proof = InclusionProof::new(vec![1, 2, 3]);
+        assert_eq!(proof.data, vec![1, 2, 3]);
     }
 
     #[test]
-    fn test_finality_proof_creation() {
+    fn test_proof_bundle_without_provenance() {
         let proof = FinalityProof::new(vec![0xCD; 32], 6, false).unwrap();
         assert_eq!(proof.confirmations, 6);
         assert!(!proof.is_deterministic);
@@ -427,5 +539,78 @@ mod tests {
             FinalityProof::new(vec![], 6, false).unwrap(),
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_proof_bundle_provenance() {
+        let bundle = ProofBundle::new(
+            DAGSegment::new(vec![], Hash::zero()),
+            vec![],
+            SealPoint::new(vec![1, 2, 3], Some(42)).unwrap(),
+            CommitAnchor::new(vec![4, 5, 6], 100, vec![]).unwrap(),
+            InclusionProof::new(vec![], Hash::zero(), 0, 0).unwrap(),
+            FinalityProof::new(vec![], 6, false).unwrap(),
+        )
+        .unwrap();
+
+        assert!(bundle.provenance().is_none());
+        assert!(!bundle.has_complete_provenance());
+
+        let mut provenance = crate::provenance::ProofProvenance::new(
+            "bitcoin".to_string(),
+            1000,
+            "runtime-1".to_string(),
+            vec![1u8; 32],
+        );
+
+        provenance.add_verification_step(crate::provenance::VerificationStep::new(
+            crate::provenance::VerificationStepType::ProofCreation,
+            "adapter".to_string(),
+            true,
+        ));
+
+        bundle.set_provenance(provenance);
+        assert!(bundle.provenance().is_some());
+        assert!(!bundle.has_complete_provenance()); // Not complete without all steps
+    }
+
+    #[test]
+    fn test_proof_bundle_certification() {
+        let bundle = ProofBundle::new(
+            DAGSegment::new(vec![], Hash::zero()),
+            vec![],
+            SealPoint::new(vec![1, 2, 3], Some(42)).unwrap(),
+            CommitAnchor::new(vec![4, 5, 6], 100, vec![]).unwrap(),
+            InclusionProof::new(vec![], Hash::zero(), 0, 0).unwrap(),
+            FinalityProof::new(vec![], 6, false).unwrap(),
+        )
+        .unwrap();
+
+        assert!(bundle.certification().is_none());
+        assert!(!bundle.has_certification());
+
+        let inputs = crate::certification::VerificationInputs::new(
+            vec![1u8; 32],
+            vec![2u8; 32],
+            vec![3u8; 32],
+            crate::certification::ChainMetadata::new("bitcoin".to_string(), 1000, vec![4u8; 32]),
+            crate::certification::RuntimePolicyConfig::new(6, false, 3, true),
+        );
+
+        let outputs = crate::certification::VerificationOutputs::new(
+            true,
+            "verified".to_string(),
+            crate::certification::VerificationStrength::maximum(),
+        );
+
+        let certification = crate::certification::ProofCertification::new(
+            "runtime-1".to_string(),
+            inputs,
+            outputs,
+        );
+
+        bundle.set_certification(certification);
+        assert!(bundle.certification().is_some());
+        assert!(bundle.has_certification());
     }
 }

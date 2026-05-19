@@ -11,6 +11,7 @@
 //! according to runtime-provided policies.
 
 use std::time::Duration;
+use crate::runtime_mode::RuntimeMode;
 
 /// Runtime policy configuration
 ///
@@ -33,13 +34,16 @@ pub struct RuntimePolicy {
 
     /// Whether to enforce strict finality (no probabilistic finality)
     pub enforce_strict_finality: bool,
+
+    /// Current runtime mode
+    pub mode: RuntimeMode,
 }
 
 impl RuntimePolicy {
     /// Create a new runtime policy with default values
     pub fn new() -> Self {
         let mut finality_depths = std::collections::HashMap::new();
-        
+
         // Default finality depths per chain
         finality_depths.insert("bitcoin".to_string(), 6);
         finality_depths.insert("ethereum".to_string(), 15);
@@ -50,11 +54,28 @@ impl RuntimePolicy {
 
         Self {
             finality_depths,
-            allow_rpc_fallback: false, // Production: no fallback
+            allow_rpc_fallback: false,
             max_retries: 3,
             retry_delay: Duration::from_secs(5),
-            enforce_strict_finality: false, // Allow probabilistic finality
+            enforce_strict_finality: false,
+            mode: RuntimeMode::Normal,
         }
+    }
+
+    /// Create a new runtime policy with a specific mode
+    pub fn with_mode(mode: RuntimeMode) -> Self {
+        let mut policy = Self::new();
+        policy.set_mode(mode);
+        policy
+    }
+
+    /// Set the runtime mode and update policy settings accordingly
+    pub fn set_mode(&mut self, mode: RuntimeMode) {
+        self.mode = mode;
+        self.allow_rpc_fallback = mode.allows_rpc_fallback();
+        self.enforce_strict_finality = mode.enforces_strict_finality();
+        self.max_retries = mode.max_retries();
+        self.retry_delay = mode.retry_delay();
     }
 
     /// Get the required finality depth for a chain
@@ -69,18 +90,17 @@ impl RuntimePolicy {
 
     /// Create a production policy (no fallbacks, strict enforcement)
     pub fn production() -> Self {
-        let mut policy = Self::new();
-        policy.allow_rpc_fallback = false;
-        policy.enforce_strict_finality = true;
-        policy
+        Self::with_mode(RuntimeMode::Normal)
     }
 
     /// Create a development policy (allows fallbacks for testing)
     pub fn development() -> Self {
-        let mut policy = Self::new();
-        policy.allow_rpc_fallback = true;
-        policy.enforce_strict_finality = false;
-        policy
+        Self::with_mode(RuntimeMode::Degraded)
+    }
+
+    /// Create an unsafe policy (emergency mode, minimal checks)
+    pub fn unsafe_mode() -> Self {
+        Self::with_mode(RuntimeMode::Unsafe)
     }
 }
 
@@ -112,6 +132,7 @@ mod tests {
     #[test]
     fn test_production_policy() {
         let policy = RuntimePolicy::production();
+        assert_eq!(policy.mode, RuntimeMode::Normal);
         assert!(!policy.allow_rpc_fallback);
         assert!(policy.enforce_strict_finality);
     }
@@ -119,7 +140,32 @@ mod tests {
     #[test]
     fn test_development_policy() {
         let policy = RuntimePolicy::development();
+        assert_eq!(policy.mode, RuntimeMode::Degraded);
         assert!(policy.allow_rpc_fallback);
         assert!(!policy.enforce_strict_finality);
+    }
+
+    #[test]
+    fn test_unsafe_policy() {
+        let policy = RuntimePolicy::unsafe_mode();
+        assert_eq!(policy.mode, RuntimeMode::Unsafe);
+        assert!(policy.allow_rpc_fallback);
+        assert!(!policy.enforce_strict_finality);
+        assert!(policy.mode.requires_operator_confirmation());
+    }
+
+    #[test]
+    fn test_set_mode() {
+        let mut policy = RuntimePolicy::new();
+        assert_eq!(policy.mode, RuntimeMode::Normal);
+
+        policy.set_mode(RuntimeMode::Degraded);
+        assert_eq!(policy.mode, RuntimeMode::Degraded);
+        assert!(policy.allow_rpc_fallback);
+        assert_eq!(policy.max_retries, 5);
+
+        policy.set_mode(RuntimeMode::Unsafe);
+        assert_eq!(policy.mode, RuntimeMode::Unsafe);
+        assert_eq!(policy.max_retries, 1);
     }
 }
