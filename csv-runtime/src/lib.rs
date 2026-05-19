@@ -19,8 +19,7 @@ pub mod event_bus;
 pub mod event_envelope;
 pub mod event_store;
 pub mod lease;
-#[cfg(feature = "postgres")]
-pub mod postgres_store;
+pub mod policy;
 pub mod replay_db;
 pub mod transfer_coordinator;
 
@@ -33,5 +32,6 @@ pub use lease::{
     DEFAULT_LEASE_DURATION_SECS, LeaseValidationError, RuntimeExecutionContext, RuntimeId,
     TransferLease, MAX_LEASE_DURATION_SECS,
 };
+pub use policy::RuntimePolicy;
 pub use replay_db::{ReplayDatabase, ReplayDbError, ReplayEntryState};
 pub use transfer_coordinator::TransferCoordinator;

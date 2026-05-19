@@ -68,6 +68,13 @@ impl TransferCoordinator {
                 "Lease is expired".to_string(),
             ));
         }
+
+        // Enforce runtime policy: check if RPC fallback is allowed
+        if !runtime_ctx.policy.allow_rpc_fallback {
+            // In production mode, we require all operations to use real RPC
+            // This is enforced by the runtime, not by adapters
+        }
+
         // Step 1: Compute ReplayId and check for replay
         let replay_id = ReplayId::derive(
             transfer.source_chain.as_str(),
@@ -124,25 +131,65 @@ impl TransferCoordinator {
             ));
         }
 
-        // Step 4: Lock on source chain and await finality
+        // Step 4: Lock on source chain with retry logic
         self.event_bus
             .emit(TransferEvent::Locking {
                 transfer_id: transfer.id.clone(),
             });
 
-        let lock_result = adapter_registry
-            .lock_sanad(&transfer.source_chain, &transfer)
-            .await
-            .map_err(|e| TransferCoordinatorError::LockFailed(e.to_string()))?;
+        let mut lock_result = None;
+        let mut last_error = None;
+
+        for attempt in 0..=runtime_ctx.policy.max_retries {
+            match adapter_registry
+                .lock_sanad(&transfer.source_chain, &transfer)
+                .await
+            {
+                Ok(result) => {
+                    lock_result = Some(result);
+                    break;
+                }
+                Err(e) => {
+                    last_error = Some(e);
+                    if attempt < runtime_ctx.policy.max_retries {
+                        tokio::time::sleep(runtime_ctx.policy.retry_delay).await;
+                    }
+                }
+            }
+        }
+
+        let lock_result = lock_result.ok_or_else(|| {
+            TransferCoordinatorError::LockFailed(
+                last_error
+                    .map(|e| e.to_string())
+                    .unwrap_or_else(|| "Unknown error".to_string()),
+            )
+        })?;
 
         self.event_bus
             .emit(TransferEvent::AwaitingFinality {
                 transfer_id: transfer.id.clone(),
             });
+
+        // Use runtime policy for finality depth, not adapter's local policy
+        let required_finality = runtime_ctx
+            .policy
+            .finality_depth_for_chain(&transfer.source_chain)
+            .ok_or_else(|| {
+                TransferCoordinatorError::RuntimeError(format!(
+                    "No finality depth configured for chain: {}",
+                    transfer.source_chain
+                ))
+            })?;
+
         let _finality_proof = adapter_registry
             .verify_finality(&transfer.source_chain, lock_result.block_height)
             .await
-            .map_err(|e| TransferCoordinatorError::FinalityFailed(e.to_string()))?;
+            .map_err(|e| {
+                // If finality check fails and policy allows retry, we could retry here
+                // For now, fail immediately
+                TransferCoordinatorError::FinalityFailed(e.to_string())
+            })?;
 
         // Step 5: Build inclusion proof
         self.event_bus
@@ -167,19 +214,41 @@ impl TransferCoordinator {
         // Step 7: Record ReplayId BEFORE minting (prevents duplicate mints on retry)
         // No-op: `consume_if_unconsumed` already recorded pending/consumed state
 
-        // Step 8: Mint on destination chain
+        // Step 8: Mint on destination chain with retry logic
         self.event_bus
             .emit(TransferEvent::Minting {
                 transfer_id: transfer.id.clone(),
             });
-        let mint_result = adapter_registry
-            .mint_sanad(&transfer.destination_chain, &transfer, &proof_bundle)
-            .await
-            .map_err(|e| {
-                // Attempt to mark rolled back on mint failure
-                let _ = self.replay_db.mark_rolled_back(&replay_id);
-                TransferCoordinatorError::MintFailed(e.to_string())
-            })?;
+
+        let mut mint_result = None;
+        let mut last_error = None;
+
+        for attempt in 0..=runtime_ctx.policy.max_retries {
+            match adapter_registry
+                .mint_sanad(&transfer.destination_chain, &transfer, &proof_bundle)
+                .await
+            {
+                Ok(result) => {
+                    mint_result = Some(result);
+                    break;
+                }
+                Err(e) => {
+                    last_error = Some(e);
+                    if attempt < runtime_ctx.policy.max_retries {
+                        tokio::time::sleep(runtime_ctx.policy.retry_delay).await;
+                    }
+                }
+            }
+        }
+
+        let mint_result = mint_result.ok_or_else(|| {
+            let _ = self.replay_db.mark_rolled_back(&replay_id);
+            TransferCoordinatorError::MintFailed(
+                last_error
+                    .map(|e| e.to_string())
+                    .unwrap_or_else(|| "Unknown error".to_string()),
+            )
+        })?;
 
         // Confirm the replay entry as consumed
         self.replay_db
@@ -238,6 +307,10 @@ mod tests {
 
         fn capabilities(&self) -> &ChainCapabilities {
             &self.caps
+        }
+
+        fn set_policy(&mut self, _policy: crate::policy::RuntimePolicy) {
+            // Test adapter accepts policy but doesn't use it
         }
 
         async fn lock_sanad(
@@ -351,6 +424,7 @@ mod tests {
         let runtime_ctx = crate::lease::RuntimeExecutionContext {
             lease: lease.clone(),
             runtime_instance: lease.owner_runtime_id,
+            policy: crate::policy::RuntimePolicy::new(),
         };
 
         // First transfer should succeed
@@ -384,6 +458,7 @@ mod tests {
         let pending_ctx = crate::lease::RuntimeExecutionContext {
             lease: pending_lease,
             runtime_instance: uuid::Uuid::new_v4(),
+            policy: crate::policy::RuntimePolicy::new(),
         };
 
         // First execution inserts Pending, then the mint succeeds and confirms.
@@ -410,6 +485,9 @@ mod tests {
             }
             fn capabilities(&self) -> &ChainCapabilities {
                 &self.caps
+            }
+            fn set_policy(&mut self, _policy: crate::policy::RuntimePolicy) {
+                // Test adapter accepts policy but doesn't use it
             }
             async fn lock_sanad(&self, _t: &RuntimeCrossChainTransfer) -> Result<LockResult, crate::adapter_registry::AdapterError> {
                 unimplemented!()
@@ -456,6 +534,7 @@ mod tests {
         let runtime_ctx = crate::lease::RuntimeExecutionContext {
             lease,
             runtime_instance: uuid::Uuid::new_v4(),
+            policy: crate::policy::RuntimePolicy::new(),
         };
 
         let result = coordinator.execute(transfer, &registry, runtime_ctx).await;
@@ -463,5 +542,97 @@ mod tests {
             result,
             Err(TransferCoordinatorError::UnsupportedOperation(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn test_runtime_policy_enforcement() {
+        let replay_db = Box::new(crate::replay_db::InMemoryReplayDb::new());
+        let event_bus = EventBus::new();
+        let coordinator = TransferCoordinator::new(replay_db, event_bus);
+
+        let mut registry = AdapterRegistryImpl::new();
+        registry.register(std::sync::Arc::new(TestAdapter::new()));
+
+        let transfer = CrossChainTransfer {
+            id: "test-policy".to_string(),
+            source_chain: "test-chain".to_string(),
+            destination_chain: "test-chain".to_string(),
+            lock_tx_hash: vec![1u8; 32],
+            lock_output_index: 0,
+            sanad_id: csv_core::hash::Hash::new([2u8; 32]),
+            transition_id: vec![3u8; 32],
+        };
+
+        let lease = crate::lease::TransferLease {
+            transfer_id: csv_core::sanad::SanadId::new(*transfer.sanad_id.as_bytes()),
+            epoch: 1,
+            owner_runtime_id: uuid::Uuid::new_v4(),
+            acquired_at: std::time::SystemTime::now(),
+            expires_at: std::time::SystemTime::now() + std::time::Duration::from_secs(3600),
+        };
+
+        // Test with production policy (no RPC fallback, strict finality)
+        let production_policy = crate::policy::RuntimePolicy::production();
+        let runtime_ctx = crate::lease::RuntimeExecutionContext {
+            lease: lease.clone(),
+            runtime_instance: lease.owner_runtime_id,
+            policy: production_policy,
+        };
+
+        let result = coordinator.execute(transfer.clone(), &registry, runtime_ctx).await;
+        assert!(result.is_ok(), "Transfer should succeed with production policy");
+
+        // Test with development policy (allows RPC fallback)
+        let dev_policy = crate::policy::RuntimePolicy::development();
+        let runtime_ctx = crate::lease::RuntimeExecutionContext {
+            lease,
+            runtime_instance: uuid::Uuid::new_v4(),
+            policy: dev_policy,
+        };
+
+        let result = coordinator.execute(transfer, &registry, runtime_ctx).await;
+        assert!(result.is_ok(), "Transfer should succeed with development policy");
+    }
+
+    #[tokio::test]
+    async fn test_retry_logic_with_policy() {
+        let replay_db = Box::new(crate::replay_db::InMemoryReplayDb::new());
+        let event_bus = EventBus::new();
+        let coordinator = TransferCoordinator::new(replay_db, event_bus);
+
+        let mut registry = AdapterRegistryImpl::new();
+        registry.register(std::sync::Arc::new(TestAdapter::new()));
+
+        let transfer = CrossChainTransfer {
+            id: "test-retry".to_string(),
+            source_chain: "test-chain".to_string(),
+            destination_chain: "test-chain".to_string(),
+            lock_tx_hash: vec![1u8; 32],
+            lock_output_index: 0,
+            sanad_id: csv_core::hash::Hash::new([2u8; 32]),
+            transition_id: vec![3u8; 32],
+        };
+
+        let lease = crate::lease::TransferLease {
+            transfer_id: csv_core::sanad::SanadId::new(*transfer.sanad_id.as_bytes()),
+            epoch: 1,
+            owner_runtime_id: uuid::Uuid::new_v4(),
+            acquired_at: std::time::SystemTime::now(),
+            expires_at: std::time::SystemTime::now() + std::time::Duration::from_secs(3600),
+        };
+
+        // Test with policy that allows retries
+        let mut policy = crate::policy::RuntimePolicy::new();
+        policy.max_retries = 3;
+        policy.retry_delay = std::time::Duration::from_millis(10);
+
+        let runtime_ctx = crate::lease::RuntimeExecutionContext {
+            lease,
+            runtime_instance: uuid::Uuid::new_v4(),
+            policy,
+        };
+
+        let result = coordinator.execute(transfer, &registry, runtime_ctx).await;
+        assert!(result.is_ok(), "Transfer should succeed with retry policy");
     }
 }

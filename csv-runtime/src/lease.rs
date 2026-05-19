@@ -100,19 +100,19 @@ pub struct TransferLease {
 /// Execution context passed to mutating runtime operations.
 ///
 /// Every mutating operation (proof validation, rollback, mint authorization,
-/// replay consumption, retry scheduling, finality transition) must receive
-/// a `RuntimeExecutionContext` that includes a valid lease.
+/// replay consumption, retry scheduling, finality transition) must verify
+/// lease ownership and use the provided policy for all decisions.
 ///
-/// The context verifies that:
-/// - The lease belongs to the calling runtime instance
-/// - The lease has not expired
-/// - The lease epoch matches the expected epoch
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+/// Adapters MUST NOT make policy decisions. They only execute operations
+/// according to the policy provided in this context.
+#[derive(Debug, Clone)]
 pub struct RuntimeExecutionContext {
-    /// Lease that authorizes execution for a transfer.
+    /// The lease authorizing this execution
     pub lease: TransferLease,
-    /// Runtime instance performing the operation.
+    /// The runtime instance performing the execution
     pub runtime_instance: RuntimeId,
+    /// Runtime policy for this execution
+    pub policy: crate::policy::RuntimePolicy,
 }
 
 impl TransferLease {
@@ -205,12 +205,16 @@ impl TransferLease {
 }
 
 impl RuntimeExecutionContext {
-    /// Create a new execution context.
+    /// Create a new execution context with policy.
     ///
     /// # Panics
     ///
     /// Panics if the lease is not valid for the given runtime instance.
-    pub fn new(lease: TransferLease, runtime_instance: RuntimeId) -> Self {
+    pub fn new(
+        lease: TransferLease,
+        runtime_instance: RuntimeId,
+        policy: crate::policy::RuntimePolicy,
+    ) -> Self {
         assert!(
             lease.is_owned_by(runtime_instance),
             "lease not owned by runtime instance"
@@ -218,6 +222,7 @@ impl RuntimeExecutionContext {
         Self {
             lease,
             runtime_instance,
+            policy,
         }
     }
 

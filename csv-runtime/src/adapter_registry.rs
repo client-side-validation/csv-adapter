@@ -67,6 +67,13 @@ pub trait ChainAdapter: Send + Sync {
     /// Returns the chain capabilities for this adapter
     fn capabilities(&self) -> &ChainCapabilities;
 
+    /// Set runtime policy for this adapter
+    ///
+    /// Adapters MUST use the provided policy for all decisions and MUST NOT
+    /// override or ignore these policies. This ensures the runtime is the
+    /// single authority for policy decisions.
+    fn set_policy(&mut self, policy: crate::policy::RuntimePolicy);
+
     /// Lock a sanad on the source chain
     async fn lock_sanad(
         &self,
