@@ -10,6 +10,7 @@
 //! - **Fix suggestions**: Errors include actionable `FixAction` for autonomous resolution
 
 use crate::collections::HashMap;
+use crate::protocol_version::ProtocolVersion;
 use serde::Serialize;
 
 /// Trait for types that can provide machine-actionable error suggestions.
@@ -525,6 +526,160 @@ impl ErrorSuggestion {
 ///
 /// Re-export of canonical ChainId for agent-facing APIs.
 pub use crate::protocol_version::ChainId;
+
+// ─── Verification level ────────────────────────────────────────────────────
+
+/// Explicit verification tier returned by all proof verification paths.
+///
+/// Callers MUST check this. `is_valid: true` with `StructuralOnly`
+/// does not constitute cryptographic proof of state transition validity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(missing_docs)]
+pub enum VerificationLevel {
+    /// Script/structure checked. No cryptographic proof verified.
+    StructuralOnly,
+    /// Merkle inclusion verified. Finality not yet confirmed.
+    MerkleVerified,
+    /// Full cryptographic verification complete.
+    FullyVerified,
+    /// Consensus-confirmed on source chain; finality threshold met.
+    ConsensusVerified,
+}
+
+// ─── Agent-facing result types ─────────────────────────────────────────────
+
+/// Agent-friendly proof verification result.
+#[derive(Debug, Clone, Serialize)]
+#[allow(missing_docs)]
+pub struct AgentVerifyProofResult {
+    pub is_valid: bool,
+    pub verification_level: VerificationLevel,
+    pub sanad_id: Option<String>,
+    pub chain: Option<String>,
+    pub seal_consumed: bool,
+    pub replay_detected: bool,
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+/// Agent-friendly transfer status enum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(missing_docs)]
+pub enum AgentTransferStatus {
+    AwaitingLock,
+    Locked,
+    AwaitingFinality,
+    ProofBuilding,
+    ProofValidated,
+    Minting,
+    Complete,
+    RolledBack,
+    Compromised,
+}
+
+/// Agent-friendly transfer result.
+#[derive(Debug, Clone, Serialize)]
+#[allow(missing_docs)]
+pub struct AgentTransferResult {
+    pub transfer_id: String,
+    pub replay_id: String,
+    pub lock_tx_hash: String,
+    pub mint_tx_hash: String,
+    pub source_chain: String,
+    pub destination_chain: String,
+    pub status: AgentTransferStatus,
+    pub proof_bundle_available: bool,
+}
+
+/// Agent-friendly seal creation result.
+#[derive(Debug, Clone, Serialize)]
+#[allow(missing_docs)]
+pub struct AgentCreateSealResult {
+    pub seal_id: String,
+    pub chain: String,
+    pub tx_hash: String,
+    pub block_height: u64,
+    pub status: AgentSealStatus,
+}
+
+/// Agent-friendly seal status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(missing_docs)]
+pub enum AgentSealStatus {
+    Pending,
+    Confirmed,
+    Consumed,
+    Invalid,
+}
+
+/// Agent-friendly sanad summary.
+#[derive(Debug, Clone, Serialize)]
+#[allow(missing_docs)]
+pub struct AgentSanadSummary {
+    pub sanad_id: String,
+    pub chain: String,
+    pub status: String,
+    pub created_at: String,
+    /// Opaque; not interpreted by the agent layer.
+    pub value: Option<String>,
+    /// Hash of semantic schema if present.
+    pub schema_id: Option<String>,
+}
+
+/// Agent-friendly get sanads result.
+#[derive(Debug, Clone, Serialize)]
+#[allow(missing_docs)]
+pub struct AgentGetSanadsResult {
+    pub items: Vec<AgentSanadSummary>,
+    pub total: u64,
+    pub has_more: bool,
+}
+
+/// Agent-friendly RPC status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+#[allow(missing_docs)]
+pub enum AgentRpcStatus {
+    Connected,
+    Degraded,
+    Unavailable,
+}
+
+/// Agent-friendly chain adapter info.
+#[derive(Debug, Clone, Serialize)]
+#[allow(missing_docs)]
+pub struct AgentChainAdapterInfo {
+    pub chain_id: String,
+    pub adapter_version: ProtocolVersion,
+    pub capabilities: Vec<String>,
+    pub network: String,
+    pub rpc_status: AgentRpcStatus,
+}
+
+/// Agent-friendly protocol info result.
+#[derive(Debug, Clone, Serialize)]
+#[allow(missing_docs)]
+pub struct AgentProtocolInfoResult {
+    pub protocol_version: ProtocolVersion,
+    pub minimum_runtime_version: ProtocolVersion,
+    pub chain_adapters: Vec<AgentChainAdapterInfo>,
+}
+
+/// Agent-friendly proof export result.
+#[derive(Debug, Clone, Serialize)]
+#[allow(missing_docs)]
+pub struct AgentExportProofResult {
+    pub transfer_id: String,
+    pub format: String,
+    pub bundle: String,
+    /// `csv_tagged_hash("csv.proof.bundle.export.v1", bundle_bytes)` as hex
+    pub bundle_hash: String,
+    pub provenance_included: bool,
+    pub verification_level: VerificationLevel,
+}
 
 #[cfg(test)]
 mod tests {

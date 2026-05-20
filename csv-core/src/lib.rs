@@ -89,8 +89,14 @@ pub mod rpc;
 // Protocol version and canonical contract (🔒 STABLE + 🟡 BETA)
 pub mod protocol_version;
 
+// Canonical serialization (Priority 0 — Constitutional hardening)
+pub mod canonical;
+
 // Agent-friendly types (AI agent support) - 🟡 BETA
 pub mod mcp;
+
+// Re-exports: Canonical serialization
+pub use canonical::{canonical_hash, from_canonical_cbor, to_canonical_cbor};
 
 // Production hardening - 🔒 STABLE
 pub mod hardening;
@@ -275,7 +281,12 @@ pub use commitments_ext::{
 };
 
 // Agent-friendly types
-pub use mcp::{ErrorSuggestion, FixAction, HasErrorSuggestion, error_codes};
+pub use mcp::{
+    AgentChainAdapterInfo, AgentCreateSealResult, AgentExportProofResult, AgentGetSanadsResult,
+    AgentProtocolInfoResult, AgentRpcStatus, AgentSanadSummary, AgentSealStatus,
+    AgentTransferResult, AgentTransferStatus, AgentVerifyProofResult, ErrorSuggestion,
+    FixAction, HasErrorSuggestion, VerificationLevel, error_codes,
+};
 
 // Production hardening
 pub use hardening::{

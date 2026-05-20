@@ -1402,26 +1402,26 @@ The audit identifies this as **Priority 0**:
 //! External crate: `ciborium` (no_std compatible, pure Rust)
 
 use alloc::vec::Vec;
-use crate::error::CsvError;
+use crate::error::ProtocolError;
 
 /// Serialize `value` to deterministic CBOR bytes.
 ///
 /// # Errors
-/// Returns `CsvError::Serialization` if encoding fails.
-pub fn to_canonical_cbor<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, CsvError> {
+/// Returns `ProtocolError::Serialization` if encoding fails.
+pub fn to_canonical_cbor<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, ProtocolError> {
     let mut buf = Vec::new();
     ciborium::into_writer(value, &mut buf)
-        .map_err(|e| CsvError::Serialization(e.to_string()))?;
+        .map_err(|e| ProtocolError::Serialization(e.to_string()))?;
     Ok(buf)
 }
 
 /// Deserialize from deterministic CBOR bytes.
 ///
 /// # Errors
-/// Returns `CsvError::Deserialization` if decoding fails.
-pub fn from_canonical_cbor<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, CsvError> {
+/// Returns `ProtocolError::Deserialization` if decoding fails.
+pub fn from_canonical_cbor<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, ProtocolError> {
     ciborium::from_reader(bytes)
-        .map_err(|e| CsvError::Deserialization(e.to_string()))
+        .map_err(|e| ProtocolError::Deserialization(e.to_string()))
 }
 
 /// Hash canonical CBOR encoding of `value` using tagged_hash.
@@ -1431,7 +1431,7 @@ pub fn from_canonical_cbor<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Resu
 pub fn canonical_hash<T: serde::Serialize>(
     domain: &str,
     value: &T,
-) -> Result<crate::hash::Hash, CsvError> {
+) -> Result<crate::hash::Hash, ProtocolError> {
     let cbor = to_canonical_cbor(value)?;
     Ok(crate::hash::Hash::new(
         crate::tagged_hash::csv_tagged_hash(domain, &cbor)
@@ -1679,6 +1679,7 @@ impl ProtocolVersion {
     }
 
     /// Check whether a runtime can service this protocol version.
+    /// real enum is : Incompatible(String)
     pub fn check_runtime(&self, runtime_version: &ProtocolVersion) -> CompatibilityResult {
         if !self.is_compatible_with(runtime_version) {
             CompatibilityResult::Incompatible {
