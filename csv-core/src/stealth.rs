@@ -30,9 +30,9 @@
 
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::hash::Hash;
+use crate::tagged_hash::csv_tagged_hash;
 
 /// Maximum size for key material in bytes.
 pub const MAX_KEY_SIZE: usize = 64;
@@ -165,12 +165,11 @@ impl StealthWallet {
         _recipient_spend_pk: &SpendPublicKey,
         ephemeral: &EphemeralPoint,
     ) -> StealthAddress {
-        // P' = SHA-256(R || scan_pk) * spend_pk (simplified: direct hash-based derivation)
-        let mut hasher = Sha256::new();
-        hasher.update(b"CSV-STEALTH-ADDR::");
-        hasher.update(ephemeral.as_bytes());
-        hasher.update(recipient_scan_pk.as_bytes());
-        let hash = hasher.finalize();
+        // P' = csv_tagged_hash(R || scan_pk) * spend_pk (simplified: direct hash-based derivation)
+        let mut data = Vec::new();
+        data.extend_from_slice(ephemeral.as_bytes());
+        data.extend_from_slice(recipient_scan_pk.as_bytes());
+        let hash = csv_tagged_hash("csv.stealth.addr.v1", &data);
 
         // Use hash as seed for stealth address (in a real elliptic curve implementation,
         // this would be scalar multiplication: P' = H(R||scan_pk) * spend_pk)
@@ -215,21 +214,18 @@ impl StealthWallet {
 
 /// Hash a nonce and recipient scan key to derive the shared secret for stealth address.
 pub fn derive_stealth_base(nonce: &[u8], scan_pk: &ScanPublicKey) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(b"CSV-STEALTH-NONCE::");
-    hasher.update(nonce);
-    hasher.update(scan_pk.as_bytes());
-    hasher.finalize().into()
+    let mut data = Vec::new();
+    data.extend_from_slice(nonce);
+    data.extend_from_slice(scan_pk.as_bytes());
+    csv_tagged_hash("csv.stealth.nonce.v1", &data)
 }
 
 /// Compute an ephemeral point from a nonce (simplified: hash to bytes).
 ///
 /// In a real elliptic curve implementation, this would be R = nonce * G.
 pub fn compute_ephemeral_point(nonce: &[u8]) -> EphemeralPoint {
-    let mut hasher = Sha256::new();
-    hasher.update(b"CSV-EPHEMERAL-POINT::");
-    hasher.update(nonce);
-    EphemeralPoint::from_bytes(hasher.finalize().into())
+    let hash = csv_tagged_hash("csv.ephemeral.point.v1", nonce);
+    EphemeralPoint::from_bytes(hash.into())
 }
 
 /// A stealth address entry for monitoring.

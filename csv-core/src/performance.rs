@@ -3,6 +3,7 @@
 //! Provides caching, bloom filters, and parallel processing to improve
 //! proof verification and seal registry operations by 2-5x.
 
+use crate::canonical::canonical_hash;
 use crate::collections::HashMap;
 use core::sync::atomic::{AtomicU64, Ordering};
 use spin::RwLock;
@@ -205,14 +206,11 @@ impl SequentialVerifier {
 
         let duration = start.elapsed();
 
-        // Create a simple hash from the proof for identification
-        let proof_bytes = serde_json::to_vec(proof).unwrap_or_default();
-        let mut hash_bytes = [0u8; 32];
-        let data_len = proof_bytes.len().min(32);
-        hash_bytes[..data_len].copy_from_slice(&proof_bytes[..data_len]);
+        // Create a canonical hash from the proof for identification
+        let proof_hash = canonical_hash("csv.verification.proof.v1", proof).unwrap_or_default();
 
         VerificationResult {
-            proof_hash: Hash::new(hash_bytes),
+            proof_hash,
             is_valid,
             verification_time: duration,
             error: if is_valid {
@@ -424,6 +422,8 @@ mod tests {
             anchor_ref: unsafe { CommitAnchor::new_unchecked(vec![0], 0, vec![]) },
             inclusion_proof: unsafe { InclusionProof::new_unchecked(vec![], Hash::zero(), 0, 0) },
             finality_proof: unsafe { FinalityProof::new_unchecked(vec![], 0, true) },
+            provenance: None,
+            certification: None,
         }
     }
 }

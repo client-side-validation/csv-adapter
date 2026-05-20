@@ -6,8 +6,8 @@
 
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
+use crate::canonical::to_canonical_cbor;
 use crate::dag::DAGSegment;
 use crate::hash::Hash;
 use crate::seal::{CommitAnchor, SealPoint};
@@ -39,6 +39,7 @@ impl ReplayId {
     /// Derive a ReplayId from all inputs that uniquely identify a transfer.
     /// The hash binds together source chain, transaction, seal, transition,
     /// and destination chain so that no two legitimate transfers share an ID.
+    /// Uses canonical CBOR serialization + tagged hashing.
     pub fn derive(
         source_chain: &str,
         source_txid: &[u8],
@@ -47,21 +48,25 @@ impl ReplayId {
         transition_id: &[u8],
         destination_chain: &str,
     ) -> Self {
-        let mut h = Sha256::new();
-        // Domain separation prefix
-        h.update(b"CSV_REPLAY_ID_V1\x00");
-        // Encode each field with length prefix to prevent collisions
-        let encode = |h: &mut Sha256, s: &[u8]| {
-            h.update(&(s.len() as u32).to_le_bytes());
-            h.update(s);
+        #[derive(Serialize)]
+        struct ReplayIdInputs<'a> {
+            source_chain: &'a str,
+            source_txid: &'a [u8],
+            source_output_index: u32,
+            seal_id: &'a [u8],
+            transition_id: &'a [u8],
+            destination_chain: &'a str,
+        }
+        let inputs = ReplayIdInputs {
+            source_chain,
+            source_txid,
+            source_output_index,
+            seal_id,
+            transition_id,
+            destination_chain,
         };
-        encode(&mut h, source_chain.as_bytes());
-        encode(&mut h, source_txid);
-        h.update(source_output_index.to_le_bytes());
-        encode(&mut h, seal_id);
-        encode(&mut h, transition_id);
-        encode(&mut h, destination_chain.as_bytes());
-        ReplayId(h.finalize().into())
+        let cbor = to_canonical_cbor(&inputs).unwrap_or_default();
+        ReplayId(crate::tagged_hash::csv_tagged_hash("csv.replay-id.v1", &cbor))
     }
 
     /// Return the raw 32-byte replay ID.
@@ -287,10 +292,8 @@ pub struct ProofBundle {
     /// Finality proof
     pub finality_proof: FinalityProof,
     /// Provenance metadata for tracking proof origin and verification chain
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub provenance: Option<crate::provenance::ProofProvenance>,
     /// Deterministic certification for reproducible verification
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub certification: Option<crate::certification::ProofCertification>,
 }
 
@@ -485,8 +488,8 @@ mod tests {
 
     #[test]
     fn test_inclusion_proof_creation() {
-        let proof = InclusionProof::new(vec![1, 2, 3]);
-        assert_eq!(proof.data, vec![1, 2, 3]);
+        let proof = InclusionProof::new(vec![1, 2, 3], Hash::zero(), 0, 0).unwrap();
+        assert_eq!(proof.proof_bytes, vec![1, 2, 3]);
     }
 
     #[test]
@@ -543,7 +546,7 @@ mod tests {
 
     #[test]
     fn test_proof_bundle_provenance() {
-        let bundle = ProofBundle::new(
+        let mut bundle = ProofBundle::new(
             DAGSegment::new(vec![], Hash::zero()),
             vec![],
             SealPoint::new(vec![1, 2, 3], Some(42)).unwrap(),
@@ -576,7 +579,7 @@ mod tests {
 
     #[test]
     fn test_proof_bundle_certification() {
-        let bundle = ProofBundle::new(
+        let mut bundle = ProofBundle::new(
             DAGSegment::new(vec![], Hash::zero()),
             vec![],
             SealPoint::new(vec![1, 2, 3], Some(42)).unwrap(),

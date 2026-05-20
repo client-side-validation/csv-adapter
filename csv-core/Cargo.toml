@@ -49,7 +49,7 @@ csv-observability = { path = "../csv-observability", optional = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 
 [features]
-default = ["std", "pq"]
+default = ["std", "pq", "secp256k1"]
 std = ["serde/std", "serde_json/std", "dep:toml", "sha2/std", "hex/std"]
 tapret = ["dep:bitcoin", "secp256k1"]
 bitcoin = ["secp256k1"]
@@ -81,3 +81,8 @@ path = "examples/basic_sanad.rs"
 [[example]]
 name = "commitment_chain"
 path = "examples/commitment_chain.rs"
+
+[[bin]]
+name = "generate_golden_fixtures"
+path = "bin/generate_golden_fixtures.rs"
+required-features = ["std"]

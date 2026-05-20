@@ -139,6 +139,51 @@ else
     echo -e "${GREEN}PASSED${NC} (no manual ABI encoding)"
 fi
 
+# 10. Check for direct adapter imports from MCP server
+echo ""
+echo "--- MCP Server Architecture Checks ---"
+if grep -r "csv-bitcoin\|csv-ethereum\|csv-solana\|csv-sui\|csv-aptos" csv-mcp-server/src --include="*.ts" 2>/dev/null; then
+    echo -e "${RED}FAILED${NC}"
+    echo "  MCP server must not import chain adapters directly:"
+    grep -rn "csv-bitcoin\|csv-ethereum\|csv-solana\|csv-sui\|csv-aptos" csv-mcp-server/src --include="*.ts" 2>/dev/null | head -20
+    FAILED=1
+else
+    echo -e "${GREEN}PASSED${NC} (MCP server has no direct adapter imports)"
+fi
+
+# 11. Check for serde_json in canonical hashing paths
+echo ""
+echo "--- Canonical Serialization Checks ---"
+if grep -rn "serde_json::to_vec\|serde_json::to_string" csv-core/src csv-runtime/src --include="*.rs" 2>/dev/null | grep -v "//\|#\[cfg(test)\]"; then
+    echo -e "${RED}FAILED${NC}"
+    echo "  Found serde_json in protocol path. Use canonical_cbor:"
+    grep -rn "serde_json::to_vec\|serde_json::to_string" csv-core/src csv-runtime/src --include="*.rs" 2>/dev/null | grep -v "//\|#\[cfg(test)\]" | head -20
+    FAILED=1
+else
+    echo -e "${GREEN}PASSED${NC} (no serde_json in canonical hashing paths)"
+fi
+
+# 12. Check that VerificationLevel is checked alongside is_valid in tests
+echo ""
+echo "--- Verification Level Checks ---"
+if grep -l "is_valid" csv-mcp-server/tests --include="*.ts" -r 2>/dev/null | xargs grep -L "verification_level" 2>/dev/null; then
+    echo -e "${YELLOW}WARNING${NC}: Tests checking is_valid without verification_level."
+    echo "  Consider adding verification_level checks for completeness."
+else
+    echo -e "${GREEN}PASSED${NC} (is_valid checks include verification_level)"
+fi
+
+# 13. Check that audit log is present in MCP server
+echo ""
+echo "--- Audit Logging Checks ---"
+if ! grep -q "auditLog" csv-mcp-server/src/index.ts 2>/dev/null; then
+    echo -e "${RED}FAILED${NC}"
+    echo "  MCP server must emit audit logs via auditLog."
+    FAILED=1
+else
+    echo -e "${GREEN}PASSED${NC} (audit logging is present)"
+fi
+
 # Final result
 echo ""
 echo "=== Final Result ==="

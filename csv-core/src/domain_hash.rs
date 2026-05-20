@@ -21,9 +21,9 @@
 //! ```
 
 use core::marker::PhantomData;
-use sha2::{Digest, Sha256};
 
 use crate::hash::Hash;
+use crate::tagged_hash::csv_tagged_hash;
 
 /// Domain marker trait for cryptographic separation
 ///
@@ -58,7 +58,7 @@ pub struct DomainSeparatedHash<D>(PhantomData<D>);
 impl<D: Domain> DomainSeparatedHash<D> {
     /// Compute a domain-separated hash of the payload
     ///
-    /// The domain tag from `D::DOMAIN` is prepended to the payload before hashing,
+    /// The domain tag from `D::DOMAIN` is used as the tag for canonical tagged hashing,
     /// ensuring cryptographic separation between domains.
     ///
     /// ## Arguments
@@ -67,23 +67,18 @@ impl<D: Domain> DomainSeparatedHash<D> {
     ///
     /// ## Returns
     ///
-    /// SHA256 hash of `DOMAIN || payload`
+    /// Canonical tagged hash of `DOMAIN || payload`
     pub fn hash(payload: &[u8]) -> Hash {
-        let mut hasher = Sha256::new();
-        hasher.update(D::DOMAIN);
-        hasher.update(payload);
-        let result = hasher.finalize();
-
-        let mut array = [0u8; 32];
-        array.copy_from_slice(&result);
-        Hash::new(array)
+        let domain_str = core::str::from_utf8(D::DOMAIN).unwrap_or("csv.unknown.domain");
+        Hash::new(csv_tagged_hash(domain_str, payload))
     }
 
     /// Compute a domain-separated hash of multiple payloads
     ///
-    /// Concatenates all payloads with separator bytes between them:
+    /// Concatenates all payloads with separator bytes between them, then applies
+    /// canonical tagged hashing:
     /// ```text
-    /// hash = SHA256(DOMAIN || payload1 || 0x00 || payload2 || 0x00 || ...)
+    /// hash = csv_tagged_hash(DOMAIN, payload1 || 0x00 || payload2 || 0x00 || ...)
     /// ```
     ///
     /// ## Arguments
@@ -92,26 +87,22 @@ impl<D: Domain> DomainSeparatedHash<D> {
     ///
     /// ## Returns
     ///
-    /// SHA256 hash of `DOMAIN || payload1 || 0x00 || payload2 || 0x00 || ...`
+    /// Canonical tagged hash of `DOMAIN || payload1 || 0x00 || payload2 || 0x00 || ...`
     pub fn hash_multiple<'a, I>(payloads: I) -> Hash
     where
         I: IntoIterator<Item = &'a [u8]>,
     {
-        let mut hasher = Sha256::new();
-        hasher.update(D::DOMAIN);
+        let domain_str = core::str::from_utf8(D::DOMAIN).unwrap_or("csv.unknown.domain");
+        let mut combined = Vec::new();
         let payloads: Vec<&[u8]> = payloads.into_iter().collect();
         for (i, payload) in payloads.iter().enumerate() {
-            hasher.update(payload);
+            combined.extend_from_slice(payload);
             // Add separator between payloads to prevent ambiguity
             if i < payloads.len() - 1 {
-                hasher.update(b"\x00");
+                combined.push(0x00);
             }
         }
-        let result = hasher.finalize();
-
-        let mut array = [0u8; 32];
-        array.copy_from_slice(&result);
-        Hash::new(array)
+        Hash::new(csv_tagged_hash(domain_str, &combined))
     }
 }
 
@@ -160,10 +151,12 @@ mod tests {
     }
 
     #[test]
-    fn test_domain_hash_not_raw_sha256() {
+    fn test_domain_hash_uses_tagged_hash() {
         let domain_hash = DomainSeparatedHash::<TestDomain1>::hash(b"test");
 
+        // Verify the hash uses tagged hashing (different from raw SHA256 of payload)
         let raw_hash = {
+            use sha2::{Digest, Sha256};
             let mut hasher = Sha256::new();
             hasher.update(b"test");
             let result = hasher.finalize();

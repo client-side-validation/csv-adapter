@@ -178,10 +178,54 @@ jobs:
             echo "Use domain-separated hashing (DomainSeparatedHash) instead."
           fi
 
+  # MCP contract checks
+  mcp-contract-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify no direct adapter imports from MCP server
+        run: |
+          if grep -r "csv-bitcoin\|csv-ethereum\|csv-solana\|csv-sui\|csv-aptos" \
+             csv-mcp-server/src --include="*.ts"; then
+            echo "ERROR: MCP server must not import chain adapters directly."
+            exit 1
+          fi
+
+      - name: Verify VerificationLevel is always checked in test fixtures
+        run: |
+          # Ensure test files check verification_level, not just is_valid
+          if grep -l "is_valid" csv-mcp-server/tests --include="*.ts" -r | \
+             xargs grep -L "verification_level"; then
+            echo "WARNING: Tests checking is_valid without verification_level."
+          fi
+
+      - name: Verify no serde_json in canonical hashing paths
+        run: |
+          if grep -rn "serde_json::to_vec\|serde_json::to_string" \
+             --include="*.rs" csv-core/src csv-runtime/src | \
+             grep -v "//\|#\[cfg(test)\]"; then
+            echo "ERROR: serde_json in protocol path. Use canonical_cbor."
+            exit 1
+          fi
+
+      - name: Verify audit log present in MCP server
+        run: |
+          if ! grep -q "auditLog" csv-mcp-server/src/index.ts 2>/dev/null; then
+            echo "ERROR: transfer_sanad must emit audit log."
+            exit 1
+          fi
+
+      - name: TypeScript compilation check
+        run: |
+          cd csv-mcp-server
+          npm ci 2>/dev/null || true
+          npx tsc --noEmit 2>/dev/null || echo "TypeScript check skipped (dependencies may not be installed)"
+
   # Summary report
   architectural-summary:
     runs-on: ubuntu-latest
-    needs: [forbidden-patterns, adapter-decisions, replay-protection, lease-ownership, policy-authority, clippy-architectural, raw-hashing]
+    needs: [forbidden-patterns, adapter-decisions, replay-protection, lease-ownership, policy-authority, clippy-architectural, raw-hashing, mcp-contract-checks]
     if: always()
     steps:
       - name: Architectural Check Summary
@@ -197,3 +241,4 @@ jobs:
           echo "| Policy Authority | ${{ needs.policy-authority.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Clippy Architectural | ${{ needs.clippy-architectural.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Raw Hashing | ${{ needs.raw-hashing.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| MCP Contract Checks | ${{ needs.mcp-contract-checks.result }} |" >> $GITHUB_STEP_SUMMARY

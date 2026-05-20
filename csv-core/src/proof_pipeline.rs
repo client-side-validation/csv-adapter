@@ -1132,6 +1132,8 @@ mod tests {
             inclusion_proof: InclusionProof::new(proof_bytes, correct_block_hash, 1, 0)
                 .unwrap(),
             finality_proof: FinalityProof::new(vec![4, 5, 6], 6, true).unwrap(),
+            provenance: None,
+            certification: None,
         };
 
         let verifier = MockVerifier;
