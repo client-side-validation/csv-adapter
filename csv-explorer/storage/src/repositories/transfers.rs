@@ -164,9 +164,9 @@ impl TransfersRepository {
             if filter.status.is_some() {
                 sql.push_str(" AND status = ?");
             }
-            Box::leak(sql.into_boxed_str())
+            Box::leak(sql.into_boxed_str()) as &'static str
         };
-        let mut query = sqlx::query_scalar::<&'static str, i64>(sql_static as &'static str);
+        let mut query = sqlx::query_scalar::<_, i64>(sql_static);
         if let Some(ref sanad_id) = filter.sanad_id {
             query = query.bind(sanad_id);
         }

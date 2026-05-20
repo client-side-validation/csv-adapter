@@ -446,7 +446,7 @@ impl AdvancedProofRepository {
 
         query.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
 
-        let query_static = Box::leak(query.into_boxed_str());
+        let query_static = Box::leak(query.into_boxed_str()) as &'static str;
         let rows = sqlx::query(query_static).fetch_all(&self.pool).await?;
 
         let mut records = Vec::new();

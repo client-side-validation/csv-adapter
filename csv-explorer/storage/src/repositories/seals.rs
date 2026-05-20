@@ -157,9 +157,9 @@ impl SealsRepository {
             if filter.sanad_id.is_some() {
                 sql.push_str(" AND sanad_id = ?");
             }
-            Box::leak(sql.into_boxed_str())
+            Box::leak(sql.into_boxed_str()) as &'static str
         };
-        let mut query = sqlx::query_scalar::<&'static str, i64>(sql_static as &'static str);
+        let mut query = sqlx::query_scalar::<_, i64>(sql_static);
         if let Some(ref chain) = filter.chain {
             query = query.bind(chain);
         }
