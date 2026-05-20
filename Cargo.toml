@@ -133,6 +133,34 @@ unused_mut = "deny"
 solana-keypair = { path = "patches/solana-keypair" }
 
 [dependencies]
+csv-sdk = { path = "csv-sdk" }
+csv-keys = { path = "csv-keys" }
+secp256k1 = "0.30"
+async-trait = "0.1"
+tokio = { version = "1", features = ["full"] }
+
+[dev-dependencies]
+csv-core = { path = "csv-core" }
+csv-runtime = { path = "csv-runtime" }
+csv-bitcoin = { path = "csv-bitcoin" }
+csv-ethereum = { path = "csv-ethereum" }
+csv-solana = { path = "csv-solana" }
+csv-sui = { path = "csv-sui" }
+csv-aptos = { path = "csv-aptos" }
+csv-celestia = { path = "csv-celestia" }
+csv-store = { path = "csv-store" }
+csv-explorer-indexer = { path = "csv-explorer/indexer" }
+csv-explorer-api = { path = "csv-explorer/api" }
+csv-explorer-shared = { path = "csv-explorer/shared" }
+csv-explorer-storage = { path = "csv-explorer/storage" }
+csv-stark = { path = "csv-stark" }
+csv-observability = { path = "csv-observability" }
+csv-p2p = { path = "csv-p2p" }
+csv-cli = { path = "csv-cli" }
+csv-wallet = { path = "csv-wallet" }
+futures = "0.3"
+serial_test = "3.0"
+serde_json = "1.0"
 
 [workspace.lints.clippy]
 needless_borrows_for_generic_args = "allow"

@@ -100,10 +100,38 @@ fn cmd_proof(
     output::kv("Proof Type", proof_type);
 
     output::progress(2, 3, "Verifying cryptographic proof...");
-    // Verify Merkle/MPT/checkpoint/ledger proof based on type
+
+    // Determine signature scheme based on source chain
+    let signature_scheme = match proof_chain {
+        "bitcoin" => csv_core::signature::SignatureScheme::Secp256k1,
+        "ethereum" => csv_core::signature::SignatureScheme::Secp256k1,
+        "sui" => csv_core::signature::SignatureScheme::Ed25519,
+        "aptos" => csv_core::signature::SignatureScheme::Ed25519,
+        "solana" => csv_core::signature::SignatureScheme::Ed25519,
+        _ => csv_core::signature::SignatureScheme::Secp256k1,
+    };
+
+    // Parse proof bundle from JSON using serde
+    let proof_bundle: csv_core::proof::ProofBundle = serde_json::from_value(proof)
+        .map_err(|e| anyhow::anyhow!("Failed to parse proof bundle: {}", e))?;
+
+    let seal_registry = |_seal_id: &[u8]| false;
+
+    let result = csv_core::verifier::verify_proof(&proof_bundle, seal_registry, signature_scheme);
+
+    output::kv(
+        "Verification Level",
+        &format!("{:?}", result.level).to_lowercase(),
+    );
+
+    if !result.errors.is_empty() {
+        for error in &result.errors {
+            output::error(&format!("✗ {}", error));
+        }
+        return Err(anyhow::anyhow!("Proof validation failed"));
+    }
 
     output::progress(3, 3, "Checking seal registry...");
-    // Check for double-spend
 
     output::success("Proof is valid");
     Ok(())
@@ -227,15 +255,21 @@ fn cmd_offline(file: String, _config: &Config, state: &UnifiedStateManager) -> R
         _ => csv_core::signature::SignatureScheme::Secp256k1,
     };
 
-    match csv_core::verifier::verify_proof(&proof_bundle, seal_registry, signature_scheme) {
-        Ok(_) => {
-            output::success("✓ Proof bundle is cryptographically valid");
+    let result = csv_core::verifier::verify_proof(&proof_bundle, seal_registry, signature_scheme);
+
+    output::kv(
+        "Verification Level",
+        &format!("{:?}", result.level).to_lowercase(),
+    );
+
+    if !result.errors.is_empty() {
+        for error in &result.errors {
+            output::error(&format!("✗ {}", error));
         }
-        Err(e) => {
-            output::error(&format!("✗ Verification failed: {}", e));
-            return Err(anyhow::anyhow!("Proof verification failed: {}", e));
-        }
+        return Err(anyhow::anyhow!("Proof verification failed"));
     }
+
+    output::success("✓ Proof bundle is cryptographically valid");
 
     output::progress(4, 5, "Generating explorer links...");
 

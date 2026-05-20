@@ -202,7 +202,7 @@ impl ConcurrentExecutor {
         operations: Vec<F>,
     ) -> Vec<Result<T, Box<dyn std::error::Error + Send + Sync>>>
     where
-        F: Fn() -> Fut + Send + Sync + Clone + 'static,
+        F: Fn() -> Fut + Send + 'static,
         Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send,
         T: Send + Sync + 'static,
     {
@@ -282,13 +282,13 @@ mod tests {
     #[tokio::test]
     async fn test_concurrent_executor() {
         let executor = ConcurrentExecutor::new(2);
-        let operations = vec![
-            || async { Ok::<_, Box<dyn std::error::Error + Send + Sync>>(1) },
-            || async { Ok::<_, Box<dyn std::error::Error + Send + Sync>>(2) },
-            || async { Ok::<_, Box<dyn std::error::Error + Send + Sync>>(3) },
+        let ops: Vec<Box<dyn Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<i32, Box<dyn std::error::Error + Send + Sync>>> + Send>> + Send>> = vec![
+            Box::new(|| Box::pin(async { Ok::<_, Box<dyn std::error::Error + Send + Sync>>(1) })),
+            Box::new(|| Box::pin(async { Ok::<_, Box<dyn std::error::Error + Send + Sync>>(2) })),
+            Box::new(|| Box::pin(async { Ok::<_, Box<dyn std::error::Error + Send + Sync>>(3) })),
         ];
 
-        let results = executor.execute_concurrent(operations).await;
+        let results = executor.execute_concurrent(ops).await;
         assert_eq!(results.len(), 3);
     }
 }

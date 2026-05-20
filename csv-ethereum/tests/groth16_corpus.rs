@@ -4,13 +4,19 @@
 //! rejects malformed/invalid proofs. They only run when the `real-groth16`
 //! feature is enabled.
 
+#[cfg(feature = "real-groth16")]
 use csv_core::hash::Hash;
+#[cfg(feature = "real-groth16")]
 use csv_core::protocol_version::builtin;
+#[cfg(feature = "real-groth16")]
 use csv_core::seal::SealPoint;
+#[cfg(feature = "real-groth16")]
 use csv_core::zk_proof::{ProofSystem, VerifierKey, ZkError, ZkPublicInputs, ZkSealProof, ZkVerifier};
+#[cfg(feature = "real-groth16")]
 use csv_ethereum::zk_verifier::EthereumGroth16Verifier;
 
 /// Helper: create a verifier key for testing
+#[cfg(feature = "real-groth16")]
 fn test_verifier_key() -> Vec<u8> {
     // A minimal 64-byte compressed BN254 verifying key for testing
     // This is a placeholder — real tests need an actual generated VK
@@ -21,6 +27,7 @@ fn test_verifier_key() -> Vec<u8> {
 }
 
 /// Helper: create default proof inputs
+#[cfg(feature = "real-groth16")]
 fn default_proof() -> (ZkSealProof, VerifierKey) {
     let seal = SealPoint::new(vec![0xAB; 32], Some(42)).unwrap();
     let public_inputs = ZkPublicInputs {

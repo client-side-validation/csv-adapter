@@ -232,7 +232,6 @@ impl ReplayDatabase for RocksReplayDb {
 mod tests {
     use super::*;
     use csv_core::proof::ReplayId;
-    use std::sync::Arc;
 
     fn test_replay_id(label: u8) -> ReplayId {
         ReplayId::derive(

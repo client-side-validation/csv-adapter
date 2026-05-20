@@ -2,10 +2,26 @@
 
 use anyhow::Result;
 use clap::Subcommand;
+use serde::{Deserialize, Serialize};
+use std::io::Read;
 
 use crate::config::{Chain, Config};
 use crate::output;
 use crate::state::UnifiedStateManager;
+
+/// Canonical proof output format (CBOR-serializable).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ProofOutput {
+    chain: String,
+    sanad_id: String,
+    proof_type: String,
+    block_height: u64,
+    inclusion_proof: String,
+    dag_root: String,
+    seal_id: String,
+    anchor_height: u64,
+    generated_at: String,
+}
 
 #[derive(Subcommand)]
 pub enum ProofAction {
@@ -114,33 +130,38 @@ fn cmd_generate(
 
     output::progress(3, 4, "Serializing proof bundle...");
 
-    // Serialize the proof bundle
-    let proof_json = serde_json::json!({
-        "chain": chain.to_string(),
-        "sanad_id": sanad_id,
-        "proof_type": match chain.as_str() {
-            "bitcoin" => "merkle",
-            "ethereum" => "mpt",
-            "sui" => "checkpoint",
-            "aptos" => "ledger",
-            "solana" => "epoch",
-            _ => "unknown",
-        },
-        "block_height": proof_bundle.finality_proof.confirmations,
-        "inclusion_proof": hex::encode(&proof_bundle.inclusion_proof.proof_bytes),
-        "dag_root": hex::encode(proof_bundle.transition_dag.root_commitment.as_bytes()),
-        "seal_id": hex::encode(&proof_bundle.seal_ref.id),
-        "anchor_height": proof_bundle.anchor_ref.block_height,
-        "generated_at": chrono::Utc::now().to_rfc3339(),
-    });
+    // Serialize the proof bundle using canonical CBOR
+    let proof_type = match chain.as_str() {
+        "bitcoin" => "merkle",
+        "ethereum" => "mpt",
+        "sui" => "checkpoint",
+        "aptos" => "ledger",
+        "solana" => "epoch",
+        _ => "unknown",
+    };
+
+    let proof_output = ProofOutput {
+        chain: chain.to_string(),
+        sanad_id,
+        proof_type: proof_type.to_string(),
+        block_height: proof_bundle.finality_proof.confirmations,
+        inclusion_proof: hex::encode(&proof_bundle.inclusion_proof.proof_bytes),
+        dag_root: hex::encode(proof_bundle.transition_dag.root_commitment.as_bytes()),
+        seal_id: hex::encode(&proof_bundle.seal_ref.id),
+        anchor_height: proof_bundle.anchor_ref.block_height,
+        generated_at: chrono::Utc::now().to_rfc3339(),
+    };
+
+    let cbor_bytes = csv_core::canonical::to_canonical_cbor(&proof_output)
+        .map_err(|e| anyhow::anyhow!("CBOR serialization failed: {}", e))?;
 
     output::progress(4, 4, "Finalizing...");
 
     if let Some(path) = output {
-        std::fs::write(&path, serde_json::to_string_pretty(&proof_json)?)?;
-        output::success(&format!("Proof saved to {}", path));
+        std::fs::write(&path, &cbor_bytes)?;
+        output::success(&format!("Proof saved to {} ({} bytes CBOR)", path, cbor_bytes.len()));
     } else {
-        output::json(&proof_json);
+        output::kv("Proof (CBOR)", &hex::encode(&cbor_bytes));
     }
 
     output::success(&format!("{} proof generated successfully", chain));
@@ -158,39 +179,40 @@ fn cmd_verify(
 
     output::header(&format!("Verifying Proof on {}", chain));
 
-    let proof_content = match proof_file {
-        Some(path) => std::fs::read_to_string(&path)?,
+    let proof_bytes = match proof_file {
+        Some(path) => std::fs::read(&path)?,
         None => {
-            let mut input = String::new();
-            std::io::stdin().read_line(&mut input)?;
+            let mut input = Vec::new();
+            std::io::stdin().read_to_end(&mut input)?;
             input
         }
     };
 
-    let proof_json: serde_json::Value = serde_json::from_str(&proof_content)
-        .map_err(|e| anyhow::anyhow!("Invalid proof JSON: {}", e))?;
+    // Try CBOR first, fall back to JSON for backward compatibility
+    let proof_output: ProofOutput = csv_core::canonical::from_canonical_cbor(&proof_bytes)
+        .or_else(|_| {
+            // Fallback: try parsing as JSON
+            let json: serde_json::Value = serde_json::from_slice(&proof_bytes)
+                .map_err(|e| anyhow::anyhow!("Invalid proof format: {}", e))?;
+            Ok::<ProofOutput, anyhow::Error>(ProofOutput {
+                chain: json.get("chain").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                sanad_id: json.get("sanad_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                proof_type: json.get("proof_type").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                block_height: json.get("block_height").and_then(|v| v.as_u64()).unwrap_or(0),
+                inclusion_proof: json.get("inclusion_proof").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                dag_root: json.get("dag_root").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                seal_id: json.get("seal_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                anchor_height: json.get("anchor_height").and_then(|v| v.as_u64()).unwrap_or(0),
+                generated_at: json.get("generated_at").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            })
+        })
+        .map_err(|e| anyhow::anyhow!("Failed to parse proof: {}", e))?;
 
-    output::kv(
-        "Proof Chain",
-        proof_json
-            .get("chain")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown"),
-    );
-    output::kv(
-        "Proof Type",
-        proof_json
-            .get("proof_type")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown"),
-    );
+    output::kv("Proof Chain", &proof_output.chain);
+    output::kv("Proof Type", &proof_output.proof_type);
 
     // Extract sanad_id from proof
-    let sanad_id_str = proof_json
-        .get("sanad_id")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("Proof missing sanad_id"))?;
-
+    let sanad_id_str = &proof_output.sanad_id;
     let bytes = hex::decode(sanad_id_str.trim_start_matches("0x"))
         .map_err(|e| anyhow::anyhow!("Invalid Sanad ID in proof: {}", e))?;
     if bytes.len() < 32 {
@@ -214,12 +236,8 @@ fn cmd_verify(
 
     output::progress(2, 4, "Reconstructing proof bundle...");
 
-    // Parse the proof bundle from JSON
-    let inclusion_proof_hex = proof_json
-        .get("inclusion_proof")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let inclusion_proof_bytes = hex::decode(inclusion_proof_hex)
+    // Parse the proof bundle from CBOR/JSON
+    let inclusion_proof_bytes = hex::decode(&proof_output.inclusion_proof)
         .map_err(|e| anyhow::anyhow!("Invalid inclusion proof: {}", e))?;
 
     // Reconstruct the proof bundle
@@ -231,24 +249,16 @@ fn cmd_verify(
             seal::{CommitAnchor, SealPoint},
         };
 
-        let dag_root = proof_json
-            .get("dag_root")
-            .and_then(|v| v.as_str())
-            .and_then(|s| hex::decode(s).ok())
+        let dag_root = hex::decode(&proof_output.dag_root)
+            .ok()
             .and_then(|b| b.try_into().ok())
             .map(Hash::new)
             .unwrap_or_else(|| Hash::new(hash_bytes));
 
-        let seal_id = proof_json
-            .get("seal_id")
-            .and_then(|v| v.as_str())
-            .and_then(|s| hex::decode(s).ok())
-            .unwrap_or_else(|| hash_bytes.to_vec());
+        let seal_id = hex::decode(&proof_output.seal_id)
+            .unwrap_or_else(|_| hash_bytes.to_vec());
 
-        let anchor_height = proof_json
-            .get("anchor_height")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0);
+        let anchor_height = proof_output.anchor_height;
 
         let dag_node = DAGNode::new(dag_root, vec![], vec![], vec![], vec![]);
         let dag_segment = DAGSegment::new(vec![dag_node], dag_root);
@@ -262,10 +272,7 @@ fn cmd_verify(
         let inclusion_proof = InclusionProof::new(inclusion_proof_bytes, dag_root, 0, 0)
             .map_err(|e| anyhow::anyhow!("Failed to create inclusion proof: {}", e))?;
 
-        let confirmations = proof_json
-            .get("block_height")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(6);
+        let confirmations = proof_output.block_height;
 
         let finality_proof = FinalityProof::new(vec![], confirmations, true)
             .map_err(|e| anyhow::anyhow!("Failed to create finality proof: {}", e))?;
@@ -295,6 +302,14 @@ fn cmd_verify(
 
     output::progress(4, 4, "Finalizing verification...");
 
+    let level = if valid {
+        csv_core::mcp::VerificationLevel::FullyVerified
+    } else {
+        csv_core::mcp::VerificationLevel::StructuralOnly
+    };
+
+    output::kv("Verification Level", &format!("{:?}", level).to_lowercase());
+
     if valid {
         output::success("Proof verified successfully - cryptographic validation passed");
         Ok(())
@@ -317,21 +332,37 @@ fn cmd_verify_cross_chain(
         source, dest
     ));
 
-    let proof_content = std::fs::read_to_string(&proof_file)?;
-    let proof: serde_json::Value = serde_json::from_str(&proof_content)?;
+    let proof_bytes = std::fs::read(&proof_file)?;
+
+    // Try CBOR first, fall back to JSON
+    let proof_output: ProofOutput = csv_core::canonical::from_canonical_cbor(&proof_bytes)
+        .or_else(|_| {
+            let json: serde_json::Value = serde_json::from_slice(&proof_bytes)
+                .map_err(|e| anyhow::anyhow!("Invalid proof format: {}", e))?;
+            Ok::<ProofOutput, anyhow::Error>(ProofOutput {
+                chain: json.get("chain").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                sanad_id: json.get("sanad_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                proof_type: json.get("proof_type").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                block_height: json.get("block_height").and_then(|v| v.as_u64()).unwrap_or(0),
+                inclusion_proof: json.get("inclusion_proof").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                dag_root: json.get("dag_root").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                seal_id: json.get("seal_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                anchor_height: json.get("anchor_height").and_then(|v| v.as_u64()).unwrap_or(0),
+                generated_at: json.get("generated_at").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            })
+        })
+        .map_err(|e| anyhow::anyhow!("Failed to parse proof: {}", e))?;
 
     output::kv("Source Chain", source.as_ref());
     output::kv("Destination Chain", dest.as_ref());
 
     // Verify the proof is from the claimed source chain
-    if let Some(proof_chain) = proof.get("chain").and_then(|v| v.as_str()) {
-        if proof_chain != source {
-            return Err(anyhow::anyhow!(
-                "Proof claims to be from {} but file says {}",
-                source,
-                proof_chain
-            ));
-        }
+    if proof_output.chain != source.to_string() {
+        return Err(anyhow::anyhow!(
+            "Proof claims to be from {} but file says {}",
+            source,
+            proof_output.chain
+        ));
     }
 
     output::progress(1, 4, "Verifying source chain proof...");

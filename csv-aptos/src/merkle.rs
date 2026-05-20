@@ -561,6 +561,7 @@ mod tests {
     #[test]
     fn test_ledger_proof_verification() {
         let proof = LedgerProof::new(100, [1u8; 32], 1, 1, vec![]);
-        assert!(proof.verify());
+        // Empty proof with matching root returns Ok(true)
+        assert!(proof.verify_against_accumulator([1u8; 32]).unwrap());
     }
 }

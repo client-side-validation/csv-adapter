@@ -48,6 +48,7 @@ zeroize = { version = "1.7", features = ["derive"] }
 # Async utilities
 futures = "0.3"
 tracing = "0.1"
+async-trait = "0.1"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

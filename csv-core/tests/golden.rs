@@ -5,6 +5,7 @@
 
 use csv_core::canonical::from_canonical_cbor;
 use csv_core::proof::ProofBundle;
+use csv_core::SanadEnvelope;
 
 macro_rules! golden_test {
     ($name:ident, $file:expr, $expect_valid:expr) => {
@@ -33,18 +34,8 @@ golden_test!(malformed_wrong_domain, "golden/malformed_proof_wrong_domain.cbor",
 #[test]
 fn valid_sanad_envelope_v1() {
     let bytes = include_bytes!("golden/valid_sanad_envelope_v1.cbor");
-    // Sanad envelope is a simple struct, verify it deserializes
-    // CBOR serializes structs as maps by default with serde_derive
-    #[derive(serde::Deserialize, Debug)]
-    #[allow(dead_code)]
-    struct SanadEnvelope {
-        version: u32,
-        sanad_id: [u8; 32],
-        payload_hash: [u8; 32],
-        merkle_root: [u8; 32],
-    }
     let envelope: SanadEnvelope = from_canonical_cbor(bytes)
         .expect("valid_sanad_envelope_v1 must deserialize");
     assert_eq!(envelope.version, 1);
-    assert_eq!(envelope.sanad_id, [14u8; 32]);
+    assert_eq!(envelope.sanad_id.as_bytes(), &[14u8; 32]);
 }

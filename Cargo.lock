@@ -3086,6 +3086,34 @@ dependencies = [
 [[package]]
 name = "csv-adapter"
 version = "0.5.0"
+dependencies = [
+ "async-trait",
+ "csv-aptos",
+ "csv-bitcoin",
+ "csv-celestia",
+ "csv-cli",
+ "csv-core",
+ "csv-ethereum",
+ "csv-explorer-api",
+ "csv-explorer-indexer",
+ "csv-explorer-shared",
+ "csv-explorer-storage",
+ "csv-keys",
+ "csv-observability",
+ "csv-p2p",
+ "csv-runtime",
+ "csv-sdk",
+ "csv-solana",
+ "csv-stark",
+ "csv-store",
+ "csv-sui",
+ "csv-wallet",
+ "futures",
+ "secp256k1 0.30.0",
+ "serde_json",
+ "serial_test",
+ "tokio",
+]
 
 [[package]]
 name = "csv-aptos"
@@ -3612,6 +3640,7 @@ version = "0.5.0"
 dependencies = [
  "aes-gcm",
  "argon2",
+ "async-trait",
  "base64 0.21.7",
  "bcs",
  "bip32",

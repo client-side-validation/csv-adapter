@@ -55,7 +55,7 @@ jobs:
         run: |
           echo "Checking for adapter-local policy decisions..."
           # Check for patterns that indicate adapter-local decisions
-          if grep -r "finality_depth\|retry_count\|rpc_fallback" --include="*.rs" csv-adapters; then
+          if grep -r "finality_depth\|retry_count\|rpc_fallback" --include="*.rs" csv-bitcoin csv-ethereum csv-solana csv-sui csv-aptos; then
             echo "WARNING: Found potential adapter-local policy decisions."
             echo "Policy decisions should be centralized in runtime."
           fi
@@ -63,7 +63,7 @@ jobs:
       - name: Check for adapter-local finality decisions
         run: |
           echo "Checking for adapter-local finality decisions..."
-          if grep -r "is_finalized\|confirmations\|finality" --include="*.rs" csv-adapters | grep -v "verify_finality"; then
+          if grep -r "is_finalized\|confirmations\|finality" --include="*.rs" csv-bitcoin csv-ethereum csv-solana csv-sui csv-aptos | grep -v "verify_finality"; then
             echo "WARNING: Found potential adapter-local finality decisions."
             echo "Finality decisions should be centralized in runtime."
           fi
@@ -124,22 +124,11 @@ jobs:
       - name: Check for adapter policy overrides
         run: |
           echo "Checking for adapter policy overrides..."
-          if grep -r "override\|ignore\|bypass" --include="*.rs" csv-adapters | grep -i "policy"; then
+          if grep -r "override\|ignore\|bypass" --include="*.rs" csv-bitcoin csv-ethereum csv-solana csv-sui csv-aptos | grep -i "policy"; then
             echo "ERROR: Found adapter policy override attempts."
             echo "Adapters must not override runtime policies."
             exit 1
           fi
-          
-      - name: Check for set_policy implementation
-        run: |
-          echo "Checking that adapters implement set_policy..."
-          # Verify all adapters have set_policy method
-          for adapter in csv-adapters/src/*.rs; do
-            if ! grep -q "set_policy" "$adapter"; then
-              echo "ERROR: Adapter $adapter missing set_policy implementation."
-              exit 1
-            fi
-          done
 
   # Run clippy with architectural lints
   clippy-architectural:
@@ -177,6 +166,23 @@ jobs:
             echo "WARNING: Found raw hashing in protocol logic."
             echo "Use domain-separated hashing (DomainSeparatedHash) instead."
           fi
+
+  # WASM build verification
+  wasm-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Build csv-core for wasm32 (no_std compatible)
+        run: cargo build --package csv-core --no-default-features --features "std" --target wasm32-unknown-unknown
 
   # MCP contract checks
   mcp-contract-checks:

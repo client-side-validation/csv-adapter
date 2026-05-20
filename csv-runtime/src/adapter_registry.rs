@@ -6,7 +6,7 @@
 #![allow(missing_docs)]
 
 use csv_core::chain_config::ChainCapabilities;
-use csv_core::finality::FinalityProof as FinalityVerifierProof;
+pub use csv_core::finality::FinalityProof as FinalityVerifierProof;
 use csv_core::hash::Hash;
 use csv_core::proof::ProofBundle;
 use csv_core::verified::{VerificationResult, VerificationFailure};
@@ -356,6 +356,10 @@ mod tests {
 
         fn capabilities(&self) -> &ChainCapabilities {
             &self.caps
+        }
+
+        fn set_policy(&mut self, _policy: crate::policy::RuntimePolicy) {
+            // Mock adapter accepts policy but doesn't use it
         }
 
         async fn lock_sanad(

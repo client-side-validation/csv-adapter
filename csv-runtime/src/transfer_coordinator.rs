@@ -364,13 +364,14 @@ impl TransferCoordinator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapter_registry::{AdapterRegistryImpl, ChainAdapter, CrossChainTransfer as RuntimeCrossChainTransfer, LockResult, MintResult};
+    use crate::adapter_registry::{AdapterRegistryImpl, ChainAdapter, CrossChainTransfer as RuntimeCrossChainTransfer, FinalityVerifierProof, LockResult, MintResult, SealRegistryStatus};
     use csv_core::chain_config::ChainCapabilities;
     use csv_core::finality::FinalityEvidence;
     use csv_core::proof::{InclusionProof, ProofBundle};
     use csv_core::verified::{
         FinalityStrength, InclusionStrength, VerificationAssurance, VerificationResult, VerifiedComponents,
     };
+    use std::sync::Arc;
 
     struct TestAdapter {
         caps: ChainCapabilities,
@@ -432,6 +433,8 @@ mod tests {
                 anchor_ref: csv_core::seal::CommitAnchor::new(vec![0u8; 32], 0, vec![]).unwrap(),
                 inclusion_proof: InclusionProof::new(vec![], csv_core::hash::Hash::new([0u8; 32]), 100, 0).unwrap(),
                 finality_proof: csv_core::proof::FinalityProof::new(vec![], 6, false).unwrap(),
+                provenance: None,
+                certification: None,
             })
         }
 
@@ -797,7 +800,7 @@ mod tests {
     async fn test_degraded_mode_policy() {
         let policy = crate::policy::RuntimePolicy::development();
         assert_eq!(policy.mode, crate::runtime_mode::RuntimeMode::Degraded);
-        assert!(policy.allows_rpc_fallback());
+        assert!(policy.mode.allows_rpc_fallback());
         assert_eq!(policy.max_retries, 5);
     }
 
@@ -805,7 +808,7 @@ mod tests {
     async fn test_unsafe_mode_policy() {
         let policy = crate::policy::RuntimePolicy::unsafe_mode();
         assert_eq!(policy.mode, crate::runtime_mode::RuntimeMode::Unsafe);
-        assert!(policy.allows_rpc_fallback());
+        assert!(policy.mode.allows_rpc_fallback());
         assert_eq!(policy.max_retries, 1);
         assert!(policy.mode.requires_operator_confirmation());
     }
@@ -1014,11 +1017,6 @@ mod tests {
 
         // Attempt recovery after timeout
         std::thread::sleep(std::time::Duration::from_millis(100));
-        coordinator.circuit_breaker().lock().unwrap().config = crate::runtime_mode::CircuitBreakerConfig {
-            failure_threshold: 5,
-            open_timeout: std::time::Duration::from_millis(50),
-            success_threshold: 2,
-        };
 
         let recovered = coordinator.attempt_circuit_breaker_recovery();
         assert!(recovered, "Circuit breaker should recover after timeout");
@@ -1038,7 +1036,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_concurrent_transfer_execution_race() {
-        let replay_db = Arc::new(std::sync::Mutex::new(crate::replay_db::InMemoryReplayDb::new()));
+        let _replay_db = Arc::new(std::sync::Mutex::new(crate::replay_db::InMemoryReplayDb::new()));
         let event_bus = EventBus::new();
         let coordinator = TransferCoordinator::new(
             Box::new(crate::replay_db::InMemoryReplayDb::new()),
@@ -1085,11 +1083,15 @@ mod tests {
                     runtime_instance: runtime_id_clone,
                     policy: crate::policy::RuntimePolicy::new(),
                 };
-                coord.execute(transfer_clone, &reg, ctx).await
+                coord.execute(transfer_clone, reg.as_ref(), ctx).await
             }));
         }
 
-        let results: Vec<_> = futures::future::join_all(handles).await;
+        // Await all handles sequentially (equivalent to join_all for testing)
+        let mut results = Vec::new();
+        for handle in handles {
+            results.push(handle.await.expect("task should not panic"));
+        }
         // All should succeed due to idempotency
         let success_count = results.iter().filter(|r| r.is_ok()).count();
         assert_eq!(success_count, 3, "All concurrent executions should succeed");
@@ -1150,11 +1152,15 @@ mod tests {
                     runtime_instance: runtime_id,
                     policy: crate::policy::RuntimePolicy::new(),
                 };
-                coord.execute(transfer_clone, &reg, ctx).await
+                coord.execute(transfer_clone, reg.as_ref(), ctx).await
             }));
         }
 
-        let results: Vec<_> = futures::future::join_all(handles).await;
+        // Await all handles sequentially (equivalent to join_all for testing)
+        let mut results = Vec::new();
+        for handle in handles {
+            results.push(handle.await.expect("task should not panic"));
+        }
         // One should succeed, one should fail due to lease conflict
         let success_count = results.iter().filter(|r| r.is_ok()).count();
         let error_count = results.iter().filter(|r| r.is_err()).count();
@@ -1176,11 +1182,7 @@ mod tests {
         impl MaliciousTestAdapter {
             fn new() -> Self {
                 Self {
-                    caps: ChainCapabilities {
-                        can_authorize_mint: true,
-                        supports_cross_chain: true,
-                        supports_finality: true,
-                    },
+                    caps: ChainCapabilities::bitcoin(),
                 }
             }
         }
@@ -1210,7 +1212,7 @@ mod tests {
                 _transfer: &CrossChainTransfer,
                 _proof_bundle: &ProofBundle,
             ) -> Result<MintResult, crate::adapter_registry::AdapterError> {
-                Err(crate::adapter_registry::AdapterError::VerificationFailed(
+                Err(crate::adapter_registry::AdapterError::InvalidProof(
                     "Malicious proof bundle detected".to_string(),
                 ))
             }
@@ -1234,8 +1236,13 @@ mod tests {
                 _block_height: u64,
             ) -> Result<FinalityVerifierProof, crate::adapter_registry::AdapterError> {
                 Ok(FinalityVerifierProof {
+                    chain_id: "malicious-chain".to_string(),
                     block_height: 100,
-                    proof: vec![],
+                    finality_evidence: csv_core::finality::FinalityEvidence::CumulativeWork {
+                        header_hash: [0u8; 32],
+                        cumulative_work: 0,
+                    },
+                    confirmations: 6,
                 })
             }
 

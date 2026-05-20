@@ -64,7 +64,7 @@ pub use provenance::{AdapterSignature, ProofProvenance, VerificationStep, Verifi
 pub use certification::{ProofCertification, VerificationInputs, VerificationOutputs};
 pub use replay_record::{GlobalReplayRecord, ReplayState};
 pub use replay_registry::{ReplayEntry, ReplayKey, ReplayRegistry, ReplayRegistryBackend};
-pub use sanad::{OwnershipProof, Sanad, SanadId};
+pub use sanad::{OwnershipProof, Sanad, SanadEnvelope, SanadId};
 pub use seal_protocol::SealProtocol;
 pub use nullifier::SealStatus;
 

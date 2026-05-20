@@ -749,24 +749,22 @@ impl ChainRuntime {
         };
 
         // Use the core proof verification pipeline for signatures and seal check
-        match csv_core::verify_proof(proof_bundle, seal_checker, signature_scheme) {
-            Ok(()) => {
-                log::info!(
-                    "Proof bundle verified successfully for sanad {:?} on {:?}",
-                    sanad_id,
-                    chain
-                );
-                Ok(true)
-            }
-            Err(e) => {
-                log::warn!(
-                    "Proof verification failed for sanad {:?} on {:?}: {}",
-                    sanad_id,
-                    chain.clone(),
-                    e
-                );
-                Ok(false)
-            }
+        let result = csv_core::verify_proof(proof_bundle, seal_checker, signature_scheme);
+        if result.is_valid {
+            log::info!(
+                "Proof bundle verified successfully for sanad {:?} on {:?}",
+                sanad_id,
+                chain
+            );
+            Ok(true)
+        } else {
+            log::warn!(
+                "Proof verification failed for sanad {:?} on {:?}: {:?}",
+                sanad_id,
+                chain.clone(),
+                result.errors
+            );
+            Ok(false)
         }
     }
 

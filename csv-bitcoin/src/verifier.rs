@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use csv_core::Hash;
 use csv_core::proof::{FinalityProof, InclusionProof, ProofBundle};
 use csv_core::proof_pipeline::ChainVerifier;
-use csv_core::signature::{Signature, SignatureScheme, verify_signatures};
+use csv_core::signature::SignatureScheme;
 use csv_core::verified::{
     FinalityStrength, InclusionStrength, VerificationAssurance, VerificationFailure,
     VerificationResult, VerifiedComponents,
@@ -167,34 +167,11 @@ impl ChainVerifier for BitcoinVerifier {
     }
 
     /// Verify zero-knowledge proof (if applicable)
+    ///
+    /// Uses the canonical csv_core::zk_proof::verify_zk_proof function.
     async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<VerificationResult> {
-        if !proof.is_empty() {
-            return Ok(VerificationResult {
-                valid: false,
-                assurance: VerificationAssurance::Structural,
-                verified_components: VerifiedComponents {
-                    inclusion: InclusionStrength::None,
-                    finality: FinalityStrength::None,
-                    replay_checked: false,
-                    ownership_signature: false,
-                },
-                error: Some(VerificationFailure::UnsupportedCapability(
-                    "ZK proofs should use BitcoinSpvProver, not the verifier directly. For SPV verification without ZK, ensure zk_proof_data is empty."
-                        .to_string(),
-                )),
-            });
-        }
-        Ok(VerificationResult {
-            valid: true,
-            assurance: VerificationAssurance::PartialCryptographic,
-            verified_components: VerifiedComponents {
-                inclusion: InclusionStrength::None,
-                finality: FinalityStrength::None,
-                replay_checked: false,
-                ownership_signature: false,
-            },
-            error: None,
-        })
+        let result = csv_core::zk_proof::verify_zk_proof(proof, None);
+        Ok(result)
     }
 
     /// Verify seal registry (check if seal has been consumed)
@@ -269,8 +246,8 @@ impl ChainVerifier for BitcoinVerifier {
 
     /// Verify signature on proof bundle
     ///
-    /// Parses signatures from the proof bundle and verifies them
-    /// using the Bitcoin secp256k1 signature scheme.
+    /// Uses the canonical csv_core::signature::verify_bundle_signatures function
+    /// which handles parsing and verification in a single call.
     async fn verify_signature(
         &self,
         bundle: &ProofBundle,
@@ -289,51 +266,8 @@ impl ChainVerifier for BitcoinVerifier {
             });
         }
 
-        // Parse signatures from the bundle
-        let mut signatures = Vec::with_capacity(bundle.signatures.len());
-
-        for sig_bytes in bundle.signatures.iter() {
-            if sig_bytes.len() < 4 {
-                return Ok(VerificationResult {
-                    valid: false,
-                    assurance: VerificationAssurance::Structural,
-                    verified_components: VerifiedComponents {
-                        inclusion: InclusionStrength::None,
-                        finality: FinalityStrength::None,
-                        replay_checked: false,
-                        ownership_signature: false,
-                    },
-                    error: Some(VerificationFailure::InvalidOwnershipSignature),
-                });
-            }
-
-            let pk_len =
-                u32::from_le_bytes([sig_bytes[0], sig_bytes[1], sig_bytes[2], sig_bytes[3]])
-                    as usize;
-
-            if sig_bytes.len() < 4 + pk_len {
-                return Ok(VerificationResult {
-                    valid: false,
-                    assurance: VerificationAssurance::Structural,
-                    verified_components: VerifiedComponents {
-                        inclusion: InclusionStrength::None,
-                        finality: FinalityStrength::None,
-                        replay_checked: false,
-                        ownership_signature: false,
-                    },
-                    error: Some(VerificationFailure::InvalidOwnershipSignature),
-                });
-            }
-
-            let public_key = sig_bytes[4..4 + pk_len].to_vec();
-            let signature = sig_bytes[4 + pk_len..].to_vec();
-            let message = bundle.transition_dag.root_commitment.as_bytes().to_vec();
-
-            signatures.push(Signature::new(signature, public_key, message));
-        }
-
-        // Bitcoin uses secp256k1 (ECDSA) for signatures
-        verify_signatures(&signatures, SignatureScheme::Secp256k1)
+        // Use canonical signature verification from csv-core
+        csv_core::signature::verify_bundle_signatures(bundle, SignatureScheme::Secp256k1)
             .map_err(|e| csv_core::ProtocolError::SignatureVerificationFailed(e.to_string()))?;
 
         Ok(VerificationResult {

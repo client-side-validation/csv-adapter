@@ -1365,7 +1365,7 @@ mod tests {
     #[test]
     fn test_eth_rlp_encoding_sepolia_vector() {
         // Set ETH_CHAIN_ID to Sepolia for this test
-        std::env::set_var("ETH_CHAIN_ID", "11155111");
+        unsafe { std::env::set_var("ETH_CHAIN_ID", "11155111"); }
 
         let to = "f010101010101010101010101010101010101010";
         let value: u64 = 1000;
@@ -1398,7 +1398,7 @@ mod tests {
         );
 
         // Clean up env var
-        std::env::remove_var("ETH_CHAIN_ID");
+        unsafe { std::env::remove_var("ETH_CHAIN_ID"); }
     }
 
     /// Regression test: Verify chain ID is correctly encoded in RLP.
@@ -1416,13 +1416,13 @@ mod tests {
         let gas_limit: u64 = 21000;
 
         // Build with mainnet chain ID
-        std::env::set_var("ETH_CHAIN_ID", "1");
+        unsafe { std::env::set_var("ETH_CHAIN_ID", "1"); }
         let tx_mainnet =
             build_eth_transaction_data(to, value, data.clone(), nonce, gas_price, gas_limit)
                 .expect("should build transaction");
 
         // Build with Sepolia chain ID
-        std::env::set_var("ETH_CHAIN_ID", "11155111");
+        unsafe { std::env::set_var("ETH_CHAIN_ID", "11155111"); }
         let tx_sepolia = build_eth_transaction_data(to, value, data, nonce, gas_price, gas_limit)
             .expect("should build transaction");
 
@@ -1433,14 +1433,14 @@ mod tests {
         );
 
         // Clean up
-        std::env::remove_var("ETH_CHAIN_ID");
+        unsafe { std::env::remove_var("ETH_CHAIN_ID"); }
     }
 
     /// Regression test: Verify nonce is correctly encoded in RLP.
     #[serial_test::serial]
     #[test]
     fn test_eth_rlp_nonce_encoding() {
-        std::env::set_var("ETH_CHAIN_ID", "1");
+        unsafe { std::env::set_var("ETH_CHAIN_ID", "1"); }
 
         let to = "f010101010101010101010101010101010101010";
         let value: u64 = 1000;
@@ -1460,6 +1460,6 @@ mod tests {
             "Nonce 0 and nonce 1 should produce different RLP output"
         );
 
-        std::env::remove_var("ETH_CHAIN_ID");
+        unsafe { std::env::remove_var("ETH_CHAIN_ID"); }
     }
 }

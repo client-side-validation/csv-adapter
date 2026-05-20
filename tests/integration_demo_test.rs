@@ -45,7 +45,7 @@ mod demo_scenario_tests {
         ];
 
         for chain in chains {
-            let key = derive_key(seed.as_bytes(), &chain, 0, 0);
+            let key = derive_key(seed.as_bytes(), &chain, 0, 0).expect("key derivation should succeed");
             assert_eq!(key.as_bytes().len(), 32);
         }
     }
@@ -60,10 +60,10 @@ mod demo_scenario_tests {
         let keystore = KeystoreFile::encrypt(&secret_key, &passphrase, KdfType::Scrypt)
             .expect("Keystore encryption should succeed");
 
-        let decrypted = keystore
+       let decrypted = keystore
             .decrypt(&passphrase)
             .expect("Keystore decryption should succeed");
-        assert_eq!(decrypted.as_bytes(), key_bytes);
+        assert_eq!(decrypted.as_bytes(), &key_bytes);
     }
 
     #[test]

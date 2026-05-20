@@ -150,6 +150,9 @@ jobs:
       - name: Build csv-wallet for wasm32 (native feature disabled)
         run: cargo build --package csv-wallet --no-default-features --features "csv-bitcoin,csv-ethereum" --target wasm32-unknown-unknown
 
+      - name: Build csv-core for wasm32
+        run: cargo build --package csv-core --target wasm32-unknown-unknown
+
       - name: Verify csv-runtime rejects persistent on wasm32
         run: |
           ! cargo build --package csv-runtime --features persistent --target wasm32-unknown-unknown 2>&1 | grep -q "compile_error" || exit 0

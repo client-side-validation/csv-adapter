@@ -318,8 +318,12 @@ impl ParallelVerifyService {
         };
 
         // Call csv_core::verify_proof
-        verify_proof(proof, seal_registry, signature_scheme)
-            .map_err(|e| format!("Proof verification failed: {}", e))
+        let vr = verify_proof(proof, seal_registry, signature_scheme);
+        if !vr.is_valid {
+            Err(format!("Proof verification failed: {}", vr.errors.first().cloned().unwrap_or_else(|| "Unknown error".to_string())))
+        } else {
+            Ok(())
+        }
     }
 
     /// Verify seals with early exit on first failure (fail-fast mode).
@@ -435,15 +439,15 @@ mod tests {
     /// Mock verifier for testing
     struct MockVerifier;
 
-    fn ok_result() -> csv_core::Result<VerificationResult> {
-        Ok(VerificationResult {
+    fn ok_result() -> csv_core::Result<csv_core::verified::VerificationResult> {
+        Ok(csv_core::verified::VerificationResult {
             valid: true,
-            assurance: VerificationAssurance::PartialCryptographic,
-            verified_components: VerifiedComponents {
-                inclusion: InclusionStrength::None,
-                finality: FinalityStrength::None,
-                replay_checked: false,
-                ownership_signature: false,
+            assurance: csv_core::verified::VerificationAssurance::ConsensusBound,
+            verified_components: csv_core::verified::VerifiedComponents {
+                inclusion: csv_core::verified::InclusionStrength::MerklePath,
+                finality: csv_core::verified::FinalityStrength::Deterministic,
+                replay_checked: true,
+                ownership_signature: true,
             },
             error: None,
         })
@@ -455,44 +459,24 @@ mod tests {
             &self,
             _proof: &csv_core::proof::InclusionProof,
             _expected_root: Hash,
-        ) -> csv_core::Result<VerificationResult> {
+        ) -> csv_core::Result<csv_core::verified::VerificationResult> {
             ok_result()
         }
 
-        async fn verify_finality(&self, _proof: &csv_core::proof::FinalityProof) -> csv_core::Result<VerificationResult> {
+        async fn verify_finality(&self, _proof: &csv_core::proof::FinalityProof) -> csv_core::Result<csv_core::verified::VerificationResult> {
             ok_result()
         }
 
-        async fn verify_zk(&self, _proof: &[u8]) -> csv_core::Result<VerificationResult> {
+        async fn verify_zk(&self, _proof: &[u8]) -> csv_core::Result<csv_core::verified::VerificationResult> {
             ok_result()
         }
 
-        async fn verify_seal_registry(&self, _seal_id: Hash) -> csv_core::Result<VerificationResult> {
-            Ok(VerificationResult {
-                valid: true,
-                assurance: VerificationAssurance::PartialCryptographic,
-                verified_components: VerifiedComponents {
-                    inclusion: InclusionStrength::None,
-                    finality: FinalityStrength::None,
-                    replay_checked: true,
-                    ownership_signature: false,
-                },
-                error: None,
-            })
+        async fn verify_seal_registry(&self, _seal_id: Hash) -> csv_core::Result<csv_core::verified::VerificationResult> {
+            ok_result()
         }
 
-        async fn verify_signature(&self, _bundle: &ProofBundle) -> csv_core::Result<VerificationResult> {
-            Ok(VerificationResult {
-                valid: true,
-                assurance: VerificationAssurance::PartialCryptographic,
-                verified_components: VerifiedComponents {
-                    inclusion: InclusionStrength::None,
-                    finality: FinalityStrength::None,
-                    replay_checked: false,
-                    ownership_signature: true,
-                },
-                error: None,
-            })
+        async fn verify_signature(&self, _bundle: &ProofBundle) -> csv_core::Result<csv_core::verified::VerificationResult> {
+            ok_result()
         }
     }
 }

@@ -43,8 +43,10 @@
 //! unauthorized state transitions or double-spends.
 
 use crate::error::{ProtocolError, Result};
+use crate::mcp::VerificationLevel;
 use crate::proof::ProofBundle;
 use crate::signature::{Signature, SignatureScheme, verify_signatures};
+use serde::Serialize;
 
 /// Verify a proof bundle according to the CSV verification pipeline.
 ///
@@ -95,6 +97,71 @@ const MAX_PROOF_BUNDLE_SIZE: usize = 1024 * 1024;
 /// Minimum required confirmations for finality
 const MIN_REQUIRED_CONFIRMATIONS: u64 = 6;
 
+/// Result of a proof verification with explicit assurance level.
+#[derive(Debug, Clone, Serialize)]
+pub struct VerificationResult {
+    /// Whether the proof passed all checks.
+    pub is_valid: bool,
+    /// The verification level achieved.
+    pub level: VerificationLevel,
+    /// Errors encountered during verification (empty if valid).
+    pub errors: Vec<String>,
+    /// Warnings (non-fatal issues).
+    pub warnings: Vec<String>,
+}
+
+impl VerificationResult {
+    /// Structural-only result (no cryptographic checks performed).
+    pub fn structural() -> Self {
+        Self {
+            is_valid: true,
+            level: VerificationLevel::StructuralOnly,
+            errors: Vec::new(),
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Merkle-verified result (inclusion proof verified, finality not confirmed).
+    pub fn merkle_verified() -> Self {
+        Self {
+            is_valid: true,
+            level: VerificationLevel::MerkleVerified,
+            errors: Vec::new(),
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Fully verified result (all checks passed).
+    pub fn fully_verified() -> Self {
+        Self {
+            is_valid: true,
+            level: VerificationLevel::FullyVerified,
+            errors: Vec::new(),
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Failed result with errors.
+    pub fn failed(errors: Vec<String>) -> Self {
+        Self {
+            is_valid: false,
+            level: VerificationLevel::StructuralOnly,
+            errors,
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Failed result with a single error.
+    pub fn from_error(e: ProtocolError) -> Self {
+        Self {
+            is_valid: false,
+            level: VerificationLevel::StructuralOnly,
+            errors: vec![e.to_string()],
+            warnings: Vec::new(),
+        }
+    }
+}
+
 /// Verify a proof bundle according to the CSV verification pipeline.
 ///
 /// This is the **primary entry point for proof verification**. It performs
@@ -122,47 +189,68 @@ const MIN_REQUIRED_CONFIRMATIONS: u64 = 6;
 /// 7. **Inclusion Verification** - Verify proof of on-chain inclusion
 /// 8. **Finality Check** - Confirm anchor reached required confirmations
 /// 9. **Anchor Reference Validation** - Verify anchor is properly formed
+///
+/// # Returns
+/// - `Ok(VerificationResult)` with `is_valid: true` and `level: FullyVerified` if all checks pass
+/// - `Ok(VerificationResult)` with `is_valid: false` and `level: StructuralOnly` if checks fail
 pub fn verify_proof(
     bundle: &ProofBundle,
     seal_registry: impl Fn(&[u8]) -> bool,
     signature_scheme: SignatureScheme,
-) -> Result<()> {
+) -> VerificationResult {
     // Step 1: Validate proof bundle size (DoS protection)
-    validate_proof_bundle_size(bundle)?;
+    if let Err(e) = validate_proof_bundle_size(bundle) {
+        return VerificationResult::from_error(e);
+    }
 
     // Step 2: Validate DAG structure
-    bundle
+    if let Err(e) = bundle
         .transition_dag
         .validate_structure()
-        .map_err(|e| ProtocolError::Generic(format!("Invalid DAG structure: {}", e)))?;
+        .map_err(|e| ProtocolError::Generic(format!("Invalid DAG structure: {}", e)))
+    {
+        return VerificationResult::from_error(e);
+    }
 
     // Step 3: Validate proof timestamp (prevent replay of old proofs)
-    validate_proof_timestamp(bundle)?;
+    if let Err(e) = validate_proof_timestamp(bundle) {
+        return VerificationResult::from_error(e);
+    }
 
     // Step 4: Validate signatures with cryptographic verification
-    verify_bundle_signatures(bundle, signature_scheme)?;
+    if let Err(e) = verify_bundle_signatures(bundle, signature_scheme) {
+        return VerificationResult::from_error(e);
+    }
 
     // Step 5: Validate domain separation (prevent cross-domain attacks)
-    validate_domain_separation(bundle)?;
+    if let Err(e) = validate_domain_separation(bundle) {
+        return VerificationResult::from_error(e);
+    }
 
     // Step 6: Validate seal reference (check for replay)
     if seal_registry(bundle.seal_ref.id.as_ref()) {
-        return Err(ProtocolError::SealReplay(format!(
+        return VerificationResult::from_error(ProtocolError::SealReplay(format!(
             "Seal {:?} has already been used",
             bundle.seal_ref
         )));
     }
 
     // Step 7: Validate inclusion proof (chain-specific, validated by adapter)
-    validate_inclusion_proof(&bundle.inclusion_proof)?;
+    if let Err(e) = validate_inclusion_proof(&bundle.inclusion_proof) {
+        return VerificationResult::from_error(e);
+    }
 
-    // Step 8: Validate finality (chain-specific, validated by adapter)
-    validate_finality_proof(&bundle.finality_proof)?;
+    // Step 8: Validate finality proof (chain-specific, validated by adapter)
+    if let Err(e) = validate_finality_proof(&bundle.finality_proof) {
+        return VerificationResult::from_error(e);
+    }
 
     // Step 9: Validate anchor reference integrity
-    validate_anchor_reference(bundle)?;
+    if let Err(e) = validate_anchor_reference(bundle) {
+        return VerificationResult::from_error(e);
+    }
 
-    Ok(())
+    VerificationResult::fully_verified()
 }
 
 /// Validate proof bundle size to prevent DoS attacks.
@@ -502,7 +590,9 @@ mod tests {
     fn test_verify_proof_valid() {
         let bundle = test_bundle_with_signatures().unwrap();
         let seal_registry = |_seal_id: &[u8]| false;
-        assert!(verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1).is_ok());
+        let result = verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1);
+        assert!(result.is_valid);
+        assert!(matches!(result.level, VerificationLevel::FullyVerified));
     }
 
     #[test]
@@ -513,14 +603,18 @@ mod tests {
             .unwrap();
 
         let seal_registry = |_seal_id: &[u8]| false;
-        assert!(verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1).is_ok());
+        let result = verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1);
+        assert!(result.is_valid);
+        assert!(matches!(result.level, VerificationLevel::FullyVerified));
     }
 
     #[test]
     fn test_verify_proof_seal_replay() {
         let bundle = test_bundle_with_signatures().unwrap();
         let seal_registry = |seal_id: &[u8]| seal_id == [1, 2, 3];
-        assert!(verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1).is_err());
+        let result = verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1);
+        assert!(!result.is_valid);
+        assert!(!result.errors.is_empty());
     }
 
     #[test]
@@ -528,7 +622,9 @@ mod tests {
         let mut bundle = test_bundle_with_signatures().unwrap();
         bundle.signatures.clear();
         let seal_registry = |_seal_id: &[u8]| false;
-        assert!(verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1).is_err());
+        let result = verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1);
+        assert!(!result.is_valid);
+        assert!(!result.errors.is_empty());
     }
 
     #[test]
@@ -536,7 +632,9 @@ mod tests {
         let mut bundle = test_bundle_with_signatures().unwrap();
         bundle.finality_proof.confirmations = 0;
         let seal_registry = |_seal_id: &[u8]| false;
-        assert!(verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1).is_err());
+        let result = verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1);
+        assert!(!result.is_valid);
+        assert!(!result.errors.is_empty());
     }
 
     #[test]
@@ -545,7 +643,9 @@ mod tests {
         // Corrupt signature format
         bundle.signatures[0] = vec![0x00, 0x00]; // Too short
         let seal_registry = |_seal_id: &[u8]| false;
-        assert!(verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1).is_err());
+        let result = verify_proof(&bundle, seal_registry, SignatureScheme::Secp256k1);
+        assert!(!result.is_valid);
+        assert!(!result.errors.is_empty());
     }
 
     #[test]
@@ -558,7 +658,9 @@ mod tests {
         bundle.signatures = vec![signature];
 
         let seal_registry = |_seal_id: &[u8]| false;
-        assert!(verify_proof(&bundle, seal_registry, SignatureScheme::Ed25519).is_ok());
+        let result = verify_proof(&bundle, seal_registry, SignatureScheme::Ed25519);
+        assert!(result.is_valid);
+        assert!(matches!(result.level, VerificationLevel::FullyVerified));
     }
 
     #[test]
@@ -576,7 +678,8 @@ mod tests {
 
         // First verification should succeed
         let seal_registry1 = |seal_id_check: &[u8]| consumed_seals.contains(seal_id_check);
-        assert!(verify_proof(&bundle1, seal_registry1, SignatureScheme::Secp256k1).is_ok());
+        let result1 = verify_proof(&bundle1, seal_registry1, SignatureScheme::Secp256k1);
+        assert!(result1.is_valid);
 
         // Mark the seal as consumed
         consumed_seals.insert(seal_id.clone());
@@ -586,13 +689,13 @@ mod tests {
 
         // Second verification should fail due to seal being consumed
         let seal_registry2 = |seal_id_check: &[u8]| consumed_seals.contains(seal_id_check);
-        let result = verify_proof(&bundle2, seal_registry2, SignatureScheme::Secp256k1);
+        let result2 = verify_proof(&bundle2, seal_registry2, SignatureScheme::Secp256k1);
 
         // Verify that the double-spend attempt is rejected
-        assert!(result.is_err(), "Double-spend attempt should be rejected");
+        assert!(!result2.is_valid, "Double-spend attempt should be rejected");
 
         // Verify the error message indicates seal replay
-        let error_msg = result.unwrap_err().to_string();
+        let error_msg = result2.errors.join(", ");
         assert!(
             error_msg.contains("seal")
                 || error_msg.contains("replay")

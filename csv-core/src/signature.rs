@@ -472,6 +472,82 @@ pub fn parse_signatures_from_bytes(
         .collect()
 }
 
+/// Parse signatures from the canonical bundle format.
+///
+/// Each signature byte array has the layout:
+/// `[pk_len (4 bytes LE)] [public_key] [signature]`
+///
+/// This is the format used by all chain adapters (Bitcoin, Ethereum, Solana).
+///
+/// # Arguments
+/// * `raw_signatures` — The signature byte arrays from the proof bundle
+/// * `message` — The message that was signed (typically the transition DAG root)
+///
+/// # Returns
+/// A vector of parsed `Signature` objects, or an error if any signature
+/// has an invalid format.
+pub fn parse_signatures_from_bundle(
+    raw_signatures: &[Vec<u8>],
+    message: &[u8],
+) -> Result<Vec<Signature>> {
+    if raw_signatures.is_empty() {
+        return Err(ProtocolError::SignatureVerificationFailed(
+            "No signatures to verify".to_string(),
+        ));
+    }
+
+    let mut signatures = Vec::with_capacity(raw_signatures.len());
+
+    for (i, sig_bytes) in raw_signatures.iter().enumerate() {
+        if sig_bytes.len() < 4 {
+            return Err(ProtocolError::SignatureVerificationFailed(format!(
+                "Signature {} too short: expected at least 4 bytes for length prefix, got {}",
+                i,
+                sig_bytes.len()
+            )));
+        }
+
+        let pk_len =
+            u32::from_le_bytes([sig_bytes[0], sig_bytes[1], sig_bytes[2], sig_bytes[3]])
+                as usize;
+
+        if sig_bytes.len() < 4 + pk_len {
+            return Err(ProtocolError::SignatureVerificationFailed(format!(
+                "Signature {} length mismatch: declared pk_len={}, but total length is {}",
+                i,
+                pk_len,
+                sig_bytes.len()
+            )));
+        }
+
+        let public_key = sig_bytes[4..4 + pk_len].to_vec();
+        let signature = sig_bytes[4 + pk_len..].to_vec();
+
+        signatures.push(Signature::new(signature, public_key, message.to_vec()));
+    }
+
+    Ok(signatures)
+}
+
+/// Verify signatures from a proof bundle using the specified scheme.
+///
+/// This is a convenience function that combines parsing and verification
+/// in a single call. It is the canonical implementation used by all adapters.
+///
+/// # Arguments
+/// * `bundle` — The proof bundle containing signatures
+/// * `scheme` — The signature scheme to use for verification
+///
+/// # Returns
+/// `Ok(())` if all signatures are valid, or an error otherwise.
+pub fn verify_bundle_signatures(
+    bundle: &crate::proof::ProofBundle,
+    scheme: SignatureScheme,
+) -> Result<()> {
+    let signatures = parse_signatures_from_bundle(&bundle.signatures, bundle.transition_dag.root_commitment.as_bytes())?;
+    verify_signatures(&signatures, scheme)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

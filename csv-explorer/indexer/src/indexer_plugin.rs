@@ -302,10 +302,10 @@ impl Default for IndexerPluginRegistryBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chain_indexer::{BlockIndexResult, ChainResult};
+    use crate::chain_indexer::{AddressIndexingResult, ChainResult};
     use async_trait::async_trait;
     use csv_explorer_shared::{
-        CommitmentScheme, ContractStatus, ContractType, CsvContract, EnhancedSanadRecord,
+        CommitmentScheme, CsvContract, EnhancedSanadRecord,
         EnhancedSealRecord, EnhancedTransferRecord, FinalityProofType, InclusionProofType, Network,
         PriorityLevel, SanadRecord, SealRecord, TransferRecord,
     };
@@ -373,8 +373,8 @@ mod tests {
             _addresses: &[String],
             _priority: PriorityLevel,
             _network: Network,
-        ) -> ChainResult<super::AddressIndexingResult> {
-            Ok(super::AddressIndexingResult {
+        ) -> ChainResult<AddressIndexingResult> {
+            Ok(AddressIndexingResult {
                 addresses_processed: 0,
                 sanads_indexed: 0,
                 seals_indexed: 0,
@@ -387,10 +387,10 @@ mod tests {
             None
         }
         fn detect_inclusion_proof_type(&self) -> InclusionProofType {
-            InclusionProofType::MerkleProof
+            InclusionProofType::Merkle
         }
         fn detect_finality_proof_type(&self) -> FinalityProofType {
-            FinalityProofType::BlockConfirmation
+            FinalityProofType::ConfirmationDepth
         }
     }
 

@@ -681,14 +681,12 @@ mod tests {
 
             // Valid DAG passes verification
             let seal_registry = |_id: &[u8]| false;
-            assert!(
-                crate::verifier::verify_proof(
-                    &bundle,
-                    seal_registry,
-                    crate::signature::SignatureScheme::Secp256k1
-                )
-                .is_ok()
+            let result = crate::verifier::verify_proof(
+                &bundle,
+                seal_registry,
+                crate::signature::SignatureScheme::Secp256k1,
             );
+            assert!(result.is_valid);
         }
 
         #[test]
@@ -734,7 +732,7 @@ mod tests {
                 seal_registry,
                 crate::signature::SignatureScheme::Secp256k1,
             );
-            assert!(result.is_err());
+            assert!(!result.is_valid);
         }
 
         #[test]

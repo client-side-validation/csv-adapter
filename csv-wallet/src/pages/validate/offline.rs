@@ -349,14 +349,15 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
         SignatureScheme::Secp256k1,
     );
 
-    let crypto_valid = verification_result.is_ok();
+    let crypto_valid = verification_result.is_valid;
+    let error_msg = verification_result.errors.first().cloned().unwrap_or_else(|| "Unknown error".to_string());
     steps.push(VerificationStep {
         name: "Cryptographic Verification".to_string(),
         passed: crypto_valid,
         details: if crypto_valid {
             "All cryptographic checks passed: signatures valid, inclusion verified, finality confirmed".to_string()
         } else {
-            format!("Cryptographic verification failed: {}", verification_result.err().map(|e| e.to_string()).unwrap_or_default())
+            format!("Cryptographic verification failed: {}", error_msg)
         },
     });
 

@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use csv_core::Hash;
 use csv_core::proof::{FinalityProof, InclusionProof};
 use csv_core::proof_pipeline::ChainVerifier;
+use csv_core::signature::SignatureScheme;
 use csv_core::verified::{
     FinalityStrength, InclusionStrength, VerificationAssurance, VerificationFailure,
     VerificationResult, VerifiedComponents,
@@ -165,35 +166,11 @@ impl ChainVerifier for EthereumVerifier {
     }
 
     /// Verify zero-knowledge proof (if applicable)
+    ///
+    /// Uses the canonical csv_core::zk_proof::verify_zk_proof function.
     async fn verify_zk(&self, proof: &[u8]) -> csv_core::Result<VerificationResult> {
-        // Ethereum may use ZK proofs for certain operations
-        // For now, return true if proof is empty, otherwise verify
-        if proof.is_empty() {
-            Ok(VerificationResult {
-                valid: true,
-                assurance: VerificationAssurance::PartialCryptographic,
-                verified_components: VerifiedComponents {
-                    inclusion: InclusionStrength::None,
-                    finality: FinalityStrength::None,
-                    replay_checked: false,
-                    ownership_signature: false,
-                },
-                error: None,
-            })
-        } else {
-            // Placeholder - would implement actual ZK proof verification
-            Ok(VerificationResult {
-                valid: true,
-                assurance: VerificationAssurance::PartialCryptographic,
-                verified_components: VerifiedComponents {
-                    inclusion: InclusionStrength::None,
-                    finality: FinalityStrength::None,
-                    replay_checked: false,
-                    ownership_signature: false,
-                },
-                error: None,
-            })
-        }
+        let result = csv_core::zk_proof::verify_zk_proof(proof, None);
+        Ok(result)
     }
 
     /// Verify seal registry (check if seal has been consumed)
@@ -305,12 +282,12 @@ impl ChainVerifier for EthereumVerifier {
     }
 
     /// Verify signature on proof bundle
+    ///
+    /// Uses the canonical csv_core::signature::verify_bundle_signatures function.
     async fn verify_signature(
         &self,
         bundle: &csv_core::proof::ProofBundle,
     ) -> csv_core::Result<VerificationResult> {
-        use csv_core::signature::{Signature, SignatureScheme, verify_signatures};
-
         if bundle.signatures.is_empty() {
             return Ok(VerificationResult {
                 valid: false,
@@ -325,54 +302,8 @@ impl ChainVerifier for EthereumVerifier {
             });
         }
 
-        // Parse signatures from the bundle
-        let mut signatures = Vec::with_capacity(bundle.signatures.len());
-
-        for sig_bytes in bundle.signatures.iter() {
-            // Parse signature format: [pk_len (4 bytes LE)] [public_key] [signature]
-            if sig_bytes.len() < 4 {
-                return Ok(VerificationResult {
-                    valid: false,
-                    assurance: VerificationAssurance::Structural,
-                    verified_components: VerifiedComponents {
-                        inclusion: InclusionStrength::None,
-                        finality: FinalityStrength::None,
-                        replay_checked: false,
-                        ownership_signature: false,
-                    },
-                    error: Some(VerificationFailure::InvalidOwnershipSignature),
-                });
-            }
-
-            let pk_len =
-                u32::from_le_bytes([sig_bytes[0], sig_bytes[1], sig_bytes[2], sig_bytes[3]])
-                    as usize;
-
-            if sig_bytes.len() < 4 + pk_len {
-                return Ok(VerificationResult {
-                    valid: false,
-                    assurance: VerificationAssurance::Structural,
-                    verified_components: VerifiedComponents {
-                        inclusion: InclusionStrength::None,
-                        finality: FinalityStrength::None,
-                        replay_checked: false,
-                        ownership_signature: false,
-                    },
-                    error: Some(VerificationFailure::InvalidOwnershipSignature),
-                });
-            }
-
-            let public_key = sig_bytes[4..4 + pk_len].to_vec();
-            let signature = sig_bytes[4 + pk_len..].to_vec();
-
-            // The signed message is the DAG root commitment
-            let message = bundle.transition_dag.root_commitment.as_bytes().to_vec();
-
-            signatures.push(Signature::new(signature, public_key, message));
-        }
-
-        // Verify all signatures using Secp256k1 (Ethereum's signature scheme)
-        verify_signatures(&signatures, SignatureScheme::Secp256k1)
+        // Use canonical signature verification from csv-core
+        csv_core::signature::verify_bundle_signatures(bundle, SignatureScheme::Secp256k1)
             .map_err(|e| csv_core::ProtocolError::SignatureVerificationFailed(e.to_string()))?;
 
         Ok(VerificationResult {

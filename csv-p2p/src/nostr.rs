@@ -853,6 +853,8 @@ mod tests {
             inclusion_proof: csv_core::proof::InclusionProof::new(vec![1u8; 32], hash, 1000, 0)
                 .unwrap(),
             finality_proof: csv_core::proof::FinalityProof::new(vec![1u8; 32], 1, true).unwrap(),
+            provenance: None,
+            certification: None,
         };
 
         let source_chain = extract_source_chain(&proof);
@@ -874,6 +876,8 @@ mod tests {
             inclusion_proof: csv_core::proof::InclusionProof::new(vec![1u8; 32], hash, 1000, 0)
                 .unwrap(),
             finality_proof: csv_core::proof::FinalityProof::new(vec![1u8; 32], 1, true).unwrap(),
+            provenance: None,
+            certification: None,
         };
 
         let dest_chain = extract_dest_chain(&proof);
@@ -895,6 +899,8 @@ mod tests {
             inclusion_proof: csv_core::proof::InclusionProof::new(vec![1u8; 32], hash, 1000, 0)
                 .unwrap(),
             finality_proof: csv_core::proof::FinalityProof::new(vec![1u8; 32], 1, true).unwrap(),
+            provenance: None,
+            certification: None,
         };
 
         let transport = NostrTransport::new();
@@ -923,6 +929,8 @@ mod tests {
             inclusion_proof: csv_core::proof::InclusionProof::new(vec![1u8; 32], hash, 1000, 0)
                 .unwrap(),
             finality_proof: csv_core::proof::FinalityProof::new(vec![1u8; 32], 1, true).unwrap(),
+            provenance: None,
+            certification: None,
         };
 
         let transport = NostrTransport::new();

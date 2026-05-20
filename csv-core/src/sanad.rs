@@ -503,6 +503,57 @@ impl Sanad {
     }
 }
 
+/// A merkleized Sanad envelope that wraps a Sanad with its payload hash.
+///
+/// This type enables efficient verification of Sanad inclusion in a merkle tree
+/// without transmitting the full Sanad payload. The `payload_hash` is computed
+/// as `csv_tagged_hash("csv.sanad.payload.v1", canonical_sanad_bytes)`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SanadEnvelope {
+    /// Protocol version
+    pub version: u32,
+    /// Unique Sanad identifier
+    pub sanad_id: SanadId,
+    /// Hash of the canonical Sanad payload: `H("csv.sanad.payload.v1" || to_canonical_bytes(sanad))`
+    pub payload_hash: Hash,
+    /// Merkle root of the batch containing this Sanad
+    pub merkle_root: Option<Hash>,
+}
+
+impl SanadEnvelope {
+    /// Create a new SanadEnvelope from a Sanad.
+    ///
+    /// The payload hash is computed from the Sanad's canonical bytes.
+    pub fn from_sanad(sanad: &Sanad) -> Self {
+        let payload_hash = Hash::new(csv_tagged_hash(
+            "csv.sanad.payload.v1",
+            &sanad.to_canonical_bytes(),
+        ));
+        Self {
+            version: 1,
+            sanad_id: sanad.id.clone(),
+            payload_hash,
+            merkle_root: None,
+        }
+    }
+
+    /// Create a new SanadEnvelope with a merkle root.
+    pub fn from_sanad_with_merkle(sanad: &Sanad, merkle_root: Hash) -> Self {
+        let mut envelope = Self::from_sanad(sanad);
+        envelope.merkle_root = Some(merkle_root);
+        envelope
+    }
+
+    /// Verify that the payload hash matches the given Sanad.
+    pub fn verify_payload(&self, sanad: &Sanad) -> bool {
+        let expected_hash = Hash::new(csv_tagged_hash(
+            "csv.sanad.payload.v1",
+            &sanad.to_canonical_bytes(),
+        ));
+        self.payload_hash == expected_hash && self.sanad_id == sanad.id
+    }
+}
+
 /// Sanad validation errors.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum SanadError {

@@ -249,6 +249,9 @@ impl FinalityProof {
         confirmations: u64,
         is_deterministic: bool,
     ) -> Result<Self, &'static str> {
+        if confirmations == 0 && !is_deterministic {
+            return Err("Zero confirmations not allowed for probabilistic finality");
+        }
         if finality_data.len() > MAX_FINALITY_DATA {
             return Err("finality_data exceeds maximum allowed size (4KB)");
         }

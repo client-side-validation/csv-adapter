@@ -15,10 +15,12 @@
 use csv_core::{
     chain_config::ChainCapabilities,
     dag::{DAGNode, DAGSegment},
+    domain_hash::DomainSeparatedHash,
+    domains::ProofBundleDomain,
     error::Result as CsvResult,
     hash::Hash,
     proof::{FinalityProof, InclusionProof, ProofBundle},
-    proof_pipeline::{ChainVerifier, ValidationResult, validate_proof_bundle},
+    proof_pipeline::{ChainVerifier, validate_proof_bundle},
     replay_registry::{ReplayKey, ReplayRegistry},
     seal::{CommitAnchor, SealPoint},
     verified::{
@@ -110,13 +112,9 @@ impl ChainVerifier for CryptoVerifier {
 
         // Step 5: Verify the proof contains the expected Merkle path structure
         // In production, this would reconstruct the Merkle tree and verify the path.
-        // For this test, we verify the proof data commits to the block hash.
-        let proof_contains_block_hash = proof
-            .proof_bytes
-            .windows(proof.block_hash.as_bytes().len())
-            .any(|window| window == proof.block_hash.as_bytes());
-
-        if proof_contains_block_hash {
+        // For this test, we verify the proof data is non-empty (domain validation
+        // already ensures proof_bytes hashes to block_hash).
+        if !proof.proof_bytes.is_empty() {
             Ok(VerificationResult {
                 valid: true,
                 assurance: VerificationAssurance::PartialCryptographic,
@@ -274,7 +272,7 @@ impl ChainVerifier for CryptoVerifier {
         }
 
         // Verify each signature using Secp256k1
-        use secp256k1::{Message, Secp256k1, SecretKey};
+        use secp256k1::{Message, Secp256k1};
 
         let secp = Secp256k1::new();
         let message = Message::from_digest_slice(bundle.transition_dag.root_commitment.as_bytes())
@@ -402,8 +400,8 @@ mod e2e_certification_tests {
         let seed = mnemonic.to_seed(None);
 
         // Derive keys for Bitcoin (source) and Ethereum (destination)
-        let bitcoin_key = derive_key(seed.as_bytes(), &ChainId::new("bitcoin"), 0, 0);
-        let ethereum_key = derive_key(seed.as_bytes(), &ChainId::new("ethereum"), 0, 0);
+        let bitcoin_key = derive_key(seed.as_bytes(), &ChainId::new("bitcoin"), 0, 0).expect("derive bitcoin key");
+        let ethereum_key = derive_key(seed.as_bytes(), &ChainId::new("ethereum"), 0, 0).expect("derive ethereum key");
 
         assert_eq!(bitcoin_key.as_bytes().len(), 32);
         assert_eq!(ethereum_key.as_bytes().len(), 32);
@@ -425,7 +423,8 @@ mod e2e_certification_tests {
 
         // Step 4: Generate proof bundle with real Secp256k1 signatures
         let secp = secp256k1::Secp256k1::new();
-        let secret_key = secp256k1::SecretKey::new(&mut secp256k1::rand::thread_rng());
+        let secret_key_bytes = [0xABu8; 32]; // Deterministic key for testing (not a real secret)
+        let secret_key = secp256k1::SecretKey::from_slice(&secret_key_bytes).expect("valid secret key");
         let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
 
         let root_commitment = Hash::new([1u8; 32]);
@@ -449,10 +448,10 @@ mod e2e_certification_tests {
         );
         let dag_segment = DAGSegment::new(vec![dag_node], root_commitment);
 
-        let block_hash = Hash::new([2u8; 32]);
+        let proof_bytes = root_commitment.as_bytes().to_vec();
+        let block_hash = DomainSeparatedHash::<ProofBundleDomain>::hash(&proof_bytes);
         let inclusion_proof = InclusionProof::new(
-            // The proof bytes must contain the block hash for the verifier to accept
-            block_hash.as_bytes().to_vec(),
+            proof_bytes,
             block_hash,
             100, // block number
             0,   // position
@@ -495,7 +494,7 @@ mod e2e_certification_tests {
             result.accepted,
             "Proof bundle should be accepted by the canonical pipeline"
         );
-        assert_eq!(result.steps.len(), 10, "All 10 validation steps should run");
+        assert_eq!(result.steps.len(), 11, "All validation steps should run");
         assert!(
             result.error.is_none(),
             "No errors should occur: {:?}",
@@ -512,7 +511,7 @@ mod e2e_certification_tests {
         }
 
         // Step 6: Register nullifier to prevent replay
-        let mut replay_registry = ReplayRegistry::new();
+       let mut replay_registry = ReplayRegistry::new();
 
         let commitment_hash = Hash::new([3u8; 32]);
         let replay_key = ReplayKey::new(
@@ -523,36 +522,22 @@ mod e2e_certification_tests {
             ChainId::new("ethereum"),
         );
 
-        // Verify not yet consumed
-        assert!(!replay_registry.is_replay(&replay_key).unwrap());
+        // Verify not yet seen
+        assert!(!replay_registry.has_been_seen(&replay_key));
 
-        // Record the proof (consumes the seal)
-        replay_registry
-            .record_proof(
-                Hash::new([1u8; 32]), // sanad_id
-                Hash::new([1u8; 32]), // seal_id
-                commitment_hash,
-                ChainId::new("bitcoin"),
-                ChainId::new("ethereum"),
-            )
-            .unwrap();
+        // Record the proof (returns true if first time)
+        let first_record = replay_registry.record_proof(replay_key.clone(), 1000);
+        assert!(first_record, "First recording should succeed");
 
-        // Verify now consumed
-        assert!(replay_registry.is_replay(&replay_key).unwrap());
+        // Verify now seen
+        assert!(replay_registry.has_been_seen(&replay_key));
 
         // Step 7: Verify double-spend prevention
-        // Attempt to record the same proof again should fail
+        // Attempt to record the same proof again should return false (replay)
+        let second_record = replay_registry.record_proof(replay_key, 1001);
         assert!(
-            replay_registry
-                .record_proof(
-                    Hash::new([1u8; 32]),
-                    Hash::new([1u8; 32]),
-                    commitment_hash,
-                    ChainId::new("bitcoin"),
-                    ChainId::new("ethereum"),
-                )
-                .is_err(),
-            "Double recording the same proof should fail"
+            !second_record,
+            "Double recording the same proof should be detected as replay"
         );
     }
 
@@ -574,7 +559,7 @@ mod e2e_certification_tests {
             vec![],
             vec![],
         );
-        let dag_segment = DAGSegment::new(vec![dag_node], Hash::zero());
+        let _dag_segment = DAGSegment::new(vec![dag_node], Hash::zero());
 
         let inclusion_proof = InclusionProof::new(
             Hash::new([2u8; 32]).as_bytes().to_vec(),
@@ -619,7 +604,7 @@ mod e2e_certification_tests {
         let bundle = proof_bundle_res.unwrap();
         let verifier = CryptoVerifier;
         let caps = ChainCapabilities::bitcoin();
-        let result = validate_proof_bundle(
+        let _result = validate_proof_bundle(
             &bundle,
             &verifier,
             ChainId::new("bitcoin"),
@@ -651,18 +636,11 @@ mod e2e_certification_tests {
         );
 
         // First consumption should succeed
-        replay_registry
-            .record_proof(
-                sanad_id,
-                sanad_id,
-                commitment_hash,
-                ChainId::new("bitcoin"),
-                ChainId::new("ethereum"),
-            )
-            .unwrap();
+        let first_record = replay_registry.record_proof(replay_key.clone(), 1000);
+        assert!(first_record, "First recording should succeed");
 
-        // Second consumption should be detected as replay
-        assert!(replay_registry.is_replay(&replay_key).unwrap());
+        // Verify now seen
+        assert!(replay_registry.has_been_seen(&replay_key));
 
         // Different destination chain should not be a replay
         let replay_key_different_dest = ReplayKey::new(
@@ -675,8 +653,7 @@ mod e2e_certification_tests {
 
         assert!(
             !replay_registry
-                .is_replay(&replay_key_different_dest)
-                .unwrap()
+                .has_been_seen(&replay_key_different_dest)
         );
     }
 
@@ -694,7 +671,7 @@ mod e2e_certification_tests {
 
         // Create a transition
         let transition = csv_core::transition::Transition::new(
-            Hash::new([3u8; 32]), // transition_id
+            1, // transition_id
             vec![],               // owned_inputs
             vec![],               // owned_outputs
             vec![],               // global_updates
@@ -835,23 +812,26 @@ mod e2e_certification_tests {
     #[tokio::test]
     async fn test_crypto_verifier_rejects_malformed_signatures() {
         // Create a proof bundle with a malformed (too short) signature
+        let root_commitment = Hash::new([1u8; 32]);
+        let proof_bytes = root_commitment.as_bytes().to_vec();
+        let block_hash = DomainSeparatedHash::<ProofBundleDomain>::hash(&proof_bytes);
         let bundle = ProofBundle::new(
             DAGSegment::new(
                 vec![DAGNode::new(
-                    Hash::new([1u8; 32]),
+                    root_commitment,
                     vec![],
                     vec![vec![0x00, 0x01]],
                     vec![],
                     vec![],
                 )],
-                Hash::new([1u8; 32]),
+                root_commitment,
             ),
             vec![vec![0x00, 0x01]], // Too short to contain pk_len + pk + sig
             SealPoint::new(vec![3u8; 32], Some(42)).unwrap(),
             CommitAnchor::new(vec![3u8; 32], 100, vec![0xAB; 64]).unwrap(),
             InclusionProof::new(
-                Hash::new([4u8; 32]).as_bytes().to_vec(),
-                Hash::new([4u8; 32]),
+                proof_bytes,
+                block_hash,
                 100,
                 0,
             )
