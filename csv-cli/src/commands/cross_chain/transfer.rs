@@ -6,6 +6,7 @@ use anyhow::Result;
 
 use csv_core::SanadId;
 use csv_core::hash::Hash;
+use csv_core::lease::LeaseManager;
 use csv_sdk::CsvClient;
 
 use crate::config::{Chain, Config};
@@ -20,6 +21,7 @@ pub async fn cmd_transfer(
     to: Chain,
     sanad_id: String,
     dest_owner: Option<String>,
+    lease_token: Option<String>,
     _config: &Config,
     state: &mut UnifiedStateManager,
 ) -> Result<()> {
@@ -50,6 +52,42 @@ pub async fn cmd_transfer(
             "Sanad {} not found in local state",
             sanad_id_hash
         ));
+    }
+
+    // Validate lease if provided
+    if let Some(lease_token_str) = &lease_token {
+        let lease_bytes = hex::decode(lease_token_str.trim_start_matches("0x"))
+            .map_err(|e| anyhow::anyhow!("Invalid lease token: {}", e))?;
+        if lease_bytes.len() < 32 {
+            return Err(anyhow::anyhow!(
+                "Invalid lease token: expected at least 32 bytes, got {} bytes",
+                lease_bytes.len()
+            ));
+        }
+
+        let mut lease_bytes_arr = [0u8; 32];
+        lease_bytes_arr.copy_from_slice(&lease_bytes[..32]);
+        let lease_id = csv_core::lease::LeaseId(Hash::new(lease_bytes_arr));
+
+        // Get stored lease info
+        let stored_lease = state
+            .get_lease(&sanad_id_hash.to_string())
+            .ok_or_else(|| anyhow::anyhow!("No lease found for this sanad. Run acquire-lease first."))?;
+
+        // Parse stored owner hash
+        let stored_owner_bytes = hex::decode(stored_lease.owner.trim_start_matches("0x"))
+            .map_err(|e| anyhow::anyhow!("Invalid stored owner: {}", e))?;
+        let mut owner_arr = [0u8; 32];
+        owner_arr.copy_from_slice(&stored_owner_bytes[..32]);
+        let owner_hash = Hash::new(owner_arr);
+
+        // Validate lease using in-memory lease manager
+        let lease_manager = LeaseManager::new();
+        lease_manager
+            .validate(lease_id, sanad_id_hash, owner_hash)
+            .map_err(|e| anyhow::anyhow!("Lease validation failed: {}", e))?;
+
+        output::info("Lease validated successfully.");
     }
 
     // Get destination owner address

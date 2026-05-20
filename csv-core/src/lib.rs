@@ -95,6 +95,9 @@ pub mod canonical;
 // Agent-friendly types (AI agent support) - 🟡 BETA
 pub mod mcp;
 
+// Lease management for cross-chain transfers
+pub mod lease;
+
 // Re-exports: Canonical serialization
 pub use canonical::{canonical_hash, from_canonical_cbor, to_canonical_cbor};
 

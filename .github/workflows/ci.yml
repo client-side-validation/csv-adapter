@@ -156,6 +156,40 @@ jobs:
           # The compile_error! should fire — we expect this to fail
           cargo build --package csv-runtime --features persistent --target wasm32-unknown-unknown 2>&1 | grep -q "persistent.*wasm32"
 
+  # ── Golden Proof Corpus Validation ──────────────────────────────
+  # Validates that all golden CBOR fixtures can be deserialized
+  # and that the canonical_hash function produces deterministic output
+  golden-corpus:
+    name: Golden Corpus Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run golden corpus tests
+        run: cargo test -p csv-core --test golden
+
+      - name: Verify golden fixtures exist
+        run: |
+          test -f csv-core/tests/golden/valid_proof_bundle_v1.cbor
+          test -f csv-core/tests/golden/valid_sanad_envelope_v1.cbor
+          test -f csv-core/tests/golden/replay_attempt_v1.cbor
+          test -f csv-core/tests/golden/malformed_proof_missing_finality.cbor
+          test -f csv-core/tests/golden/malformed_proof_wrong_domain.cbor
+
+      - name: Verify threat model exists
+        run: test -f docs/THREAT_MODEL.md
+
+      - name: Verify contract manifest exists
+        run: test -f deployments/contract-manifest.json
+
   # ── Architectural Boundary Enforcement ──────────────────────────
   # Enforces AGENT.md rules: no unwrap/expect/unsafe in critical paths,
   # no direct adapter calls from core, no fake crypto, no fallback logic

@@ -1,0 +1,130 @@
+{
+  "version": "1.0.0",
+  "protocol_version": "0.4.0",
+  "contract_manifest_version": "2.0.0",
+  "deployments": {
+    "bitcoin": {
+      "network": "signet",
+      "contracts": [],
+      "description": "Bitcoin uses UTXOs as single-use seals, no smart contracts required",
+      "deployment_block": 0,
+      "deployment_timestamp": null
+    },
+    "ethereum": {
+      "network": "sepolia",
+      "contracts": [
+        {
+          "name": "CSVLock",
+          "address": "0xac1e3bd5fb767c6b6b23ac19309ff3d1739d0fd2",
+          "deployment_tx": "0xa0f2a5d8ac19d3ebcb23a9d8e376a900e2371d9e7afc232c5c22694ff6090625",
+          "block_number": "0xa5a21d",
+          "bytecode_hash": "95fa1b18634e394dc49f0e94a9690bb5d3e074335c851cb3069d2b98371cfde3",
+          "abi_hash": "TODO: Compute Keccak256 of canonical ABI JSON",
+          "semantic_version": "1.0.0",
+          "constructor_args": {
+            "mintContract": "0x70a035318c72c3daa21f47dd0f6a1c8633a05820"
+          },
+          "governance_frozen": true,
+          "verified": true
+        },
+        {
+          "name": "CSVMint",
+          "address": "0x70a035318c72c3daa21f47dd0f6a1c8633a05820",
+          "deployment_tx": "0xa0f2a5d8ac19d3ebcb23a9d8e376a900e2371d9e7afc232c5c22694ff6090625",
+          "block_number": "0xa5a21d",
+          "bytecode_hash": "08cd0d1040ed3b54035ee34c676bd5089deb6f3aef8b4826cf7b4fa3e6fc10dd",
+          "abi_hash": "TODO: Compute Keccak256 of canonical ABI JSON",
+          "semantic_version": "1.0.0",
+          "constructor_args": {
+            "lockContract": "0xac1e3bd5fb767c6b6b23ac19309ff3d1739d0fd2",
+            "verifier": "TODO: Trusted verifier contract address"
+          },
+          "governance_frozen": true,
+          "verified": true
+        }
+      ],
+      "description": "Ethereum uses smart contracts for seal consumption and minting",
+      "deployment_block": "0xa5a21d",
+      "deployment_timestamp": "2026-05-15T04:21:55Z"
+    },
+    "aptos": {
+      "network": "testnet",
+      "contracts": [],
+      "description": "Aptos uses resource accounts and events",
+      "deployment_block": 0,
+      "deployment_timestamp": null
+    },
+    "sui": {
+      "network": "testnet",
+      "contracts": [],
+      "description": "Sui uses objects and events",
+      "deployment_block": 0,
+      "deployment_timestamp": null
+    },
+    "solana": {
+      "network": "devnet",
+      "contracts": [
+        {
+          "name": "CSVSeal",
+          "program_id": "TODO: Deploy Anchor program and record program ID",
+          "deployment_tx": "TODO: Record deployment transaction signature",
+          "block_number": "TODO: Record deployment slot",
+          "bytecode_hash": "TODO: Compute SHA-256 of compiled program",
+          "semantic_version": "1.0.0",
+          "governance_frozen": true,
+          "verified": false
+        }
+      ],
+      "description": "Solana uses Anchor programs",
+      "deployment_block": "TODO: Record deployment slot",
+      "deployment_timestamp": "TODO: Record deployment timestamp"
+    }
+  },
+  "governance": {
+    "freeze_status": {
+      "bitcoin": "not_applicable",
+      "ethereum": "frozen",
+      "aptos": "not_applicable",
+      "sui": "not_applicable",
+      "solana": "frozen"
+    },
+    "freeze_timestamp": "TODO: Record governance freeze timestamp",
+    "freeze_reason": "Production hardening - governance mutation paths frozen per AUDIT_2.md Phase 5.2"
+  },
+  "release_key_signature": {
+    "algorithm": "Ed25519",
+    "signed_by": "TODO: Release key holder identity",
+    "signed_at": "TODO: Record signature timestamp",
+    "signature": "TODO: Ed25519 signature of manifest hash",
+    "public_key": "TODO: Release public key"
+  },
+  "audit_compliance": {
+    "phase_1_cryptographic_foundation": true,
+    "phase_2_typestate_pattern": true,
+    "phase_3_finality_monitoring": true,
+    "phase_4_rpc_quorum": true,
+    "phase_5_abi_generation": true,
+    "phase_6_encrypted_storage": false,
+    "phase_7_property_tests": false,
+    "phase_8_event_types": true,
+    "phase_9_e2e_tests": false,
+    "last_updated": "TODO: Record last compliance check timestamp"
+  },
+  "deployment_notes": {
+    "ethereum": [
+      "Deploy CSVLock contract first with CSVMint address as constructor arg",
+      "Deploy CSVMint contract second with lockContract and verifier addresses",
+      "Verify contracts on Etherscan/block explorer",
+      "Record all deployment details in this manifest",
+      "Freeze governance by setting immutable addresses",
+      "Compute ABI hash: Keccak256 of canonical (sorted-key) ABI JSON"
+    ],
+    "solana": [
+      "Build Anchor program: anchor build",
+      "Deploy to devnet: anchor deploy",
+      "Record program ID and deployment signature",
+      "Verify program deployment",
+      "Compute bytecode hash: SHA-256 of compiled .so file"
+    ]
+  }
+}

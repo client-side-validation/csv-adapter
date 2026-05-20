@@ -1,5 +1,6 @@
 //! CLI state management — persistent state using unified storage
 
+use std::collections::HashMap;
 use std::io::{self, Write};
 use std::path::Path;
 
@@ -21,6 +22,16 @@ pub struct UnifiedStateManager {
     pub storage: UnifiedStorage,
     file_path: String,
     passphrase: String,
+    /// In-memory lease cache keyed by sanad_id
+    leases: HashMap<String, LeaseInfo>,
+}
+
+/// Stored lease information
+#[derive(Clone)]
+pub(crate) struct LeaseInfo {
+    lease_id: String,
+    pub owner: String,
+    ttl_secs: u64,
 }
 
 impl UnifiedStateManager {
@@ -73,6 +84,7 @@ impl UnifiedStateManager {
             storage,
             file_path: path,
             passphrase: passphrase.to_string(),
+            leases: HashMap::new(),
         })
     }
 
@@ -96,6 +108,7 @@ impl UnifiedStateManager {
             storage,
             file_path: path.to_string(),
             passphrase: passphrase.to_string(),
+            leases: HashMap::new(),
         })
     }
 
@@ -105,6 +118,7 @@ impl UnifiedStateManager {
             storage: UnifiedStorage::new().with_defaults(),
             file_path: Self::default_path(),
             passphrase: passphrase.to_string(),
+            leases: HashMap::new(),
         }
     }
 
@@ -364,5 +378,35 @@ impl UnifiedStateManager {
             derivation_path,
             keystore_ref: None,
         });
+    }
+
+    // --- Lease Management ---
+
+    /// Store a lease for later use in transfers
+    pub fn store_lease(
+        &mut self,
+        sanad_id: csv_core::hash::Hash,
+        lease_id: csv_core::lease::LeaseId,
+        owner: csv_core::hash::Hash,
+        ttl_secs: u64,
+    ) {
+        self.leases.insert(
+            sanad_id.to_string(),
+            LeaseInfo {
+                lease_id: format!("0x{}", hex::encode(lease_id.as_bytes())),
+                owner: format!("0x{}", hex::encode(owner.as_bytes())),
+                ttl_secs,
+            },
+        );
+    }
+
+    /// Get a lease by sanad ID
+    pub fn get_lease(&self, sanad_id: &str) -> Option<&LeaseInfo> {
+        self.leases.get(sanad_id)
+    }
+
+    /// Check if a lease exists for a sanad
+    pub fn has_lease(&self, sanad_id: &str) -> bool {
+        self.leases.contains_key(sanad_id)
     }
 }

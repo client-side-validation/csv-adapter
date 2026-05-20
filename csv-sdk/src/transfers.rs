@@ -198,6 +198,7 @@ pub struct TransferBuilder {
     to_address: Option<String>,
     priority: Priority,
     metadata: HashMap<String, String>,
+    lease_token: Option<csv_core::hash::Hash>,
 }
 
 impl TransferBuilder {
@@ -216,6 +217,7 @@ impl TransferBuilder {
             to_address: None,
             priority: Priority::default(),
             metadata: HashMap::new(),
+            lease_token: None,
         }
     }
 
@@ -243,6 +245,15 @@ impl TransferBuilder {
     /// Attach custom metadata to the transfer.
     pub fn with_metadata(mut self, key: String, value: String) -> Self {
         self.metadata.insert(key, value);
+        self
+    }
+
+    /// Set the lease token for this transfer.
+    ///
+    /// The lease token must have been acquired via the
+    /// [`TransferManager::acquire_lease()`] method before calling this.
+    pub fn with_lease_token(mut self, lease_token: csv_core::hash::Hash) -> Self {
+        self.lease_token = Some(lease_token);
         self
     }
 
