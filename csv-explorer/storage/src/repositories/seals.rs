@@ -96,7 +96,8 @@ impl SealsRepository {
             sql.push_str(&format!(" OFFSET {}", offset));
         }
 
-        let mut query = sqlx::query(&sql);
+        let sql_static = Box::leak(sql.into_boxed_str()) as &'static str;
+        let mut query = sqlx::query(sql_static);
         if let Some(ref chain) = filter.chain {
             query = query.bind(chain);
         }
@@ -141,7 +142,24 @@ impl SealsRepository {
             sql.push_str(" AND sanad_id = ?");
         }
 
-        let mut query = sqlx::query_scalar::<_, i64>(&sql);
+        // Build the SQL string in a temporary scope to ensure it's not in scope when we create the query
+        let sql_static = {
+            let mut sql = String::from("SELECT COUNT(*) FROM seals WHERE 1=1");
+            if filter.chain.is_some() {
+                sql.push_str(" AND chain = ?");
+            }
+            if filter.seal_type.is_some() {
+                sql.push_str(" AND seal_type = ?");
+            }
+            if filter.status.is_some() {
+                sql.push_str(" AND status = ?");
+            }
+            if filter.sanad_id.is_some() {
+                sql.push_str(" AND sanad_id = ?");
+            }
+            Box::leak(sql.into_boxed_str())
+        };
+        let mut query = sqlx::query_scalar::<&'static str, i64>(sql_static as &'static str);
         if let Some(ref chain) = filter.chain {
             query = query.bind(chain);
         }
@@ -154,8 +172,8 @@ impl SealsRepository {
         if let Some(ref sanad_id) = filter.sanad_id {
             query = query.bind(sanad_id);
         }
-
         let count = query.fetch_one(&self.pool).await?;
+
         Ok(count as u64)
     }
 

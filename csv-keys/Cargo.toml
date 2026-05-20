@@ -78,7 +78,6 @@ thiserror = "1.0"
 # Directory resolution for file keystore (native-only)
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 dirs = "5.0"
-hakari = { version = "0.1", path = "../hakari" }
 
 [features]
 default = ["bip44", "secp256k1"]

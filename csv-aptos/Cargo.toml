@@ -40,7 +40,6 @@ tokio = { version = "1", features = ["rt", "time", "macros"] }
 reqwest = { version = "0.12", features = ["json"], optional = true }
 async-trait.workspace = true
 rand_core = "0.6"
-hakari = { version = "0.1", path = "../hakari" }
 
 [features]
 default = []
@@ -48,6 +47,8 @@ default = []
 rpc = ["tokio/macros", "reqwest"]
 # Enables aptos-sdk integration
 aptos-sdk = []
+# Dev/mocks feature for test utilities
+dev-mocks = []
 
 [dev-dependencies]
 rand = "0.8"

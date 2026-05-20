@@ -44,7 +44,6 @@ sui-crypto = { version = "0.3.0", optional = true, features = ["ed25519"] }
 bcs = { version = "0.1", optional = true }
 async-trait.workspace = true
 rand = "0.8"
-hakari = { version = "0.1", path = "../hakari" }
 
 [features]
 default = []

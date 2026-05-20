@@ -99,7 +99,8 @@ impl SanadsRepository {
             sql.push_str(&format!(" OFFSET {}", offset));
         }
 
-        let mut query = sqlx::query(&sql);
+        let sql_static = Box::leak(sql.into_boxed_str()) as &'static str;
+        let mut query = sqlx::query(sql_static);
         if let Some(ref chain) = filter.chain {
             query = query.bind(chain);
         }

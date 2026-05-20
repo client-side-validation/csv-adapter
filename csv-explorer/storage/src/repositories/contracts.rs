@@ -84,7 +84,8 @@ impl ContractsRepository {
             sql.push_str(&format!(" OFFSET {}", offset));
         }
 
-        let mut query = sqlx::query(&sql);
+        let sql_static = Box::leak(sql.into_boxed_str()) as &'static str;
+        let mut query = sqlx::query(sql_static);
         if let Some(ref chain) = filter.chain {
             query = query.bind(chain);
         }
@@ -101,19 +102,21 @@ impl ContractsRepository {
 
     /// Count contracts matching the filter.
     pub async fn count(&self, filter: ContractFilter) -> Result<u64> {
-        let mut sql = String::from("SELECT COUNT(*) FROM contracts WHERE 1=1");
-
-        if filter.chain.is_some() {
-            sql.push_str(" AND chain = ?");
-        }
-        if filter.contract_type.is_some() {
-            sql.push_str(" AND contract_type = ?");
-        }
-        if filter.status.is_some() {
-            sql.push_str(" AND status = ?");
-        }
-
-        let mut query = sqlx::query_scalar::<_, i64>(&sql);
+        // Build the SQL string in a temporary scope to ensure it's not in scope when we create the query
+        let sql_static = {
+            let mut sql = String::from("SELECT COUNT(*) FROM contracts WHERE 1=1");
+            if filter.chain.is_some() {
+                sql.push_str(" AND chain = ?");
+            }
+            if filter.contract_type.is_some() {
+                sql.push_str(" AND contract_type = ?");
+            }
+            if filter.status.is_some() {
+                sql.push_str(" AND status = ?");
+            }
+            Box::leak(sql.into_boxed_str())
+        };
+        let mut query = sqlx::query_scalar::<&'static str, i64>(sql_static as &'static str);
         if let Some(ref chain) = filter.chain {
             query = query.bind(chain);
         }
@@ -123,8 +126,8 @@ impl ContractsRepository {
         if let Some(status) = filter.status {
             query = query.bind(status.to_string());
         }
-
         let count = query.fetch_one(&self.pool).await?;
+
         Ok(count as u64)
     }
 

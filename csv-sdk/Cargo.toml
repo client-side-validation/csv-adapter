@@ -60,7 +60,7 @@ toml = "0.8"
 dirs = { version = "5.0", optional = true }
 rand = "0.8"
 chrono = { version = "0.4", features = ["serde"], optional = true }
-sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio"], optional = true }
+sqlx = { version = "0.9.0-alpha.1", features = ["sqlite", "_rt-tokio", "tls-rustls"], optional = true }
 
 # Optional: bring in chain-specific heavy deps when full chain support is needed
 bitcoin = { version = "0.32", features = ["serde", "rand"], optional = true }
@@ -74,7 +74,6 @@ csv-ethereum = { version = "0.5.0", path = "../csv-ethereum", optional = true }
 csv-sui = { version = "0.5.0", path = "../csv-sui", optional = true }
 csv-aptos = { version = "0.5.0", path = "../csv-aptos", optional = true }
 csv-solana = { version = "0.5.0", path = "../csv-solana", optional = true }
-hakari = { version = "0.1", path = "../hakari" }
 
 [features]
 default = ["std", "tokio", "native"]

@@ -14,7 +14,7 @@ use serde::{de::DeserializeOwned, Serialize};
 pub enum HttpClient {
     /// Native HTTP client backed by `reqwest`.
     #[cfg(not(target_arch = "wasm32"))]
-    Native(crate::services::explorer::NativeClient),
+    Native(NativeClient),
     /// WASM HTTP client backed by `web_sys::fetch`.
     #[cfg(target_arch = "wasm32")]
     Wasm,
@@ -25,7 +25,7 @@ impl HttpClient {
     pub fn new(base_url: String) -> Self {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            Self::Native(crate::services::explorer::NativeClient::new(base_url))
+            Self::Native(NativeClient::new(base_url))
         }
         #[cfg(target_arch = "wasm32")]
         {
@@ -90,7 +90,7 @@ mod native_impl {
     use reqwest::Client as ReqwestClient;
 
     /// Native HTTP client backed by `reqwest`.
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub struct NativeClient {
         base_url: String,
         client: ReqwestClient,

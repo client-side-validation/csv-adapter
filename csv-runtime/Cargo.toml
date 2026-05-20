@@ -13,7 +13,8 @@ tracing = "0.1"
 async-trait = "0.1"
 uuid = { version = "1.1", features = ["v4", "serde"] }
 serde_json = "1.0"
-sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls", "chrono", "uuid"], optional = true }
+hex = "0.4"
+sqlx = { version = "0.9.0-alpha.1", features = ["postgres", "_rt-tokio", "tls-rustls", "chrono", "uuid"], optional = true }
 chrono = { version = "0.4", features = ["serde"], optional = true }
 
 # csv-runtime is native-only (depends on rocksdb, tokio net, etc.)
@@ -22,7 +23,9 @@ chrono = { version = "0.4", features = ["serde"], optional = true }
 tokio = { version = "1", features = ["full"] }
 rocksdb = { version = "0.21", optional = true }
 bytes = { version = "1", optional = true }
-hakari = { version = "0.1", path = "../hakari" }
+
+[dev-dependencies]
+tempfile = "3"
 
 [features]
 default = ["persistent"]

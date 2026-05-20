@@ -6,4 +6,4 @@ publish = false
 
 [dependencies]
 anyhow = "1.0"
-hakari = { version = "0.1", path = "../hakari" }
+

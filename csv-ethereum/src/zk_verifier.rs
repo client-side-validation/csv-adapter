@@ -91,7 +91,7 @@ impl EthereumGroth16Verifier {
         hasher.update(public_inputs.block_height.to_le_bytes());
         hasher.update(public_inputs.timestamp.to_le_bytes());
 
-        let input_hash: [u8; 32] = hasher.finalize().into();
+        let _input_hash: [u8; 32] = hasher.finalize().into();
 
         // DEV ONLY: deterministic consistency heuristic.
         let consistent = proof_bytes[0] != 0
@@ -108,12 +108,14 @@ impl EthereumGroth16Verifier {
         public_inputs: &ZkPublicInputs,
     ) -> Result<bool, ZkError> {
         use ark_bn254::{Bn254, Fr};
+        use ark_ff::PrimeField;
         use ark_groth16::{Groth16, Proof, VerifyingKey};
         use ark_serialize::CanonicalDeserialize;
+        use ark_snark::SNARK;
 
         // 1. Deserialize verification key (loaded at construction time).
         let vk_bytes = self.verifier_key.as_ref().ok_or_else(|| {
-            ZkError::VerifierNotFound("No verifier key loaded".to_string())
+            ZkError::VerifierNotFound(builtin::ETHEREUM.clone())
         })?;
         let vk = VerifyingKey::<Bn254>::deserialize_compressed(vk_bytes.as_slice())
             .map_err(|e| ZkError::InvalidProof(format!("VK deserialization failed: {e}")))?;

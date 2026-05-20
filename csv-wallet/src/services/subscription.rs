@@ -287,21 +287,26 @@ impl WalletSubscriptionManager {
                         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
                         // Resubscribe to all existing addresses
-                        let subs = subscriptions.read().unwrap();
-                        for (address, chains) in subs.iter() {
-                            for chain in chains {
-                                let request = SubscriptionRequest {
-                                    action: "subscribe".to_string(),
-                                    address: address.clone(),
-                                    chain: Some(chain.clone()),
-                                    network: None,
-                                };
-                                if let Ok(json) = serde_json::to_string(&request) {
-                                    let _ = ws_sender.send(Message::Text(json)).await;
-                                }
+                        let subs: Vec<_> = {
+                            let guard = subscriptions.read().unwrap();
+                            guard
+                                .iter()
+                                .flat_map(|(address, chains)| {
+                                    chains.iter().map(move |chain| (address.clone(), chain.clone()))
+                                })
+                                .collect()
+                        };
+                        for (address, chain) in &subs {
+                            let request = SubscriptionRequest {
+                                action: "subscribe".to_string(),
+                                address: address.clone(),
+                                chain: Some(chain.clone()),
+                                network: None,
+                            };
+                            if let Ok(json) = serde_json::to_string(&request) {
+                                let _ = ws_sender.send(Message::Text(json)).await;
                             }
                         }
-                        drop(subs);
 
                         // Handle WebSocket messages
                         loop {
@@ -311,7 +316,8 @@ impl WalletSubscriptionManager {
                                         Ok(Message::Text(text)) => {
                                             if let Ok(response) = serde_json::from_str::<SubscriptionResponse>(&text) {
                                                 if let Some(event) = response.event {
-                                                    if let Some(sender) = event_sender.read().unwrap().as_ref() {
+                                                    let sender_opt = event_sender.read().unwrap().clone();
+                                                    if let Some(sender) = sender_opt {
                                                         let _ = sender.send(event);
                                                     }
                                                 }

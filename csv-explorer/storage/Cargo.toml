@@ -15,4 +15,3 @@ chrono.workspace = true
 uuid.workspace = true
 tracing.workspace = true
 serde_json.workspace = true
-hakari = { version = "0.1", path = "../../hakari" }

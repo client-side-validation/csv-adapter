@@ -42,6 +42,7 @@ ark-groth16      = { version = "0.4", optional = true }
 ark-serialize    = { version = "0.4", optional = true }
 ark-ec           = { version = "0.4", optional = true }
 ark-ff           = { version = "0.4", optional = true }
+ark-snark        = { version = "0.4", optional = true }
 
 # Official Ethereum implementations for maximum compatibility
 alloy = { version = "1.8", features = ["full"], optional = true }
@@ -53,12 +54,11 @@ url = { version = "2.5", optional = true }
 # Async runtime — non-optional for polling (PF-03)
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time"] }
 serde_json = "1.0"
-hakari = { version = "0.1", path = "../hakari" }
 
 [features]
 default = []
 # Real Groth16 pairing verification — feature-gated so the mock path is unreachable in production
-real-groth16 = ["dep:ark-bn254", "dep:ark-groth16", "dep:ark-serialize", "dep:ark-ec", "dep:ark-ff"]
+real-groth16 = ["dep:ark-bn254", "dep:ark-groth16", "dep:ark-serialize", "dep:ark-ec", "dep:ark-ff", "dep:ark-snark"]
 rpc = ["alloy", "alloy-sol-types", "alloy-contract", "csv-store", "reqwest", "url"]
 quorum = ["csv-core/quorum", "reqwest", "url"]
 production = ["rpc", "quorum"]

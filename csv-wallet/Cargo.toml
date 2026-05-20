@@ -20,23 +20,7 @@ csv-core = { path = "../csv-core", default-features = false, features = ["std"] 
 csv-store = { path = "../csv-store", default-features = false, features = ["browser-storage", "encrypted-storage"] }
 csv-keys = { path = "../csv-keys", features = ["wasm", "production"] }
 
-# Native-only dependencies (csv-runtime, tokio, reqwest, dirs, tokio-tungstenite, hakari)
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-csv-runtime = { path = "../csv-runtime", optional = true }
-csv-sdk = { path = "../csv-sdk", features = ["bitcoin", "tokio", "wallet"] }
-tokio = { version = "1.0", features = ["macros", "rt", "sync", "time"] }
-tokio-tungstenite = { version = "0.20", optional = true }
-reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
-dirs = "5.0"
-csv-bitcoin = { path = "../csv-bitcoin", optional = true }
-csv-ethereum = { path = "../csv-ethereum", optional = true }
-hakari = { version = "0.1", path = "../hakari" }
-
-# WASM-only dependencies
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-csv-sdk = { path = "../csv-sdk", default-features = false, features = ["wasm"] }
-
-# Shared dependencies (work on both targets)
+# Dioxus UI
 dioxus = { version = "0.7", features = ["web", "router"] }
 
 # Cryptography - wasm compatible
@@ -88,6 +72,21 @@ bcs = "0.1"
 
 # Base64 for Solana
 base64 = "0.21"
+
+# Native-only dependencies
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+csv-runtime = { path = "../csv-runtime", optional = true }
+csv-sdk = { path = "../csv-sdk", features = ["bitcoin", "tokio", "wallet"] }
+tokio = { version = "1.0", features = ["macros", "rt", "sync", "time"] }
+tokio-tungstenite = { version = "0.20", optional = true }
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
+dirs = "5.0"
+csv-bitcoin = { path = "../csv-bitcoin", optional = true }
+csv-ethereum = { path = "../csv-ethereum", optional = true }
+
+# WASM-only dependencies
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+csv-sdk = { path = "../csv-sdk", default-features = false, features = ["wasm"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

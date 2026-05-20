@@ -103,7 +103,8 @@ impl TransfersRepository {
             sql.push_str(&format!(" OFFSET {}", offset));
         }
 
-        let mut query = sqlx::query(&sql);
+        let sql_static = Box::leak(sql.into_boxed_str()) as &'static str;
+        let mut query = sqlx::query(sql_static);
         if let Some(ref sanad_id) = filter.sanad_id {
             query = query.bind(sanad_id);
         }
@@ -148,7 +149,24 @@ impl TransfersRepository {
             sql.push_str(" AND status = ?");
         }
 
-        let mut query = sqlx::query_scalar::<_, i64>(&sql);
+        // Build the SQL string in a temporary scope to ensure it's not in scope when we create the query
+        let sql_static = {
+            let mut sql = String::from("SELECT COUNT(*) FROM transfers WHERE 1=1");
+            if filter.sanad_id.is_some() {
+                sql.push_str(" AND sanad_id = ?");
+            }
+            if filter.from_chain.is_some() {
+                sql.push_str(" AND from_chain = ?");
+            }
+            if filter.to_chain.is_some() {
+                sql.push_str(" AND to_chain = ?");
+            }
+            if filter.status.is_some() {
+                sql.push_str(" AND status = ?");
+            }
+            Box::leak(sql.into_boxed_str())
+        };
+        let mut query = sqlx::query_scalar::<&'static str, i64>(sql_static as &'static str);
         if let Some(ref sanad_id) = filter.sanad_id {
             query = query.bind(sanad_id);
         }
@@ -158,11 +176,11 @@ impl TransfersRepository {
         if let Some(ref to_chain) = filter.to_chain {
             query = query.bind(to_chain);
         }
-        if let Some(status) = filter.status {
+        if let Some(ref status) = filter.status {
             query = query.bind(status.to_string());
         }
-
         let count = query.fetch_one(&self.pool).await?;
+
         Ok(count as u64)
     }
 

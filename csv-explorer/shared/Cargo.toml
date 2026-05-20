@@ -15,7 +15,6 @@ csv-core.workspace = true
 hex.workspace = true
 getrandom = { version = "0.2", features = ["js"] }
 uuid = { version = "1.0", features = ["v4", "serde", "js"] }
-hakari = { version = "0.1", path = "../../hakari" }
 
 # Server-only dependencies
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

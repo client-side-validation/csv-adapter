@@ -22,7 +22,6 @@ pqcrypto-traits = { version = "0.3", optional = true }
 rand = "0.8"
 hex = "0.4"
 getrandom = { version = "0.3", features = ["wasm_js"] }
-hakari = { version = "0.1", path = "../../hakari" }
 
 [features]
 default = ["pq"]

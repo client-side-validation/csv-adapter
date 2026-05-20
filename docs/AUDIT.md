@@ -940,7 +940,6 @@ web-sys = { workspace = true, features = [
 ] }
 gloo-timers = { workspace = true, features = ["futures"] }
 
-hakari = { version = "0.1", path = "../hakari" }
 
 # ─── Native-only deps ────────────────────────────────────────────────────────
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

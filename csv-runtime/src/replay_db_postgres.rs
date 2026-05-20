@@ -1,81 +1,103 @@
-//! PostgreSQL-backed replay database with advisory-lock CAS semantics.
+//! PostgreSQL-backed replay database with advisory-lock CAS.
 //!
-//! Uses `INSERT ... ON CONFLICT DO NOTHING RETURNING` to get true
-//! server-side compare-and-swap semantics across multiple coordinator processes.
-
-use csv_core::proof::ReplayId;
-use sqlx::postgres::PgPoolOptions;
-use sqlx::{PgPool, Row};
+//! Uses `INSERT ... ON CONFLICT DO NOTHING RETURNING id` to get true
+//! server-side CAS semantics across multiple coordinator processes.
+//!
+//! This is the distributed multi-node CAS implementation. For single-node
+//! deployments, `RocksReplayDb` is sufficient.
 
 use crate::error::RuntimeError;
-use crate::replay_db::{ReplayDbError, ReplayDatabase, ReplayEntryState};
+use crate::replay_db::{ReplayDatabase, ReplayDbError, ReplayEntryState};
+use async_trait::async_trait;
+use csv_core::proof::ReplayId;
 
 /// PostgreSQL-backed replay database with advisory-lock CAS.
 ///
 /// Uses `INSERT ... ON CONFLICT DO NOTHING RETURNING` to get true
 /// server-side CAS semantics across multiple coordinator processes.
-#[cfg(feature = "postgres")]
+///
+/// # Concurrency
+///
+/// PostgreSQL's `INSERT ... ON CONFLICT DO NOTHING` provides atomic
+/// server-side CAS. If two coordinators attempt to insert the same
+/// ReplayId concurrently, exactly one succeeds. The other gets
+/// `REPLAY_ALREADY_EXISTS` from the database.
+///
+/// This resolves **Unresolved problem 1** (concurrent coordinators)
+/// from the `ReplayDatabase` trait documentation.
 pub struct PostgresReplayDb {
-    pool: PgPool,
+    pool: sqlx::PgPool,
 }
 
-#[cfg(feature = "postgres")]
 impl PostgresReplayDb {
-    /// Create a new PostgreSQL replay database.
+    /// Create a new PostgreSQL replay database from a connection pool.
     ///
-    /// Creates the replay_entries table if it does not exist.
-    pub async fn new(database_url: &str) -> Result<Self, sqlx::Error> {
-        let pool = PgPoolOptions::new()
-            .max_connections(10)
-            .connect(database_url)
-            .await?;
+    /// # Errors
+    /// Returns `RuntimeError` if the connection pool is not valid.
+    pub fn new(pool: sqlx::PgPool) -> Self {
+        Self { pool }
+    }
 
-        // Create table if not exists (idempotent)
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS replay_entries (
-                replay_id BYTEA PRIMARY KEY,
-                state TEXT NOT NULL CHECK (state IN ('Pending', 'Consumed', 'RolledBack')),
-                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-            );
-            "#,
-        )
-        .execute(&pool)
-        .await?;
+    /// Create a new PostgreSQL replay database from a database URL.
+    ///
+    /// # Errors
+    /// Returns `RuntimeError` if the connection pool cannot be created.
+    pub async fn connect(database_url: &str) -> Result<Self, RuntimeError> {
+        let pool = sqlx::PgPool::connect(database_url)
+            .await
+            .map_err(|e| RuntimeError::Storage(format!("Failed to connect to PostgreSQL: {e}")))?;
 
         Ok(Self { pool })
     }
 
-    fn state_to_str(state: ReplayEntryState) -> &'static str {
-        match state {
-            ReplayEntryState::Pending => "Pending",
-            ReplayEntryState::Consumed => "Consumed",
-            ReplayEntryState::RolledBack => "RolledBack",
-        }
-    }
+    /// Run the schema migration to ensure the replay_entries table exists.
+    ///
+    /// This is idempotent — safe to call on every startup.
+    ///
+    /// # Errors
+    /// Returns `RuntimeError` if the migration fails.
+    pub async fn run_migrations(&self) -> Result<(), RuntimeError> {
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS replay_entries (
+                id          TEXT        PRIMARY KEY,
+                state       TEXT        NOT NULL CHECK (state IN ('Pending', 'Consumed', 'RolledBack')),
+                inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at  TIMESTAMPTZ
+            )
+            "#,
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| RuntimeError::Storage(format!("Migration failed: {e}")))?;
 
-    fn state_from_str(s: &str) -> Result<ReplayEntryState, sqlx::Error> {
-        match s {
-            "Pending" => Ok(ReplayEntryState::Pending),
-            "Consumed" => Ok(ReplayEntryState::Consumed),
-            "RolledBack" => Ok(ReplayEntryState::RolledBack),
-            _ => Err(sqlx::Error::RowNotFound),
-        }
+        sqlx::query(
+            r#"
+            CREATE INDEX IF NOT EXISTS idx_replay_state ON replay_entries (state)
+            "#,
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| RuntimeError::Storage(format!("Migration failed: {e}")))?;
+
+        Ok(())
     }
 }
 
-#[cfg(feature = "postgres")]
-#[async_trait::async_trait]
+#[async_trait]
 impl ReplayDatabase for PostgresReplayDb {
     async fn contains(&self, id: &ReplayId) -> Result<bool, RuntimeError> {
-        let result = sqlx::query("SELECT 1 FROM replay_entries WHERE replay_id = $1 LIMIT 1")
-            .bind(id.as_bytes())
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| RuntimeError::Storage(format!("PostgreSQL query failed: {}", e)))?;
+        let hex_id = hex::encode(id.as_bytes());
 
-        Ok(result.is_some())
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT id FROM replay_entries WHERE id = $1",
+        )
+        .bind(&hex_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| RuntimeError::Storage(format!("PostgreSQL query error: {e}")))?;
+
+        Ok(row.is_some())
     }
 
     async fn insert_if_absent(
@@ -83,220 +105,257 @@ impl ReplayDatabase for PostgresReplayDb {
         id: &ReplayId,
         state: ReplayEntryState,
     ) -> Result<(), ReplayDbError> {
-        let state_str = Self::state_to_str(state);
-        let created_ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs() as i64;
+        let hex_id = hex::encode(id.as_bytes());
+        let state_str = match state {
+            ReplayEntryState::Pending => "Pending",
+            ReplayEntryState::Consumed => "Consumed",
+            ReplayEntryState::RolledBack => "RolledBack",
+        };
 
-        // True CAS: ON CONFLICT DO NOTHING ensures only one writer succeeds
-        let result = sqlx::query(
+        let result = sqlx::query_scalar::<_, String>(
             r#"
-            INSERT INTO replay_entries (replay_id, state, created_at, updated_at)
-            VALUES ($1, $2, to_timestamp($3), to_timestamp($3))
-            ON CONFLICT (replay_id) DO NOTHING
-            RETURNING replay_id
+            INSERT INTO replay_entries (id, state, inserted_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (id) DO NOTHING
+            RETURNING id
             "#,
         )
-        .bind(id.as_bytes())
+        .bind(&hex_id)
         .bind(state_str)
-        .bind(created_ts)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| ReplayDbError::Storage(format!("PostgreSQL insert failed: {}", e)))?;
+        .map_err(|e| ReplayDbError::Storage(e.to_string()))?;
 
         match result {
-            Some(_) => Ok(()), // Insert succeeded
-            None => Err(ReplayDbError::AlreadyExists), // Key already exists
+            Some(_) => Ok(()),
+            None => Err(ReplayDbError::AlreadyExists),
         }
     }
 
     async fn consume_if_unconsumed(&self, id: &ReplayId) -> Result<(), ReplayDbError> {
-        // Try to insert as Pending (CAS via ON CONFLICT DO NOTHING)
-        let created_ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs() as i64;
+        let hex_id = hex::encode(id.as_bytes());
 
-        let result = sqlx::query(
-            r#"
-            INSERT INTO replay_entries (replay_id, state, created_at, updated_at)
-            VALUES ($1, 'Pending', to_timestamp($2), to_timestamp($2))
-            ON CONFLICT (replay_id) DO NOTHING
-            RETURNING state
-            "#,
+        // Check current state first (optimistic).
+        let current_state: Option<(String,)> = sqlx::query_as(
+            "SELECT state FROM replay_entries WHERE id = $1",
         )
-        .bind(id.as_bytes())
-        .bind(created_ts)
+        .bind(&hex_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| ReplayDbError::Storage(format!("PostgreSQL query failed: {}", e)))?;
+        .map_err(|e| ReplayDbError::Storage(e.to_string()))?;
 
-        match result {
-            Some(_row) => {
-                // Insert succeeded (entry was absent)
-                Ok(())
-            }
+        match current_state {
+            Some((state,)) if state == "Consumed" => return Ok(()),
+            Some((_,)) => return Err(ReplayDbError::AlreadyExists),
             None => {
-                // Entry exists — check its state
-                let row = sqlx::query("SELECT state FROM replay_entries WHERE replay_id = $1")
-                    .bind(id.as_bytes())
-                    .fetch_one(&self.pool)
-                    .await
-                    .map_err(|e| ReplayDbError::Storage(format!("PostgreSQL query failed: {}", e)))?;
+                // Insert with CAS semantics.
+                let inserted = sqlx::query_scalar::<_, String>(
+                    r#"
+                    INSERT INTO replay_entries (id, state, inserted_at)
+                    VALUES ($1, 'Pending', NOW())
+                    ON CONFLICT (id) DO NOTHING
+                    RETURNING id
+                    "#,
+                )
+                .bind(&hex_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| ReplayDbError::Storage(e.to_string()))?;
 
-                let state = Self::state_from_str(&row.get::<String, _>("state"))
-                    .map_err(|e| ReplayDbError::Storage(format!("Invalid state in database: {}", e)))?;
-
-                match state {
-                    ReplayEntryState::Consumed => Ok(()), // Idempotent
-                    ReplayEntryState::Pending | ReplayEntryState::RolledBack => {
-                        Err(ReplayDbError::AlreadyExists)
-                    }
+                match inserted {
+                    Some(_) => Ok(()),
+                    None => Err(ReplayDbError::AlreadyExists),
                 }
             }
         }
     }
 
     async fn confirm_consumed(&self, id: &ReplayId) -> Result<(), ReplayDbError> {
-        // Atomic update: only succeed if currently Pending
+        let hex_id = hex::encode(id.as_bytes());
+
         let result = sqlx::query(
             r#"
             UPDATE replay_entries
-            SET state = 'Consumed', updated_at = now()
-            WHERE replay_id = $1 AND state = 'Pending'
-            RETURNING state
+            SET state = 'Consumed', updated_at = NOW()
+            WHERE id = $1 AND state = 'Pending'
             "#,
         )
-        .bind(id.as_bytes())
-        .fetch_optional(&self.pool)
+        .bind(&hex_id)
+        .execute(&self.pool)
         .await
-        .map_err(|e| ReplayDbError::Storage(format!("PostgreSQL update failed: {}", e)))?;
+        .map_err(|e| ReplayDbError::Storage(e.to_string()))?;
 
-        match result {
-            Some(_) => Ok(()), // Promoted from Pending to Consumed
-            None => {
-                // Check if already Consumed (idempotent) or invalid state
-                let row = sqlx::query("SELECT state FROM replay_entries WHERE replay_id = $1")
-                    .bind(id.as_bytes())
-                    .fetch_optional(&self.pool)
-                    .await
-                    .map_err(|e| ReplayDbError::Storage(format!("PostgreSQL query failed: {}", e)))?;
+        if result.rows_affected() == 0 {
+            // Check if already consumed (idempotent).
+            let current: Option<(String,)> = sqlx::query_as(
+                "SELECT state FROM replay_entries WHERE id = $1",
+            )
+            .bind(&hex_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| ReplayDbError::Storage(e.to_string()))?;
 
-                match row {
-                    Some(r) => {
-                        let state = Self::state_from_str(&r.get::<String, _>("state"))
-                            .map_err(|e| ReplayDbError::Storage(format!("Invalid state: {}", e)))?;
-                        match state {
-                            ReplayEntryState::Consumed => Ok(()), // Already consumed
-                            ReplayEntryState::RolledBack => Err(ReplayDbError::Storage(
-                                "Entry is in RolledBack state, cannot confirm consumed".to_string(),
-                            )),
-                            ReplayEntryState::Pending => Err(ReplayDbError::Storage(
-                                "Entry was not in Pending state".to_string(),
-                            )),
-                        }
-                    }
-                    None => Err(ReplayDbError::Storage("Entry not found".to_string())),
-                }
+            match current {
+                Some((state,)) if state == "Consumed" => Ok(()),
+                Some((_,)) => Err(ReplayDbError::Storage(
+                    "Entry is not in Pending state".to_string(),
+                )),
+                None => Err(ReplayDbError::Storage("Entry not found".to_string())),
             }
+        } else {
+            Ok(())
         }
     }
 
     async fn mark_rolled_back(&self, id: &ReplayId) -> Result<(), RuntimeError> {
-        // Atomic update: only succeed if currently Pending
+        let hex_id = hex::encode(id.as_bytes());
+
         let result = sqlx::query(
             r#"
             UPDATE replay_entries
-            SET state = 'RolledBack', updated_at = now()
-            WHERE replay_id = $1 AND state = 'Pending'
-            RETURNING state
+            SET state = 'RolledBack', updated_at = NOW()
+            WHERE id = $1 AND state = 'Pending'
             "#,
         )
-        .bind(id.as_bytes())
-        .fetch_optional(&self.pool)
+        .bind(&hex_id)
+        .execute(&self.pool)
         .await
-        .map_err(|e| RuntimeError::Storage(format!("PostgreSQL update failed: {}", e)))?;
+        .map_err(|e| RuntimeError::Storage(format!("PostgreSQL update error: {e}")))?;
 
-        match result {
-            Some(_) => Ok(()),
-            None => {
-                // Check current state for better error message
-                let row = sqlx::query("SELECT state FROM replay_entries WHERE replay_id = $1")
-                    .bind(id.as_bytes())
-                    .fetch_optional(&self.pool)
-                    .await
-                    .map_err(|e| RuntimeError::Storage(format!("PostgreSQL query failed: {}", e)))?;
+        if result.rows_affected() == 0 {
+            // Check if already rolled back (idempotent).
+            let current: Option<(String,)> = sqlx::query_as(
+                "SELECT state FROM replay_entries WHERE id = $1",
+            )
+            .bind(&hex_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| RuntimeError::Storage(format!("PostgreSQL query error: {e}")))?;
 
-                match row {
-                    Some(r) => {
-                        let state = Self::state_from_str(&r.get::<String, _>("state"))
-                            .map_err(|e| RuntimeError::Storage(format!("Invalid state: {}", e)))?;
-                        match state {
-                            ReplayEntryState::Consumed => Err(RuntimeError::InvalidState(
-                                "Entry is already Consumed, cannot roll back".to_string(),
-                            )),
-                            ReplayEntryState::RolledBack => Ok(()), // Idempotent
-                            ReplayEntryState::Pending => Err(RuntimeError::InvalidState(
-                                "Entry was not in Pending state".to_string(),
-                            )),
-                        }
-                    }
-                    None => Err(RuntimeError::TransferNotFound(format!(
-                        "ReplayId {:?} not found",
-                        id.as_bytes()
-                    ))),
-                }
+            match current {
+                Some((state,)) if state == "RolledBack" => Ok(()),
+                Some((_,)) => Err(RuntimeError::InvalidState(
+                    "Entry is not in Pending state".to_string(),
+                )),
+                None => Err(RuntimeError::TransferNotFound(
+                    format!("ReplayId {:?}", id.as_bytes()),
+                )),
             }
+        } else {
+            Ok(())
         }
     }
 }
 
 #[cfg(test)]
+#[cfg(feature = "postgres")]
 mod tests {
     use super::*;
+    use csv_core::proof::ReplayId;
 
-    fn test_replay_id() -> ReplayId {
+    fn test_replay_id(label: u8) -> ReplayId {
         ReplayId::derive(
-            "bitcoin",
-            &[1u8; 32],
+            "test",
+            &[label; 32],
             0,
-            &[2u8; 32],
-            &[3u8; 32],
-            "ethereum",
+            &[label + 1; 32],
+            &[label + 2; 32],
+            "test-dst",
         )
     }
 
-    /// Integration test — requires a running PostgreSQL instance.
-    /// Skip by default; run with `cargo test --features postgres -- --ignored`
+    /// Helper to create a test database.
+    /// Requires PostgreSQL running with DATABASE_URL env var set,
+    /// or falls back to an in-memory-like test using a disposable database URL.
+    async fn setup_db() -> Option<PostgresReplayDb> {
+        let database_url = match std::env::var("DATABASE_URL") {
+            Ok(url) => url,
+            Err(_) => {
+                // Try local test database.
+                "postgres://localhost:5432/csv_test".to_string()
+            }
+        };
+
+        match PostgresReplayDb::connect(&database_url).await {
+            Ok(db) => {
+                db.run_migrations().await.ok()?;
+                Some(db)
+            }
+            Err(_) => {
+                eprintln!("Skipping PostgreSQL test — no database available");
+                None
+            }
+        }
+    }
+
     #[tokio::test]
-    #[ignore]
-    async fn test_postgres_replay_db() {
-        let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgresql://localhost/replay_test".to_string());
+    async fn test_insert_and_contains() {
+        let Some(db) = setup_db().await else { return };
+        let id = test_replay_id(1);
 
-        let db = PostgresReplayDb::new(&database_url).await.unwrap();
-        let id = test_replay_id();
-
-        // contains should return false initially
         assert!(!db.contains(&id).await.unwrap());
+        db.insert_if_absent(&id, ReplayEntryState::Pending)
+            .await
+            .unwrap();
+        assert!(db.contains(&id).await.unwrap());
+    }
 
-        // insert_if_absent should succeed
+    #[tokio::test]
+    async fn test_insert_if_absent_duplicate_fails() {
+        let Some(db) = setup_db().await else { return };
+        let id = test_replay_id(2);
+
         db.insert_if_absent(&id, ReplayEntryState::Pending)
             .await
             .unwrap();
 
-        // contains should return true
-        assert!(db.contains(&id).await.unwrap());
-
-        // insert_if_absent should fail for duplicate
         let result = db.insert_if_absent(&id, ReplayEntryState::Pending).await;
         assert!(matches!(result, Err(ReplayDbError::AlreadyExists)));
+    }
 
-        // confirm_consumed should succeed
+    #[tokio::test]
+    async fn test_confirm_consumed() {
+        let Some(db) = setup_db().await else { return };
+        let id = test_replay_id(3);
+
+        db.insert_if_absent(&id, ReplayEntryState::Pending)
+            .await
+            .unwrap();
         db.confirm_consumed(&id).await.unwrap();
 
-        // consume_if_unconsumed should be idempotent (already consumed)
+        assert!(db.contains(&id).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_mark_rolled_back() {
+        let Some(db) = setup_db().await else { return };
+        let id = test_replay_id(4);
+
+        db.insert_if_absent(&id, ReplayEntryState::Pending)
+            .await
+            .unwrap();
+        db.mark_rolled_back(&id).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_consume_if_unconsumed_fresh() {
+        let Some(db) = setup_db().await else { return };
+        let id = test_replay_id(5);
+
         db.consume_if_unconsumed(&id).await.unwrap();
+        assert!(db.contains(&id).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_pending_blocks_consume_if_unconsumed() {
+        let Some(db) = setup_db().await else { return };
+        let id = test_replay_id(6);
+
+        db.insert_if_absent(&id, ReplayEntryState::Pending)
+            .await
+            .unwrap();
+
+        let result = db.consume_if_unconsumed(&id).await;
+        assert!(matches!(result, Err(ReplayDbError::AlreadyExists)));
     }
 }
