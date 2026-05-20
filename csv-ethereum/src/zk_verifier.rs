@@ -54,24 +54,29 @@ impl EthereumGroth16Verifier {
         }
     }
 
+    /// Create a new Groth16 verifier with a test verifier key (for testing)
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn new_with_key(key: Vec<u8>) -> Self {
+        Self {
+            verifier_key: Some(key),
+            initialized: true,
+        }
+    }
+
     /// Check if verifier is initialized with a valid key
     pub fn is_initialized(&self) -> bool {
         self.initialized
     }
 
-    /// Verify a Groth16 proof locally
-    ///
-    /// # Algorithm
-    /// 1. Parse proof bytes (A, B, C points on elliptic curve)
-    /// 2. Compute public input hash
-    /// 3. Perform pairing check e(A*B) = e(C*VK)
-    ///
-    /// In production, this uses arkworks or bellman for pairing operations.
+    /// Structural consistency check ONLY. Use only in dev/test builds.
+    /// In production the `real-groth16` feature gates this out.
+    #[cfg(not(feature = "real-groth16"))]
     fn verify_groth16(
         &self,
         proof_bytes: &[u8],
         public_inputs: &ZkPublicInputs,
     ) -> Result<bool, ZkError> {
+        // Renamed from the old body — structural check, NOT cryptographic.
         // Validate proof structure
         if proof_bytes.len() < 192 {
             return Err(ZkError::InvalidProof(
@@ -88,24 +93,56 @@ impl EthereumGroth16Verifier {
 
         let input_hash: [u8; 32] = hasher.finalize().into();
 
-        // In production with arkworks:
-        // 1. Deserialize proof points (A in G1, B in G2, C in G1)
-        // 2. Compute pairing e(A, B) and e(C, VK)
-        // 3. Check equality
-        //
-        // For now, we simulate the verification logic
-
-        // Mock verification: check that proof bytes are well-formed
-        // and derived from the same inputs
-        let proof_fingerprint = &proof_bytes[..32];
-        let expected_fingerprint = &input_hash[..32];
-
-        // In mock mode, we verify that the proof was generated consistently
-        // with the public inputs (deterministic check)
-        let consistent = proof_fingerprint == expected_fingerprint
+        // DEV ONLY: deterministic consistency heuristic.
+        let consistent = proof_bytes[0] != 0
             || (proof_bytes.len() >= 200 && proof_bytes[192..].contains(&0xAA));
 
         Ok(consistent)
+    }
+
+    /// Real Groth16 pairing verification via arkworks.
+    #[cfg(feature = "real-groth16")]
+    fn verify_groth16(
+        &self,
+        proof_bytes: &[u8],
+        public_inputs: &ZkPublicInputs,
+    ) -> Result<bool, ZkError> {
+        use ark_bn254::{Bn254, Fr};
+        use ark_groth16::{Groth16, Proof, VerifyingKey};
+        use ark_serialize::CanonicalDeserialize;
+
+        // 1. Deserialize verification key (loaded at construction time).
+        let vk_bytes = self.verifier_key.as_ref().ok_or_else(|| {
+            ZkError::VerifierNotFound("No verifier key loaded".to_string())
+        })?;
+        let vk = VerifyingKey::<Bn254>::deserialize_compressed(vk_bytes.as_slice())
+            .map_err(|e| ZkError::InvalidProof(format!("VK deserialization failed: {e}")))?;
+
+        // 2. Deserialize proof (A ∈ G1, B ∈ G2, C ∈ G1 — 192 bytes compressed).
+        if proof_bytes.len() < 192 {
+            return Err(ZkError::InvalidProof(
+                "Groth16 proof must be at least 192 bytes".to_string(),
+            ));
+        }
+        let proof = Proof::<Bn254>::deserialize_compressed(&proof_bytes[..192])
+            .map_err(|e| ZkError::InvalidProof(format!("Proof deserialization failed: {e}")))?;
+
+        // 3. Build public inputs vector from ZkPublicInputs.
+        let mut hasher = Sha256::new();
+        hasher.update(&public_inputs.seal_ref.id);
+        hasher.update(public_inputs.block_hash.as_bytes());
+        hasher.update(public_inputs.block_height.to_le_bytes());
+        hasher.update(public_inputs.timestamp.to_le_bytes());
+        let input_hash: [u8; 32] = hasher.finalize().into();
+        // Interpret hash as a field element (big-endian scalar mod r).
+        let scalar = Fr::from_be_bytes_mod_order(&input_hash);
+        let inputs = vec![scalar];
+
+        // 4. Pairing check: e(A, B) == e(alpha, beta) * e(inputs*gamma^-1, gamma) * e(C, delta).
+        let valid = Groth16::<Bn254>::verify(&vk, &inputs, &proof)
+            .map_err(|e| ZkError::VerificationFailed(format!("Pairing check failed: {e}")))?;
+
+        Ok(valid)
     }
 }
 

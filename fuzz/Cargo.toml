@@ -42,3 +42,9 @@ name = "finality_parser"
 path = "fuzz_targets/finality_parser.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "verify_pipeline"
+path = "fuzz_targets/verify_pipeline.rs"
+test = false
+doc = false

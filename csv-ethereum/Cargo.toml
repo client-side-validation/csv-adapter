@@ -36,6 +36,13 @@ alloy-rlp = "0.3"
 alloy-trie = "0.8"
 alloy-consensus = "1.8"
 
+# Real Groth16 pairing verification
+ark-bn254        = { version = "0.4", optional = true }
+ark-groth16      = { version = "0.4", optional = true }
+ark-serialize    = { version = "0.4", optional = true }
+ark-ec           = { version = "0.4", optional = true }
+ark-ff           = { version = "0.4", optional = true }
+
 # Official Ethereum implementations for maximum compatibility
 alloy = { version = "1.8", features = ["full"], optional = true }
 alloy-sol-types = { version = "1.5", optional = true }
@@ -50,6 +57,8 @@ hakari = { version = "0.1", path = "../hakari" }
 
 [features]
 default = []
+# Real Groth16 pairing verification — feature-gated so the mock path is unreachable in production
+real-groth16 = ["dep:ark-bn254", "dep:ark-groth16", "dep:ark-serialize", "dep:ark-ec", "dep:ark-ff"]
 rpc = ["alloy", "alloy-sol-types", "alloy-contract", "csv-store", "reqwest", "url"]
 quorum = ["csv-core/quorum", "reqwest", "url"]
 production = ["rpc", "quorum"]

@@ -447,10 +447,63 @@ impl LedgerProof {
         }
     }
 
-    /// Verify this ledger proof
+    /// Structural pre-check only. Does NOT verify the Merkle accumulator path.
+    /// Use `verify_against_accumulator()` in production code.
+    #[cfg(any(test, feature = "dev-mocks"))]
+    pub fn verify_structure_only(&self) -> bool {
+        self.root_hash != [0u8; 32]
+    }
+
+    /// Full Merkle accumulator proof verification.
+    ///
+    /// Verifies that `self.root_hash` is a valid leaf at position `self.version`
+    /// in the Aptos JMT accumulator rooted at `expected_accumulator_root`.
+    ///
+    /// The Aptos accumulator uses a bottom-up hash rule:
+    ///   parent = sha3_256(0x01 || left || right)
+    /// where left/right ordering depends on position parity.
+    pub fn verify_against_accumulator(
+        &self,
+        expected_accumulator_root: [u8; 32],
+    ) -> Result<bool, MerkleAccumulatorError> {
+        if self.proof.is_empty() && self.root_hash != expected_accumulator_root {
+            return Err(MerkleAccumulatorError::InvalidProof);
+        }
+        if self.proof.is_empty() {
+            return Ok(true);
+        }
+
+        // Walk the sibling hashes bottom-up using the Aptos accumulator hash rule:
+        //   parent = sha3_256(0x01 || left || right)
+        let mut current = self.root_hash;
+        let mut pos = self.version;
+        for sibling in &self.proof {
+            let (left, right) = if pos % 2 == 0 {
+                (current, match sibling {
+                    MerkleProofItem::Left { hash } => *hash,
+                    MerkleProofItem::Sanad { hash } => *hash,
+                })
+            } else {
+                (match sibling {
+                    MerkleProofItem::Left { hash } => *hash,
+                    MerkleProofItem::Sanad { hash } => *hash,
+                }, current)
+            };
+            current = MerkleNode::compute_internal_hash(left, right);
+            pos /= 2;
+        }
+
+        if current == expected_accumulator_root {
+            Ok(true)
+        } else {
+            Err(MerkleAccumulatorError::HashMismatch)
+        }
+    }
+
+    /// Legacy verification — kept for backward compatibility.
+    /// In production code, use `verify_against_accumulator()` instead.
+    #[deprecated(since = "0.5.0", note = "Use verify_against_accumulator() for real verification")]
     pub fn verify(&self) -> bool {
-        // In production, verify the proof against the ledger root
-        // For now, just check that the root is non-zero
         self.root_hash != [0u8; 32]
     }
 }

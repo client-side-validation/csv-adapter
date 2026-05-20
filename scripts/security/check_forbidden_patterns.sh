@@ -122,7 +122,12 @@ echo ""
 echo "--- Mock Proof Checks ---"
 check_pattern "mock_proof\|MockProof\|MOCK_PROOF" "mock proofs" "csv-core/src csv-bitcoin/src csv-ethereum/src csv-aptos/src csv-solana/src" "tests fuzz benches"
 
-# 8. Check for manual ABI encoding in EVM adapters
+# 8. Check for verify_structure_only in production modules
+echo ""
+echo "--- LedgerProof Structural Mock Checks ---"
+check_pattern "verify_structure_only\b" "LedgerProof structural mock in production" "csv-aptos/src csv-core/src" "tests fuzz"
+
+# 9. Check for manual ABI encoding in EVM adapters
 echo ""
 echo "--- Manual ABI Encoding Checks ---"
 if grep -r "build_abi_call\|manual_selector\|abi\.encode" csv-ethereum/src --include="*.rs" --exclude-dir=tests --exclude-dir=fuzz 2>/dev/null; then

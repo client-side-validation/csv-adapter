@@ -16,12 +16,12 @@ bincode = "1.3"
 hakari = { version = "0.1", path = "../hakari" }
 
 [features]
-# EXPERIMENTAL: STARK batch verification for IoT sensor streams.
-# This module uses mock/stub implementations and is NOT ready for production.
-# Enable this feature explicitly to include csv-stark in your build.
-# Production builds MUST exclude this module.
-# Integration with winterfell or stone-prover is needed for real STARK proofs.
-experimental = []
+default = []
+# Enable the mock/stub prover and verifier for development and testing.
+# SECURITY: Must NOT be used in production builds.
+dev-stark = []
+# Enable real SP1 integration when available (pending implementation).
+sp1 = []
 
 [dev-dependencies]
 rand = "0.8"

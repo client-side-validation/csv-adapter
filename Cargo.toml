@@ -84,7 +84,9 @@ bip39 = { version = "2.0", features = ["rand"] }
 zeroize = { version = "1.7", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-getrandom = { version = "0.3", features = ["wasm_js"] }
+# Pin getrandom 0.2 series; all crates that need WASM RNG use this.
+# The `js` feature enables WASM support (window.crypto.getRandomValues).
+getrandom = { version = "0.2", features = ["js"] }
 
 # Web & WASM
 web-sys = { version = "0.3", features = ["Storage", "Window"] }
