@@ -16,3 +16,23 @@ rustflags = [
     # (enforced via scripts/security/check_forbidden_patterns.sh)
 ]
 
+# WASM32-specific build flags
+# Ensures deterministic builds and proper panic handling in the browser
+[target.wasm32-unknown-unknown]
+rustflags = [
+    "-C", "opt-level=z",
+    "-Dwarnings",
+    "-Dunused_imports",
+    "-Dunused_variables",
+    "-Dunused_mut",
+]
+
+[target.wasm32-wasi]
+rustflags = [
+    "-C", "opt-level=2",
+    "-Dwarnings",
+    "-Dunused_imports",
+    "-Dunused_variables",
+    "-Dunused_mut",
+]
+

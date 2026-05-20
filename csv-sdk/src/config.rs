@@ -9,6 +9,9 @@ use std::path::PathBuf;
 
 use csv_core::ChainId;
 
+#[cfg(not(target_arch = "wasm32"))]
+use dirs;
+
 /// Network identifier for chain endpoints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -167,11 +170,21 @@ impl Default for Config {
 
 impl Config {
     /// Default configuration file path: `~/.csv/config.toml`.
+    ///
+    /// Returns `~/.csv/config.toml` on native targets.
+    /// On wasm32, returns `/.csv/config.toml` (browser storage path).
     pub fn default_path() -> PathBuf {
-        let mut path = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        path.push(".csv");
-        path.push("config.toml");
-        path
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let mut path = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+            path.push(".csv");
+            path.push("config.toml");
+            path
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            PathBuf::from("/.csv/config.toml")
+        }
     }
 
     /// Load configuration from a TOML file.

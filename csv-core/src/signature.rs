@@ -74,7 +74,18 @@ impl Signature {
     /// using the appropriate key generation function for the scheme.
     pub fn sign(scheme: SignatureScheme, secret_key: &[u8], message: &[u8]) -> Result<Self> {
         let signature = match scheme {
-            SignatureScheme::Secp256k1 => sign_secp256k1(message, secret_key)?,
+            SignatureScheme::Secp256k1 => {
+                #[cfg(feature = "secp256k1")]
+                {
+                    sign_secp256k1(message, secret_key)?
+                }
+                #[cfg(not(feature = "secp256k1"))]
+                {
+                    return Err(ProtocolError::SignatureVerificationFailed(
+                        "secp256k1 signing requires the 'bitcoin', 'ethereum', or 'tapret' feature to be enabled".to_string(),
+                    ));
+                }
+            }
             SignatureScheme::Ed25519 => sign_ed25519(message, secret_key)?,
             SignatureScheme::MlDsa65 => {
                 #[cfg(feature = "pq")]
@@ -104,7 +115,16 @@ impl Signature {
     pub fn verify(&self, scheme: SignatureScheme) -> Result<()> {
         match scheme {
             SignatureScheme::Secp256k1 => {
-                verify_secp256k1(&self.signature, &self.public_key, &self.message)
+                #[cfg(feature = "secp256k1")]
+                {
+                    verify_secp256k1(&self.signature, &self.public_key, &self.message)
+                }
+                #[cfg(not(feature = "secp256k1"))]
+                {
+                    Err(ProtocolError::SignatureVerificationFailed(
+                        "secp256k1 verification requires the 'bitcoin', 'ethereum', or 'tapret' feature to be enabled".to_string(),
+                    ))
+                }
             }
             SignatureScheme::Ed25519 => {
                 verify_ed25519(&self.signature, &self.public_key, &self.message)
@@ -121,6 +141,7 @@ impl Signature {
 /// Signature format: 64 bytes (r || s) or 65 bytes (recovery_id || r || s)
 /// Public key format: 33 bytes (compressed) or 65 bytes (uncompressed)
 /// Message: 32 bytes (pre-hashed)
+#[cfg(feature = "secp256k1")]
 fn verify_secp256k1(signature: &[u8], public_key: &[u8], message: &[u8]) -> Result<()> {
     use secp256k1::{Message, PublicKey, Secp256k1, ecdsa};
 
@@ -260,6 +281,7 @@ fn verify_ed25519(signature: &[u8], public_key: &[u8], message: &[u8]) -> Result
 ///
 /// # Returns
 /// Signature bytes (64 bytes: r || s)
+#[cfg(feature = "secp256k1")]
 fn sign_secp256k1(message: &[u8], secret_key: &[u8]) -> Result<Vec<u8>> {
     use secp256k1::{Message, Secp256k1, SecretKey};
 
@@ -280,6 +302,24 @@ fn sign_secp256k1(message: &[u8], secret_key: &[u8]) -> Result<Vec<u8>> {
     let sig = secp.sign_ecdsa(&msg, &sk);
 
     Ok(sig.serialize_der().to_vec())
+}
+
+/// Stub: secp256k1 verification not available without feature
+#[cfg(not(feature = "secp256k1"))]
+#[expect(dead_code)]
+fn verify_secp256k1(_signature: &[u8], _public_key: &[u8], _message: &[u8]) -> Result<()> {
+    Err(ProtocolError::SignatureVerificationFailed(
+        "secp256k1 verification requires the 'bitcoin', 'ethereum', or 'tapret' feature to be enabled".to_string(),
+    ))
+}
+
+/// Stub: secp256k1 signing not available without feature
+#[cfg(not(feature = "secp256k1"))]
+#[expect(dead_code)]
+fn sign_secp256k1(_message: &[u8], _secret_key: &[u8]) -> Result<Vec<u8>> {
+    Err(ProtocolError::SignatureVerificationFailed(
+        "secp256k1 signing requires the 'bitcoin', 'ethereum', or 'tapret' feature to be enabled".to_string(),
+    ))
 }
 
 /// Sign a message using Ed25519

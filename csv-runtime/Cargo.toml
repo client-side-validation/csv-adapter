@@ -11,24 +11,21 @@ serde = { version = "1", features = ["derive"] }
 thiserror = "1"
 tracing = "0.1"
 async-trait = "0.1"
-rocksdb = { version = "0.21", optional = true }
-hakari = { version = "0.1", path = "../hakari" }
 uuid = { version = "1.1", features = ["v4", "serde"] }
 serde_json = "1.0"
-sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls", "chrono", "uuid"], optional = true }
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls", "chrono", "uuid"], optional = true }
 chrono = { version = "0.4", features = ["serde"], optional = true }
 
-# Native: full tokio (net, fs, io-util, etc.)
-# WASM: rt + macros + sync + time only (no net — mio is unsupported on wasm32)
+# csv-runtime is native-only (depends on rocksdb, tokio net, etc.)
+# wasm32 is not supported - see compile_error! in lib.rs
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1", features = ["full"] }
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-tokio = { version = "1", features = ["rt", "macros", "sync", "time"] }
+rocksdb = { version = "0.21", optional = true }
+bytes = { version = "1", optional = true }
+hakari = { version = "0.1", path = "../hakari" }
 
 [features]
 default = ["persistent"]
-persistent = ["dep:rocksdb"]
+persistent = ["dep:rocksdb", "dep:bytes"]
 postgres = ["dep:sqlx", "dep:chrono"]
 serde = []
- 

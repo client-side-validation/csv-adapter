@@ -12,6 +12,12 @@
 
 #![warn(missing_docs)]
 
+#[cfg(all(target_arch = "wasm32", feature = "persistent"))]
+compile_error!(
+    "The 'persistent' feature requires native I/O (rocksdb) and is incompatible with wasm32. \
+     Disable the 'persistent' feature for wasm32 builds."
+);
+
 pub mod adapter_registry;
 pub mod adversarial;
 pub mod config;
@@ -23,6 +29,10 @@ pub mod event_store;
 pub mod lease;
 pub mod policy;
 pub mod replay_db;
+#[cfg(feature = "persistent")]
+pub mod replay_db_rocksdb;
+#[cfg(feature = "postgres")]
+pub mod replay_db_postgres;
 pub mod runtime_mode;
 pub mod transfer_coordinator;
 

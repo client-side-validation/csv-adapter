@@ -31,7 +31,7 @@ async-trait = "0.1"
 log = { version = "0.4", default-features = false }
 chrono = { version = "0.4", features = ["serde"] }
 bitcoin = { version = "0.30", optional = true }
-secp256k1 = { version = "0.28", features = ["rand-std"] }
+secp256k1 = { version = "0.28", features = ["rand-std"], optional = true }
 ed25519-dalek = { version = "2.0", features = ["rand_core"] }
 bloomfilter = { version = "3.0", default-features = false }
 spin = "0.9"
@@ -44,17 +44,20 @@ reqwest = { version = "0.11", features = ["json"], optional = true }
 url = { version = "2.5", optional = true }
 tokio = { version = "1", features = ["rt", "macros", "time"], optional = true }
 csv-observability = { path = "../csv-observability", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 hakari = { version = "0.1", path = "../hakari" }
 
 [features]
 default = ["std", "pq"]
 std = ["serde/std", "serde_json/std", "dep:toml", "sha2/std", "hex/std"]
-tapret = ["dep:bitcoin"]
-bitcoin = []
+tapret = ["dep:bitcoin", "secp256k1"]
+bitcoin = ["secp256k1"]
 solana = []
 aptos = []
 sui = []
-ethereum = []
+ethereum = ["secp256k1"]
+secp256k1 = ["dep:secp256k1"]
 pq = ["dep:pqcrypto-dilithium", "dep:pqcrypto-traits"]
 zk = ["dep:curve25519-dalek", "dep:rand_core"]
 quorum = ["dep:reqwest", "dep:url", "dep:tokio"]
@@ -69,6 +72,7 @@ rand = "0.8"
 proptest = "1.4"
 tempfile = "3.8"
 tokio = { version = "1", features = ["macros", "rt", "time"] }
+secp256k1 = { version = "0.28", features = ["rand-std"] }
 
 [[example]]
 name = "basic_sanad"

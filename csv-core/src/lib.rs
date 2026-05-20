@@ -54,16 +54,19 @@ extern crate alloc;
 pub mod collections;
 
 // Re-exports
-pub use commitment::{Commitment, CommitmentScheme};
+pub use commitment::Commitment;
+pub use commitments_ext::CommitmentScheme;
 pub use hash::Hash;
 pub use merkle::{MerkleProof, MerkleTree};
-pub use proof_pipeline::{ProofBundle, ProofPipeline, ValidationStep};
+pub use proof_pipeline::{ValidationStep};
+pub use proof::ProofBundle;
 pub use provenance::{AdapterSignature, ProofProvenance, VerificationStep, VerificationStepType};
 pub use certification::{ProofCertification, VerificationInputs, VerificationOutputs};
 pub use replay_record::{GlobalReplayRecord, ReplayState};
 pub use replay_registry::{ReplayEntry, ReplayKey, ReplayRegistry, ReplayRegistryBackend};
-pub use sanad::{Sanad, SanadId};
-pub use seal_protocol::{SealProtocol, SealStatus}; // Sanad/Title types (re-exported from title)
+pub use sanad::{OwnershipProof, Sanad, SanadId};
+pub use seal_protocol::SealProtocol;
+pub use nullifier::SealStatus;
 
 // Advanced commitment types
 pub mod commitments_ext;
@@ -110,9 +113,14 @@ pub mod vm;
 pub mod commitment;
 pub mod hash;
 pub mod merkle;
+pub mod seal;
+pub mod domain_hash;
+pub mod domains;
+pub mod tagged_hash;
 pub mod proof_pipeline;
 pub mod provenance;
 pub mod certification;
+#[allow(missing_docs)]
 pub mod replay_record;
 pub mod replay_registry;
 pub mod sanad;
@@ -133,9 +141,6 @@ pub use trust_package::{
 
 /// Proof provenance metadata for forensic and deterministic verification.
 pub mod proof_provenance;
-
-/// Global replay registry record types.
-pub mod replay_record;
 
 /// Startup-time config validation helpers to assert capability alignment.
 pub mod config_validation;
@@ -166,7 +171,6 @@ pub mod wallet_types;
 
 // Error handling and traits - 🔒 STABLE
 pub mod error;
-pub mod seal_protocol;
 
 // Chain operation traits (Production Guarantee Plan Phase 2) - 🔒 STABLE
 pub mod backend;
@@ -224,9 +228,6 @@ pub use protocol_version::{
 // Re-exports: Stable API (will not change without semver-major bump)
 // ===========================================================================
 
-pub use commitment::Commitment;
-pub use hash::Hash;
-pub use sanad::{OwnershipProof, Sanad, SanadError, SanadId};
 pub use seal::{CommitAnchor, SealPoint};
 pub use signature::{
     Signature, SignatureScheme, parse_signatures_from_bytes, verify_signatures, PQ_DEFAULT_SCHEME,
@@ -234,12 +235,11 @@ pub use signature::{
 
 // DAG and proofs
 pub use dag::{DAGNode, DAGSegment};
-pub use proof::{FinalityProof, InclusionProof, ProofBundle, ProofPhase, ReplayId};
+pub use proof::{FinalityProof, InclusionProof, ProofPhase, ReplayId};
 pub use verifier::verify_proof;
 
 // Errors and traits
 pub use error::{ProtocolError, Result};
-pub use seal_protocol::SealProtocol;
 
 // Chain operations (Production Guarantee Plan Phase 2)
 pub use backend::{
@@ -262,11 +262,8 @@ pub use cross_chain::{
     CrossChainTransferProof, StandardTransferVerifier,
 };
 pub use nullifier::{
-    DoubleSpendError, OptimizedSealNullifier, SealConsumption, SealNullifier, SealStatus,
+    DoubleSpendError, OptimizedSealNullifier, SealConsumption, SealNullifier,
 };
-
-// Replay registry (use csv_store::ReplayRegistryStore for persistence)
-pub use replay_registry::{ReplayEntry, ReplayKey, ReplayRegistry, ReplayRegistryBackend};
 
 // ===========================================================================
 // Re-exports: Beta API (may receive additive changes)
@@ -274,7 +271,7 @@ pub use replay_registry::{ReplayEntry, ReplayKey, ReplayRegistry, ReplayRegistry
 
 // Advanced commitment types
 pub use commitments_ext::{
-    CommitmentScheme, EnhancedCommitment, FinalityProofType, InclusionProofType, ProofMetadata,
+    EnhancedCommitment, FinalityProofType, InclusionProofType, ProofMetadata,
 };
 
 // Agent-friendly types

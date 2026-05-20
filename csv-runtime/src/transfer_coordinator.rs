@@ -236,7 +236,7 @@ impl TransferCoordinator {
             });
 
         // Use runtime policy for finality depth, not adapter's local policy
-        let required_finality = runtime_ctx
+        let _required_finality = runtime_ctx
             .policy
             .finality_depth_for_chain(&transfer.source_chain)
             .ok_or_else(|| {

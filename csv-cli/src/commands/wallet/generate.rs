@@ -84,7 +84,7 @@ pub fn cmd_init(
 
     if account > 0 {
         output::info(&format!(
-            "Bitcoin account index: {} (BIP-86 path: m/86'/coin_type'/{}'/0/0)",
+            "Bitcoin account index: {} (BIP-86 path: m/86'/0'/{}'/0/0)",
             account, account
         ));
     }
@@ -140,7 +140,7 @@ fn generate_wallet_for_chain(
     keystore: &mut FileKeystore,
     passphrase: &Passphrase,
 ) -> Result<String> {
-    // Phase 5: Use keystore's BIP-44 derivation for all chains
+    // Phase 5: Use keystore's BIP-86 derivation for Bitcoin, BIP-44 for other chains
     let core_chain = csv_core::ChainId::new(chain.as_str());
 
     // Convert mnemonic to seed
@@ -171,15 +171,15 @@ fn generate_wallet_for_chain(
     )?;
 
     // Store in state with derivation path
-    let coin_type = match chain.as_str() {
-        "bitcoin" => "0",
-        "ethereum" => "60",
-        "sui" => "784",
-        "aptos" => "637",
-        "solana" => "501",
-        _ => "0",
+    let (purpose, coin_type) = match chain.as_str() {
+        "bitcoin" => ("86", "0"),
+        "ethereum" => ("44", "60"),
+        "sui" => ("44", "784"),
+        "aptos" => ("44", "637"),
+        "solana" => ("44", "501"),
+        _ => ("44", "0"),
     };
-    let derivation_path = format!("m/44'/{}'/{}'/0/0", coin_type, account);
+    let derivation_path = format!("m/{}/{}'/{}'/0/0", purpose, coin_type, account);
     state.store_address_with_derivation(chain.clone(), address.clone(), Some(derivation_path));
 
     Ok(address)
@@ -206,7 +206,7 @@ fn generate_bitcoin(network: Network, state: &mut UnifiedStateManager) -> Result
     output::header("Bitcoin Wallet Generated");
     output::kv("Network", &network.to_string());
     output::kv("Address", &address);
-    output::kv("Derivation Path", "m/86'/0'/0'/0/0");
+    output::kv("Derivation Path", "m/86'/0'/0'/0/0 (BIP-86 Taproot)");
 
     println!();
     output::warning(

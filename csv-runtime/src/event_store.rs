@@ -434,8 +434,8 @@ impl EventStore for RocksDbEventStore {
         let prefix = format!("{}{:?}:", Self::EVENTS_PREFIX, aggregate_id);
         let mut result = Vec::new();
 
-        for result in self.db.prefix_iterator(prefix.as_bytes()) {
-            let (_, value) = result.map_err(|e| EventStoreError::Io(e.to_string()))?;
+        for entry in self.db.prefix_iterator(prefix.as_bytes()) {
+            let (_, value) = entry.map_err(|e| EventStoreError::Io(e.to_string()))?;
             let event: RuntimeEventEnvelope = serde_json::from_slice(&value)
                 .map_err(|e| EventStoreError::Serialization(e.to_string()))?;
 
@@ -520,12 +520,12 @@ impl EventStore for RocksDbEventStore {
         keep_after_version: u64,
     ) -> Result<usize, EventStoreError> {
         let key = Self::snapshot_key(aggregate_id);
-        match self.db.get(key) {
+        match self.db.get(&key) {
             Ok(Some(value)) => {
                 let snapshot: AggregateSnapshot = serde_json::from_slice(&value)
                     .map_err(|e| EventStoreError::Serialization(e.to_string()))?;
                 if snapshot.version < keep_after_version {
-                    self.db.delete(key).map_err(|e| EventStoreError::Io(e.to_string()))?;
+                    self.db.delete(&key).map_err(|e| EventStoreError::Io(e.to_string()))?;
                     Ok(1)
                 } else {
                     Ok(0)

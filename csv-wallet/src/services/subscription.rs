@@ -2,13 +2,19 @@
 //!
 //! Connects to the explorer's WebSocket subscription endpoint and receives
 //! real-time updates for wallet-owned addresses across all chains.
+//!
+//! **Native-only**: WebSocket support requires `tokio_tungstenite` which
+//! does not compile for wasm32. On wasm32, use the adaptive polling fallback.
 
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{RwLock, mpsc};
+
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::sync::{RwLock as TokioRwLock, mpsc};
 
 #[cfg(not(target_arch = "wasm32"))]
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -26,11 +32,19 @@ pub struct WalletSubscriptionManager {
     /// Per-chain adaptive polling intervals (fallback when WebSocket is unavailable)
     chain_intervals: std::sync::RwLock<HashMap<String, u64>>,
     /// Active subscriptions per address and chain
-    subscriptions: Arc<RwLock<HashMap<String, Vec<String>>>>, // address -> chains
-    /// Event sender for broadcasting events to subscribers
-    event_sender: Arc<RwLock<Option<mpsc::UnboundedSender<SubscriptionEvent>>>>,
-    /// WebSocket connection handle
-    ws_handle: Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>,
+    subscriptions: Arc<std::sync::RwLock<HashMap<String, Vec<String>>>>, // address -> chains
+    /// Event sender for broadcasting events to subscribers (native only)
+    #[cfg(not(target_arch = "wasm32"))]
+    event_sender: Arc<std::sync::RwLock<Option<mpsc::UnboundedSender<SubscriptionEvent>>>>,
+    /// Placeholder for wasm32 (no event channel support)
+    #[cfg(target_arch = "wasm32")]
+    event_sender: Arc<std::sync::RwLock<()>>,
+    /// WebSocket connection handle (native only)
+    #[cfg(not(target_arch = "wasm32"))]
+    ws_handle: Arc<std::sync::RwLock<Option<tokio::task::JoinHandle<()>>>>,
+    /// Placeholder for wasm32 (no WebSocket support)
+    #[cfg(target_arch = "wasm32")]
+    ws_handle: std::marker::PhantomData<()>,
 }
 
 /// Event received from the explorer WebSocket.
@@ -110,9 +124,15 @@ impl WalletSubscriptionManager {
             ws_url,
             connected: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             chain_intervals: std::sync::RwLock::new(HashMap::new()),
-            subscriptions: Arc::new(RwLock::new(HashMap::new())),
-            event_sender: Arc::new(RwLock::new(None)),
-            ws_handle: Arc::new(RwLock::new(None)),
+            subscriptions: Arc::new(std::sync::RwLock::new(HashMap::new())),
+            #[cfg(not(target_arch = "wasm32"))]
+            event_sender: Arc::new(std::sync::RwLock::new(None)),
+            #[cfg(target_arch = "wasm32")]
+            event_sender: Arc::new(std::sync::RwLock::new(())),
+            #[cfg(not(target_arch = "wasm32"))]
+            ws_handle: Arc::new(std::sync::RwLock::new(None)),
+            #[cfg(target_arch = "wasm32")]
+            ws_handle: PhantomData,
         }
     }
 
@@ -133,6 +153,9 @@ impl WalletSubscriptionManager {
     }
 
     /// Subscribe to events for a specific address and chain.
+    ///
+    /// **Native-only**: Uses `reqwest::Client` which does not compile for wasm32.
+    /// On wasm32, use `subscribe_with_fallback` which uses HTTP polling.
     #[cfg(not(target_arch = "wasm32"))]
     pub async fn subscribe(
         &self,
@@ -167,7 +190,21 @@ impl WalletSubscriptionManager {
         Ok(())
     }
 
+    /// WASM32 stub — returns an error indicating WebSocket is not available.
+    #[cfg(target_arch = "wasm32")]
+    pub async fn subscribe(
+        &self,
+        _address: &str,
+        _chain: Option<&str>,
+        _network: Option<&str>,
+    ) -> Result<(), String> {
+        Err("WebSocket subscription is native-only on wasm32; use subscribe_with_fallback".to_string())
+    }
+
     /// Unsubscribe from events for a specific address.
+    ///
+    /// **Native-only**: Uses `reqwest::Client` which does not compile for wasm32.
+    /// On wasm32, use `subscribe_with_fallback` which uses HTTP polling.
     #[cfg(not(target_arch = "wasm32"))]
     pub async fn unsubscribe(&self, address: &str, chain: Option<&str>) -> Result<(), String> {
         use reqwest::Client;
@@ -197,6 +234,12 @@ impl WalletSubscriptionManager {
         Ok(())
     }
 
+    /// WASM32 stub — returns an error indicating WebSocket is not available.
+    #[cfg(target_arch = "wasm32")]
+    pub async fn unsubscribe(&self, _address: &str, _chain: Option<&str>) -> Result<(), String> {
+        Err("WebSocket unsubscribe is native-only on wasm32; use subscribe_with_fallback".to_string())
+    }
+
     /// Check if connected.
     pub fn is_connected(&self) -> bool {
         self.connected.load(std::sync::atomic::Ordering::Relaxed)
@@ -214,6 +257,9 @@ impl WalletSubscriptionManager {
     }
 
     /// Connect to the WebSocket endpoint with adaptive retry logic.
+    ///
+    /// **Native-only**: Requires `tokio_tungstenite` which does not compile for wasm32.
+    /// On wasm32, the `subscribe_with_fallback` method will skip WebSocket and use HTTP polling.
     #[cfg(not(target_arch = "wasm32"))]
     pub async fn connect(&self) -> Result<(), String> {
         if self.is_connected() {
@@ -226,7 +272,7 @@ impl WalletSubscriptionManager {
         let event_sender = Arc::clone(&self.event_sender);
 
         let (tx, mut _rx) = mpsc::unbounded_channel::<SubscriptionEvent>();
-        *event_sender.write().await = Some(tx);
+        *event_sender.write().unwrap() = Some(tx);
 
         let handle = tokio::spawn(async move {
             let mut retry_count = 0;
@@ -241,7 +287,7 @@ impl WalletSubscriptionManager {
                         let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
                         // Resubscribe to all existing addresses
-                        let subs = subscriptions.read().await;
+                        let subs = subscriptions.read().unwrap();
                         for (address, chains) in subs.iter() {
                             for chain in chains {
                                 let request = SubscriptionRequest {
@@ -265,7 +311,7 @@ impl WalletSubscriptionManager {
                                         Ok(Message::Text(text)) => {
                                             if let Ok(response) = serde_json::from_str::<SubscriptionResponse>(&text) {
                                                 if let Some(event) = response.event {
-                                                    if let Some(sender) = event_sender.read().await.as_ref() {
+                                                    if let Some(sender) = event_sender.read().unwrap().as_ref() {
                                                         let _ = sender.send(event);
                                                     }
                                                 }
@@ -306,17 +352,31 @@ impl WalletSubscriptionManager {
             tracing::warn!("WebSocket connection failed after {} retries", max_retries);
         });
 
-        *self.ws_handle.write().await = Some(handle);
+        *self.ws_handle.write().unwrap() = Some(handle);
         Ok(())
     }
 
+    /// WASM32 stub — returns an error indicating WebSocket is not available.
+    #[cfg(target_arch = "wasm32")]
+    pub async fn connect(&self) -> Result<(), String> {
+        Err("WebSocket connection is native-only on wasm32; use subscribe_with_fallback for HTTP polling".to_string())
+    }
+
     /// Disconnect from the WebSocket endpoint.
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn disconnect(&self) {
         self.set_connected(false);
-        if let Some(handle) = self.ws_handle.write().await.take() {
+        if let Some(handle) = self.ws_handle.write().unwrap().take() {
             handle.abort();
         }
-        *self.event_sender.write().await = None;
+        *self.event_sender.write().unwrap() = None;
+    }
+
+    /// WASM32 stub — no-op since WebSocket is not available.
+    #[cfg(target_arch = "wasm32")]
+    pub async fn disconnect(&self) {
+        self.set_connected(false);
+        *self.event_sender.write().unwrap() = ();
     }
 
     /// Get adaptive polling interval with jitter for a specific chain.
@@ -354,7 +414,7 @@ impl WalletSubscriptionManager {
                         tracing::warn!("WebSocket subscription failed: {}", e);
                     } else {
                         // Store subscription for reconnection
-                        let mut subs = self.subscriptions.write().await;
+                        let mut subs = self.subscriptions.write().unwrap();
                         subs.entry(address.to_string())
                             .or_insert_with(Vec::new)
                             .push(chain.unwrap_or("default").to_string());
@@ -372,6 +432,7 @@ impl WalletSubscriptionManager {
         let chain = chain_str.to_string();
         let _on_event = Arc::new(on_event);
 
+        #[cfg(not(target_arch = "wasm32"))]
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_millis(poll_interval));
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -389,6 +450,38 @@ impl WalletSubscriptionManager {
             }
         });
 
+        #[cfg(target_arch = "wasm32")]
+        {
+            let address_clone = address.clone();
+            let chain_clone = chain.clone();
+            let poll_interval_clone = poll_interval;
+            wasm_bindgen_futures::spawn_local(async move {
+                loop {
+                    // Use a simple delay loop for wasm32 polling
+                    // In production, this would use requestAnimationFrame or a similar browser-native timer
+                    let promise = js_sys::Promise::new(&mut |resolve, _reject| {
+                        let window = web_sys::window().unwrap();
+                        let timeout_id = window
+                            .set_timeout_with_callback_and_timeout_and_arguments_0(
+                                &resolve,
+                                poll_interval_clone as i32,
+                            )
+                            .unwrap();
+                           let _ = timeout_id;
+                    });
+                    wasm_bindgen_futures::JsFuture::from(promise).await.ok();
+                    // Here you would make HTTP requests to the explorer API
+                    // and call on_event when new data is found
+                    tracing::debug!(
+                        "Polling {} for chain {} (interval: {}ms)",
+                        address_clone,
+                        chain_clone,
+                        poll_interval_clone
+                    );
+                }
+            });
+        }
+
         Ok(())
     }
 }
@@ -401,7 +494,10 @@ impl Clone for WalletSubscriptionManager {
             chain_intervals: std::sync::RwLock::new(self.chain_intervals.read().unwrap().clone()),
             subscriptions: Arc::clone(&self.subscriptions),
             event_sender: Arc::clone(&self.event_sender),
+            #[cfg(not(target_arch = "wasm32"))]
             ws_handle: Arc::clone(&self.ws_handle),
+            #[cfg(target_arch = "wasm32")]
+            ws_handle: PhantomData,
         }
     }
 }

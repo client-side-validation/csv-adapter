@@ -203,6 +203,7 @@ impl FileKeystore {
     ///
     /// # Arguments
     /// * `keystore_dir` - Path to the keystore directory (default: ~/.csv/keystore)
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(keystore_dir: Option<&str>) -> Result<Self, FileKeystoreError> {
         let dir = match keystore_dir {
             Some(path) => {
@@ -250,6 +251,18 @@ impl FileKeystore {
             session: None,
             meta,
         })
+    }
+
+    /// Create a new file keystore with a custom directory.
+    ///
+    /// On wasm32, this uses the provided path directly without home directory resolution.
+    #[cfg(target_arch = "wasm32")]
+    pub fn new(keystore_dir: Option<&str>) -> Result<Self, FileKeystoreError> {
+        let dir = match keystore_dir {
+            Some(path) => std::path::PathBuf::from(path),
+            None => std::path::PathBuf::from(".csv/keystore"),
+        };
+        Self::with_dir(dir)
     }
 
     /// Create a new file keystore with a custom directory.
@@ -497,6 +510,7 @@ impl FileKeystore {
 }
 
 /// Expand ~ to home directory in a path.
+#[cfg(not(target_arch = "wasm32"))]
 fn expand_tilde(path: &std::path::Path) -> std::path::PathBuf {
     let s = path.to_string_lossy();
     if s.starts_with("~/") || s == "~" {
@@ -505,6 +519,13 @@ fn expand_tilde(path: &std::path::Path) -> std::path::PathBuf {
             return home.join(rest.trim_start_matches('/'));
         }
     }
+    path.to_path_buf()
+}
+
+/// Expand ~ to home directory in a path.
+/// On wasm32, this is a no-op since we don't have access to the home directory.
+#[cfg(target_arch = "wasm32")]
+fn expand_tilde(path: &std::path::Path) -> std::path::PathBuf {
     path.to_path_buf()
 }
 

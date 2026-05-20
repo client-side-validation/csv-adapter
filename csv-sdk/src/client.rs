@@ -354,6 +354,8 @@ impl CsvClient {
     /// }
     /// ```
     pub async fn init_adapters(&self, network: NetworkType) -> Result<(), CsvError> {
+        let mut failed_chains: Vec<String> = Vec::new();
+
         for chain in &self.enabled_chains {
             let adapter_result =
                 Self::build_adapter_for_chain(chain.clone(), &self.config, network).await;
@@ -377,9 +379,20 @@ impl CsvClient {
                 }
                 Err(e) => {
                     log::warn!("Failed to initialize adapter for chain {:?}: {}", chain, e);
-                    // Continue with other chains even if one fails
+                    failed_chains.push(chain.to_string());
                 }
             }
+        }
+
+        let registered = self.chain_runtime.registered_chains().await;
+        if registered.is_empty() && !failed_chains.is_empty() {
+            return Err(CsvError::ConfigError(
+                format!(
+                    "No chain adapters could be initialized. Failed chains: [{}]. \
+                     Check your configuration (e.g., Bitcoin requires an xpub for seal protocol).",
+                    failed_chains.join(", ")
+                )
+            ));
         }
 
         Ok(())
@@ -395,7 +408,7 @@ impl CsvClient {
         let _is_testnet = matches!(network, NetworkType::Testnet);
 
         match chain.as_str() {
-            #[cfg(feature = "bitcoin")]
+            #[cfg(all(feature = "bitcoin", feature = "rpc"))]
             "bitcoin" => {
                 log::info!("Building Bitcoin adapter for {:?} network", network);
                 let rpc_url = _config
@@ -439,6 +452,11 @@ impl CsvClient {
                     .bitcoin_from_config(btc_config, rpc)
                     .await
                     .map(Some)
+            }
+            #[cfg(all(feature = "bitcoin", not(feature = "rpc")))]
+            "bitcoin" => {
+                log::warn!("Bitcoin adapter requires 'rpc' feature for RPC client; skipping");
+                Ok(None)
             }
             #[cfg(feature = "ethereum")]
             "ethereum" => {

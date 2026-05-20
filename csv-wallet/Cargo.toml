@@ -16,19 +16,28 @@ path = "src/main.rs"
 
 [dependencies]
 # Core CSV Protocol types
-csv-runtime = { path = "../csv-runtime" }
 csv-core = { path = "../csv-core", default-features = false, features = ["std"] }
 csv-store = { path = "../csv-store", default-features = false, features = ["browser-storage", "encrypted-storage"] }
 csv-keys = { path = "../csv-keys", features = ["wasm", "production"] }
-csv-sdk = { path = "../csv-sdk", features = ["bitcoin", "tokio", "wallet"] }
 
-# Chain adapters (accessed through csv-sdk::csv_bitcoin per Engineering Plan)
+# Native-only dependencies (csv-runtime, tokio, reqwest, dirs, tokio-tungstenite, hakari)
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+csv-runtime = { path = "../csv-runtime", optional = true }
+csv-sdk = { path = "../csv-sdk", features = ["bitcoin", "tokio", "wallet"] }
+tokio = { version = "1.0", features = ["macros", "rt", "sync", "time"] }
+tokio-tungstenite = { version = "0.20", optional = true }
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
+dirs = "5.0"
 csv-bitcoin = { path = "../csv-bitcoin", optional = true }
 csv-ethereum = { path = "../csv-ethereum", optional = true }
+hakari = { version = "0.1", path = "../hakari" }
 
-# Dioxus 0.7
+# WASM-only dependencies
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+csv-sdk = { path = "../csv-sdk", default-features = false, features = ["wasm"] }
+
+# Shared dependencies (work on both targets)
 dioxus = { version = "0.7", features = ["web", "router"] }
-dioxus-router = "0.7"
 
 # Cryptography - wasm compatible
 getrandom = { workspace = true }
@@ -43,7 +52,7 @@ rand = { version = "0.8", features = ["std"] }
 bip32 = { version = "0.5", features = ["std", "mnemonic"] }
 bitcoin = { version = "0.32", default-features = false, features = ["serde", "rand-std", "std"] }
 
-# Ethereum RLP encoding - CRITICAL FIX: proper EIP-1559 encoding instead of manual byte concat
+# Ethereum RLP encoding
 rlp = "0.5"
 ethereum-types = "0.14"
 
@@ -52,9 +61,7 @@ aes-gcm = "0.10"
 argon2 = "0.5"
 zeroize = { version = "1.7", features = ["derive"] }
 
-# Async runtime and WebSocket support
-tokio = { version = "1.0", features = ["macros", "rt", "sync", "time"] }
-tokio-tungstenite = { version = "0.20", optional = true }
+# Async utilities
 futures = "0.3"
 tracing = "0.1"
 
@@ -66,35 +73,28 @@ serde_json = "1.0"
 thiserror = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde", "js"] }
-dirs = "5.0"
 
 # Web/wasm
 console_error_panic_hook = "0.1"
-web-sys = { workspace = true, features = ["Window", "Storage", "Document", "Element", "HtmlInputElement", "FileReader", "Blob", "BlobPropertyBag", "Url", "HtmlAnchorElement", "File", "FileList", "ProgressEvent", "Navigator", "DataTransfer", "Event", "DragEvent", "Clipboard"] }
+web-sys = { workspace = true, features = ["Window", "Storage", "Document", "Element", "HtmlInputElement", "FileReader", "Blob", "BlobPropertyBag", "Url", "HtmlAnchorElement", "File", "FileList", "ProgressEvent", "Navigator", "DataTransfer", "Event", "DragEvent", "Clipboard", "Request", "RequestInit", "RequestMode", "RequestCredentials", "Headers", "Response"] }
 wasm-bindgen = "0.2.93"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3.70"
 gloo-timers = { workspace = true, features = ["futures"] }
 serde-wasm-bindgen = "0.6"
 
-# HTTP for wasm - reqwest not compatible with WASM, use browser fetch API instead
-reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
-
-# BCS encoding (used by both Sui and Aptos)
+# BCS encoding
 bcs = "0.1"
 
-# Base64 for Solana transaction encoding
+# Base64 for Solana
 base64 = "0.21"
-hakari = { version = "0.1", path = "../hakari" }
 
 [dev-dependencies]
-# Web testing
 wasm-bindgen-test = "0.3"
-# Serialize tests that modify environment variables
 serial_test = "3.0"
 
 [features]
 default = ["native"]
-native = ["dep:reqwest"]
-csv-bitcoin = ["dep:csv-bitcoin"]
+native = ["dep:csv-runtime", "dep:reqwest", "dep:tokio-tungstenite"]
+csv-bitcoin = ["dep:csv-bitcoin", "csv-sdk/bitcoin"]
 csv-ethereum = ["dep:csv-ethereum"]

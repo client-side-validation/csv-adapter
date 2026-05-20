@@ -118,6 +118,7 @@ pub enum RaceOutcome {
 
 /// Adversarial test runner
 pub struct AdversarialTestRunner {
+    #[allow(dead_code)]
     config: AdversarialConfig,
     reorgs: Vec<SimulatedReorg>,
     ha_failovers: Vec<HAFailoverScenario>,
@@ -201,19 +202,20 @@ impl ConcurrentExecutor {
         operations: Vec<F>,
     ) -> Vec<Result<T, Box<dyn std::error::Error + Send + Sync>>>
     where
-        F: Fn() -> Fut + Send + Sync + Clone,
+        F: Fn() -> Fut + Send + Sync + Clone + 'static,
         Fut: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send,
-        T: Send + Sync,
+        T: Send + Sync + 'static,
     {
         let semaphore = Arc::new(Mutex::new(0));
         let mut tasks = Vec::new();
 
         for op in operations {
             let semaphore = semaphore.clone();
+            let max_concurrent = self.max_concurrent;
             let task = tokio::spawn(async move {
                 // Limit concurrency
                 let mut guard = semaphore.lock().await;
-                if *guard < self.max_concurrent {
+                if *guard < max_concurrent {
                     *guard += 1;
                     drop(guard);
                 } else {

@@ -43,7 +43,7 @@ getrandom = { version = "0.2", features = ["js"] }
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-uuid = { version = "1.6", features = ["v4", "serde"] }
+uuid = { version = "1.6", features = ["v4", "serde", "js"] }
 
 # Cryptographic primitives
 sha2 = "0.10"
@@ -57,10 +57,10 @@ base64 = "0.22"
 bs58 = { version = "0.5", optional = true }
 
 # Secp256k1 for Bitcoin/Ethereum
-secp256k1 = { version = "0.28", features = ["global-context", "rand-std"], optional = true }
+secp256k1 = { version = "0.29", features = ["global-context", "rand-std"], optional = true }
 
 # Bitcoin library for address derivation
-bitcoin = { version = "0.31", optional = true }
+bitcoin = { version = "0.32", optional = true }
 
 # Blake2 for Sui address hashing
 blake2 = { version = "0.10", optional = true }
@@ -75,7 +75,8 @@ js-sys = { version = "0.3", optional = true }
 # Error handling
 thiserror = "1.0"
 
-# Directory resolution for file keystore
+# Directory resolution for file keystore (native-only)
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 dirs = "5.0"
 hakari = { version = "0.1", path = "../hakari" }
 

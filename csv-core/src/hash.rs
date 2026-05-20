@@ -75,6 +75,17 @@ impl Hash {
         self.0
     }
 
+    /// Combines two hashes by hashing their concatenation.
+    ///
+    /// This is used for Merkle tree internal node construction.
+    pub fn combine(left: &Self, right: &Self) -> Self {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(left.0);
+        hasher.update(right.0);
+        Self::new(hasher.finalize().into())
+    }
+
     /// Returns a new [`Vec<u8>`] containing the hash bytes.
     ///
     /// This allocates. For a borrowed slice, use [`Self::as_slice`].

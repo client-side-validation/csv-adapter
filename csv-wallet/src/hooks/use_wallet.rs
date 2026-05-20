@@ -89,7 +89,7 @@ impl WalletContext {
                 &format!("{:?} Account 1", chain),
                 &address,
                 &keystore_ref,
-                Some("m/44'/0'/0'/0/0"), // Generic derivation path
+                Some("m/86'/0'/0'/0/0"), // BIP-86 Taproot derivation path
             );
 
             wallet.add_account(account);

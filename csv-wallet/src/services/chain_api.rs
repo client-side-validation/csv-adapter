@@ -1,7 +1,11 @@
 //! Chain API service for wallet operations.
 //!
 //! Provides chain RPC operations using csv-sdk runtime.
+//!
+//! **Native-only**: This module depends on `csv_sdk::runtime` which requires
+//! native I/O (tokio, sqlx, rocksdb). On wasm32, use `csv_sdk::wasm` APIs instead.
 
+#[cfg(not(target_arch = "wasm32"))]
 use csv_sdk::runtime::{ChainRuntime, RuntimeConfig, RuntimeManager};
 use csv_core::ChainId;
 
@@ -37,10 +41,18 @@ impl std::fmt::Display for ChainApiError {
 impl std::error::Error for ChainApiError {}
 
 /// Chain API using csv-sdk runtime.
+///
+/// **Native-only**: Requires `csv_sdk::runtime` which depends on tokio/sqlx.
+#[cfg(not(target_arch = "wasm32"))]
 pub struct ChainApi {
     runtime: ChainRuntime,
 }
 
+/// Debug stub for wasm32 builds.
+#[cfg(target_arch = "wasm32")]
+pub struct ChainApi;
+
+#[cfg(not(target_arch = "wasm32"))]
 impl std::fmt::Debug for ChainApi {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ChainApi")
@@ -49,20 +61,41 @@ impl std::fmt::Debug for ChainApi {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+impl std::fmt::Debug for ChainApi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChainApi").finish()
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 impl Clone for ChainApi {
     fn clone(&self) -> Self {
-        // Create new runtime via RuntimeManager
         let runtime_config = RuntimeConfig::default();
         let runtime_manager = RuntimeManager::new(runtime_config);
         let runtime = runtime_manager.chain_runtime().clone();
-
         Self { runtime }
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+impl Clone for ChainApi {
+    fn clone(&self) -> Self {
+        Self
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 impl Default for ChainApi {
     fn default() -> Self {
         Self::new(ChainConfig::for_chain(&ChainId::new("ethereum")))
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Default for ChainApi {
+    fn default() -> Self {
+        Self
     }
 }
 
@@ -98,23 +131,28 @@ impl ChainConfig {
 
 impl ChainApi {
     /// Create new chain API.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(_config: ChainConfig) -> Self {
-        // Create runtime manager with default config
         let runtime_config = RuntimeConfig::default();
         let runtime_manager = RuntimeManager::new(runtime_config);
         let runtime = runtime_manager.chain_runtime().clone();
-
         Self { runtime }
     }
 
+    /// WASM32 stub — returns empty ChainApi.
+    #[cfg(target_arch = "wasm32")]
+    pub fn new(_config: ChainConfig) -> Self {
+        Self
+    }
+
     /// Get balance for an address.
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get_balance(
         &self,
         address: &str,
         chain: ChainId,
     ) -> Result<String, ChainApiError> {
         let chain_str = chain.as_str().to_string();
-        // Use csv-sdk runtime to query balance
         match self.runtime.get_balance(chain, address).await {
             Ok(balance_info) => Ok(balance_info.total.to_string()),
             Err(e) => Err(ChainApiError::BalanceUnavailable {
@@ -123,5 +161,20 @@ impl ChainApi {
                 source: e.to_string(),
             }),
         }
+    }
+
+    /// WASM32 stub — returns a placeholder balance.
+    /// In production wasm32 builds, use `csv_sdk::wasm::get_balance()` instead.
+    #[cfg(target_arch = "wasm32")]
+    pub async fn get_balance(
+        &self,
+        _address: &str,
+        _chain: ChainId,
+    ) -> Result<String, ChainApiError> {
+        Err(ChainApiError::BalanceUnavailable {
+            chain: _chain.as_str().to_string(),
+            address: _address.to_string(),
+            source: "ChainApi is native-only on wasm32; use csv_sdk::wasm APIs".to_string(),
+        })
     }
 }

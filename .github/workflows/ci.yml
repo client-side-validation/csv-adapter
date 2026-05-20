@@ -127,6 +127,35 @@ jobs:
           cargo fuzz run abi_decoder -- -max_total_time=60 fuzz_targets/abi_decoder/corpus || true
           cargo fuzz run rpc_parser -- -max_total_time=60 fuzz_targets/rpc_parser/corpus || true
 
+  # ── WASM32 Build Check ──────────────────────────────────────────
+  # Ensures csv-wallet and csv-runtime compile for wasm32-unknown-unknown
+  # Every PR changing Cargo.toml must pass this job
+  wasm32-check:
+    name: WASM32 Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build csv-runtime for wasm32 (no persistent feature)
+        run: cargo build --package csv-runtime --no-default-features --target wasm32-unknown-unknown
+
+      - name: Build csv-wallet for wasm32 (native feature disabled)
+        run: cargo build --package csv-wallet --no-default-features --features "csv-bitcoin,csv-ethereum" --target wasm32-unknown-unknown
+
+      - name: Verify csv-runtime rejects persistent on wasm32
+        run: |
+          ! cargo build --package csv-runtime --features persistent --target wasm32-unknown-unknown 2>&1 | grep -q "compile_error" || exit 0
+          # The compile_error! should fire — we expect this to fail
+          cargo build --package csv-runtime --features persistent --target wasm32-unknown-unknown 2>&1 | grep -q "persistent.*wasm32"
+
   # ── Architectural Boundary Enforcement ──────────────────────────
   # Enforces AGENT.md rules: no unwrap/expect/unsafe in critical paths,
   # no direct adapter calls from core, no fake crypto, no fallback logic

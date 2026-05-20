@@ -17,7 +17,10 @@ use csv_core::error::Result as CoreResult;
 use csv_core::proof::{FinalityProof, ProofBundle};
 use csv_core::seal::CommitAnchor as CoreCommitAnchor;
 use csv_core::seal::SealPoint as CoreSealPoint;
+
+#[cfg(feature = "rpc")]
 use csv_core::proof_pipeline::ChainVerifier;
+#[cfg(feature = "rpc")]
 use crate::finality::FinalityCheckerTrait;
 
 use crate::config::EthereumConfig;

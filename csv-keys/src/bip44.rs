@@ -277,12 +277,29 @@ pub fn derive_all_chain_keys(
 /// # Returns
 /// The derived address as a string.
 pub fn derive_address_from_key(key_bytes: &[u8], chain: &ChainId) -> Result<String, Bip44Error> {
+    derive_address_from_key_with_network(key_bytes, chain, bitcoin::Network::Testnet)
+}
+
+/// Derive an address from a raw 32-byte private key for a specific chain with explicit network.
+///
+/// # Arguments
+/// * `key_bytes` - 32-byte private key
+/// * `chain` - Target blockchain
+/// * `network` - Bitcoin network (only used for Bitcoin chain)
+///
+/// # Returns
+/// The derived address as a string.
+pub fn derive_address_from_key_with_network(
+    key_bytes: &[u8],
+    chain: &ChainId,
+    network: bitcoin::Network,
+) -> Result<String, Bip44Error> {
     if key_bytes.len() != 32 {
         return Err(Bip44Error::InvalidSeedLength(key_bytes.len()));
     }
 
     match chain.as_str() {
-        "bitcoin" => derive_bitcoin_address_from_key(key_bytes),
+        "bitcoin" => derive_bitcoin_address_from_key(key_bytes, network),
         "ethereum" => derive_ethereum_address_from_key(key_bytes),
         "sui" => derive_sui_address_from_key(key_bytes),
         "aptos" => derive_aptos_address_from_key(key_bytes),
@@ -296,16 +313,24 @@ pub fn derive_address_from_chain_id(
     key_bytes: &[u8],
     chain_id: &ChainId,
 ) -> Result<String, Bip44Error> {
+    derive_address_from_chain_id_with_network(key_bytes, chain_id, bitcoin::Network::Testnet)
+}
+
+/// Derive an address from a raw 32-byte private key for a specific chain with explicit network.
+pub fn derive_address_from_chain_id_with_network(
+    key_bytes: &[u8],
+    chain_id: &ChainId,
+    network: bitcoin::Network,
+) -> Result<String, Bip44Error> {
     match chain_id.as_str() {
         "bitcoin" | "ethereum" | "sui" | "aptos" | "solana" => {}
         _ => return Err(Bip44Error::UnsupportedChain(chain_id.clone())),
     };
-    derive_address_from_key(key_bytes, chain_id)
+    derive_address_from_key_with_network(key_bytes, chain_id, network)
 }
 
-fn derive_bitcoin_address_from_key(key_bytes: &[u8]) -> Result<String, Bip44Error> {
-    use bitcoin::Address;
-    use bitcoin::key::TapTweak;
+fn derive_bitcoin_address_from_key(key_bytes: &[u8], network: bitcoin::Network) -> Result<String, Bip44Error> {
+    use bitcoin::address::KnownHrp;
     use secp256k1::{Keypair, Secp256k1, SecretKey, XOnlyPublicKey};
 
     let secret_key = SecretKey::from_slice(key_bytes)
@@ -314,9 +339,13 @@ fn derive_bitcoin_address_from_key(key_bytes: &[u8]) -> Result<String, Bip44Erro
     let secp = Secp256k1::new();
     let keypair = Keypair::from_secret_key(&secp, &secret_key);
     let (xonly_pubkey, _parity) = XOnlyPublicKey::from_keypair(&keypair);
-    let (tweaked_pubkey, _parity) = xonly_pubkey.tap_tweak(&secp, None);
 
-    let address = Address::p2tr_tweaked(tweaked_pubkey, bitcoin::Network::Testnet);
+    let hrp = match network {
+        bitcoin::Network::Bitcoin => KnownHrp::Mainnet,
+        bitcoin::Network::Testnet | bitcoin::Network::Testnet4 | bitcoin::Network::Signet | bitcoin::Network::Regtest => KnownHrp::Testnets,
+    };
+
+    let address = bitcoin::Address::p2tr(&secp, xonly_pubkey, None, hrp);
     Ok(address.to_string())
 }
 

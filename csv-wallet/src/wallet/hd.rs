@@ -164,78 +164,17 @@ impl ExtendedWallet {
 
     /// Get addresses for all chains.
     pub fn all_addresses(&self) -> Vec<(ChainId, String)> {
-        use blake2::Blake2b;
-        use ed25519_dalek::SigningKey;
-        use secp256k1::{Secp256k1, SecretKey};
-        use sha2::Digest;
-        use sha3::Keccak256;
+        use csv_keys::bip44::{derive_all_chain_keys, derive_address_from_key};
 
         let mut addresses = Vec::new();
+        let keys = derive_all_chain_keys(&self.seed, 0);
 
-        // Bitcoin - derive proper Taproot (P2TR) address
-        match self.derive_taproot_address(0, 0) {
-            Ok(address) => {
-                addresses.push((ChainId::new("bitcoin"), address));
-            }
-            Err(e) => {
-                eprintln!("Error: Bitcoin address derivation failed: {}", e);
+        for (chain_id, key) in &keys {
+            match derive_address_from_key(key.as_bytes(), chain_id) {
+                Ok(address) => addresses.push((chain_id.clone(), address)),
+                Err(e) => eprintln!("Error: Address derivation failed for {:?}: {}", chain_id, e),
             }
         }
-
-        // Ethereum
-        let mut key_bytes = [0u8; 32];
-        key_bytes.copy_from_slice(&self.seed[32..]);
-        if let Ok(secret_key) = SecretKey::from_slice(&key_bytes) {
-            let secp = Secp256k1::new();
-            let public_key = secret_key.public_key(&secp);
-            let pubkey_bytes = public_key.serialize_uncompressed();
-            let mut hasher = Keccak256::new();
-            hasher.update(&pubkey_bytes[1..]);
-            let hash = hasher.finalize();
-            let mut address = [0u8; 20];
-            address.copy_from_slice(&hash[12..]);
-            addresses.push((
-                ChainId::new("ethereum"),
-                format!("0x{}", hex::encode(address)),
-            ));
-        }
-
-        // Sui
-        let mut sui_key = [0u8; 32];
-        sui_key.copy_from_slice(&self.seed[..32]);
-        let sui_signing = SigningKey::from_bytes(&sui_key);
-        let sui_verifying: ed25519_dalek::VerifyingKey = sui_signing.verifying_key();
-        let hash: [u8; 32] = {
-            let mut hasher = Blake2b::new();
-            hasher.update([0x00]);
-            hasher.update(sui_verifying.as_bytes());
-            hasher.finalize().into()
-        };
-        addresses.push((ChainId::new("sui"), format!("0x{}", hex::encode(hash))));
-
-        // Aptos
-        let mut aptos_key = [0u8; 32];
-        aptos_key.copy_from_slice(&self.seed[32..]);
-        let aptos_signing = SigningKey::from_bytes(&aptos_key);
-        let aptos_verifying: ed25519_dalek::VerifyingKey = aptos_signing.verifying_key();
-        let mut hasher = sha3::Sha3_256::new();
-        hasher.update(aptos_verifying.as_bytes());
-        hasher.update([0x00]);
-        let hash = hasher.finalize();
-        addresses.push((
-            ChainId::new("aptos"),
-            format!("0x{}", hex::encode(&hash[..])),
-        ));
-
-        // Solana
-        let mut solana_key = [0u8; 32];
-        solana_key.copy_from_slice(&self.seed[..32]);
-        let solana_signing = SigningKey::from_bytes(&solana_key);
-        let solana_verifying: ed25519_dalek::VerifyingKey = solana_signing.verifying_key();
-        addresses.push((
-            ChainId::new("solana"),
-            bs58::encode(solana_verifying.as_bytes()).into_string(),
-        ));
 
         addresses
     }

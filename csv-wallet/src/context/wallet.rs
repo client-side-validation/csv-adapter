@@ -42,6 +42,7 @@ pub struct WalletContext {
     /// Adaptive poller for fallback HTTP polling
     adaptive_poller: Arc<AdaptivePoller>,
     /// Optional MPC batcher for Bitcoin commitment aggregation (90% fee savings)
+    #[cfg(feature = "csv-bitcoin")]
     bitcoin_batcher: Arc<std::sync::Mutex<Option<csv_sdk::csv_bitcoin::mpc_batch::MpcBatcher>>>,
     #[cfg(target_arch = "wasm32")]
     encrypted_seal_store: std::sync::Arc<std::sync::Mutex<Option<EncryptedStorageManager>>>,
@@ -89,6 +90,7 @@ impl WalletContext {
             selected_contract,
             subscription_manager,
             adaptive_poller,
+            #[cfg(feature = "csv-bitcoin")]
             bitcoin_batcher: Arc::new(std::sync::Mutex::new(None)),
             #[cfg(target_arch = "wasm32")]
             encrypted_seal_store: std::sync::Arc::new(std::sync::Mutex::new(None)),
@@ -490,11 +492,27 @@ impl WalletContext {
         private_key_hex: &str,
         passphrase: &str,
     ) -> Result<(), String> {
+        self.import_account_from_key_with_network(chain, name, private_key_hex, passphrase)
+    }
+
+    /// Import an account from a private key with explicit network.
+    pub fn import_account_from_key_with_network(
+        &mut self,
+        chain: ChainId,
+        name: &str,
+        private_key_hex: &str,
+        passphrase: &str,
+    ) -> Result<(), String> {
         use csv_keys::memory::{Passphrase, SecretKey};
 
-        // Derive address from private key
+        // Derive address from private key using the selected network
+        let bitcoin_network = match self.state.read().selected_network {
+            Network::Main => bitcoin::Network::Bitcoin,
+            Network::Test | Network::Dev => bitcoin::Network::Testnet,
+        };
+
         let address =
-            crate::wallet_core::ChainAccount::derive_address(chain.clone(), private_key_hex)
+            crate::wallet_core::ChainAccount::derive_address_with_network(chain.clone(), private_key_hex, bitcoin_network)
                 .map_err(|e| format!("Failed to derive address: {}", e))?;
 
         // Parse the private key bytes
@@ -953,6 +971,7 @@ impl WalletContext {
     /// // High-volume batcher: up to 50 seals, min 5, 10 min timeout
     /// wallet_ctx.enable_bitcoin_batcher(MpcBatcher::high_volume());
     /// ```
+    #[cfg(feature = "csv-bitcoin")]
     pub fn enable_bitcoin_batcher(&self, batcher: csv_sdk::csv_bitcoin::mpc_batch::MpcBatcher) {
         let mut guard = self.bitcoin_batcher.lock().unwrap();
         *guard = Some(batcher);
@@ -962,12 +981,14 @@ impl WalletContext {
     ///
     /// Any pending commitments will remain queued but won't be published
     /// until batcher is re-enabled and finalize_batch() is called.
+    #[cfg(feature = "csv-bitcoin")]
     pub fn disable_bitcoin_batcher(&self) {
         let mut guard = self.bitcoin_batcher.lock().unwrap();
         *guard = None;
     }
 
     /// Check if Bitcoin batcher is enabled
+    #[cfg(feature = "csv-bitcoin")]
     pub fn is_bitcoin_batcher_enabled(&self) -> bool {
         let guard = self.bitcoin_batcher.lock().unwrap();
         guard.is_some()
@@ -984,6 +1005,7 @@ impl WalletContext {
     /// - `Ok(true)` if batch is ready to publish (reached batch_size threshold)
     /// - `Ok(false)` if queued but batch not yet ready
     /// - `Err` if batcher not enabled
+    #[cfg(feature = "csv-bitcoin")]
     pub fn queue_bitcoin_seal(
         &self,
         commitment: csv_core::hash::Hash,
@@ -1001,12 +1023,14 @@ impl WalletContext {
     /// Check if a Bitcoin batch is ready for publication.
     ///
     /// Returns true if pending commitments >= min_batch_size threshold.
+    #[cfg(feature = "csv-bitcoin")]
     pub fn is_bitcoin_batch_ready(&self) -> bool {
         let guard = self.bitcoin_batcher.lock().unwrap();
         guard.as_ref().map(|b| b.has_batch_ready()).unwrap_or(false)
     }
 
     /// Get count of pending Bitcoin seals in the batch queue.
+    #[cfg(feature = "csv-bitcoin")]
     pub fn pending_bitcoin_batch_count(&self) -> usize {
         let guard = self.bitcoin_batcher.lock().unwrap();
         guard.as_ref().map(|b| b.pending_count()).unwrap_or(0)
@@ -1020,6 +1044,7 @@ impl WalletContext {
     /// # Returns
     /// - `Ok((tree, commitments))` if there are pending seals
     /// - `Err` if batcher not enabled or no pending seals
+    #[cfg(feature = "csv-bitcoin")]
     pub fn build_bitcoin_mpc_tree(
         &self,
     ) -> Result<
@@ -1040,6 +1065,7 @@ impl WalletContext {
     /// Generate inclusion proofs for all seals in a batch.
     ///
     /// Call this after building the MPC tree to get proofs for each seal.
+    #[cfg(feature = "csv-bitcoin")]
     pub fn generate_bitcoin_batch_proofs(
         &self,
         tree: &csv_core::commit_mux::CommitMux,
@@ -1054,6 +1080,7 @@ impl WalletContext {
     }
 
     /// Peek at pending Bitcoin seals without consuming them.
+    #[cfg(feature = "csv-bitcoin")]
     pub fn peek_pending_bitcoin_seals(&self) -> Vec<csv_sdk::csv_bitcoin::mpc_batch::PendingCommitment> {
         let guard = self.bitcoin_batcher.lock().unwrap();
         guard.as_ref().map(|b| b.peek_pending()).unwrap_or_default()
@@ -1063,6 +1090,7 @@ impl WalletContext {
     ///
     /// # Warning
     /// This discards queued seals without publishing them. Use with caution.
+    #[cfg(feature = "csv-bitcoin")]
     pub fn clear_bitcoin_batch_queue(&self) {
         let guard = self.bitcoin_batcher.lock().unwrap();
         if let Some(batcher) = guard.as_ref() {

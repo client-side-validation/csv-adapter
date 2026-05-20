@@ -121,8 +121,16 @@ impl ChainRuntime {
     /// // runtime.register_adapter(ChainId::new("ethereum"), adapter);
     /// ```
     pub async fn register_adapter(&self, chain: ChainId, adapter: Arc<dyn ChainBackend>) {
-        let mut adapters = self.adapters.lock().await;
-        adapters.insert(chain, adapter);
+        #[cfg(feature = "tokio")]
+        {
+            let mut adapters = self.adapters.lock().await;
+            adapters.insert(chain, adapter);
+        }
+        #[cfg(not(feature = "tokio"))]
+        {
+            let mut adapters = self.adapters.lock().unwrap();
+            adapters.insert(chain, adapter);
+        }
     }
 
     /// Query the balance for an address on the specified chain.
@@ -501,17 +509,20 @@ impl ChainRuntime {
 
     /// Get the adapter for the specified chain.
     async fn get_adapter(&self, chain: ChainId) -> Result<Arc<dyn ChainBackend>, CsvError> {
+        #[cfg(feature = "tokio")]
         let adapters = self.adapters.lock().await;
+        #[cfg(not(feature = "tokio"))]
+        let adapters = self.adapters.lock().unwrap();
 
         // Validate that RPC endpoints were configured and adapters initialized.
-        // This is a configuration error, not a runtime failure — it should be
-        // caught immediately at startup per the "Fail Closed, Always" principle.
+        // This is a configuration error — init_adapters() should catch this at startup.
         if adapters.is_empty() {
-            panic!(
-                "CRITICAL: No chain adapters registered in ChainRuntime. \
+            return Err(CsvError::ConfigError(
+                "No chain adapters registered in ChainRuntime. \
                  Call `client.init_adapters(NetworkType::Testnet)` or `init_adapters(NetworkType::Mainnet)` \
                  with proper RPC configuration before using runtime operations."
-            );
+                    .to_string(),
+            ));
         }
 
         adapters
@@ -522,14 +533,30 @@ impl ChainRuntime {
 
     /// Check if an adapter is registered for the given chain.
     pub async fn has_adapter(&self, chain: ChainId) -> bool {
-        let adapters = self.adapters.lock().await;
-        adapters.contains_key(&chain)
+        #[cfg(feature = "tokio")]
+        {
+            let adapters = self.adapters.lock().await;
+            adapters.contains_key(&chain)
+        }
+        #[cfg(not(feature = "tokio"))]
+        {
+            let adapters = self.adapters.lock().unwrap();
+            adapters.contains_key(&chain)
+        }
     }
 
     /// Get the list of registered chains.
     pub async fn registered_chains(&self) -> Vec<ChainId> {
-        let adapters = self.adapters.lock().await;
-        adapters.keys().cloned().collect()
+        #[cfg(feature = "tokio")]
+        {
+            let adapters = self.adapters.lock().await;
+            adapters.keys().cloned().collect()
+        }
+        #[cfg(not(feature = "tokio"))]
+        {
+            let adapters = self.adapters.lock().unwrap();
+            adapters.keys().cloned().collect()
+        }
     }
 
     /// Generate a proof for a sanad on the specified chain.
@@ -777,6 +804,8 @@ impl ChainRuntime {
             finality_proof: csv_core::FinalityProof::new(vec![], 1, true).map_err(|e| {
                 CsvError::P2PError(format!("Failed to create finality proof: {}", e))
             })?,
+            provenance: None,
+            certification: None,
         };
 
         transport
@@ -801,6 +830,7 @@ impl ChainRuntime {
         let sanad_id_clone: csv_core::sanad::SanadId = sanad_id.clone();
 
         // Run the store access in a blocking task since it uses std::sync::Mutex
+        #[cfg(feature = "tokio")]
         let is_consumed = tokio::task::spawn_blocking(move || {
             let store = store_arc.lock().map_err(|e| e.to_string())?;
             match store.get_sanad(&sanad_id_clone) {
@@ -812,6 +842,16 @@ impl ChainRuntime {
         .await
         .map_err(|e| CsvError::StoreError(format!("Task join error: {}", e)))?
         .map_err(CsvError::StoreError)?;
+
+        #[cfg(not(feature = "tokio"))]
+        let is_consumed = {
+            let store = store_arc.lock().map_err(|e| CsvError::StoreError(e.to_string()))?;
+            match store.get_sanad(&sanad_id_clone) {
+                Ok(Some(record)) => Ok(record.consumed_at.is_some()),
+                Ok(None) => Ok(false), // Sanad not found = not consumed
+                Err(e) => Err(CsvError::StoreError(e.to_string())),
+            }
+        }?;
 
         Ok(SealCheckData {
             sanad_id: sanad_id.clone(),

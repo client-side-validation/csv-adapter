@@ -50,12 +50,17 @@ impl ProgramWallet {
         self.anchor_ref = Some(anchor_ref);
     }
 
-    /// Sign transaction
-    pub fn sign_transaction(&self, transaction: &mut Transaction) -> SolanaResult<()> {
-        // Use a default hash for now - would need actual recent blockhash
-        use solana_sdk::hash::Hash;
-        let default_hash = Hash::default();
-        transaction.partial_sign(&[&self.keypair], default_hash);
+    /// Sign transaction with the given recent blockhash.
+    ///
+    /// The caller MUST fetch a valid recent blockhash from the Solana RPC
+    /// before calling this method. Using a stale or default blockhash will
+    /// cause the transaction to be rejected by the network.
+    pub fn sign_transaction(
+        &self,
+        transaction: &mut Transaction,
+        recent_blockhash: solana_sdk::hash::Hash,
+    ) -> SolanaResult<()> {
+        transaction.partial_sign(&[&self.keypair], recent_blockhash);
         Ok(())
     }
 

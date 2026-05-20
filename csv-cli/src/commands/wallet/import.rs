@@ -1,7 +1,7 @@
 //! Wallet import from mnemonic phrase.
 //!
 //! Imports a mnemonic phrase (from csv-wallet or other source) and derives
-//! all chain accounts using BIP-44 derivation. Keys are stored in the
+//! all chain accounts using BIP-86 derivation for Bitcoin. Keys are stored in the
 //! encrypted file keystore.
 
 use crate::config::{Config, Network};
@@ -68,7 +68,7 @@ pub fn cmd_import(
             "solana" => "501",
             _ => "0",
         };
-        let derivation_path = format!("m/44'/{}'/{}'/0/0", coin_type, account);
+        let derivation_path = format!("m/86'/{}'/{}'/0/0", coin_type, account);
 
         // Store account
         let store_chain = match core_chain.to_string().as_str() {

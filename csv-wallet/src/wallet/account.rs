@@ -3,7 +3,7 @@
 //! Each account belongs to a specific chain and uses secure keystore references.
 //! Private keys are never stored in memory longer than necessary for signing.
 
-use csv_keys::bip44::derive_address_from_chain_id;
+use csv_keys::bip44::derive_address_from_chain_id_with_network;
 use csv_core::ChainId;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -78,6 +78,15 @@ impl ChainAccount {
     ///
     /// Uses csv-keys for canonical address derivation across all chains.
     pub fn derive_address(chain: ChainId, hex_key: &str) -> Result<String, String> {
+        Self::derive_address_with_network(chain, hex_key, bitcoin::Network::Testnet)
+    }
+
+    /// Derive address from private key for a specific chain with explicit network.
+    pub fn derive_address_with_network(
+        chain: ChainId,
+        hex_key: &str,
+        network: bitcoin::Network,
+    ) -> Result<String, String> {
         let hex_clean = hex_key.strip_prefix("0x").unwrap_or(hex_key);
         let bytes = hex::decode(hex_clean).map_err(|e| format!("Invalid hex: {}", e))?;
         if bytes.len() != 32 {
@@ -86,7 +95,7 @@ impl ChainAccount {
         let bytes_arr: [u8; 32] = bytes
             .try_into()
             .map_err(|_| "Invalid key length".to_string())?;
-        derive_address_from_chain_id(&bytes_arr, &chain)
+        derive_address_from_chain_id_with_network(&bytes_arr, &chain, network)
             .map_err(|e| format!("Address derivation failed: {}", e))
     }
 }
