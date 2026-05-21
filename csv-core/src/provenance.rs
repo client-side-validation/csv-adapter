@@ -22,8 +22,9 @@
 //! 4. Seal registry verification
 //! 5. Replay protection check
 
-use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
+
+use crate::lease::now_secs;
 
 /// Provenance metadata for a proof bundle
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -34,8 +35,8 @@ pub struct ProofProvenance {
     pub origin_block_height: u64,
     /// Runtime instance that created the proof
     pub runtime_instance: String,
-    /// Timestamp when the proof was created
-    pub created_at: SystemTime,
+    /// Timestamp when the proof was created (Unix epoch seconds)
+    pub created_at: u64,
     /// Verification chain tracking each validation step
     pub verification_chain: Vec<VerificationStep>,
     /// Cryptographic hash of the proof bundle
@@ -51,8 +52,8 @@ pub struct VerificationStep {
     pub step_type: VerificationStepType,
     /// Component that performed the verification
     pub component: String,
-    /// Timestamp when verification occurred
-    pub timestamp: SystemTime,
+    /// Timestamp when verification occurred (Unix epoch seconds)
+    pub timestamp: u64,
     /// Whether verification succeeded
     pub success: bool,
     /// Optional error message if verification failed
@@ -85,8 +86,8 @@ pub struct AdapterSignature {
     pub adapter_id: String,
     /// Signature data
     pub signature: Vec<u8>,
-    /// Timestamp when signature was created
-    pub signed_at: SystemTime,
+    /// Timestamp when signature was created (Unix epoch seconds)
+    pub signed_at: u64,
 }
 
 impl ProofProvenance {
@@ -101,7 +102,7 @@ impl ProofProvenance {
             origin_chain,
             origin_block_height,
             runtime_instance,
-            created_at: SystemTime::now(),
+            created_at: now_secs(),
             verification_chain: Vec::new(),
             proof_hash,
             adapter_signature: None,
@@ -128,7 +129,7 @@ impl ProofProvenance {
             VerificationStepType::ReplayProtectionCheck,
         ];
 
-        let step_types: std::collections::HashSet<_> = self
+        let step_types: crate::collections::HashSet<_> = self
             .verification_chain
             .iter()
             .map(|s| &s.step_type)
@@ -159,7 +160,7 @@ impl VerificationStep {
         Self {
             step_type,
             component,
-            timestamp: SystemTime::now(),
+            timestamp: now_secs(),
             success,
             error: None,
             state_hash: None,
@@ -185,7 +186,7 @@ impl AdapterSignature {
         Self {
             adapter_id,
             signature,
-            signed_at: SystemTime::now(),
+            signed_at: now_secs(),
         }
     }
 }

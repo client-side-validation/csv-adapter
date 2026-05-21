@@ -4,6 +4,9 @@ pragma solidity ^0.8.20;
 /// @title CSVLock — Cross-Chain Sanad Lock on Ethereum
 /// @notice Registers nullifiers, emits lock events, and supports time-locked refunds
 contract CSVLock {
+    /// @notice Protocol version — incremented on every breaking change
+    uint256 public constant VERSION = 1;
+
     uint8 public constant ASSET_CLASS_UNSPECIFIED = 0;
     uint8 public constant ASSET_CLASS_FUNGIBLE_TOKEN = 1;
     uint8 public constant ASSET_CLASS_NON_FUNGIBLE_TOKEN = 2;
@@ -203,7 +206,7 @@ contract CSVLock {
             msg.sender,
             destinationChain,
             destinationOwner,
-            blockhash(block.number - 1),
+            bytes32(0), // blockhash(block.number - 1) removed: unreliable beyond 256 blocks
             metadata.assetClass,
             metadata.assetId,
             metadata.metadataHash,

@@ -1,1496 +1,989 @@
 # AUDIT.md
 
-## Executive Summary
+# CSV Protocol — Deep Architecture, Security, Contract, and Runtime Audit
 
-This repository is ambitious and unusually broad in scope. It attempts to define a cross-chain cryptographic sealing, proof, sanad, commitment, runtime, explorer, wallet, contract, SDK, and distributed verification ecosystem spanning:
-
-- Bitcoin
-- Ethereum
-- Solana
-- Aptos
-- Sui
-- Celestia
-- WASM
-- TypeScript SDKs
-- Runtime orchestration
-- Explorer/indexer infrastructure
-- Smart contracts
-- Wallet UX
-- ZK integrations
-
-The strongest aspect of the codebase is its architectural intent:
-
-- deterministic cryptographic primitives
-- replay resistance
-- domain-separated hashing
-- explicit proof lifecycle states
-- reorg awareness
-- offline verification concepts
-- adapter isolation
-- multi-chain abstractions
-- no_std-oriented core philosophy in parts of csv-core
-
-However, the repository is still in a transitional stage between:
-
-1. research/prototype system
-2. production distributed protocol
-3. multi-language ecosystem
-4. cryptographic infrastructure platform
-
-The core risk is not individual bugs.
-
-The main risk is architectural over-expansion before invariant hardening.
-
-The protocol surface is already large enough that future compatibility mistakes, proof format instability, schema drift, runtime inconsistency, contract divergence, and adapter-level semantic mismatches could permanently fragment the ecosystem.
-
-The repository needs a stronger:
-
-- protocol constitution
-- canonical serialization strategy
-- invariant enforcement layer
-- version negotiation model
-- deterministic runtime model
-- proof evolution strategy
-- WASM-first execution philosophy
-- formalized contract compatibility layer
-- distributed systems failure model
-
-before ecosystem scaling.
+Date: 2026-05-21
+Scope: `csv-core`, `csv-runtime`, adapters, contracts, explorer, SDK/runtime boundaries, deployment readiness, seal semantics, Sanad model, distributed-system behavior.
 
 ---
 
-# 1. Native Code / WASM Conversion Strategy
+# Executive Assessment
 
-## Current State
+The repository shows unusually strong architectural intent.
 
-The repository is already heavily Rust-centric.
+Several parts already demonstrate mature protocol thinking:
 
-This is excellent.
+- explicit security invariants in `csv-core`
+- separation between runtime and adapters
+- chain-specific crates instead of conditional spaghetti
+- replay-prevention awareness
+- observability hooks
+- seal semantics treated as protocol primitives
+- multi-chain abstraction without collapsing into lowest-common-denominator APIs
+- early attention to adversarial behavior
+- deployment profile separation
 
-The strongest long-term decision in the repository is:
+The problem is not conceptual direction.
 
-- shared Rust core
-- cryptographic determinism
-- WASM-compatible structure in multiple crates
-- strong separation between adapters and protocol logic
+The problem is operational hardness.
 
-The repository is already closer to a WASM-native architecture than most blockchain systems.
+Right now the repository behaves more like a protocol research platform than a production-grade settlement fabric.
 
-However:
+There are strong signs of architectural ambition exceeding current enforcement.
 
-- several crates are still implicitly server-native
-- async/runtime assumptions are not consistently abstracted
-- storage abstractions leak platform assumptions
-- networking assumptions are not WASM-clean
-- cryptographic crates may pull native dependencies
-- explorer/runtime/indexer components are tightly infrastructure-oriented
-- smart contract bindings duplicate protocol semantics instead of sharing canonical schemas
+Examples:
 
----
+- security invariants are documented but not mechanically enforced
+- distributed consistency assumptions exist but durability semantics are incomplete
+- contracts are modeled as stable anchors, but schema/version evolution strategy is underdefined
+- runtime abstraction exists, but deterministic execution guarantees are still weak
+- there are many `unwrap()`/`expect()` calls across the codebase
+- too many trust boundaries remain implicit
+- chain adapters can still become leakage vectors into core semantics
+- several crates are structurally present but operationally shallow
 
-## How Much Can Be Converted To Native Rust + WASM?
+This means the protocol is currently vulnerable to:
 
-### Realistic Maximum
+- state divergence
+- replay inconsistencies
+- adapter-specific semantic corruption
+- schema drift
+- event ordering bugs
+- non-deterministic proofs
+- incomplete finality guarantees
+- unsafe deployment upgrades
+- weak auditability under incident response
 
-| Layer | WASM Feasibility | Notes |
-|---|---|---|
-| csv-core | Excellent | Should become the canonical WASM-safe protocol kernel |
-| csv-sdk | Excellent | Ideal WASM target |
-| typescript-sdk/wasm | Excellent | Already aligned |
-| proof verification | Excellent | Major advantage |
-| sanad verification | Excellent | Strong browser compatibility |
-| hash/proof/commitment primitives | Excellent | Should be fully deterministic |
-| wallet logic | Very good | Needs storage/runtime abstraction cleanup |
-| explorer UI | Excellent | Dioxus/WASM compatible |
-| runtime orchestration | Moderate | Depends on storage/event infra |
-| indexer | Weak | Native infra-heavy |
-| blockchain RPC adapters | Moderate | Depends on transport abstraction |
-| zk proving | Weak to Moderate | Verification yes, proving usually native |
-| contract deployment tooling | Weak | Better as native CLI tooling |
+The repository is not yet ready for independent external implementers.
 
----
+A second team attempting to implement the protocol from contracts/specs alone would likely produce incompatible behavior.
 
-## What You Lose When Maximizing WASM
-
-### 1. Native Performance
-
-You lose:
-
-- raw throughput
-- SIMD flexibility
-- direct syscalls
-- zero-copy IO patterns
-- memory mapping optimizations
-- some multithreading advantages
-
-Especially for:
-
-- indexing
-- cryptographic proving
-- database-heavy runtimes
-- large Merkle proof generation
+That is the main architectural warning.
 
 ---
 
-### 2. Runtime Control
+# Critical Findings
 
-WASM environments are sandboxed.
+# 1. SECURITY INVARIANTS ARE DECLARATIVE, NOT ENFORCED
 
-You lose:
+`csv-core/src/seal_protocol.rs` contains strong invariant documentation.
 
-- unrestricted sockets
-- direct filesystem assumptions
-- unrestricted threading
-- low-level OS scheduling
-- native daemon ergonomics
+That is valuable.
 
-This affects:
+But the invariants are still comments.
 
-- runtime coordinators
-- indexers
-- PostgreSQL integration
-- RocksDB integration
-- event buses
+The system currently relies on adapter authors to “do the right thing”.
 
----
+That fails under scale.
 
-### 3. Dependency Ecosystem
+A malicious or careless adapter can still:
 
-Many Rust crates still assume:
+- accept malformed proofs
+- bypass replay semantics
+- weaken inclusion validation
+- alter hash domain separation
+- redefine finality semantics
+- create silent cross-chain ambiguity
 
-- tokio native features
-- libc
-- OpenSSL
-- native TLS
-- system entropy assumptions
+## Architectural Risk
 
-WASM-first architecture forces stricter dependency discipline.
+The protocol currently trusts adapter correctness too early.
 
-This is painful initially but beneficial long-term.
+The runtime should trust proofs.
+It should not trust adapters.
 
----
+Adapters should produce canonical proof artifacts.
+The runtime/core should validate them.
 
-## Recommended Architecture
+Right now too much verification responsibility sits inside adapters.
 
-### Strong Recommendation
+That creates chain-specific trust islands.
 
-Split the repository into:
+## Required Refactor
 
-### A. Deterministic Protocol Kernel
+Move verification semantics into canonical core verification engines.
 
-Canonical WASM-safe layer:
+Adapters should only:
 
-- csv-core
-- proof logic
-- sanad schemas
-- canonical hashing
-- serialization
-- validation
+- fetch chain data
+- normalize proofs
+- expose chain metadata
+- expose finality parameters
+
+Core should own:
+
+- seal lifecycle verification
+- replay verification
+- commitment verification
 - proof verification
-- state transition validation
-- replay prevention
-- deterministic VM
+- state transition verification
+- event canonicalization
 
-This layer should:
+## Required Structure
 
-- compile no_std
-- compile to WASM
-- avoid allocator assumptions where possible
-- avoid async internally
-- avoid network dependencies
-- avoid filesystem dependencies
-- avoid timestamps internally
-- avoid randomness internally unless injected
+```rust
+trait ChainAdapter {
+    fn fetch_anchor(&self, anchor_id: AnchorId) -> Result<AnchorData>;
+    fn fetch_proof(&self, proof_id: ProofId) -> Result<RawProof>;
+    fn chain_context(&self) -> ChainContext;
+}
 
-This becomes:
+trait ProofVerifier {
+    fn verify(&self, proof: CanonicalProof) -> Result<VerifiedProof>;
+}
+```
 
-- the constitutional layer
-- the consensus-compatible layer
-- the verification layer
-
-This should be treated almost like a blockchain VM specification.
+The runtime should never accept “verified=true” from adapters.
 
 ---
 
-### B. Runtime Infrastructure Layer
+# 2. MASSIVE `unwrap()` / `expect()` SURFACE
 
-Native/server-oriented:
+Repository scan shows:
 
-- indexers
-- PostgreSQL
-- RocksDB
-- networking
-- RPC aggregation
-- orchestration
-- observability
-- event buses
-- deployment tooling
+- ~784 `unwrap()` usages
+- ~129 `expect()` usages
+- multiple `panic!()` paths
+- several `unsafe` usages
 
-This should be adapter-driven and replaceable.
+This is one of the biggest production-readiness blockers.
 
----
+In a distributed settlement system:
 
-### C. Thin Language Bindings
+`unwrap()` is not merely a crash risk.
 
-- TypeScript
-- WASM
-- mobile
-- browser
-- node
+It becomes:
 
-These should only expose canonical Rust protocol logic.
+- consensus divergence risk
+- event-stream truncation risk
+- partial-transfer corruption risk
+- replay-window corruption
+- settlement deadlock trigger
+- observability blind spot
 
-Do not reimplement protocol semantics in TypeScript.
+## Example Failure Scenario
 
-That becomes a long-term consensus risk.
+Node A crashes during replay DB persistence.
 
----
+Node B commits the event.
 
-## Critical Recommendation
+A restarted coordinator replays partially persisted state.
 
-The protocol should become:
+Now the transfer graph diverges.
 
-"verification-first"
+The repository already hints at replay semantics, but panic surfaces undermine the entire model.
 
-not
+## Required Enforcement
 
-"runtime-first"
+CI must reject:
 
-Meaning:
+- `unwrap()`
+- `expect()`
+- `panic!()`
+- unchecked indexing
+- `unsafe`
 
-The protocol must always be verifiable:
+outside explicitly approved modules.
 
-- offline
-- cross-language
-- deterministically
-- inside WASM
-- inside constrained environments
-- inside browsers
-- inside zk circuits eventually
+## Required Replacement Pattern
 
-This is more important than maximizing runtime performance.
+```rust
+let proof = proof_store
+    .load(id)
+    .map_err(RuntimeError::ProofLoadFailure)?;
+```
 
----
+Every failure path must:
 
-# 2. Sanads: Why Only One Optional Value?
-
-## Current Problem
-
-The current sanad design appears intentionally minimalist.
-
-That is architecturally understandable.
-
-However:
-
-using only a single optional `value` field severely limits:
-
-- semantic richness
-- composability
-- verifiable metadata
-- traceability
-- policy execution
-- structured proofs
-- machine reasoning
-- future interoperability
-
-The protocol currently risks becoming:
-
-"hashes with weak semantics"
-
-instead of:
-
-"structured cryptographic state transitions"
+- preserve causality
+- preserve trace identifiers
+- preserve replay determinism
+- emit structured telemetry
+- classify retryability
 
 ---
 
-## Why Minimalism Was Probably Chosen
+# 3. CONTRACTS ARE NOT YET STABLE PROTOCOL ARTIFACTS
 
-Likely reasons:
+This is the single most important long-term architectural issue.
 
-### 1. Deterministic Hashing
+The contracts currently look like implementation containers.
 
-Simpler schemas reduce:
+They must become immutable protocol anchors.
 
-- serialization ambiguity
-- canonicalization problems
-- replay surface
-- verification complexity
+Your own concern is correct:
 
-This is correct.
+changing contracts frequently after runtime/core evolution becomes operationally catastrophic.
 
----
+Especially across:
 
-### 2. Cross-Chain Portability
+- multiple chains
+- proofs
+- Sanad evolution
+- third-party builders
+- historical verification
+- archival reconstruction
 
-Minimal fields make:
-
-- Ethereum
-- Bitcoin
-- Solana
-- Sui
-- Aptos
-
-all easier to support uniformly.
+Right now the contracts do not yet expose a hardened canonical schema governance model.
 
 ---
 
-### 3. Future-Proofing
+# 4. SANAD DATA MODEL IS UNDER-SPECIFIED FOR LONG-TERM EVOLUTION
 
-The designers likely wanted:
+The Solana `SanadAccount` already includes:
 
-- opaque payloads
-- protocol agnosticism
-- application-level extensibility
+- owner
+- sanad_id
+- commitment
+- state_root
+- metadata_hash
+- proof_root
+- nullifier
+- asset class
 
-This is a valid direction.
+That is good.
+
+But the schema is still structurally fragile.
+
+## Problems
+
+## A. No explicit schema versioning
+
+There is no strong evolution mechanism.
+
+Future additions will break:
+
+- proof compatibility
+- historical verification
+- external SDK implementations
+- archival reconstruction
+
+## B. No canonical serialization specification
+
+Different chains/languages will serialize differently.
+
+This destroys proof portability.
+
+## C. Metadata semantics are weak
+
+`metadata_hash` alone is insufficient.
+
+You need:
+
+- canonical metadata envelope
+- detached metadata proofs
+- recursive proof support
+- canonical field ordering
+- schema registries
+- semantic type IDs
+
+## D. No content-addressed proof envelope
+
+The protocol needs immutable proof-addressable structures.
+
+Current model is still too account-centric.
 
 ---
 
-## But Minimalism Alone Is Not Enough
+# 5. REQUIRED CANONICAL SANAD ENVELOPE
 
-A single opaque `value` field creates major problems:
+This should become the protocol center.
 
-| Problem | Consequence |
-|---|---|
-| No semantic typing | Hard interoperability |
-| No canonical schema registry | Fragmentation |
-| No partial verification | Everything becomes opaque |
-| No proof introspection | Weak auditability |
-| No deterministic semantic validation | Runtime inconsistency |
-| Hard zk integration | Expensive witness handling |
-| Weak traceability | Poor provenance |
-| Weak policy enforcement | Unsafe automation |
+Not chain accounts.
+
+Not runtime structs.
+
+Not SDK DTOs.
+
+A canonical envelope.
+
+## Required Model
+
+```rust
+struct CanonicalSanadEnvelope {
+    protocol_version: u16,
+    sanad_id: Hash256,
+    sanad_type: TypeId,
+    issuer_id: Hash256,
+
+    body_hash: Hash256,
+    metadata_root: Hash256,
+    proof_root: Hash256,
+    seal_root: Hash256,
+
+    timestamp: u64,
+    nonce: u64,
+
+    parent_refs: Vec<Hash256>,
+    dependency_refs: Vec<Hash256>,
+
+    signature_scheme: SignatureScheme,
+    canonical_encoding: EncodingType,
+}
+```
+
+This envelope must:
+
+- serialize identically everywhere
+- hash identically everywhere
+- survive chain migration
+- survive adapter rewrites
+- survive SDK rewrites
+- survive runtime rewrites
+
+The chain contracts should store only commitments.
+
+Never large semantic payloads.
 
 ---
 
-# Recommended Sanad Model
+# 6. NO STRONG EVENT CANONICALIZATION STRATEGY
 
-## Strong Recommendation
+The runtime already contains event abstractions.
 
-Separate:
+But event semantics are still under-defined.
 
-1. canonical cryptographic envelope
-2. extensible semantic payload
+Distributed settlement systems fail from event ambiguity long before cryptography fails.
+
+## Missing Pieces
+
+- globally ordered event IDs
+- causality chains
+- replay checkpoints
+- deterministic event hashing
+- idempotency guarantees
+- monotonic sequencing
+- poison-event handling
+- duplicate-event reconciliation
+- tombstone semantics
+
+## Required Event Structure
+
+```rust
+struct CanonicalEvent {
+    event_id: Hash256,
+    causality_parent: Option<Hash256>,
+    transfer_id: Hash256,
+    sequence: u64,
+    emitted_at: u64,
+    event_type: EventType,
+    payload_hash: Hash256,
+}
+```
+
+---
+
+# 7. REPLAY PROTECTION IS CONCEPTUALLY GOOD BUT OPERATIONALLY WEAK
+
+`ReplayDatabase` is one of the strongest architectural directions in the repository.
+
+But replay prevention in distributed systems is not just key existence.
+
+You need:
+
+- atomic state transitions
+- durable write-ahead logging
+- monotonic checkpoints
+- crash-safe commit semantics
+- distributed fencing
+- lease expiration semantics
+- consensus-aware idempotency
+
+## Missing Operational Guarantees
+
+There is insufficient evidence of:
+
+- WAL guarantees
+- crash recovery invariants
+- split-brain handling
+- multi-coordinator fencing
+- deterministic replay reconstruction
+
+## Required Model
+
+Replay state should become append-only.
+
+Never mutable.
 
 Example:
 
 ```rust
-struct SanadEnvelope {
-    version: u32,
-    sanad_id: Hash,
-    schema_id: Hash,
-    payload_hash: Hash,
-    issuer: PublicKey,
-    timestamp: u64,
-    seal_refs: Vec<Hash>,
-    proof_refs: Vec<Hash>,
-    payload: CanonicalPayload,
+enum ReplayRecord {
+    Pending,
+    Locked,
+    Anchored,
+    Finalized,
+    Rejected,
+    Reverted,
 }
 ```
 
-Then:
+Each transition should:
+
+- include previous hash
+- include monotonic sequence
+- include actor identity
+- be signed or MACed
+
+---
+
+# 8. ADAPTER ISOLATION IS INCOMPLETE
+
+The architecture intends adapter isolation.
+
+But the repository still risks semantic leakage.
+
+Examples:
+
+- chain-specific proof assumptions
+- chain-native timing semantics
+- chain-native account assumptions
+- inconsistent finality behavior
+- chain-native replay semantics
+
+The runtime must never understand:
+
+- Solana slots
+- Ethereum confirmations
+- Aptos epochs
+- Bitcoin mempool semantics
+
+Adapters should translate all of this into canonical protocol semantics.
+
+Right now the abstraction boundary is still porous.
+
+---
+
+# 9. FINALITY MODEL IS UNDERDEFINED
+
+This is extremely dangerous.
+
+Different chains expose:
+
+- probabilistic finality
+- deterministic finality
+- optimistic finality
+- checkpointed finality
+- economic finality
+
+A universal “verify_finality()” abstraction is insufficient.
+
+The runtime requires a canonical finality confidence model.
+
+## Required Structure
 
 ```rust
-enum CanonicalPayload {
-    JsonCanonical(Vec<u8>),
-    CborCanonical(Vec<u8>),
-    DagCbor(Vec<u8>),
-    IPLD(Vec<u8>),
-    TypedBinary(Vec<u8>),
+enum FinalityGuarantee {
+    Probabilistic {
+        confirmations: u64,
+        reorg_probability: f64,
+    },
+
+    Deterministic {
+        checkpoint_hash: Hash256,
+    },
+
+    Economic {
+        slash_cost: u128,
+    },
 }
 ```
 
----
+Without this:
 
-# Can AI Be Used?
-
-Yes — but not directly inside proofs.
-
-AI should NEVER define canonical truth.
-
-AI should only:
-
-- assist extraction
-- assist classification
-- assist schema mapping
-- assist semantic enrichment
-- assist indexing
-- assist queryability
-
-The canonical proof system must remain deterministic.
+cross-chain transfers can finalize under incompatible trust assumptions.
 
 ---
 
-## Correct AI Architecture
+# 10. NO CLEAR GOVERNANCE MODEL FOR CONTRACT EVOLUTION
 
-### AI Layer (Non-Canonical)
+This is critical.
 
-AI can:
+You already understand the operational danger:
 
-- parse documents
-- extract entities
-- summarize content
-- classify sanad types
-- generate semantic tags
-- map to schemas
+contracts cannot change frequently.
 
-But these outputs must be:
+But the repository lacks a visible governance architecture for:
 
-- signed
-- versioned
-- separately attributable
-- revocable
-- non-authoritative
+- schema evolution
+- contract migration
+- proof evolution
+- deprecation windows
+- capability negotiation
+- feature flags
+- verifier upgrades
 
----
+## Required Strategy
 
-## What Must Stay Deterministic
-
-The following must NEVER depend on AI:
-
-- hashes
-- commitments
-- proofs
-- canonical serialization
-- seal consumption
-- transition validity
-- replay protection
-- proof verification
-- state machine transitions
-
----
-
-# Complex Sanad Data and Proof Impact
-
-## Important Principle
-
-The more complex the payload:
-
-the more important canonicalization becomes.
-
-Without canonicalization:
-
-proofs become unverifiable across implementations.
-
----
-
-## You Need Canonical Serialization
-
-Mandatory recommendation:
-
-Use one of:
-
-- DAG-CBOR
-- deterministic CBOR
-- canonical protobuf
-- IPLD
-
-Avoid raw JSON for canonical proof payloads.
-
-JSON is unsafe unless aggressively canonicalized.
-
----
-
-## Proof System Impact
-
-### If Payloads Become Complex
-
-Then proofs must support:
-
-- subtree hashing
-- selective disclosure
-- field-level proofs
-- Merkleized payloads
-- typed schemas
-- version negotiation
-- recursive proofs
-
-Otherwise proofs become enormous and brittle.
-
----
-
-## Recommended Future Direction
-
-Move toward:
-
-```text
-Sanad
- ├── Canonical Envelope
- ├── Merkleized Payload
- ├── Typed Schema
- ├── Selective Disclosure Proofs
- ├── Seal References
- ├── Cross-chain Anchors
- └── Provenance DAG
-```
-
-This is the correct long-term architecture.
-
----
-
-# 3. Deep Repository Audit
-
-# Architectural Audit
-
-## Strengths
-
-### 1. Excellent Separation of Domains
-
-The repository structure is surprisingly mature.
-
-Strong areas:
-
-- adapter isolation
-- core/runtime separation
-- explorer/indexer separation
-- contract isolation
-- SDK isolation
-- proof-centric architecture
-- transfer state modeling
-- replay modeling
-
-The repository already thinks in terms of:
-
-- distributed systems
-- adversarial conditions
-- finality variance
-- reorgs
-- verification pipelines
-
-This is substantially more mature than most blockchain repositories.
-
----
-
-### 2. Strong Cryptographic Awareness
-
-Positive signs:
-
-- tagged hashing
-- replay registries
-- deterministic proofs
-- reorg monitoring
-- taproot/tapret awareness
-- proof provenance
-- commitment chains
-- state transition modeling
-
-The `tagged_hash.rs` design is correct and security-aware.
-
-The use of domain separation is especially important.
-
----
-
-### 3. Strong State Modeling
-
-The transfer state system is one of the strongest architectural parts.
-
-Explicit transition states reduce:
-
-- invalid progression
-- replay ambiguity
-- partial completion hazards
-- runtime inconsistency
-
-This is good protocol engineering.
-
----
-
-### 4. Good Testing Intent
-
-Positive indicators:
-
-- property tests
-- compile-fail tests
-- replay resistance tests
-- rollback consistency tests
-- fuzz targets
-- integration testing
-
-This is significantly above average.
-
----
-
-# Architectural Weaknesses
-
-## 1. Protocol Constitution Is Not Yet Formalized
-
-This is the biggest issue.
-
-The repository has:
-
-- many protocol concepts
-- many implementations
-- many chains
-- many proof paths
-
-But there is no single:
-
-"constitutional protocol definition"
-
-The danger:
-
-different adapters eventually drift.
-
----
-
-## Missing Canonical Protocol Layer
-
-You need:
-
-- canonical serialization spec
-- canonical hashing spec
-- canonical proof encoding spec
-- schema evolution rules
-- compatibility guarantees
-- invariant document
-- deterministic execution guarantees
-- contract/event ABI guarantees
-
-This should exist independently of implementation.
-
-Currently the implementation is partially defining the protocol.
-
-That becomes dangerous at ecosystem scale.
-
----
-
-## 2. Adapter Semantic Drift Risk
-
-Each chain adapter independently implements:
-
-- proofs
-- seals
-- minting
-- verification
-- signatures
-- node interactions
-
-This creates long-term divergence risk.
-
-Example risk:
-
-Ethereum verifier semantics drift from Solana verifier semantics.
-
-Then:
-
-- proofs disagree
-- replay rules diverge
-- seal interpretation diverges
-- state equivalence breaks
-
----
-
-## Recommendation
-
-Move most verification logic into csv-core.
-
-Adapters should only provide:
-
-- transport
-- chain data extraction
-- finality proofs
-- contract interaction
-
-NOT semantic validation logic.
-
----
-
-# Security Audit
-
-## Positive Security Signals
-
-### Tagged Hashing
-
-`csv-core/src/tagged_hash.rs`
-
-Good:
-
-- BIP340-style domain separation
-- protocol namespacing
-- collision prevention
-- deterministic hashing
-
-This is production-quality direction.
-
----
-
-### Reorg Awareness
-
-`csv-core/src/monitor.rs`
-
-Good:
-
-- reorg detection
-- rollback handling
-- publication timeout tracking
-- censorship awareness
-
-This is stronger than many production blockchain systems.
-
----
-
-### Tapret Verification
-
-`csv-core/src/tapret_verify.rs`
-
-Positive:
-
-- explicit structure validation
-- commitment offset verification
-- BIP341 awareness
-- output key derivation checks
-
-However:
-
-there are dangerous limitations.
-
----
-
-## Critical Security Concerns
-
-# 1. Structural Verification ≠ Full Verification
-
-The Tapret module itself admits:
-
-"structural verification"
-
-This is dangerous if downstream developers misunderstand guarantees.
-
-Potential issue:
-
-partial verification mistaken for cryptographic validity.
-
----
-
-## Recommendation
-
-Introduce explicit verification levels:
+Every deployed contract must expose:
 
 ```rust
-enum VerificationLevel {
-    StructuralOnly,
-    MerkleVerified,
-    FullyVerified,
-    ConsensusVerified,
+struct ContractCapabilities {
+    protocol_version: u16,
+    supported_proof_versions: Vec<u16>,
+    supported_hash_algorithms: Vec<HashAlg>,
+    supported_seal_versions: Vec<u16>,
 }
 ```
 
-Never expose boolean validity alone.
+Runtime nodes must negotiate capabilities.
+
+Never assume compatibility.
 
 ---
 
-# 2. Runtime Consensus Ambiguity
+# 11. EXPLORER ARCHITECTURE IS NOT YET INCIDENT-READY
 
-The repository lacks:
+Explorer/indexer systems become forensic infrastructure during attacks.
 
-- Byzantine fault model definition
-- trust assumptions
-- consistency guarantees
-- runtime quorum guarantees
-- canonical replay resolution
-
-This becomes critical once:
-
-- multiple runtimes exist
-- third-party chains integrate
-- distributed coordinators emerge
-
----
-
-# 3. Versioning Is Under-Specified
-
-This is one of the highest long-term risks.
+Right now the explorer appears operationally helpful but not forensic-grade.
 
 Missing:
 
-- proof version negotiation
-- schema compatibility matrix
-- runtime compatibility guarantees
-- canonical upgrade path
-- seal format versioning
-- cross-chain compatibility guarantees
+- immutable event snapshots
+- forensic replay tooling
+- proof lineage tracing
+- causal graph visualization
+- seal ancestry reconstruction
+- transfer rollback simulation
+- tamper-evident indexing
 
-Without this:
+The explorer should become a verification instrument.
 
-future upgrades may permanently fragment proofs.
-
----
-
-# 4. Potential Serialization Risks
-
-I strongly suspect hidden risk around:
-
-- serde defaults
-- field ordering
-- optional fields
-- enum representation
-- JSON ambiguity
-- language interoperability
-
-This becomes catastrophic for:
-
-- proofs
-- hashing
-- seals
-- cross-language verification
+Not merely a UI.
 
 ---
 
-## Mandatory Recommendation
+# 12. OBSERVABILITY EXISTS BUT IS NOT PROTOCOL-CENTRIC
 
-Never hash raw serde JSON.
+Most systems add metrics.
 
-Instead:
-
-- canonical CBOR
-- deterministic binary encoding
-- schema-hashed payloads
-
-must become mandatory.
-
----
-
-# 5. Contract/Event Consistency Risk
-
-The Ethereum seal ABI manually computes:
-
-- selectors
-- event signatures
-- calldata
-
-This is acceptable for minimal contracts.
-
-But ecosystem-scale systems need:
-
-- generated ABI bindings
-- ABI freeze guarantees
-- event versioning
-- canonical manifest generation
-- deployment attestation
-
-Otherwise:
-
-silent divergence becomes possible.
-
----
-
-# 6. Replay Registry Design Needs Formal Proofing
-
-Replay prevention exists conceptually.
-
-Good.
-
-But replay systems require:
-
-- canonical scope definition
-- distributed consistency guarantees
-- pruning rules
-- tombstone guarantees
-- rollback semantics
-- finality semantics
-
-This area likely needs formal modeling.
-
----
-
-# Dependency Audit
-
-## Positive
-
-Rust ecosystem choice is generally strong.
-
-Good signs:
-
-- avoidance of excessive JS core logic
-- cryptographic orientation
-- no obvious massive framework dependence
-- protocol-centric architecture
-
----
-
-## Concerns
-
-### 1. Potential Tokio Lock-In
-
-Large distributed systems become difficult to WASM-port when:
-
-- tokio assumptions spread everywhere
-- async leaks into protocol layers
-- runtime-specific behavior affects determinism
-
-Recommendation:
-
-keep async outside protocol logic.
-
----
-
-### 2. Native Crypto Dependency Risks
-
-Need audit for:
-
-- OpenSSL
-- platform TLS
-- libc coupling
-- RNG assumptions
-- architecture-specific SIMD
-
-Especially for WASM portability.
-
----
-
-### 3. Duplicated Logic Across Languages
-
-TypeScript SDK likely risks semantic drift.
-
-Long-term dangerous.
-
-Recommendation:
-
-WASM-first SDK architecture.
-
-TS should become thin wrappers over WASM protocol core.
-
----
-
-# Distributed Systems Audit
-
-## Strong Concepts Already Present
-
-The repository already understands:
-
-- reorgs
-- finality
-- rollback
-- proof provenance
-- event ordering
-- replay attacks
-- distributed proof validation
-
-This is excellent.
-
----
-
-## Missing Distributed Guarantees
-
-### 1. Event Ordering Model
-
-Not clearly defined.
-
-Need:
-
-- causal ordering
-- canonical replay resolution
-- eventual consistency model
-- deterministic conflict handling
-
----
-
-### 2. Failure Domain Definitions
-
-Need explicit definitions for:
-
-- Byzantine nodes
-- malicious indexers
-- RPC equivocation
-- partial chain partitions
-- delayed finality
-- inconsistent chain data
-- runtime split brain
-
----
-
-### 3. Proof Availability Strategy
-
-No strong proof availability layer yet.
-
-Eventually needed:
-
-- proof gossip
-- content addressing
-- DAG synchronization
-- deterministic proof chunking
-- light client verification
-
----
-
-### 4. Runtime Consensus Layer Missing
-
-If multiple coordinators exist:
-
-what defines truth?
-
-This becomes a major future architectural problem.
-
----
-
-# Reliability Audit
-
-## Positive Reliability Signals
-
-- compile-fail tests
-- replay tests
-- rollback tests
-- property testing
-- reorg awareness
-- timeout tracking
-- explicit states
-
-These are excellent signs.
-
----
-
-## Reliability Gaps
-
-### 1. Deterministic Serialization Not Fully Enforced
-
-This is the largest reliability threat.
-
----
-
-### 2. Cross-Chain Consistency Not Formally Proven
-
-Need:
-
-- equivalence tests
-- cross-adapter invariant tests
-- proof parity tests
-- contract/runtime consistency tests
-
----
-
-### 3. Eventual Scale Risks
-
-Current repository structure may become difficult at scale because:
-
-- adapters duplicate logic
-- protocol evolution is not centralized
-- schemas are insufficiently formalized
-- proofs are not strongly versioned
-
----
-
-# Readiness for External Ecosystem Adoption
-
-## Current Status
-
-### Good Enough For
-
-- research
-- prototype deployments
-- internal integrations
-- advanced alpha users
-- protocol experimentation
-- architecture validation
-
----
-
-### NOT Yet Ready For
-
-- long-lived external ecosystem
-- third-party chain implementations
-- independent verifier ecosystems
-- permanent proof archival
-- stable contract ecosystem
-- institutional-grade interoperability
-
----
-
-# What Must Exist Before External Ecosystem Expansion
-
-## Mandatory
-
-### 1. Canonical Protocol Specification
-
-Non-code specification.
-
-Must define:
-
-- serialization
-- hashing
-- proofs
-- state transitions
-- seal semantics
-- replay semantics
-- compatibility rules
-
----
-
-### 2. Compatibility Constitution
+Settlement systems require causality observability.
 
 You need:
 
-- version negotiation
-- deprecation rules
-- migration guarantees
-- schema evolution rules
-- ABI guarantees
+- transfer lineage IDs
+- cross-chain trace propagation
+- deterministic replay traces
+- proof verification spans
+- state-transition audit trails
+- cryptographic operation timing
+- finality lag metrics
+- chain drift metrics
 
----
+## Required Trace Fields
 
-### 3. Golden Test Corpus
-
-Mandatory.
-
-Need:
-
-- canonical proof vectors
-- canonical sanad vectors
-- cross-language fixtures
-- replay fixtures
-- malformed proof fixtures
-- adversarial fixtures
-
-All SDKs and chains must pass them.
-
----
-
-### 4. Formal Invariant Definitions
-
-You already started this direction.
-
-Need expansion.
-
----
-
-# 4. csv-Contracts Audit
-
-# Overall Assessment
-
-The contract architecture is directionally correct.
-
-Good:
-
-- minimalism
-- seal orientation
-- event-centric design
-- deployment scripts
-- chain isolation
-- low on-chain complexity
-
-This is smart.
-
-Keeping contracts minimal is the correct strategy.
-
----
-
-# However: Major Long-Term Risks Exist
-
-## 1. Contract Semantics Must Become Immutable
-
-You already correctly identified:
-
-frequent contract upgrades are infeasible.
-
-Correct.
-
-This means:
-
-contracts must become:
-
-- constitutional
-- minimal
-- future-proof
-- schema-agnostic
-- proof-compatible
-- stable for many years
-
----
-
-# Recommended Contract Philosophy
-
-Contracts should NOT understand:
-
-- application logic
-- sanad semantics
-- runtime policy
-- AI semantics
-- workflow semantics
-
-Contracts should ONLY verify:
-
-- commitments
-- seal uniqueness
-- proof roots
-- authorized transitions
-- replay prevention
-- version compatibility
-
----
-
-# Strong Recommendation
-
-Move toward:
+Every operation should include:
 
 ```text
-On-chain:
-- immutable commitment roots
-- seal consumption
-- proof anchors
-- replay nullifiers
-- minimal verification
-
-Off-chain:
-- semantics
-- indexing
-- AI enrichment
-- workflows
-- large payloads
-- DAG traversal
+transfer_id
+seal_id
+proof_id
+chain_id
+event_sequence
+replay_checkpoint
+causality_parent
+runtime_epoch
 ```
-
-This is the correct architecture.
-
----
-
-# Smart Contract Risks
-
-## 1. ABI Stability Risk
-
-Deployment scripts exist.
-
-Good.
-
-But there is insufficient evidence of:
-
-- ABI freeze governance
-- semantic versioning
-- manifest signing
-- deployment attestation
-- deterministic deployment verification
-
----
-
-## Recommendation
-
-Every deployment should produce:
-
-```text
-contract-manifest.json
- ├── chain
- ├── address
- ├── bytecode hash
- ├── ABI hash
- ├── semantic version
- ├── deployment block
- ├── proof schema version
- └── verification status
-```
-
-Signed by release keys.
-
----
-
-# 2. Proof Compatibility Must Be First-Class
-
-Contracts should be designed for:
-
-- recursive proofs
-- Merkleized payloads
-- future zk verification
-- selective disclosure
-- compact commitments
-
-Current contracts appear minimal enough to evolve into this.
-
-Good.
-
----
-
-# 3. Event Design Must Be Canonical
-
-Events are part of the protocol.
-
-Treat them as consensus interfaces.
-
-Never casually modify:
-
-- event field ordering
-- indexing semantics
-- topic layouts
-- hash derivation
-
----
-
-# 4. Seal Design Needs Stronger Formalization
-
-Seals are effectively:
-
-single-use cryptographic capability tokens.
-
-This is powerful.
-
-But requires:
-
-- exact uniqueness semantics
-- rollback semantics
-- reorg semantics
-- replay scope
-- chain equivalence rules
-- canonical seal derivation
-
----
-
-# Future-Proof Contract Design Recommendations
-
-## Recommended Canonical Model
-
-```text
-Seal
- ├── seal_id
- ├── version
- ├── chain_domain
- ├── commitment_root
- ├── nullifier
- ├── proof_root
- ├── schema_hash
- ├── replay_scope
- └── metadata_hash
-```
-
-This enables:
-
-- future sanad evolution
-- proof upgrades
-- zk systems
-- selective disclosure
-- compact verification
-
-without changing contracts.
-
----
-
-# Highest Priority Recommendations
-
-# Priority 0 (Critical)
-
-## 1. Freeze Canonical Serialization
-
-Must happen before ecosystem expansion.
-
----
-
-## 2. Define Protocol Constitution
-
-Must exist independent of implementation.
-
----
-
-## 3. Define Versioning Strategy
 
 Without this:
 
-future proof incompatibility is almost guaranteed.
+incident reconstruction becomes guesswork.
 
 ---
 
-## 4. Make csv-core the Constitutional Kernel
+# 13. DEPLOYMENT MODEL IS UNDERHARDENED
 
-Everything else becomes adapters.
+The repository contains deployment abstractions.
 
----
+But distributed protocol deployment requires:
 
-# Priority 1
+- deterministic bootstrap
+- immutable manifests
+- reproducible builds
+- chain capability verification
+- schema compatibility checks
+- cryptographic deployment attestations
+- rollback-safe migrations
 
-## 5. WASM-First Refactor
+## Required Artifact
 
-Protocol verification must run:
+Every deployment should emit:
 
-- browser
-- mobile
-- node
-- server
-- embedded
+```text
+manifest.json
+proof-manifest.json
+contract-hashes.json
+adapter-capabilities.json
+runtime-policy.json
+```
 
----
+Signed.
 
-## 6. Merkleized Sanad Payloads
+Content-addressed.
 
-Critical for future scalability.
-
----
-
-## 7. Canonical Proof Corpus
-
-Required before third-party implementations.
-
----
-
-# Priority 2
-
-## 8. Formal Threat Modeling
-
-Need explicit adversarial models.
+Immutable.
 
 ---
 
-## 9. Cross-Adapter Equivalence Testing
+# 14. CONTRACT STORAGE DESIGN STILL LEANS TOO HEAVILY ON MUTABLE STATE
 
-Critical long-term.
+The Solana contract already improved by removing O(n) lock vectors.
+
+That is good.
+
+But the broader architecture still models state too mutably.
+
+Protocol-grade systems should prefer:
+
+- append-only histories
+- immutable commitments
+- content-addressed state
+- event sourcing
+- deterministic reconstruction
+
+instead of:
+
+- mutable account records
+- overwrite-style updates
+- stateful branching
 
 ---
 
-## 10. Contract Manifest Governance
+# 15. CRYPTOGRAPHIC AGILITY IS PRESENT BUT NOT FULLY SAFE
 
-Needed for ecosystem trust.
+The repository hints at tagged hashing and proof-root abstractions.
+
+Good direction.
+
+But cryptographic agility becomes dangerous without strict domain governance.
+
+## Missing
+
+- algorithm registry
+- forbidden algorithm registry
+- mandatory domain separation rules
+- hash namespace governance
+- canonical transcript construction
+- proof transcript versioning
+
+## Required Rule
+
+No direct raw hashing anywhere.
+
+All hashing must go through:
+
+```rust
+TaggedHash::new(
+    Domain::SealCommitment,
+    version,
+    payload,
+)
+```
 
 ---
 
-# Final Verdict
+# 16. RUNTIME DETERMINISM IS NOT YET GUARANTEED
 
-This repository has unusually strong architectural instincts.
+This is extremely important.
 
-The protocol direction is substantially more sophisticated than most blockchain projects.
+Distributed settlement runtimes must behave deterministically under:
 
-Especially strong:
+- retries
+- crashes
+- concurrent coordinators
+- duplicate events
+- reordered delivery
+- delayed finality
+- chain reorgs
 
-- cryptographic awareness
-- replay modeling
-- state transition thinking
-- cross-chain abstraction
-- verification orientation
-- reorg awareness
-- deterministic intent
+Current architecture suggests awareness of this.
 
-However:
+But deterministic execution guarantees are not yet enforceable.
 
-the repository is approaching the point where architectural discipline matters more than adding features.
+## Required Rule
 
-The main future risks are:
+All state transitions must become:
 
-- semantic drift
-- serialization instability
-- proof incompatibility
-- contract divergence
-- schema fragmentation
-- runtime inconsistency
-- uncontrolled extensibility
+```text
+pure(current_state, event) -> next_state
+```
 
-The correct next phase is:
+No hidden IO.
 
-not feature expansion.
+No implicit clocks.
 
-It is constitutional hardening.
+No ambient state.
 
-The repository should evolve into:
+No adapter mutation.
 
-- a deterministic protocol kernel
-- with stable canonical proofs
-- stable serialization
-- immutable contract semantics
-- WASM-first verification
-- formally defined invariants
-- strongly versioned schemas
-- ecosystem compatibility guarantees
+---
 
-If done correctly, the architecture can scale into:
+# 17. MISSING FORMAL SPECIFICATION LAYER
 
-- browser-native verification
-- cross-chain proof portability
-- long-lived sanad ecosystems
-- recursive zk integrations
-- decentralized proof markets
-- offline sovereign verification
-- interoperable third-party implementations
+This is one of the largest ecosystem blockers.
 
-without fragmenting the protocol.
+The repository currently acts as:
+
+- implementation
+n- partial specification
+- protocol definition
+
+all simultaneously.
+
+That does not scale.
+
+External implementers need:
+
+- canonical protocol specification
+- proof format specification
+- event semantics specification
+- canonical serialization specification
+- failure semantics specification
+- replay semantics specification
+- chain capability specification
+- deterministic test vectors
+
+Without this:
+
+every independent implementation becomes a fork.
+
+---
+
+# REQUIRED PRIORITY ROADMAP
+
+# PHASE 1 — HARDENING
+
+Mandatory before ecosystem expansion.
+
+## Required
+
+- eliminate unwrap/expect/panic paths
+- freeze canonical serialization
+- introduce protocol-versioned envelopes
+- centralize proof verification
+- enforce deterministic replay semantics
+- add malicious adapter test suites
+- introduce append-only replay logs
+- define canonical event model
+- forbid non-domain-separated hashing
+- freeze proof envelope format
+
+---
+
+# PHASE 2 — CONTRACT STABILIZATION
+
+## Required
+
+- immutable schema governance
+- capability negotiation
+- canonical proof commitments
+- contract upgrade governance
+- version compatibility matrix
+- deployment attestation manifests
+- chain-independent proof semantics
+
+---
+
+# PHASE 3 — ECOSYSTEM READINESS
+
+## Required
+
+- formal protocol specification
+- interoperability test harness
+- deterministic reference vectors
+- SDK conformance tests
+- independent verifier implementation
+- formal replay simulator
+- adversarial fuzz infrastructure
+
+---
+
+# CODE-LEVEL RECOMMENDATIONS
+
+# Replace Boolean Verification APIs
+
+Forbidden:
+
+```rust
+fn verify() -> bool
+```
+
+Required:
+
+```rust
+enum VerificationResult {
+    Valid,
+    Invalid(VerificationFailure),
+    Retryable(TransientFailure),
+}
+```
+
+---
+
+# Introduce Canonical IDs Everywhere
+
+Use strongly typed IDs.
+
+```rust
+struct TransferId(Hash256);
+struct SealId(Hash256);
+struct ProofId(Hash256);
+struct EventId(Hash256);
+```
+
+Avoid raw `[u8; 32]` everywhere.
+
+Raw byte arrays eventually create semantic corruption.
+
+---
+
+# Replace Mutable State Machines
+
+Avoid:
+
+```rust
+sanad.locked = true;
+```
+
+Prefer:
+
+```rust
+enum SealState {
+    Created,
+    Locked,
+    Anchored,
+    Finalized,
+    Refunded,
+}
+```
+
+with explicit transition validation.
+
+---
+
+# Add Deterministic Serialization Layer
+
+Mandatory.
+
+Example:
+
+```rust
+trait CanonicalSerialize {
+    fn canonical_encode(&self) -> Vec<u8>;
+}
+```
+
+Every proof, event, seal, and Sanad must use identical encoding across:
+
+- Rust
+- TypeScript
+- WASM
+- Solana
+- EVM
+- Sui
+- Aptos
+
+---
+
+# Add Contract Capability Discovery
+
+Every contract should expose:
+
+```rust
+fn capabilities() -> ContractCapabilities
+```
+
+This prevents silent incompatibility.
+
+---
+
+# Introduce Immutable Audit Trail Hashing
+
+Every replay/event record should include:
+
+```rust
+prev_event_hash
+record_hash
+state_hash
+```
+
+This creates tamper-evident lineage.
+
+---
+
+# Add Protocol Test Vector Repository
+
+You need a dedicated repository containing:
+
+- canonical proof vectors
+- malformed proof vectors
+- replay attack vectors
+- chain reorg vectors
+- serialization vectors
+- malicious adapter vectors
+- finality edge cases
+
+Without vectors:
+
+external implementations will drift.
+
+---
+
+# FINAL ASSESSMENT
+
+The repository contains the foundation of a serious protocol.
+
+The architectural intent is substantially above average.
+
+The strongest parts are:
+
+- protocol-oriented thinking
+- replay awareness
+- seal semantics
+- adapter separation
+- multi-chain abstraction direction
+- explicit adversarial awareness
+- event-driven runtime direction
+
+The weakest parts are:
+
+- enforcement
+- determinism
+- schema governance
+- contract immutability strategy
+- canonical serialization
+- operational replay guarantees
+- runtime purity
+- formal specification boundaries
+- ecosystem reproducibility
+
+The repository is currently:
+
+- strong enough for internal iteration
+- strong enough for controlled prototyping
+- not yet strong enough for independent ecosystem implementation
+- not yet hardened enough for irreversible settlement-grade deployment
+
+The core architectural transition still missing is this:
+
+from:
+
+"a runtime with chain adapters"
+
+into:
+
+"a deterministic cryptographic protocol with canonical semantics independent of chains"
+
+That shift changes everything:
+
+- proofs
+- contracts
+- replay semantics
+- observability
+- serialization
+- governance
+- ecosystem compatibility
+- auditability
+- long-term survivability.
 

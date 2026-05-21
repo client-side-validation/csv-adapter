@@ -846,6 +846,7 @@ mod tests {
         let hash: csv_core::hash::Hash = [0u8; 32].into();
 
         let proof = ProofBundle {
+            version: 1,
             transition_dag: csv_core::dag::DAGSegment::new(vec![], hash),
             signatures: vec![],
             seal_ref: csv_core::seal::SealPoint::new(vec![1u8; 32], None).unwrap(),
@@ -869,6 +870,7 @@ mod tests {
         let hash: csv_core::hash::Hash = [0u8; 32].into();
 
         let proof = ProofBundle {
+            version: 1,
             transition_dag: csv_core::dag::DAGSegment::new(vec![], hash),
             signatures: vec![],
             seal_ref: csv_core::seal::SealPoint::new(vec![1u8; 32], None).unwrap(),
@@ -892,6 +894,7 @@ mod tests {
         let hash: csv_core::hash::Hash = [0u8; 32].into();
 
         let proof = ProofBundle {
+            version: 1,
             transition_dag: csv_core::dag::DAGSegment::new(vec![], hash),
             signatures: vec![vec![1u8; 64]],
             seal_ref: csv_core::seal::SealPoint::new(vec![1u8; 32], None).unwrap(),
@@ -922,6 +925,7 @@ mod tests {
         let hash: csv_core::hash::Hash = [0u8; 32].into();
 
         let proof = ProofBundle {
+            version: 1,
             transition_dag: csv_core::dag::DAGSegment::new(vec![], hash),
             signatures: vec![],
             seal_ref: csv_core::seal::SealPoint::new(vec![1u8; 32], None).unwrap(),

@@ -116,7 +116,7 @@ pub fn create_full_wallet(
         ChainId::new("solana"),
     ] {
         let key = derive_key(seed.as_bytes(), &chain, 0, 0).map_err(KeystoreError::Bip44)?;
-        let keystore = KeystoreFile::encrypt(&key, encryption_passphrase, KdfType::Scrypt)
+        let keystore = KeystoreFile::encrypt(&key, encryption_passphrase, KdfType::ScryptTest)
             .map_err(KeystoreError::Keystore)?;
         keystores.push((chain, keystore));
     }

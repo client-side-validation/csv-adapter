@@ -82,8 +82,6 @@ tokio = { version = "1.0", features = ["macros", "rt", "sync", "time"] }
 tokio-tungstenite = { version = "0.20", optional = true }
 reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
 dirs = "5.0"
-csv-bitcoin = { path = "../csv-bitcoin", optional = true }
-csv-ethereum = { path = "../csv-ethereum", optional = true }
 
 # WASM-only dependencies
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -96,5 +94,5 @@ serial_test = "3.0"
 [features]
 default = ["native"]
 native = ["dep:csv-runtime", "dep:reqwest", "dep:tokio-tungstenite"]
-csv-bitcoin = ["dep:csv-bitcoin", "csv-sdk/bitcoin"]
-csv-ethereum = ["dep:csv-ethereum"]
+csv-bitcoin = ["csv-sdk/bitcoin"]
+csv-ethereum = ["csv-sdk/ethereum"]

@@ -4,11 +4,12 @@
 //! actors. A lease is a time-bound authorization that must be acquired before
 //! a transfer can proceed.
 
+use core::fmt;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::collections::HashMap;
 use crate::hash::Hash;
+use crate::tagged_hash::csv_tagged_hash;
 
 /// Unique lease identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -41,7 +42,7 @@ pub struct Lease {
     pub sanad_id: Hash,
     /// Party authorized to execute the transfer
     pub owner: Hash,
-    /// Timestamp when the lease was created
+    /// Timestamp when the lease was created (Unix epoch seconds)
     pub created_at: u64,
     /// Time-to-live in seconds
     pub ttl_secs: u64,
@@ -55,16 +56,11 @@ impl Lease {
     /// * `owner` — The party authorized to execute the transfer
     /// * `ttl_secs` — Time-to-live in seconds (must be > 0)
     pub fn new(sanad_id: Hash, owner: Hash, ttl_secs: u64) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-
         Self {
             id: LeaseId(Hash::new([0u8; 32])), // Set by LeaseManager
             sanad_id,
             owner,
-            created_at: now,
+            created_at: now_secs(),
             ttl_secs,
         }
     }
@@ -77,11 +73,7 @@ impl Lease {
 
     /// Check if this lease is valid at the current time
     pub fn is_valid_now(&self) -> bool {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        self.is_valid(now)
+        self.is_valid(now_secs())
     }
 
     /// Return the expiration time as a Unix timestamp
@@ -100,18 +92,38 @@ impl Lease {
     }
 }
 
+/// Returns the current time as Unix epoch seconds.
+///
+/// In `std` builds, this uses `SystemTime`. In `no_std` builds, it returns 0.
+#[cfg(feature = "std")]
+pub fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+/// Returns the current time as Unix epoch seconds.
+///
+/// In `no_std` builds, this returns 0. Callers should override this
+/// by replacing the function pointer in the `csv_runtime` crate.
+#[cfg(not(feature = "std"))]
+pub fn now_secs() -> u64 {
+    0
+}
+
 /// Manages lease acquisition, validation, and release
 #[derive(Debug, Default)]
 pub struct LeaseManager {
     /// Active leases keyed by sanad_id
-    pub leases: std::collections::HashMap<Hash, Lease>,
+    pub leases: HashMap<Hash, Lease>,
 }
 
 impl LeaseManager {
     /// Create a new lease manager
     pub fn new() -> Self {
         Self {
-            leases: std::collections::HashMap::new(),
+            leases: HashMap::new(),
         }
     }
 
@@ -145,7 +157,7 @@ impl LeaseManager {
         }
 
         let mut lease = Lease::new(sanad_id, owner, ttl_secs);
-        lease.id = LeaseId(Hash::new(crate::tagged_hash::csv_tagged_hash("csv.lease.id.v1", &lease.id.as_bytes()[..])));
+        lease.id = LeaseId(Hash::new(csv_tagged_hash("csv.lease.id.v1", &lease.id.as_bytes()[..])));
 
         self.leases.insert(sanad_id, lease.clone());
         Ok(lease.id)
@@ -204,7 +216,7 @@ impl LeaseManager {
         self.leases
             .get(&sanad_id)
             .filter(|l| l.is_valid_now())
-            .map(|l| l.remaining_secs(SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs()))
+            .map(|l| l.remaining_secs(now_secs()))
     }
 }
 
@@ -256,10 +268,7 @@ mod tests {
         assert!(lease.is_valid_now());
 
         // Simulate time passing
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = now_secs();
         assert!(!lease.is_valid(now + 120));
         assert_eq!(lease.remaining_secs(now + 30), 30);
         assert_eq!(lease.remaining_secs(now + 120), 0);

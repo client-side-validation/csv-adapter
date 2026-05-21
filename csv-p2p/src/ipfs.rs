@@ -280,8 +280,8 @@ mod tests {
         assert_eq!(config.timeout_secs, 30);
     }
 
-    #[test]
-    fn test_ipfs_transport_creation() {
+    #[tokio::test]
+    async fn test_ipfs_transport_creation() {
         let transport = IpfsTransport::with_defaults();
         assert_eq!(transport.transport_name(), "ipfs");
         assert!(!transport.is_connected().await);

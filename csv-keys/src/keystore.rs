@@ -161,39 +161,49 @@ impl KeystoreFile {
         // Calculate MAC (SHA3-256 of derived key + ciphertext)
         let mac = calculate_mac(&derived_key, &ciphertext);
 
-        // Build KDF parameters
-        let kdfparams = match kdf_type {
-            KdfType::Scrypt => KdfParams {
-                dklen: 32,
-                salt: hex::encode(salt),
-                n: Some(262144), // 2^18
-                r: Some(8),
-                p: Some(1),
-                c: None,
-                prf: None,
-            },
-            KdfType::Pbkdf2 => KdfParams {
-                dklen: 32,
-                salt: hex::encode(salt),
-                n: None,
-                r: None,
-                p: None,
-                c: Some(100000),
-                prf: Some("hmac-sha256".to_string()),
-            },
-        };
+       // Build KDF parameters
+            let kdfparams = match kdf_type {
+                KdfType::Scrypt => KdfParams {
+                    dklen: 32,
+                    salt: hex::encode(salt),
+                    n: Some(262144), // 2^18
+                    r: Some(8),
+                    p: Some(1),
+                    c: None,
+                    prf: None,
+                },
+                KdfType::ScryptTest => KdfParams {
+                    dklen: 32,
+                    salt: hex::encode(salt),
+                    n: Some(1024), // 2^10
+                    r: Some(8),
+                    p: Some(1),
+                    c: None,
+                    prf: None,
+                },
+                KdfType::Pbkdf2 => KdfParams {
+                    dklen: 32,
+                    salt: hex::encode(salt),
+                    n: None,
+                    r: None,
+                    p: None,
+                    c: Some(100000),
+                    prf: Some("hmac-sha256".to_string()),
+                },
+            };
 
-        let crypto = CryptoParams {
-            cipher: "aes-256-gcm".to_string(),
-            ciphertext: hex::encode(&ciphertext),
-            cipherparams: CipherParams {
-                iv: hex::encode(iv_bytes),
-            },
-            kdf: match kdf_type {
-                KdfType::Scrypt => "scrypt",
-                KdfType::Pbkdf2 => "pbkdf2",
-            }
-            .to_string(),
+            let crypto = CryptoParams {
+                cipher: "aes-256-gcm".to_string(),
+                ciphertext: hex::encode(&ciphertext),
+                cipherparams: CipherParams {
+                    iv: hex::encode(iv_bytes),
+                },
+                kdf: match kdf_type {
+                    KdfType::Scrypt => "scrypt",
+                    KdfType::ScryptTest => "scrypt",
+                    KdfType::Pbkdf2 => "pbkdf2",
+                }
+                .to_string(),
             kdfparams,
             mac: hex::encode(mac),
         };
@@ -218,7 +228,15 @@ impl KeystoreFile {
             .map_err(|e| KeystoreError::InvalidFormat(format!("Invalid salt: {}", e)))?;
 
         let kdf_type = match self.crypto.kdf.as_str() {
-            "scrypt" => KdfType::Scrypt,
+            "scrypt" => {
+                // Determine cost from stored N parameter
+                let n = self.crypto.kdfparams.n.unwrap_or(262144);
+                if n <= 4096 {
+                    KdfType::ScryptTest
+                } else {
+                    KdfType::Scrypt
+                }
+            }
             "pbkdf2" => KdfType::Pbkdf2,
             _ => return Err(KeystoreError::InvalidFormat("Unknown KDF".to_string())),
         };
@@ -299,6 +317,8 @@ pub enum KdfType {
     /// Scrypt KDF (memory-hard, recommended).
     #[default]
     Scrypt,
+    /// Low-cost scrypt for tests (N=1024).
+    ScryptTest,
     /// PBKDF2 KDF (NIST standard, faster).
     Pbkdf2,
 }
@@ -315,6 +335,18 @@ fn derive_key(
         KdfType::Scrypt => {
             let params = scrypt::Params::new(
                 18, // log2(N) = 18 => N = 262144
+                8,  // r
+                1,  // p
+                32, // key length
+            )
+            .map_err(|e| KeystoreError::KdfError(e.to_string()))?;
+
+            scrypt::scrypt(passphrase.as_bytes(), salt, &params, &mut key)
+                .map_err(|e| KeystoreError::KdfError(e.to_string()))?;
+        }
+        KdfType::ScryptTest => {
+            let params = scrypt::Params::new(
+                10, // log2(N) = 10 => N = 1024
                 8,  // r
                 1,  // p
                 32, // key length

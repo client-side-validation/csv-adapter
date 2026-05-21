@@ -33,9 +33,17 @@ pub enum ProofPhase {
 /// The replay database is append-only; a ReplayId already present means
 /// the transfer has been seen before.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ReplayId([u8; 32]);
+pub struct ReplayId {
+    /// Protocol version this replay ID was generated for
+    pub version: u32,
+    /// 32-byte replay ID payload
+    pub id: [u8; 32],
+}
 
 impl ReplayId {
+    /// Current protocol version for replay IDs.
+    pub const CURRENT_VERSION: u32 = 1;
+
     /// Derive a ReplayId from all inputs that uniquely identify a transfer.
     /// The hash binds together source chain, transaction, seal, transition,
     /// and destination chain so that no two legitimate transfers share an ID.
@@ -66,12 +74,13 @@ impl ReplayId {
             destination_chain,
         };
         let cbor = to_canonical_cbor(&inputs).unwrap_or_default();
-        ReplayId(crate::tagged_hash::csv_tagged_hash("csv.replay-id.v1", &cbor))
+        let id = crate::tagged_hash::csv_tagged_hash("csv.replay-id.v1", &cbor);
+        ReplayId { version: Self::CURRENT_VERSION, id }
     }
 
     /// Return the raw 32-byte replay ID.
     pub fn as_bytes(&self) -> &[u8; 32] {
-        &self.0
+        &self.id
     }
 }
 
@@ -282,6 +291,8 @@ impl FinalityProof {
 /// Complete proof bundle for peer-to-peer verification
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProofBundle {
+    /// Protocol version this bundle conforms to
+    pub version: u32,
     /// State transition DAG segment
     pub transition_dag: DAGSegment,
     /// Authorizing signatures
@@ -301,6 +312,9 @@ pub struct ProofBundle {
 }
 
 impl ProofBundle {
+    /// Current protocol version for proof bundles.
+    pub const CURRENT_VERSION: u32 = 1;
+
     /// Create a new proof bundle
     ///
     /// # Arguments
@@ -322,6 +336,7 @@ impl ProofBundle {
         finality_proof: FinalityProof,
     ) -> Result<Self, &'static str> {
         Self::with_certification(
+            Self::CURRENT_VERSION,
             transition_dag,
             signatures,
             seal_ref,
@@ -356,6 +371,7 @@ impl ProofBundle {
         provenance: Option<crate::provenance::ProofProvenance>,
     ) -> Result<Self, &'static str> {
         Self::with_certification(
+            Self::CURRENT_VERSION,
             transition_dag,
             signatures,
             seal_ref,
@@ -370,6 +386,7 @@ impl ProofBundle {
     /// Create a new proof bundle with certification
     ///
     /// # Arguments
+    /// * `version` - Protocol version this bundle conforms to
     /// * `transition_dag` - State transition DAG segment
     /// * `signatures` - Authorizing signatures (total max 1MB)
     /// * `seal_ref` - Seal reference
@@ -382,6 +399,7 @@ impl ProofBundle {
     /// # Errors
     /// Returns an error if signatures exceed the maximum total size
     pub fn with_certification(
+        version: u32,
         transition_dag: DAGSegment,
         signatures: Vec<Vec<u8>>,
         seal_ref: SealPoint,
@@ -397,6 +415,7 @@ impl ProofBundle {
             return Err("total signatures size exceeds maximum allowed (1MB)");
         }
         Ok(Self {
+            version,
             transition_dag,
             signatures,
             seal_ref,
@@ -454,6 +473,7 @@ impl ProofBundle {
         finality_proof: FinalityProof,
     ) -> Self {
         Self {
+            version: Self::CURRENT_VERSION,
             transition_dag,
             signatures,
             seal_ref,

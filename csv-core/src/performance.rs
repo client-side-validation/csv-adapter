@@ -8,9 +8,9 @@ use crate::collections::HashMap;
 use core::sync::atomic::{AtomicU64, Ordering};
 use spin::RwLock;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 use crate::hash::Hash;
+use crate::lease::now_secs;
 use crate::proof::ProofBundle;
 
 /// Thread-safe proof cache with LRU eviction policy
@@ -37,7 +37,7 @@ impl ProofCache {
         let cache = self.cache.read();
         if let Some(cached) = cache.get(hash) {
             // Check if the cache entry is still valid (30 second TTL)
-            if cached.expires_at > Instant::now() {
+            if cached.expires_at > now_secs() {
                 self.hits.fetch_add(1, Ordering::Relaxed);
                 return Some(cached.proof.clone());
             }
@@ -70,8 +70,8 @@ impl ProofCache {
 
         let cached = CachedProof {
             proof,
-            accessed_at: Instant::now(),
-            expires_at: Instant::now() + Duration::from_secs(30),
+            accessed_at: now_secs(),
+            expires_at: now_secs() + 30,
         };
 
         cache.insert(hash, cached);
@@ -102,8 +102,8 @@ struct CachedProof {
     proof: ProofBundle,
     /// Last access time (for future LRU implementation)
     #[allow(dead_code)]
-    accessed_at: Instant,
-    expires_at: Instant,
+    accessed_at: u64,
+    expires_at: u64,
 }
 
 /// Cache statistics
@@ -199,12 +199,12 @@ impl SequentialVerifier {
 
     /// Verify a single proof bundle
     fn verify_single(&self, proof: &ProofBundle) -> VerificationResult {
-        let start = Instant::now();
+        let start = now_secs();
 
         // Simulate proof verification (real implementation would use chain-specific logic)
         let is_valid = self.verify_proof_internal(proof);
 
-        let duration = start.elapsed();
+        let elapsed = now_secs().saturating_sub(start);
 
         // Create a canonical hash from the proof for identification
         let proof_hash = canonical_hash("csv.verification.proof.v1", proof).unwrap_or_default();
@@ -212,7 +212,7 @@ impl SequentialVerifier {
         VerificationResult {
             proof_hash,
             is_valid,
-            verification_time: duration,
+            verification_time_secs: elapsed,
             error: if is_valid {
                 None
             } else {
@@ -229,12 +229,15 @@ impl SequentialVerifier {
     /// that perform actual signature and proof verification.
     fn verify_proof_internal(&self, _proof: &ProofBundle) -> bool {
         // Simulate verification work for benchmarking
-        std::thread::sleep(Duration::from_micros(100));
-        // Return false in production builds to prevent accidental use
         #[cfg(not(test))]
-        return false;
+        {
+            // In production, don't actually sleep — just return false
+            return false;
+        }
         #[cfg(test)]
-        return true;
+        {
+            return true;
+        }
     }
 }
 
@@ -245,8 +248,8 @@ pub struct VerificationResult {
     pub proof_hash: Hash,
     /// Whether the proof is valid
     pub is_valid: bool,
-    /// Time taken to verify the proof
-    pub verification_time: Duration,
+    /// Time taken to verify the proof (in seconds)
+    pub verification_time_secs: u64,
     /// Error message if verification failed
     pub error: Option<String>,
 }
@@ -416,6 +419,7 @@ mod tests {
         use crate::seal::{CommitAnchor, SealPoint};
 
         ProofBundle {
+            version: 1,
             transition_dag: DAGSegment::new(vec![], Hash::zero()),
             signatures: vec![],
             seal_ref: unsafe { SealPoint::new_unchecked(vec![0], Some(0)) },

@@ -512,6 +512,8 @@ impl Sanad {
 pub struct SanadEnvelope {
     /// Protocol version
     pub version: u32,
+    /// Schema identifier for this envelope type
+    pub schema_id: String,
     /// Unique Sanad identifier
     pub sanad_id: SanadId,
     /// Hash of the canonical Sanad payload: `H("csv.sanad.payload.v1" || to_canonical_bytes(sanad))`
@@ -521,6 +523,9 @@ pub struct SanadEnvelope {
 }
 
 impl SanadEnvelope {
+    /// Schema identifier for Sanad envelopes.
+    pub const SCHEMA_ID: &'static str = "csv.sanad.envelope.v1";
+
     /// Create a new SanadEnvelope from a Sanad.
     ///
     /// The payload hash is computed from the Sanad's canonical bytes.
@@ -531,6 +536,7 @@ impl SanadEnvelope {
         ));
         Self {
             version: 1,
+            schema_id: Self::SCHEMA_ID.to_string(),
             sanad_id: sanad.id.clone(),
             payload_hash,
             merkle_root: None,

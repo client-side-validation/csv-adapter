@@ -424,6 +424,7 @@ mod tests {
             _lock_result: &LockResult,
         ) -> Result<ProofBundle, crate::adapter_registry::AdapterError> {
             Ok(ProofBundle {
+                version: 1,
                 transition_dag: csv_core::dag::DAGSegment::new(
                     vec![],
                     csv_core::hash::Hash::new([0u8; 32]),

@@ -7,7 +7,6 @@
 use crate::collections::HashMap;
 use crate::verified::{FinalityStrength, InclusionStrength};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
 
 /// State model used by a chain
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -373,59 +372,142 @@ fn default_start_block() -> u64 {
     0
 }
 
-/// Configuration loader for dynamic chain discovery
-pub struct ChainConfigLoader {
-    configs: HashMap<String, ChainConfig>,
+/// Trait for file system and environment operations.
+///
+/// This abstraction allows chain config loading to work in both `std` and
+/// `no_std` environments. Implementations can be provided for real file
+/// system access, in-memory mocks, or WASI.
+pub trait FileSystem {
+    /// Read all files in a directory, returning file paths and contents.
+    fn read_dir_toml_files(&self, dir: &str) -> Result<Vec<(String, String)>, Box<dyn std::error::Error + Send + Sync>>;
+    
+    /// Read a single file by path.
+    fn read_file(&self, path: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>>;
+    
+    /// Check if a path exists.
+    fn path_exists(&self, path: &str) -> bool;
 }
 
-impl Default for ChainConfigLoader {
+/// Environment variable access trait.
+pub trait EnvVars {
+    /// Get an environment variable by name.
+    fn get_var(&self, name: &str) -> Option<String>;
+}
+
+/// Default std-based file system implementation.
+#[cfg(feature = "std")]
+pub struct StdFileSystem;
+
+#[cfg(feature = "std")]
+impl FileSystem for StdFileSystem {
+    fn read_dir_toml_files(&self, dir: &str) -> Result<Vec<(String, String)>, Box<dyn std::error::Error + Send + Sync>> {
+        let mut paths: Vec<_> = std::fs::read_dir(dir)?
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| path.extension() == Some(std::ffi::OsStr::new("toml")))
+            .collect();
+        paths.sort();
+        
+        let mut result = Vec::new();
+        for path in paths {
+            let content = std::fs::read_to_string(&path)?;
+            let name = path.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            result.push((name, content));
+        }
+        Ok(result)
+    }
+    
+    fn read_file(&self, path: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        Ok(std::fs::read_to_string(path)?)
+    }
+    
+    fn path_exists(&self, path: &str) -> bool {
+        std::path::Path::new(path).exists()
+    }
+}
+
+/// Default no-op environment variable implementation (returns None for all vars).
+pub struct NoEnvVars;
+impl EnvVars for NoEnvVars {
+    fn get_var(&self, _name: &str) -> Option<String> {
+        None
+    }
+}
+
+/// Std-based environment variable implementation.
+#[cfg(feature = "std")]
+pub struct StdEnvVars;
+
+#[cfg(feature = "std")]
+impl EnvVars for StdEnvVars {
+    fn get_var(&self, name: &str) -> Option<String> {
+        std::env::var(name).ok()
+    }
+}
+
+/// Configuration loader for dynamic chain discovery.
+///
+/// Uses trait-based abstractions for file system and environment access
+/// to support both `std` and `no_std` environments.
+pub struct ChainConfigLoader<F: FileSystem, E: EnvVars> {
+    configs: HashMap<String, ChainConfig>,
+    fs: F,
+    env: E,
+}
+
+impl Default for ChainConfigLoader<StdFileSystem, StdEnvVars> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ChainConfigLoader {
-    /// Create new loader
+impl ChainConfigLoader<StdFileSystem, StdEnvVars> {
+    /// Create new loader with default std implementations.
     pub fn new() -> Self {
+        Self::with_fs_env(StdFileSystem, StdEnvVars)
+    }
+}
+
+impl<F: FileSystem, E: EnvVars> ChainConfigLoader<F, E> {
+    /// Create new loader with custom file system and environment implementations.
+    pub fn with_fs_env(fs: F, env: E) -> Self {
         Self {
             configs: HashMap::new(),
+            fs,
+            env,
         }
     }
 
-    /// Load all chain configurations from directory
-    /// Invalid configs are skipped with a warning rather than failing the entire operation
+    /// Load all chain configurations from directory.
+    /// Invalid configs are skipped with a warning rather than failing the entire operation.
     pub fn load_from_directory(
         &mut self,
-        config_dir: &Path,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut paths: Vec<PathBuf> = std::fs::read_dir(config_dir)?
-            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-            .filter(|path| path.extension() == Some(std::ffi::OsStr::new("toml")))
-            .collect();
-
-        paths.sort();
-
-        for path in paths {
-            self.load_file(&path)?;
+        config_dir: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let files = self.fs.read_dir_toml_files(config_dir)?;
+        
+        for (name, content) in files {
+            self.load_content(&name, &content)?;
         }
 
         Ok(())
     }
 
-    /// Load a single chain configuration file.
-    ///
-    /// Invalid configs are skipped with a warning rather than failing the entire operation.
-    pub fn load_file(&mut self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-        let content = std::fs::read_to_string(path)?;
-
-        match toml::from_str::<ChainConfig>(&content) {
+    /// Load a single chain configuration from TOML content.
+    fn load_content(
+        &mut self,
+        name: &str,
+        content: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        match toml::from_str::<ChainConfig>(content) {
             Ok(config) => {
                 let chain_id = config.chain_id.clone();
                 self.configs.insert(chain_id.clone(), config);
-                println!("Loaded chain config: {}", chain_id);
+                println!("Loaded chain config: {} (from {})", chain_id, name);
             }
             Err(e) => {
-                eprintln!("Warning: Failed to parse {}: {}", path.display(), e);
+                eprintln!("Warning: Failed to parse {}: {}", name, e);
             }
         }
 
@@ -435,20 +517,20 @@ impl ChainConfigLoader {
     /// Load chain configurations from the default search locations.
     ///
     /// Search order:
-    /// 1. `CSV_CHAIN_CONFIG_DIR`
-    /// 2. `chains`
+    /// 1. `CSV_CHAIN_CONFIG_DIR` environment variable
+    /// 2. `chains` directory
     pub fn load_from_default_locations(
         &mut self,
-    ) -> Result<Option<PathBuf>, Box<dyn std::error::Error>> {
+    ) -> Result<Option<String>, Box<dyn std::error::Error + Send + Sync>> {
         let mut candidates = Vec::new();
 
-        if let Ok(path) = std::env::var("CSV_CHAIN_CONFIG_DIR") {
-            candidates.push(PathBuf::from(path));
+        if let Some(path) = self.env.get_var("CSV_CHAIN_CONFIG_DIR") {
+            candidates.push(path);
         }
-        candidates.push(PathBuf::from("chains"));
+        candidates.push("chains".to_string());
 
         for candidate in candidates {
-            if candidate.exists() {
+            if self.fs.path_exists(&candidate) {
                 self.load_from_directory(&candidate)?;
                 return Ok(Some(candidate));
             }

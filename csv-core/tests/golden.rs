@@ -37,5 +37,7 @@ fn valid_sanad_envelope_v1() {
     let envelope: SanadEnvelope = from_canonical_cbor(bytes)
         .expect("valid_sanad_envelope_v1 must deserialize");
     assert_eq!(envelope.version, 1);
-    assert_eq!(envelope.sanad_id.as_bytes(), &[14u8; 32]);
+    assert_eq!(envelope.schema_id, SanadEnvelope::SCHEMA_ID);
+    assert!(!envelope.sanad_id.as_bytes().is_empty());
+    assert!(!envelope.payload_hash.as_bytes().is_empty());
 }

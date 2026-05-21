@@ -6,8 +6,10 @@
 //! - Timeout configuration
 //! - Memory limits enforcement
 
-use std::collections::VecDeque;
-use std::time::Duration;
+use alloc::collections::VecDeque;
+use serde::{Deserialize, Serialize};
+
+use crate::lease::now_secs;
 
 /// Maximum number of items in bounded queues
 pub const MAX_SEAL_NULLIFIER_SIZE: usize = 1000;
@@ -18,17 +20,17 @@ pub const MAX_CACHE_SIZE: usize = 1000;
 /// Maximum number of entries in registries
 pub const MAX_REGISTRY_SIZE: usize = 10000;
 
-/// Default timeout for RPC calls
-pub const DEFAULT_RPC_TIMEOUT: Duration = Duration::from_secs(30);
+/// Default timeout for RPC calls (in seconds)
+pub const DEFAULT_RPC_TIMEOUT_SECS: u64 = 30;
 
-/// Default timeout for health checks
-pub const DEFAULT_HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
+/// Default timeout for health checks (in seconds)
+pub const DEFAULT_HEALTH_CHECK_TIMEOUT_SECS: u64 = 5;
 
 /// Default maximum failures before circuit opens
 pub const DEFAULT_CIRCUIT_MAX_FAILURES: usize = 5;
 
-/// Default reset timeout for circuit breaker
-pub const DEFAULT_CIRCUIT_RESET_TIMEOUT: Duration = Duration::from_secs(60);
+/// Default reset timeout for circuit breaker (in seconds)
+pub const DEFAULT_CIRCUIT_RESET_TIMEOUT_SECS: u64 = 60;
 
 /// Bounded queue for enforcing size limits on collections
 ///
@@ -102,22 +104,25 @@ pub enum CircuitState {
 ///
 /// Transitions from `Closed` to `Open` when failures exceed the threshold,
 /// then to `HalfOpen` after a timeout period to test recovery.
+#[derive(Clone, Debug)]
 pub struct CircuitBreaker {
     failure_count: usize,
     max_failures: usize,
-    last_failure_time: Option<std::time::SystemTime>,
-    reset_timeout: Duration,
+    /// Unix epoch seconds of last failure (0 = never)
+    last_failure_time: u64,
+    /// Reset timeout in seconds
+    reset_timeout_secs: u64,
     state: CircuitState,
 }
 
 impl CircuitBreaker {
     /// Create a new circuit breaker with the given failure threshold and reset timeout
-    pub fn new(max_failures: usize, reset_timeout: Duration) -> Self {
+    pub fn new(max_failures: usize, reset_timeout_secs: u64) -> Self {
         Self {
             failure_count: 0,
             max_failures,
-            last_failure_time: None,
-            reset_timeout,
+            last_failure_time: 0,
+            reset_timeout_secs,
             state: CircuitState::Closed,
         }
     }
@@ -125,7 +130,7 @@ impl CircuitBreaker {
     /// Record a failure and potentially trip the circuit open
     pub fn record_failure(&mut self) {
         self.failure_count += 1;
-        self.last_failure_time = Some(std::time::SystemTime::now());
+        self.last_failure_time = now_secs();
 
         if self.failure_count >= self.max_failures {
             self.state = CircuitState::Open;
@@ -146,8 +151,9 @@ impl CircuitBreaker {
         match self.state {
             CircuitState::Closed => true,
             CircuitState::Open => {
-                if let Some(last_failure) = self.last_failure_time {
-                    if last_failure.elapsed().unwrap_or_default() > self.reset_timeout {
+                if self.last_failure_time > 0 {
+                    let elapsed = now_secs().saturating_sub(self.last_failure_time);
+                    if elapsed > self.reset_timeout_secs {
                         self.state = CircuitState::HalfOpen;
                         true
                     } else {
@@ -175,24 +181,24 @@ impl CircuitBreaker {
 
 impl Default for CircuitBreaker {
     fn default() -> Self {
-        Self::new(DEFAULT_CIRCUIT_MAX_FAILURES, DEFAULT_CIRCUIT_RESET_TIMEOUT)
+        Self::new(DEFAULT_CIRCUIT_MAX_FAILURES, DEFAULT_CIRCUIT_RESET_TIMEOUT_SECS)
     }
 }
 
 /// Timeout configuration for RPC calls and health checks
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TimeoutConfig {
-    /// Timeout for individual RPC calls
-    pub rpc_call: Duration,
-    /// Timeout for health check requests
-    pub health_check: Duration,
+    /// Timeout for individual RPC calls (in seconds)
+    pub rpc_call: u64,
+    /// Timeout for health check requests (in seconds)
+    pub health_check: u64,
 }
 
 impl Default for TimeoutConfig {
     fn default() -> Self {
         Self {
-            rpc_call: DEFAULT_RPC_TIMEOUT,
-            health_check: DEFAULT_HEALTH_CHECK_TIMEOUT,
+            rpc_call: DEFAULT_RPC_TIMEOUT_SECS,
+            health_check: DEFAULT_HEALTH_CHECK_TIMEOUT_SECS,
         }
     }
 }

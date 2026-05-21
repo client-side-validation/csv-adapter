@@ -8,6 +8,9 @@ import "../src/CSVMint.sol";
 /// @title Deploy — Deploy CSVLock and CSVMint on Sepolia testnet
 /// @notice Run with: forge script script/Deploy.s.sol --rpc-url $SEPOLIA_RPC_URL --private-key $DEPLOYER_KEY --broadcast --verify
 contract Deploy is Script {
+    /// @notice Protocol version for deployment manifest
+    uint256 public constant VERSION = 1;
+
     function run() external returns (address lockAddr, address mintAddr) {
         uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
         address deployer = vm.addr(deployerKey);
@@ -37,6 +40,10 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
 
+        // Generate deployment manifest
+        string memory manifest = _generateManifest(address(lock), address(mint));
+        vm.writeLine("deployment_manifest.json", manifest);
+
         // Output for CI/state.json parsing
         console.log("\n=== DEPLOYMENT SUMMARY ===");
         console.log("CSVLock:", address(lock));
@@ -47,5 +54,30 @@ contract Deploy is Script {
 
         lockAddr = address(lock);
         mintAddr = address(mint);
+    }
+
+    /// @notice Generate a deployment manifest with contract addresses and metadata
+    /// @param lockAddr Address of the deployed CSVLock contract
+    /// @param mintAddr Address of the deployed CSVMint contract
+    /// @return Manifest string in JSON format
+    function _generateManifest(address lockAddr, address mintAddr) internal view returns (string memory) {
+        return string(
+            abi.encodePacked(
+                '{"version":',
+                vm.toString(VERSION),
+                ',"timestamp":',
+                vm.toString(block.timestamp),
+                ',"chainId":',
+                vm.toString(block.chainid),
+                ',"deployer":"',
+                vm.toString(msg.sender),
+                '","contracts":{',
+                '"CSVLock":"',
+                vm.toString(lockAddr),
+                '","CSVMint":"',
+                vm.toString(mintAddr),
+                '"}}'
+            )
+        );
     }
 }

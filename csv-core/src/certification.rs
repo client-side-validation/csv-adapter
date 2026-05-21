@@ -19,9 +19,9 @@
 //! 4. Generate certification digest
 //! 5. Sign certification with runtime identity
 
-use std::time::SystemTime;
-use std::hash::Hasher;
 use serde::{Deserialize, Serialize};
+
+use crate::lease::now_secs;
 
 /// Deterministic proof certification
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -30,8 +30,8 @@ pub struct ProofCertification {
     pub version: u32,
     /// Runtime instance that performed certification
     pub runtime_instance: String,
-    /// Timestamp when certification was created
-    pub certified_at: SystemTime,
+    /// Timestamp when certification was created (Unix epoch seconds)
+    pub certified_at: u64,
     /// Certification digest (hash of all verification inputs and outputs)
     pub certification_digest: Vec<u8>,
     /// Verification inputs used for certification
@@ -79,8 +79,8 @@ pub struct IntermediateState {
     pub step: String,
     /// State hash
     pub state_hash: Vec<u8>,
-    /// Timestamp
-    pub timestamp: SystemTime,
+    /// Timestamp (Unix epoch seconds)
+    pub timestamp: u64,
     /// Step-specific metadata
     pub metadata: Vec<u8>,
 }
@@ -94,7 +94,7 @@ pub struct ChainMetadata {
     pub block_height: u64,
     /// Block hash
     pub block_hash: Vec<u8>,
-    /// Current timestamp
+    /// Current timestamp (Unix epoch seconds)
     pub chain_timestamp: u64,
 }
 
@@ -137,7 +137,7 @@ impl ProofCertification {
         Self {
             version: 1,
             runtime_instance,
-            certified_at: SystemTime::now(),
+            certified_at: now_secs(),
             certification_digest,
             verification_inputs,
             verification_outputs,
@@ -161,21 +161,28 @@ impl ProofCertification {
         inputs: &VerificationInputs,
         outputs: &VerificationOutputs,
     ) -> Vec<u8> {
-        // In a real implementation, this would use a cryptographic hash
-        // For now, we use a simple hash of the serialized data
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        use std::hash::Hash;
-        
-        inputs.proof_bundle.hash(&mut hasher);
-        inputs.block_header.hash(&mut hasher);
-        inputs.state_root.hash(&mut hasher);
-        inputs.chain_metadata.chain_id.hash(&mut hasher);
-        inputs.chain_metadata.block_height.hash(&mut hasher);
-        outputs.success.hash(&mut hasher);
-        outputs.final_result.hash(&mut hasher);
-        
-        let hash = hasher.finish();
-        hash.to_be_bytes().to_vec()
+        // Use canonical CBOR serialization + tagged hashing for deterministic digest
+        #[derive(serde::Serialize)]
+        struct DigestInputs<'a> {
+            proof_bundle: &'a [u8],
+            block_header: &'a [u8],
+            state_root: &'a [u8],
+            chain_id: &'a str,
+            block_height: u64,
+            success: bool,
+            final_result: &'a str,
+        }
+        let digest_inputs = DigestInputs {
+            proof_bundle: &inputs.proof_bundle,
+            block_header: &inputs.block_header,
+            state_root: &inputs.state_root,
+            chain_id: &inputs.chain_metadata.chain_id,
+            block_height: inputs.chain_metadata.block_height,
+            success: outputs.success,
+            final_result: &outputs.final_result,
+        };
+        let cbor = crate::canonical::to_canonical_cbor(&digest_inputs).unwrap_or_default();
+        crate::tagged_hash::csv_tagged_hash("csv.certification.digest.v1", &cbor).to_vec()
     }
 
     /// Verify that this certification matches the expected inputs and outputs
@@ -254,7 +261,7 @@ impl IntermediateState {
         Self {
             step,
             state_hash,
-            timestamp: SystemTime::now(),
+            timestamp: now_secs(),
             metadata,
         }
     }
@@ -267,10 +274,7 @@ impl ChainMetadata {
             chain_id,
             block_height,
             block_hash,
-            chain_timestamp: SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
+            chain_timestamp: now_secs(),
         }
     }
 }

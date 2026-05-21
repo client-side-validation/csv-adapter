@@ -7,6 +7,9 @@ pragma solidity ^0.8.20;
 /// The source chain lock event must be proven via a Merkle proof that
 /// is verified against a trusted bridge/relayer commitment root.
 contract CSVMint {
+    /// @notice Protocol version — incremented on every breaking change
+    uint256 public constant VERSION = 1;
+
     uint8 public constant ASSET_CLASS_UNSPECIFIED = 0;
     uint8 public constant ASSET_CLASS_FUNGIBLE_TOKEN = 1;
     uint8 public constant ASSET_CLASS_NON_FUNGIBLE_TOKEN = 2;
@@ -64,6 +67,7 @@ contract CSVMint {
     );
 
     /// @notice Chain IDs for cross-chain transfers
+    /// @dev These IDs must match the chain IDs used in the CSV protocol
     uint8 public constant CHAIN_BITCOIN = 0;
     uint8 public constant CHAIN_SUI = 1;
     uint8 public constant CHAIN_APTOS = 2;

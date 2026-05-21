@@ -788,6 +788,7 @@ impl ChainRuntime {
 
         // Build a minimal ProofBundle from the InclusionProof for broadcast
         let proof_bundle = csv_core::ProofBundle {
+            version: 1,
             transition_dag: csv_core::dag::DAGSegment::new(vec![], proof.block_hash),
             signatures: vec![],
             seal_ref: csv_core::SealPoint::new(vec![], None)

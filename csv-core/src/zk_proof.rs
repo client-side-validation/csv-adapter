@@ -26,10 +26,10 @@
 //! - Verifier keys are chain-specific and registered at runtime
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 use crate::hash::Hash;
 use crate::seal::SealPoint;
+use crate::tagged_hash::csv_tagged_hash;
 
 /// Maximum ZK proof size (1MB)
 pub const MAX_ZK_PROOF_SIZE: usize = 1024 * 1024;
@@ -68,11 +68,11 @@ impl VerifierKey {
 
     /// Compute a hash of this verifier key for identification
     pub fn hash(&self) -> Hash {
-        let mut hasher = Sha256::new();
-        hasher.update(self.chain.as_bytes());
-        hasher.update(&self.key_bytes);
-        hasher.update(self.version.to_le_bytes());
-        Hash::new(hasher.finalize().into())
+        let mut data = Vec::with_capacity(32 + self.key_bytes.len() + 4);
+        data.extend_from_slice(self.chain.as_bytes());
+        data.extend_from_slice(&self.key_bytes);
+        data.extend_from_slice(&self.version.to_le_bytes());
+        Hash::new(csv_tagged_hash("csv.zk.verifier-key.v1", &data))
     }
 }
 
@@ -231,15 +231,17 @@ pub struct ChainWitness {
 impl ChainWitness {
     /// Compute a hash of the witness for integrity verification
     pub fn hash(&self) -> Hash {
-        let mut hasher = Sha256::new();
-        hasher.update(self.chain.as_bytes());
-        hasher.update(self.block_hash.as_bytes());
-        hasher.update(self.block_height.to_le_bytes());
-        hasher.update(&self.tx_data);
-        hasher.update(&self.inclusion_proof);
-        hasher.update(&self.finality_proof);
-        hasher.update(self.timestamp.to_le_bytes());
-        Hash::new(hasher.finalize().into())
+        let mut data = Vec::with_capacity(
+            32 + 32 + 8 + self.tx_data.len() + self.inclusion_proof.len() + self.finality_proof.len() + 8
+        );
+        data.extend_from_slice(self.chain.as_bytes());
+        data.extend_from_slice(self.block_hash.as_bytes());
+        data.extend_from_slice(&self.block_height.to_le_bytes());
+        data.extend_from_slice(&self.tx_data);
+        data.extend_from_slice(&self.inclusion_proof);
+        data.extend_from_slice(&self.finality_proof);
+        data.extend_from_slice(&self.timestamp.to_le_bytes());
+        Hash::new(csv_tagged_hash("csv.zk.witness.v1", &data))
     }
 }
 
@@ -650,9 +652,10 @@ pub mod pedersen {
     use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
     use curve25519_dalek::scalar::Scalar;
     use serde::{Deserialize, Serialize};
-    use sha2::{Digest, Sha256, Sha512};
+    use sha2::{Digest, Sha512};
 
     use crate::hash::Hash;
+    use crate::tagged_hash::csv_tagged_hash;
 
     pub const MAX_COMMITTED_VALUE: u64 = (1u64 << 48) - 1;
 
@@ -685,10 +688,9 @@ pub mod pedersen {
             }
         }
         pub fn hash(&self) -> Hash {
-            let mut hasher = Sha256::new();
-            hasher.update(b"CSV-COMMITMENT-HASH::");
-            hasher.update(self.commitment);
-            Hash::new(hasher.finalize().into())
+            let mut data = Vec::with_capacity(32);
+            data.extend_from_slice(&self.commitment);
+            Hash::new(csv_tagged_hash("csv.pedersen.commitment.v1", &data))
         }
     }
 

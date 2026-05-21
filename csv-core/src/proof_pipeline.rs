@@ -1266,6 +1266,7 @@ mod tests {
             DomainSeparatedHash::<ProofBundleDomain>::hash(&proof_bytes);
 
         let bundle = ProofBundle {
+            version: 1,
             transition_dag: DAGSegment::new(vec![node], Hash::new([9u8; 32])),
             // Signature format: [pk_len (4 bytes LE)] [public_key] [signature]
             signatures: vec![vec![4, 0, 0, 0, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x01, 0x02]],

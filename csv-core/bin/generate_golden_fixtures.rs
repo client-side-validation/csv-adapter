@@ -13,7 +13,6 @@ use csv_core::provenance::{AdapterSignature, ProofProvenance, VerificationStep, 
 use csv_core::seal::{CommitAnchor, SealPoint};
 use std::fs;
 use std::path::Path;
-use std::time::SystemTime;
 
 fn main() {
     let golden_dir = Path::new("tests/golden");
@@ -90,9 +89,13 @@ in CI to ensure fixture integrity.
 }
 
 fn create_valid_proof_bundle() -> ProofBundle {
-    let system_time = SystemTime::now();
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
 
     ProofBundle {
+        version: 1,
         transition_dag: DAGSegment {
             nodes: vec![DAGNode {
                 node_id: Hash::new([1u8; 32]),
@@ -128,11 +131,11 @@ fn create_valid_proof_bundle() -> ProofBundle {
             origin_chain: "bitcoin".to_string(),
             origin_block_height: 800000,
             runtime_instance: "csv-runtime-1".to_string(),
-            created_at: system_time,
+            created_at: now_secs,
             verification_chain: vec![VerificationStep {
                 step_type: VerificationStepType::ProofCreation,
                 component: "csv-core".to_string(),
-                timestamp: system_time,
+                timestamp: now_secs,
                 success: true,
                 error: None,
                 state_hash: Some(vec![12u8; 32]),
@@ -141,7 +144,7 @@ fn create_valid_proof_bundle() -> ProofBundle {
             adapter_signature: Some(AdapterSignature {
                 adapter_id: "bitcoin-adapter".to_string(),
                 signature: vec![14u8; 64],
-                signed_at: system_time,
+                signed_at: now_secs,
             }),
         }),
         certification: None,
@@ -149,21 +152,22 @@ fn create_valid_proof_bundle() -> ProofBundle {
 }
 
 fn create_valid_sanad_envelope() -> Vec<u8> {
-    // Create a simple struct that represents a sanad envelope
-    #[derive(serde::Serialize)]
-    struct SanadEnvelope {
-        version: u32,
-        sanad_id: [u8; 32],
-        payload_hash: [u8; 32],
-        merkle_root: [u8; 32],
-    }
+    use csv_core::sanad::{Sanad, SanadEnvelope as CoreSanadEnvelope, OwnershipProof};
+    use csv_core::hash::Hash;
 
-    let envelope = SanadEnvelope {
-        version: 1,
-        sanad_id: [14u8; 32],
-        payload_hash: [15u8; 32],
-        merkle_root: [16u8; 32],
-    };
+    // Create a minimal Sanad to generate a proper envelope
+    let sanad = Sanad::new(
+        Hash::new([14u8; 32]),
+        OwnershipProof {
+            proof: vec![1u8, 2, 3],
+            owner: vec![4u8; 32],
+            scheme: None,
+        },
+        &[5u8; 16],
+    );
+
+    let mut envelope = CoreSanadEnvelope::from_sanad(&sanad);
+    envelope.merkle_root = Some(Hash::new([16u8; 32]));
 
     to_canonical_cbor(&envelope).expect("Failed to serialize sanad envelope")
 }
