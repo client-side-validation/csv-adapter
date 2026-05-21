@@ -350,7 +350,7 @@ fn perform_offline_verification(input: &str) -> VerificationResult {
     );
 
     let crypto_valid = verification_result.is_valid;
-    let error_msg = verification_result.errors.first().cloned().unwrap_or_else(|| "Unknown error".to_string());
+    let error_msg = verification_result.errors.first().map(|e| e.to_string()).unwrap_or_else(|| "Unknown error".to_string());
     steps.push(VerificationStep {
         name: "Cryptographic Verification".to_string(),
         passed: crypto_valid,

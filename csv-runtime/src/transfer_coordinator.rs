@@ -5,9 +5,11 @@
 
 #![allow(missing_docs)]
 
+use csv_core::cross_chain::CrossChainRegistryEntry;
 use csv_core::proof::ReplayId;
 
 use crate::adapter_registry::{AdapterRegistry, CrossChainTransfer};
+use crate::coordinator_lease::CoordinatorLease;
 use crate::error::TransferCoordinatorError;
 use crate::event_bus::{EventBus, TransferEvent};
 use crate::replay_db::ReplayDatabase;
@@ -34,11 +36,25 @@ pub struct TransferCoordinator {
     circuit_breaker: std::sync::Arc<std::sync::Mutex<crate::runtime_mode::CircuitBreaker>>,
     /// Health monitor for runtime health tracking
     health_monitor: std::sync::Arc<std::sync::Mutex<crate::runtime_mode::HealthMonitor>>,
+    /// Optional distributed lease backend for HA deployments
+    coordinator_lease: Option<Box<dyn CoordinatorLease>>,
 }
 
 impl TransferCoordinator {
     /// Create a new transfer coordinator
     pub fn new(replay_db: Box<dyn ReplayDatabase>, event_bus: EventBus) -> Self {
+        Self::with_coordinator_lease(replay_db, event_bus, None)
+    }
+
+    /// Create a new transfer coordinator with an optional distributed lease backend.
+    ///
+    /// When a `CoordinatorLease` is provided, the coordinator uses it for distributed
+    /// lease enforcement across multiple runtime instances (HA deployments).
+    pub fn with_coordinator_lease(
+        replay_db: Box<dyn ReplayDatabase>,
+        event_bus: EventBus,
+        coordinator_lease: Option<Box<dyn CoordinatorLease>>,
+    ) -> Self {
         Self {
             replay_db,
             event_bus,
@@ -48,6 +64,7 @@ impl TransferCoordinator {
             health_monitor: std::sync::Arc::new(std::sync::Mutex::new(
                 crate::runtime_mode::HealthMonitor::new(),
             )),
+            coordinator_lease,
         }
     }
 
@@ -99,12 +116,36 @@ impl TransferCoordinator {
         adapter_registry: &dyn AdapterRegistry,
         runtime_ctx: crate::lease::RuntimeExecutionContext,
     ) -> Result<TransferReceipt, TransferCoordinatorError> {
-        // Enforce lease ownership for mutating operations. The lease must match
+      // Enforce lease ownership for mutating operations. The lease must match
         // the transfer's Sanad identifier and must be currently active.
         let expected = csv_core::sanad::SanadId::new(*transfer.sanad_id.as_bytes());
         if runtime_ctx.lease.transfer_id != expected {
             return Err(TransferCoordinatorError::RuntimeError(
                 "Lease transfer_id does not match transfer SanadId".to_string(),
+            ));
+        }
+        if !runtime_ctx.lease.is_active(std::time::SystemTime::now()) {
+            return Err(TransferCoordinatorError::RuntimeError(
+                "Lease is expired".to_string(),
+            ));
+        }
+
+        // Validate that the runtime instance matches the lease owner.
+        // This prevents any runtime from executing a transfer with a valid lease
+        // for the same transfer_id — only the lease owner may execute.
+        if runtime_ctx.lease.owner_runtime_id != runtime_ctx.runtime_instance {
+            return Err(TransferCoordinatorError::RuntimeError(format!(
+                "Lease owner {} does not match calling runtime {}",
+                runtime_ctx.lease.owner_runtime_id, runtime_ctx.runtime_instance
+            )));
+        }
+
+        // Validate epoch to detect stale leases.
+        // A lease with epoch 0 is considered stale — it was acquired before
+        // epoch tracking was enabled and cannot be trusted for execution.
+        if runtime_ctx.lease.epoch == 0 {
+            return Err(TransferCoordinatorError::RuntimeError(
+                "Lease epoch is 0 — lease is stale and cannot be used for execution".to_string(),
             ));
         }
         if !runtime_ctx.lease.is_active(std::time::SystemTime::now()) {
@@ -341,6 +382,32 @@ impl TransferCoordinator {
             .await
             .map_err(|e| TransferCoordinatorError::RuntimeError(e.to_string()))?;
 
+        // Persist the full transfer entry for recovery and audit.
+        let lock_tx_bytes: [u8; 32] = lock_result.tx_hash.as_bytes().try_into().unwrap_or_else(|_| [0u8; 32]);
+        let mint_tx_bytes: [u8; 32] = mint_result.tx_hash.as_bytes().try_into().unwrap_or_else(|_| [0u8; 32]);
+        
+        let registry_entry = CrossChainRegistryEntry {
+            sanad_id: transfer.sanad_id,
+            source_chain: csv_core::ChainId(transfer.source_chain.clone()),
+            source_seal: csv_core::seal::SealPoint::new(lock_result.tx_hash.as_bytes().to_vec(), Some(lock_result.block_height)).unwrap_or_else(|_| {
+                csv_core::seal::SealPoint::new(vec![0u8; 32], Some(0)).unwrap()
+            }),
+            destination_chain: csv_core::ChainId(transfer.destination_chain.clone()),
+            destination_seal: csv_core::seal::SealPoint::new(mint_result.tx_hash.as_bytes().to_vec(), None).unwrap_or_else(|_| {
+                csv_core::seal::SealPoint::new(vec![0u8; 32], None).unwrap()
+            }),
+            lock_tx_hash: csv_core::hash::Hash::new(lock_tx_bytes),
+            mint_tx_hash: csv_core::hash::Hash::new(mint_tx_bytes),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0),
+        };
+
+        if let Err(e) = self.replay_db.store_transfer_entry(&registry_entry).await {
+            tracing::warn!("Failed to persist transfer entry: {}", e);
+        }
+
         self.event_bus
             .emit(TransferEvent::Complete {
                 transfer_id: transfer.id.clone(),
@@ -358,6 +425,29 @@ impl TransferCoordinator {
     /// Subscribe to transfer events
     pub fn subscribe(&mut self, subscriber: crate::event_bus::EventSubscriber) {
         self.event_bus.subscribe(subscriber);
+    }
+
+    /// Load all persisted transfer entries from the replay database.
+    ///
+    /// Called at startup to rebuild the in-memory session index from durable storage.
+    /// Returns an empty vec if no entries exist.
+    pub async fn load_all_transfers(&self) -> Result<Vec<CrossChainRegistryEntry>, TransferCoordinatorError> {
+        self.replay_db
+            .load_all_transfers()
+            .await
+            .map_err(|e| TransferCoordinatorError::ReplayDbError(e.to_string()))
+    }
+
+    /// Set the distributed coordinator lease backend.
+    ///
+    /// Used by HA deployments to inject a PostgreSQL-backed lease implementation.
+    pub fn set_coordinator_lease(&mut self, lease: Box<dyn CoordinatorLease>) {
+        self.coordinator_lease = Some(lease);
+    }
+
+    /// Get the optional distributed coordinator lease backend.
+    pub fn coordinator_lease(&self) -> Option<&dyn CoordinatorLease> {
+        self.coordinator_lease.as_deref()
     }
 }
 
@@ -545,8 +635,8 @@ mod tests {
             expires_at: std::time::SystemTime::now() + std::time::Duration::from_secs(3600),
         };
         let pending_ctx = crate::lease::RuntimeExecutionContext {
-            lease: pending_lease,
-            runtime_instance: uuid::Uuid::new_v4(),
+            lease: pending_lease.clone(),
+            runtime_instance: pending_lease.owner_runtime_id,
             policy: crate::policy::RuntimePolicy::new(),
         };
 
@@ -621,8 +711,8 @@ mod tests {
             expires_at: std::time::SystemTime::now() + std::time::Duration::from_secs(3600),
         };
         let runtime_ctx = crate::lease::RuntimeExecutionContext {
-            lease,
-            runtime_instance: uuid::Uuid::new_v4(),
+            lease: lease.clone(),
+            runtime_instance: lease.owner_runtime_id,
             policy: crate::policy::RuntimePolicy::new(),
         };
 
@@ -674,8 +764,8 @@ mod tests {
         // Test with development policy (allows RPC fallback)
         let dev_policy = crate::policy::RuntimePolicy::development();
         let runtime_ctx = crate::lease::RuntimeExecutionContext {
-            lease,
-            runtime_instance: uuid::Uuid::new_v4(),
+            lease: lease.clone(),
+            runtime_instance: lease.owner_runtime_id,
             policy: dev_policy,
         };
 
@@ -716,8 +806,8 @@ mod tests {
         policy.retry_delay = std::time::Duration::from_millis(10);
 
         let runtime_ctx = crate::lease::RuntimeExecutionContext {
-            lease,
-            runtime_instance: uuid::Uuid::new_v4(),
+            lease: lease.clone(),
+            runtime_instance: lease.owner_runtime_id,
             policy,
         };
 
@@ -758,8 +848,8 @@ mod tests {
         };
 
         let runtime_ctx = crate::lease::RuntimeExecutionContext {
-            lease,
-            runtime_instance: uuid::Uuid::new_v4(),
+            lease: lease.clone(),
+            runtime_instance: lease.owner_runtime_id,
             policy: crate::policy::RuntimePolicy::new(),
         };
 
@@ -967,8 +1057,8 @@ mod tests {
         };
 
         let runtime_ctx = crate::lease::RuntimeExecutionContext {
-            lease,
-            runtime_instance: uuid::Uuid::new_v4(),
+            lease: lease.clone(),
+            runtime_instance: lease.owner_runtime_id,
             policy: crate::policy::RuntimePolicy::new(),
         };
 
@@ -1285,8 +1375,8 @@ mod tests {
         };
 
         let runtime_ctx = crate::lease::RuntimeExecutionContext {
-            lease,
-            runtime_instance: uuid::Uuid::new_v4(),
+            lease: lease.clone(),
+            runtime_instance: lease.owner_runtime_id,
             policy: crate::policy::RuntimePolicy::new(),
         };
 
@@ -1324,7 +1414,7 @@ mod tests {
 
         let runtime_ctx = crate::lease::RuntimeExecutionContext {
             lease: lease.clone(),
-            runtime_instance: uuid::Uuid::new_v4(),
+            runtime_instance: lease.owner_runtime_id,
             policy: crate::policy::RuntimePolicy::new(),
         };
 
@@ -1472,8 +1562,8 @@ mod tests {
         };
 
         let runtime_ctx = crate::lease::RuntimeExecutionContext {
-            lease,
-            runtime_instance: uuid::Uuid::new_v4(),
+            lease: lease.clone(),
+            runtime_instance: lease.owner_runtime_id,
             policy: crate::policy::RuntimePolicy::new(),
         };
 

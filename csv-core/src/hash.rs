@@ -75,15 +75,16 @@ impl Hash {
         self.0
     }
 
-    /// Combines two hashes by hashing their concatenation.
+    /// Combines two hashes by hashing their concatenation with domain separation.
+    ///
+    /// Uses `csv_tagged_hash("csv-merkle-combine", left ‖ right)` to prevent
+    /// cross-protocol hash collision attacks on Merkle tree nodes.
     ///
     /// This is used for Merkle tree internal node construction.
     pub fn combine(left: &Self, right: &Self) -> Self {
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(left.0);
-        hasher.update(right.0);
-        Self::new(hasher.finalize().into())
+        use crate::tagged_hash::csv_tagged_hash;
+        let data = [&left.0[..], &right.0[..]].concat();
+        Self::new(csv_tagged_hash("csv-merkle-combine", &data))
     }
 
     /// Returns a new [`Vec<u8>`] containing the hash bytes.

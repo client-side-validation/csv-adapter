@@ -33,6 +33,8 @@ pub mod replay_db;
 pub mod replay_db_rocksdb;
 #[cfg(feature = "postgres")]
 pub mod replay_db_postgres;
+#[cfg(feature = "postgres")]
+pub mod coordinator_lease_postgres;
 pub mod runtime_mode;
 pub mod transfer_coordinator;
 pub mod coordinator_lease;
@@ -58,3 +60,6 @@ pub use coordinator_lease::{
     CoordinatorId, CoordinatorLease, InMemoryLease, LeaseError, LeaseGuard, MintCoordinator,
     MintProvider, MintReceipt,
 };
+
+#[cfg(feature = "postgres")]
+pub use coordinator_lease_postgres::PostgresCoordinatorLease;

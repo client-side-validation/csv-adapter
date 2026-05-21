@@ -320,7 +320,8 @@ impl ParallelVerifyService {
         // Call csv_core::verify_proof
         let vr = verify_proof(proof, seal_registry, signature_scheme);
         if !vr.is_valid {
-            Err(format!("Proof verification failed: {}", vr.errors.first().cloned().unwrap_or_else(|| "Unknown error".to_string())))
+            let msg = vr.errors.first().map(|e| e.to_string()).unwrap_or_else(|| "Unknown error".to_string());
+            Err(format!("Proof verification failed: {}", msg))
         } else {
             Ok(())
         }

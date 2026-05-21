@@ -10,6 +10,7 @@ use crate::error::RuntimeError;
 use crate::replay_db::{ReplayDatabase, ReplayDbError, ReplayEntryState};
 use async_trait::async_trait;
 use csv_core::proof::ReplayId;
+use csv_core::cross_chain::CrossChainRegistryEntry;
 
 /// PostgreSQL-backed replay database with advisory-lock CAS.
 ///
@@ -244,6 +245,47 @@ impl ReplayDatabase for PostgresReplayDb {
         } else {
             Ok(())
         }
+    }
+
+    async fn store_transfer_entry(
+        &self,
+        entry: &CrossChainRegistryEntry,
+    ) -> Result<(), RuntimeError> {
+        let sanad_hex = hex::encode(entry.sanad_id.as_bytes());
+        let entry_json = serde_json::to_string(entry)
+            .map_err(|e| RuntimeError::Storage(format!("Serialization error: {e}")))?;
+
+        sqlx::query(
+            "INSERT INTO cross_chain_transfers (sanad_id, entry_data) VALUES ($1, $2)
+             ON CONFLICT (sanad_id) DO NOTHING",
+        )
+        .bind(&sanad_hex)
+        .bind(&entry_json)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| RuntimeError::Storage(format!("PostgreSQL query error: {e}")))?;
+
+        Ok(())
+    }
+
+    async fn load_all_transfers(
+        &self,
+    ) -> Result<Vec<CrossChainRegistryEntry>, RuntimeError> {
+        let rows = sqlx::query_as::<_, (String, String)>(
+            "SELECT sanad_id, entry_data FROM cross_chain_transfers",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RuntimeError::Storage(format!("PostgreSQL query error: {e}")))?;
+
+        let mut transfers = Vec::new();
+        for (_sanad_hex, entry_json) in rows {
+            let entry: CrossChainRegistryEntry = serde_json::from_str(&entry_json)
+                .map_err(|e| RuntimeError::Storage(format!("Serialization error: {e}")))?;
+            transfers.push(entry);
+        }
+
+        Ok(transfers)
     }
 }
 

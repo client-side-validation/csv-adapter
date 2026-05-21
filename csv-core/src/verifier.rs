@@ -71,6 +71,22 @@ pub enum VerificationErrorCode {
     InternalError,
 }
 
+impl std::fmt::Display for VerificationErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SealReplay => write!(f, "SEAL_REPLAY"),
+            Self::SignatureInvalid => write!(f, "SIGNATURE_INVALID"),
+            Self::InclusionProofInvalid => write!(f, "INCLUSION_PROOF_INVALID"),
+            Self::FinalityNotReached => write!(f, "FINALITY_NOT_REACHED"),
+            Self::DomainMismatch => write!(f, "DOMAIN_MISMATCH"),
+            Self::MalformedProof => write!(f, "MALFORMED_PROOF"),
+            Self::ProofTooLarge => write!(f, "PROOF_TOO_LARGE"),
+            Self::AnchorInvalid => write!(f, "ANCHOR_INVALID"),
+            Self::InternalError => write!(f, "INTERNAL_ERROR"),
+        }
+    }
+}
+
 /// Typed verification error with retryability semantics.
 #[derive(Debug, Clone, Serialize)]
 pub struct VerificationError {
@@ -80,6 +96,12 @@ pub struct VerificationError {
     pub message: String,
     /// Whether retrying may succeed (transient vs permanent).
     pub retryable: bool,
+}
+
+impl std::fmt::Display for VerificationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}] {}", self.code, self.message)
+    }
 }
 
 impl VerificationError {
