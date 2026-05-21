@@ -434,7 +434,7 @@ impl CsvClient {
                     finality_depth: 6,
                     publication_timeout_seconds: 3600,
                     rpc_url: rpc_url.clone(),
-                    xpub: None,
+                    xpub: _config.chains.get("bitcoin").and_then(|c| c.xpub.clone()),
                 };
                 // Create RPC client - this uses reqwest::blocking which needs its own runtime
                 // We must create it outside any async context to avoid runtime conflicts

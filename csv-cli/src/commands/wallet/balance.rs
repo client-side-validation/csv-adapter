@@ -79,14 +79,70 @@ pub fn cmd_list(_config: &Config, state: &mut UnifiedStateManager) -> Result<()>
 /// chain adapter dependencies per Phase 5 of the Production Guarantee Plan.
 async fn query_balance(chain: &Chain, address: &str, config: &Config) -> Result<f64> {
     use csv_sdk::prelude::NetworkType;
+    use csv_sdk::config::{ChainConfig, RpcConfig, StoreConfig};
+    use std::collections::HashMap;
 
     // Map CLI Chain to core Chain
     let core_chain = csv_core::ChainId::new(chain.as_str());
 
-    // Build CSV client with the requested chain enabled
+    // Build SDK config from CLI config, passing through xpub
+    let sdk_chain = config.chains.get(&core_chain.clone()).cloned();
+    let wallet_xpub = config.wallets.get(&core_chain.clone()).and_then(|w| w.xpub.clone());
+
+    let mut sdk_chains = HashMap::new();
+    if let Some(cc) = &sdk_chain {
+        let rpc = RpcConfig {
+            url: cc.rpc_url.clone(),
+            api_key: None,
+            timeout_ms: 30_000,
+            max_retries: 3,
+        };
+        sdk_chains.insert(
+            core_chain.to_string(),
+            ChainConfig {
+                rpc,
+                finality_depth: cc.finality_depth as u32,
+                enabled: true,
+                xpub: wallet_xpub,
+            },
+        );
+    } else {
+        // Use default chain config with xpub from wallet config
+        let rpc_url = config.get_rpc_url(&core_chain);
+        let rpc = RpcConfig {
+            url: rpc_url,
+            api_key: None,
+            timeout_ms: 30_000,
+            max_retries: 3,
+        };
+        sdk_chains.insert(
+            core_chain.to_string(),
+            ChainConfig {
+                rpc,
+                finality_depth: 6,
+                enabled: true,
+                xpub: wallet_xpub,
+            },
+        );
+    }
+
+    let sdk_config = csv_sdk::config::Config {
+        network: if config.network().is_testnet() {
+            csv_sdk::config::Network::Testnet
+        } else {
+            csv_sdk::config::Network::Mainnet
+        },
+        chains: sdk_chains,
+        store: StoreConfig::default(),
+        log_level: None,
+        data_dir: None,
+    };
+
+    // Build CSV client with the requested chain enabled and config
     let client = CsvClient::builder()
         .with_chain(core_chain.clone())
         .with_store_backend(StoreBackend::InMemory)
+        .with_config(sdk_config)
         .build()
         .map_err(|e| anyhow::anyhow!("Failed to build CSV client: {}", e))?;
 

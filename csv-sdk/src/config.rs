@@ -82,6 +82,9 @@ pub struct ChainConfig {
     pub finality_depth: u32,
     /// Whether this chain is enabled.
     pub enabled: bool,
+    /// Extended public key for HD wallet derivation (Bitcoin xpub).
+    /// Used to derive addresses and watch for transactions without spending.
+    pub xpub: Option<String>,
 }
 
 impl Default for ChainConfig {
@@ -90,6 +93,7 @@ impl Default for ChainConfig {
             rpc: RpcConfig::default(),
             finality_depth: 6,
             enabled: false,
+            xpub: None,
         }
     }
 }

@@ -188,20 +188,50 @@ fn generate_wallet_for_chain(
 // Individual chain generators (for non-mnemonic wallet generation)
 
 fn generate_bitcoin(network: Network, state: &mut UnifiedStateManager) -> Result<()> {
+    use csv_keys::bip39::{derive_xpub, BitcoinNetwork};
     use csv_keys::bip44::derive_address_from_key;
-    use csv_keys::memory::SecretKey;
-    use rand::RngCore;
+    use csv_keys::memory::{Passphrase, SecretKey};
+    use csv_keys::file_keystore::FileKeystore;
 
-    let mut key_bytes = [0u8; 32];
-    rand::rngs::OsRng.fill_bytes(&mut key_bytes);
-    let secret_key = SecretKey::new(key_bytes);
+    // Generate a BIP-39 mnemonic for HD wallet derivation
+    let mnemonic_type = MnemonicType::Words12;
+    let mnemonic = Mnemonic::generate(mnemonic_type);
+    let mnemonic_str = mnemonic.as_str().to_string();
 
-    // Derive Bitcoin address using the keystore runtime
-    let address =
-        derive_address_from_key(secret_key.as_bytes(), &csv_core::ChainId::new("bitcoin"))
-            .map_err(|e| anyhow::anyhow!("Failed to derive address: {}", e))?;
+    // Convert mnemonic to 64-byte seed
+    let mnemonic_obj =
+        csv_keys::bip39::Mnemonic::from_phrase(&mnemonic_str).map_err(|e| anyhow::anyhow!("Invalid mnemonic: {}", e))?;
+    let seed = mnemonic_obj.to_seed(None);
+
+    // Derive BIP-86 xpub (safe to share, can derive addresses but not spend)
+    let bitcoin_network = match network {
+        Network::Main => BitcoinNetwork::Mainnet,
+        Network::Test => BitcoinNetwork::Testnet,
+        Network::Dev => BitcoinNetwork::Testnet,
+    };
+    let _xpub = derive_xpub(seed.as_bytes(), bitcoin_network, 0)
+        .map_err(|e| anyhow::anyhow!("Failed to derive xpub: {}", e))?;
+
+    // Derive first address from seed using existing bip44 utility
+    let address = derive_address_from_key(seed.as_bytes(), &csv_core::ChainId::new("bitcoin"))
+        .map_err(|e| anyhow::anyhow!("Failed to derive address: {}", e))?;
 
     state.store_address(Chain::new("bitcoin"), address.clone());
+
+    // Store private key in keystore for future signing
+    let mut keystore = FileKeystore::new(None)?;
+    let passphrase = Passphrase::new("default");
+    // Derive a 32-byte private key from the seed for signing
+    let mut key_bytes = [0u8; 32];
+    key_bytes.copy_from_slice(&seed.as_bytes()[..32]);
+    let secret_key = SecretKey::new(key_bytes);
+    keystore.store_key(
+        "bitcoin-0",
+        "bitcoin",
+        Some("Bitcoin Account (account 0)"),
+        &secret_key,
+        &passphrase,
+    )?;
 
     output::header("Bitcoin Wallet Generated");
     output::kv("Network", &network.to_string());
@@ -210,7 +240,7 @@ fn generate_bitcoin(network: Network, state: &mut UnifiedStateManager) -> Result
 
     println!();
     output::warning(
-        "Your private key has been generated. Use 'csv wallet export' to view it securely.",
+        "Your mnemonic phrase has been generated. Use 'csv wallet export' to view it securely.",
     );
 
     Ok(())
@@ -318,12 +348,68 @@ fn generate_solana(state: &mut UnifiedStateManager) -> Result<()> {
 }
 
 fn save_wallet_config(
-    _mnemonic: &str,
+    mnemonic: &str,
     addresses: &HashMap<Chain, String>,
     _config: &Config,
 ) -> Result<()> {
+    use csv_keys::bip39::{derive_xpub, BitcoinNetwork};
+    use csv_keys::bip39::Mnemonic as Bip39Mnemonic;
+
+    // Derive seed from mnemonic
+    let mnemonic_obj = Bip39Mnemonic::from_phrase(mnemonic)
+        .map_err(|e| anyhow::anyhow!("Invalid mnemonic: {}", e))?;
+    let seed = mnemonic_obj.to_seed(None);
+
+    // Load existing config to preserve other settings
+    let config_path = expand_path("~/.csv/config.toml");
+    let mut config_data = if std::path::Path::new(&config_path).exists() {
+        std::fs::read_to_string(&config_path)?
+    } else {
+        String::new()
+    };
+
+    // Derive and save Bitcoin xpub
+    if addresses.contains_key(&Chain::new("bitcoin")) {
+        let xpub = derive_xpub(seed.as_bytes(), BitcoinNetwork::Testnet, 0)
+            .map_err(|e| anyhow::anyhow!("Failed to derive xpub: {}", e))?;
+
+        // Add or update [wallets.bitcoin] section
+        let wallet_section = format!("[wallets.bitcoin]\nxpub = \"{}\"\n", xpub);
+
+        if config_data.contains("[wallets.bitcoin]") {
+            // Replace existing section
+            let start = config_data.find("[wallets.bitcoin]").unwrap();
+            let end = config_data[start..]
+                .find("\n[")
+                .map(|i| i + start + 1)
+                .unwrap_or(config_data.len());
+            config_data.replace_range(start..end, &wallet_section);
+        } else {
+            // Append new section
+            if !config_data.ends_with('\n') {
+                config_data.push('\n');
+            }
+            config_data.push_str(&wallet_section);
+        }
+    }
+
+    // Write updated config
+    std::fs::create_dir_all(expand_path("~/.csv"))?;
+    std::fs::write(&config_path, &config_data)?;
+
     output::info(&format!("Saved {} wallet addresses", addresses.len()));
+    output::info(&format!("Configuration saved to {}", config_path));
     Ok(())
+}
+
+/// Expand ~ to home directory
+fn expand_path(path: &str) -> String {
+    if let Some(stripped) = path.strip_prefix("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(stripped).to_string_lossy().to_string();
+        }
+    }
+    path.to_string()
 }
 
 /// Prompt user for a passphrase with confirmation.

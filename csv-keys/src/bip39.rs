@@ -7,6 +7,83 @@ use crate::memory::Seed;
 use std::str::FromStr;
 use thiserror::Error;
 
+/// Bitcoin network for xpub derivation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BitcoinNetwork {
+    /// Mainnet (xpub prefix)
+    Mainnet,
+    /// Testnet (tpub prefix)
+    Testnet,
+    /// Signet (tpub prefix)
+    Signet,
+    /// Regtest (tpub prefix)
+    Regtest,
+}
+
+impl BitcoinNetwork {
+    fn to_bitcoin_network(self) -> bitcoin::Network {
+        match self {
+            BitcoinNetwork::Mainnet => bitcoin::Network::Bitcoin,
+            BitcoinNetwork::Testnet => bitcoin::Network::Testnet,
+            BitcoinNetwork::Signet => bitcoin::Network::Signet,
+            BitcoinNetwork::Regtest => bitcoin::Network::Regtest,
+        }
+    }
+}
+
+/// Derive a BIP-86 extended public key (xpub) from a seed.
+///
+/// The xpub is derived at the account level: m/86'/coin_type'/account'
+/// This is safe to share publicly — it can derive all addresses for the account
+/// but cannot spend funds.
+///
+/// # Arguments
+/// * `seed` — 64-byte BIP-39 seed
+/// * `network` — Bitcoin network (determines xpub prefix: xpub vs tpub)
+/// * `account` — Account index (default 0)
+///
+/// # Returns
+/// The extended public key string (starts with "xpub" or "tpub")
+///
+/// # Example
+/// ```
+/// use csv_keys::bip39::{Mnemonic, MnemonicType, derive_xpub, BitcoinNetwork};
+///
+/// let mnemonic = Mnemonic::generate(MnemonicType::Words12);
+/// let seed = mnemonic.to_seed(None);
+/// let xpub = derive_xpub(seed.as_bytes(), BitcoinNetwork::Testnet, 0).unwrap();
+/// assert!(xpub.starts_with("tpub"));
+/// ```
+pub fn derive_xpub(seed: &[u8; 64], network: BitcoinNetwork, account: u32) -> Result<String, String> {
+    use bitcoin::bip32::{Xpriv, Xpub, DerivationPath};
+
+    let btc_net = network.to_bitcoin_network();
+
+    // Create master extended private key from seed
+    let master_xpriv = Xpriv::new_master(btc_net, seed)
+        .map_err(|e| format!("Failed to derive master key: {}", e))?;
+
+    // BIP-86: m/86'/coin_type'/account'
+    let coin_type = match network {
+        BitcoinNetwork::Mainnet => 0u32,
+        _ => 1u32,
+    };
+
+    let path = DerivationPath::from_str(&format!("m/86'/{}'/{}'", coin_type, account))
+        .map_err(|e| format!("Invalid derivation path: {}", e))?;
+
+    // Derive account-level extended private key
+    let account_xpriv = master_xpriv
+        .derive_priv(&secp256k1::Secp256k1::new(), &path)
+        .map_err(|e| format!("Failed to derive account key: {}", e))?;
+
+    // Convert to extended public key
+    let secp = secp256k1::Secp256k1::new();
+    let account_xpub = Xpub::from_priv(&secp, &account_xpriv);
+
+    Ok(account_xpub.to_string())
+}
+
 /// Error type for BIP-39 operations.
 #[derive(Debug, Error)]
 pub enum Bip39Error {

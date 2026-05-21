@@ -144,6 +144,12 @@ impl SealWallet {
         Self::from_seed(&seed, network).expect("valid seed")
     }
 
+    /// Return the master extended public key (xpub) as a string.
+    /// This is safe to share publicly — it can derive addresses but not spend.
+    pub fn xpub(&self) -> String {
+        Xpub::from_priv(&self.secp, &self.master_key).to_string()
+    }
+
     pub fn from_xpub(xpub: &str, network: Network) -> Result<Self, WalletError> {
         let extended_pub = Xpub::from_str(xpub)
             .map_err(|e| WalletError::InvalidKey(format!("Invalid xpub: {}", e)))?;
