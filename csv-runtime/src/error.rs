@@ -29,6 +29,34 @@ pub enum RuntimeError {
     /// Concurrent coordinator conflict
     #[error("Concurrent coordinator conflict: {0}")]
     ConcurrentConflict(String),
+
+    /// Lease conflict — another coordinator holds the lease
+    #[error("Lease conflict: {0}")]
+    LeaseConflict(String),
+
+    /// Lease expired during mint operation
+    #[error("Lease expired: {0}")]
+    LeaseExpired(String),
+
+    /// Replay detected — transfer already executed
+    #[error("Replay detected: transfer with this ReplayId already exists")]
+    ReplayDetected(ReplayId),
+
+    /// Mint failed after insert — needs recovery
+    #[error("Mint failed: {cause}")]
+    MintFailed { cause: String },
+
+    /// Finality not met for chain
+    #[error("Finality not met for chain {chain}: guarantee={guarantee:?}, required={required:?}")]
+    FinalityNotMet {
+        chain: csv_core::mcp::ChainId,
+        guarantee: csv_core::finality_guarantee::FinalityGuarantee,
+        required: csv_core::finality_guarantee::FinalityPolicy,
+    },
+
+    /// No policy registered for chain
+    #[error("No finality policy registered for chain {0}")]
+    NoPolicyForChain(csv_core::mcp::ChainId),
 }
 
 /// Errors specific to the transfer coordinator

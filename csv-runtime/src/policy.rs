@@ -80,7 +80,7 @@ impl RuntimePolicy {
 
     /// Get the required finality depth for a chain
     pub fn finality_depth_for_chain(&self, chain_id: &str) -> Option<u64> {
-        self.finality_depths.get(chain_id).copied()
+        self.finality_depths.get(chain_id).copied().or(Some(1))
     }
 
     /// Set the finality depth for a specific chain

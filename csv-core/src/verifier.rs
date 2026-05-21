@@ -48,6 +48,123 @@ use crate::proof::ProofBundle;
 use crate::signature::{Signature, SignatureScheme, verify_signatures};
 use serde::Serialize;
 
+/// Machine-readable error code for verification failures.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub enum VerificationErrorCode {
+    /// Seal was already consumed — replay attempt
+    SealReplay,
+    /// Signature verification failed
+    SignatureInvalid,
+    /// Inclusion proof verification failed
+    InclusionProofInvalid,
+    /// Finality requirements not met
+    FinalityNotReached,
+    /// Domain mismatch between proof and expected chain
+    DomainMismatch,
+    /// Proof structure is malformed
+    MalformedProof,
+    /// Proof exceeds maximum allowed size
+    ProofTooLarge,
+    /// Anchor reference is invalid
+    AnchorInvalid,
+    /// Internal verification error
+    InternalError,
+}
+
+/// Typed verification error with retryability semantics.
+#[derive(Debug, Clone, Serialize)]
+pub struct VerificationError {
+    /// Machine-readable error code for routing.
+    pub code: VerificationErrorCode,
+    /// Human-readable description.
+    pub message: String,
+    /// Whether retrying may succeed (transient vs permanent).
+    pub retryable: bool,
+}
+
+impl VerificationError {
+    /// Create a seal replay error (permanent — never retry).
+    pub fn seal_replay(seal_id: &[u8]) -> Self {
+        Self {
+            code: VerificationErrorCode::SealReplay,
+            message: format!("Seal {:?} already consumed — replay attempt", seal_id),
+            retryable: false,
+        }
+    }
+
+    /// Create a signature invalid error (permanent — never retry).
+    pub fn signature_invalid() -> Self {
+        Self {
+            code: VerificationErrorCode::SignatureInvalid,
+            message: "Signature verification failed".to_string(),
+            retryable: false,
+        }
+    }
+
+    /// Create an inclusion proof invalid error (permanent — never retry).
+    pub fn inclusion_proof_invalid(reason: &str) -> Self {
+        Self {
+            code: VerificationErrorCode::InclusionProofInvalid,
+            message: format!("Inclusion proof invalid: {}", reason),
+            retryable: false,
+        }
+    }
+
+    /// Create a finality not reached error (transient — retry after more confirmations).
+    pub fn finality_not_reached(confirmations: u64, required: u64) -> Self {
+        Self {
+            code: VerificationErrorCode::FinalityNotReached,
+            message: format!("{} confirmations, need {}", confirmations, required),
+            retryable: true,
+        }
+    }
+
+    /// Create a domain mismatch error (permanent — never retry).
+    pub fn domain_mismatch(expected: &str, found: &str) -> Self {
+        Self {
+            code: VerificationErrorCode::DomainMismatch,
+            message: format!("Domain mismatch: expected {}, found {}", expected, found),
+            retryable: false,
+        }
+    }
+
+    /// Create a malformed proof error (permanent — never retry).
+    pub fn malformed_proof(reason: &str) -> Self {
+        Self {
+            code: VerificationErrorCode::MalformedProof,
+            message: format!("Malformed proof: {}", reason),
+            retryable: false,
+        }
+    }
+
+    /// Create a proof too large error (permanent — never retry).
+    pub fn proof_too_large(actual: usize, max: usize) -> Self {
+        Self {
+            code: VerificationErrorCode::ProofTooLarge,
+            message: format!("Proof too large: {} bytes (max {})", actual, max),
+            retryable: false,
+        }
+    }
+
+    /// Create an anchor invalid error (permanent — never retry).
+    pub fn anchor_invalid(reason: &str) -> Self {
+        Self {
+            code: VerificationErrorCode::AnchorInvalid,
+            message: format!("Anchor invalid: {}", reason),
+            retryable: false,
+        }
+    }
+
+    /// Create an internal error (transient — may retry).
+    pub fn internal(reason: &str) -> Self {
+        Self {
+            code: VerificationErrorCode::InternalError,
+            message: format!("Internal error: {}", reason),
+            retryable: true,
+        }
+    }
+}
+
 /// Verify a proof bundle according to the CSV verification pipeline.
 ///
 /// This is the **primary entry point for proof verification**. It performs
@@ -105,7 +222,7 @@ pub struct VerificationResult {
     /// The verification level achieved.
     pub level: VerificationLevel,
     /// Errors encountered during verification (empty if valid).
-    pub errors: Vec<String>,
+    pub errors: Vec<VerificationError>,
     /// Warnings (non-fatal issues).
     pub warnings: Vec<String>,
 }
@@ -141,8 +258,8 @@ impl VerificationResult {
         }
     }
 
-    /// Failed result with errors.
-    pub fn failed(errors: Vec<String>) -> Self {
+    /// Failed result with typed errors.
+    pub fn failed(errors: Vec<VerificationError>) -> Self {
         Self {
             is_valid: false,
             level: VerificationLevel::StructuralOnly,
@@ -151,12 +268,46 @@ impl VerificationResult {
         }
     }
 
-    /// Failed result with a single error.
-    pub fn from_error(e: ProtocolError) -> Self {
+    /// Failed result with a single typed error.
+    pub fn from_verification_error(e: VerificationError) -> Self {
         Self {
             is_valid: false,
             level: VerificationLevel::StructuralOnly,
-            errors: vec![e.to_string()],
+            errors: vec![e],
+            warnings: Vec::new(),
+        }
+    }
+
+    /// Failed result from a ProtocolError, converted to typed error.
+    pub fn from_protocol_error(e: &ProtocolError) -> Self {
+        let error = match e {
+            ProtocolError::SealReplay(_) => {
+                VerificationError::seal_replay(&[])
+            }
+            ProtocolError::SignatureVerificationFailed(_) => {
+                VerificationError::signature_invalid()
+            }
+            ProtocolError::InclusionProofFailed(_) => {
+                VerificationError::inclusion_proof_invalid("verification failed")
+            }
+            ProtocolError::FinalityNotReached(msg) => {
+                // Parse confirmations from message if possible
+                let confirmations = msg.split(':').nth(1)
+                    .and_then(|s| s.split(',').next())
+                    .and_then(|s| s.trim().parse::<u64>().ok())
+                    .unwrap_or(0);
+                let required = msg.split(',').nth(1)
+                    .and_then(|s| s.split(':').nth(1))
+                    .and_then(|s| s.trim().parse::<u64>().ok())
+                    .unwrap_or(MIN_REQUIRED_CONFIRMATIONS);
+                VerificationError::finality_not_reached(confirmations, required)
+            }
+            _ => VerificationError::malformed_proof(&e.to_string()),
+        };
+        Self {
+            is_valid: false,
+            level: VerificationLevel::StructuralOnly,
+            errors: vec![error],
             warnings: Vec::new(),
         }
     }
@@ -200,7 +351,7 @@ pub fn verify_proof(
 ) -> VerificationResult {
     // Step 1: Validate proof bundle size (DoS protection)
     if let Err(e) = validate_proof_bundle_size(bundle) {
-        return VerificationResult::from_error(e);
+        return VerificationResult::from_protocol_error(&e);
     }
 
     // Step 2: Validate DAG structure
@@ -209,27 +360,27 @@ pub fn verify_proof(
         .validate_structure()
         .map_err(|e| ProtocolError::Generic(format!("Invalid DAG structure: {}", e)))
     {
-        return VerificationResult::from_error(e);
+        return VerificationResult::from_protocol_error(&e);
     }
 
     // Step 3: Validate proof timestamp (prevent replay of old proofs)
     if let Err(e) = validate_proof_timestamp(bundle) {
-        return VerificationResult::from_error(e);
+        return VerificationResult::from_protocol_error(&e);
     }
 
     // Step 4: Validate signatures with cryptographic verification
     if let Err(e) = verify_bundle_signatures(bundle, signature_scheme) {
-        return VerificationResult::from_error(e);
+        return VerificationResult::from_protocol_error(&e);
     }
 
     // Step 5: Validate domain separation (prevent cross-domain attacks)
     if let Err(e) = validate_domain_separation(bundle) {
-        return VerificationResult::from_error(e);
+        return VerificationResult::from_protocol_error(&e);
     }
 
     // Step 6: Validate seal reference (check for replay)
     if seal_registry(bundle.seal_ref.id.as_ref()) {
-        return VerificationResult::from_error(ProtocolError::SealReplay(format!(
+        return VerificationResult::from_protocol_error(&ProtocolError::SealReplay(format!(
             "Seal {:?} has already been used",
             bundle.seal_ref
         )));
@@ -237,17 +388,17 @@ pub fn verify_proof(
 
     // Step 7: Validate inclusion proof (chain-specific, validated by adapter)
     if let Err(e) = validate_inclusion_proof(&bundle.inclusion_proof) {
-        return VerificationResult::from_error(e);
+        return VerificationResult::from_protocol_error(&e);
     }
 
     // Step 8: Validate finality proof (chain-specific, validated by adapter)
     if let Err(e) = validate_finality_proof(&bundle.finality_proof) {
-        return VerificationResult::from_error(e);
+        return VerificationResult::from_protocol_error(&e);
     }
 
     // Step 9: Validate anchor reference integrity
     if let Err(e) = validate_anchor_reference(bundle) {
-        return VerificationResult::from_error(e);
+        return VerificationResult::from_protocol_error(&e);
     }
 
     VerificationResult::fully_verified()
@@ -695,7 +846,12 @@ mod tests {
         assert!(!result2.is_valid, "Double-spend attempt should be rejected");
 
         // Verify the error message indicates seal replay
-        let error_msg = result2.errors.join(", ");
+        let error_msg: String = result2
+            .errors
+            .iter()
+            .map(|e| format!("{:?}", e))
+            .collect::<Vec<_>>()
+            .join(", ");
         assert!(
             error_msg.contains("seal")
                 || error_msg.contains("replay")

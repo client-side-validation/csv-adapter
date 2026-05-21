@@ -67,6 +67,19 @@ pub enum ProtocolError {
         actual: u8,
     },
 
+    /// Unsupported protocol version
+    #[error("Unsupported protocol version: found {found}, max supported {max_supported}")]
+    UnsupportedVersion {
+        /// Version found in the data
+        found: u16,
+        /// Maximum version supported by this implementation
+        max_supported: u16,
+    },
+
+    /// Malformed envelope or data
+    #[error("Malformed envelope or data")]
+    MalformedEnvelope,
+
     /// Domain separator mismatch
     #[error("Domain separator mismatch")]
     DomainSeparatorMismatch,
@@ -157,6 +170,8 @@ impl HasErrorSuggestion for ProtocolError {
             ProtocolError::SerializationError(_) => error_codes::CORE_SERIALIZATION_ERROR,
             ProtocolError::InvalidConfig(_) => error_codes::CORE_INVALID_CONFIG,
             ProtocolError::VersionMismatch { .. } => error_codes::CORE_VERSION_MISMATCH,
+            ProtocolError::UnsupportedVersion { .. } => error_codes::CORE_VERSION_MISMATCH,
+            ProtocolError::MalformedEnvelope => error_codes::CORE_INVALID_CONFIG,
             ProtocolError::DomainSeparatorMismatch => error_codes::CORE_DOMAIN_SEPARATOR_MISMATCH,
             ProtocolError::SignatureVerificationFailed(_) => {
                 error_codes::CORE_SIGNATURE_VERIFICATION_FAILED
@@ -248,6 +263,18 @@ impl HasErrorSuggestion for ProtocolError {
                      Upgrade or downgrade to the correct protocol version.",
                     expected, actual
                 )
+            }
+            ProtocolError::UnsupportedVersion { found, max_supported } => {
+                format!(
+                    "Protocol version {} is not supported. Maximum supported version is {}. \
+                     Upgrade your client to a version that supports protocol v{}.",
+                    found, max_supported, max_supported
+                )
+            }
+            ProtocolError::MalformedEnvelope => {
+                "The envelope data is malformed or corrupted. Verify the data format \
+                 matches the expected canonical serialization."
+                    .to_string()
             }
             ProtocolError::DomainSeparatorMismatch => {
                 "The domain separator does not match. Ensure you are using \

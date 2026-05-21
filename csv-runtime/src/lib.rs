@@ -35,6 +35,7 @@ pub mod replay_db_rocksdb;
 pub mod replay_db_postgres;
 pub mod runtime_mode;
 pub mod transfer_coordinator;
+pub mod coordinator_lease;
 
 // Re-exports
 pub use adapter_registry::{AdapterRegistryImpl, ChainAdapter};
@@ -51,3 +52,9 @@ pub use policy::RuntimePolicy;
 pub use replay_db::{ReplayDatabase, ReplayDbError, ReplayEntryState};
 pub use runtime_mode::{CircuitBreaker, CircuitBreakerConfig as RuntimeCircuitBreakerConfig, CircuitBreakerState, HealthMonitor, HealthStatus, RuntimeMode};
 pub use transfer_coordinator::TransferCoordinator;
+
+// Coordinator lease re-exports
+pub use coordinator_lease::{
+    CoordinatorId, CoordinatorLease, InMemoryLease, LeaseError, LeaseGuard, MintCoordinator,
+    MintProvider, MintReceipt,
+};

@@ -10,6 +10,7 @@ use crate::error::RuntimeError;
 use crate::replay_db::{ReplayDatabase, ReplayDbError, ReplayEntryState};
 use async_trait::async_trait;
 use csv_core::proof::ReplayId;
+use csv_core::cross_chain::CrossChainRegistryEntry;
 use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, DBCompressionType, Options, DB};
 use std::sync::Arc;
 
@@ -225,6 +226,42 @@ impl ReplayDatabase for RocksReplayDb {
             .map_err(|e| RuntimeError::Storage(format!("RocksDB error: {e}")))?;
 
         Ok(())
+    }
+
+    async fn store_transfer_entry(
+        &self,
+        entry: &CrossChainRegistryEntry,
+    ) -> Result<(), RuntimeError> {
+        let key = entry.sanad_id.as_bytes().to_vec();
+        let val = serde_json::to_vec(entry)
+            .map_err(|e| RuntimeError::Storage(format!("Serialization error: {e}")))?;
+
+        let mut batch = rocksdb::WriteBatch::default();
+        batch.put_cf(self.cf_replay(), &key, &val);
+
+        self.db
+            .write(batch)
+            .map_err(|e| RuntimeError::Storage(format!("RocksDB write error: {e}")))?;
+
+        Ok(())
+    }
+
+    async fn load_all_transfers(
+        &self,
+    ) -> Result<Vec<CrossChainRegistryEntry>, RuntimeError> {
+        let mut transfers = Vec::new();
+        let db = &self.db;
+
+        for result in db.iterator_cf(self.cf_replay(), rocksdb::IteratorMode::Start) {
+            let (_key, value) = result.map_err(|e| {
+                RuntimeError::Storage(format!("RocksDB iterator error: {e}"))
+            })?;
+            let entry: CrossChainRegistryEntry = serde_json::from_slice(&value)
+                .map_err(|e| RuntimeError::Storage(format!("Serialization error: {e}")))?;
+            transfers.push(entry);
+        }
+
+        Ok(transfers)
     }
 }
 

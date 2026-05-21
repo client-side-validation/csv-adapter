@@ -75,6 +75,80 @@ impl CrossChainHashAlgorithm {
             }
         }
     }
+
+    /// Hash bytes with chain-specific domain separation.
+    ///
+    /// The domain tag binds the hash to a specific chain and operation context,
+    /// preventing cross-chain replay attacks where the same content on different
+    /// chains would produce identical hashes.
+    ///
+    /// # Domain Tag Format
+    /// `"csv-cross-chain-v1:{chain}:{domain}"`
+    pub fn hash_bytes_domain(
+        self,
+        chain: &ChainId,
+        domain: CrossChainDomain,
+        bytes: &[u8],
+    ) -> Hash {
+        use crate::tagged_hash::csv_tagged_hash;
+
+        // Build domain tag: "csv-cross-chain-v1:{chain}:{domain}"
+        let tag = format!(
+            "csv-cross-chain-v1:{}:{}",
+            chain.as_str(),
+            domain.as_str()
+        );
+
+        // Apply the chain's native hash, then wrap with tagged_hash for domain separation
+        let native_hash = self.raw_hash(bytes);
+        let final_hash = csv_tagged_hash(&tag, &native_hash);
+        Hash::new(final_hash)
+    }
+
+    /// Raw chain-native hash WITHOUT domain separation.
+    ///
+    /// ONLY for use when verifying chain-native Merkle proofs where the
+    /// raw hash must match what the chain itself produced.
+    pub(crate) fn raw_hash(self, bytes: &[u8]) -> [u8; 32] {
+        match self {
+            Self::DoubleSha256 => {
+                let first = Sha256::digest(bytes);
+                Sha256::digest(first).into()
+            }
+            Self::Sha256 => Sha256::digest(bytes).into(),
+            Self::Keccak256 => Keccak256::digest(bytes).into(),
+            Self::Sha3_256 => Sha3_256::digest(bytes).into(),
+        }
+    }
+}
+
+/// Domain context for cross-chain hashing operations.
+///
+/// Each domain represents a distinct cryptographic context.
+/// Hashes in different domains are cryptographically separated
+/// even if the underlying content is identical.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CrossChainDomain {
+    /// Hashing a lock event commitment
+    LockEventCommitment,
+    /// Hashing a state root
+    StateRoot,
+    /// Binding a proof to a transfer
+    ProofBinding,
+    /// Finality attestation
+    FinalityAttestation,
+}
+
+impl CrossChainDomain {
+    /// Convert domain to its string representation.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::LockEventCommitment => "lock-commitment",
+            Self::StateRoot => "state-root",
+            Self::ProofBinding => "proof-binding",
+            Self::FinalityAttestation => "finality-attestation",
+        }
+    }
 }
 
 /// Return the canonical signature scheme for a given chain.

@@ -12,23 +12,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Check for unwrap() calls
+
+      - name: Check for unwrap() calls in all production crates
         run: |
-          echo "Checking for forbidden unwrap() calls..."
-          if grep -r "\.unwrap()" --include="*.rs" csv-runtime/src csv-core/src; then
-            echo "ERROR: Found unwrap() calls. Use proper error handling instead."
-            exit 1
-          fi
-          
-      - name: Check for expect() calls
+          echo "Checking for forbidden unwrap() calls in all production crates..."
+          DIRS="csv-core/src csv-runtime/src csv-bitcoin/src csv-solana/src \
+                csv-ethereum/src csv-aptos/src csv-sui/src csv-celestia/src \
+                csv-sdk/src csv-cli/src"
+          FOUND=0
+          for dir in $DIRS; do
+            if [ -d "$dir" ]; then
+              if grep -r "\.unwrap()" --include="*.rs" "$dir" 2>/dev/null | grep -v "#\[cfg(test)\]" | grep -v "/tests/" | grep -v "/examples/"; then
+                echo "ERROR: unwrap() found in $dir"
+                FOUND=1
+              fi
+            fi
+          done
+          [ "$FOUND" -eq 0 ] || exit 1
+
+      - name: Check for expect() calls in all production crates
         run: |
-          echo "Checking for forbidden expect() calls..."
-          if grep -r "\.expect(" --include="*.rs" csv-runtime/src csv-core/src; then
-            echo "ERROR: Found expect() calls. Use proper error handling instead."
-            exit 1
-          fi
-          
+          echo "Checking for forbidden expect() calls in all production crates..."
+          DIRS="csv-core/src csv-runtime/src csv-bitcoin/src csv-solana/src \
+                csv-ethereum/src csv-aptos/src csv-sui/src csv-celestia/src \
+                csv-sdk/src csv-cli/src"
+          FOUND=0
+          for dir in $DIRS; do
+            if [ -d "$dir" ]; then
+              if grep -r "\.expect(" --include="*.rs" "$dir" 2>/dev/null | grep -v "#\[cfg(test)\]" | grep -v "/tests/" | grep -v "/examples/"; then
+                echo "ERROR: expect() found in $dir"
+                FOUND=1
+              fi
+            fi
+          done
+          [ "$FOUND" -eq 0 ] || exit 1
+
       - name: Check for todo!() macros
         run: |
           echo "Checking for forbidden todo!() macros..."
@@ -36,7 +54,7 @@ jobs:
             echo "ERROR: Found todo!() macros. Implement the functionality instead."
             exit 1
           fi
-          
+
       - name: Check for unsafe code
         run: |
           echo "Checking for unsafe blocks..."
@@ -157,14 +175,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
-      - name: Check for raw hashing in protocol logic
+
+      - name: Check for raw hashing in core/runtime/sdk
         run: |
-          echo "Checking for raw hashing in protocol logic..."
-          # Look for direct hash calls in protocol logic (should use domain-separated hashing)
-          if grep -r "sha256\|keccak\|blake" --include="*.rs" csv-core/src csv-runtime/src | grep -v "domain_separated\|Domain"; then
-            echo "WARNING: Found raw hashing in protocol logic."
-            echo "Use domain-separated hashing (DomainSeparatedHash) instead."
+          echo "Checking for raw hashing in core/runtime/sdk..."
+          # Sha256::digest / Keccak256::digest must not appear outside adapter raw_hash()
+          if grep -r --include="*.rs" 'Sha256::digest\|Keccak256::digest' \
+             csv-core/src csv-runtime/src csv-sdk/src 2>/dev/null | \
+             grep -v "raw_hash\|test\|#\[cfg(test)\]"; then
+            echo "ERROR: Raw hashing found in core/runtime/sdk — use csv_tagged_hash()"
+            exit 1
+          fi
+
+      - name: Check for raw hashing in adapters (must use domain separation)
+        run: |
+          echo "Checking for raw hashing in adapters..."
+          # Adapters should use CrossChainHashAlgorithm::hash_bytes_domain() for cross-chain ops
+          if grep -r --include="*.rs" 'Sha256::digest\|Keccak256::digest' \
+             csv-bitcoin/src csv-solana/src csv-ethereum/src csv-sui/src csv-aptos/src 2>/dev/null | \
+             grep -v "raw_hash\|test\|#\[cfg(test)\]\|proof_bytes\|merkle"; then
+            echo "WARNING: Raw hashing found in adapters — ensure domain separation is used."
           fi
 
   # WASM build verification
@@ -240,11 +270,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Forbidden Patterns | ${{ needs.forbidden-patterns.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Forbidden Patterns (all crates) | ${{ needs.forbidden-patterns.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Adapter Decisions | ${{ needs.adapter-decisions.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Replay Protection | ${{ needs.replay-protection.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Lease Ownership | ${{ needs.lease-ownership.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Policy Authority | ${{ needs.policy-authority.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Clippy Architectural | ${{ needs.clippy-architectural.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Raw Hashing | ${{ needs.raw-hashing.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Raw Hashing (domain separation) | ${{ needs.raw-hashing.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| MCP Contract Checks | ${{ needs.mcp-contract-checks.result }} |" >> $GITHUB_STEP_SUMMARY

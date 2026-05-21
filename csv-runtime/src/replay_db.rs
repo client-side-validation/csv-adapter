@@ -15,6 +15,7 @@
 
 
 use csv_core::proof::ReplayId;
+use csv_core::cross_chain::CrossChainRegistryEntry;
 use crate::error::RuntimeError;
 
 /// State of a replay entry
@@ -92,12 +93,29 @@ pub trait ReplayDatabase: Send + Sync {
 
     /// Mark a `Pending` entry as rolled-back (append-only: entry remains, state changes).
     async fn mark_rolled_back(&self, id: &ReplayId) -> Result<(), RuntimeError>;
+
+    /// Persist full transfer entry payload for later restore.
+    ///
+    /// This is called after `insert_if_absent` succeeds to store the
+    /// rich transfer metadata alongside the ReplayId CAS key.
+    async fn store_transfer_entry(
+        &self,
+        entry: &CrossChainRegistryEntry,
+    ) -> Result<(), RuntimeError>;
+
+    /// Load all persisted transfer entries (called once at startup).
+    ///
+    /// Used to rebuild the in-memory session index from durable storage.
+    async fn load_all_transfers(
+        &self,
+    ) -> Result<Vec<CrossChainRegistryEntry>, RuntimeError>;
 }
 
 /// In-memory implementation of ReplayDatabase for testing.
 /// Not suitable for production — does not provide durability or concurrent safety.
 pub struct InMemoryReplayDb {
     entries: std::sync::Arc<std::sync::RwLock<std::collections::HashMap<ReplayId, ReplayEntryState>>>,
+    transfer_entries: std::sync::Arc<std::sync::RwLock<std::collections::HashMap<String, CrossChainRegistryEntry>>>,
 }
 
 impl InMemoryReplayDb {
@@ -105,6 +123,9 @@ impl InMemoryReplayDb {
     pub fn new() -> Self {
         Self {
             entries: std::sync::Arc::new(std::sync::RwLock::new(
+                std::collections::HashMap::new(),
+            )),
+            transfer_entries: std::sync::Arc::new(std::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
         }
@@ -185,6 +206,23 @@ impl ReplayDatabase for InMemoryReplayDb {
                 format!("ReplayId {:?}", id.as_bytes()),
             )),
         }
+    }
+
+    async fn store_transfer_entry(
+        &self,
+        entry: &CrossChainRegistryEntry,
+    ) -> Result<(), RuntimeError> {
+        let key = hex::encode(entry.sanad_id);
+        let mut entries = self.transfer_entries.write().unwrap();
+        entries.insert(key, entry.clone());
+        Ok(())
+    }
+
+    async fn load_all_transfers(
+        &self,
+    ) -> Result<Vec<CrossChainRegistryEntry>, RuntimeError> {
+        let entries = self.transfer_entries.read().unwrap();
+        Ok(entries.values().cloned().collect())
     }
 }
 

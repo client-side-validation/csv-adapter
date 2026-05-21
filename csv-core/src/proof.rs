@@ -82,6 +82,36 @@ impl ReplayId {
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.id
     }
+
+    /// Derive a ReplayId from a cross-chain transfer proof.
+    ///
+    /// Binds together source chain, lock tx hash, source seal,
+    /// destination chain, and sanad ID for deterministic replay prevention.
+    pub fn from_cross_chain_proof(proof: &crate::cross_chain::CrossChainTransferProof) -> Self {
+        use crate::canonical::to_canonical_cbor;
+        use crate::tagged_hash::csv_tagged_hash;
+
+        #[derive(Serialize)]
+        struct CrossChainReplayInputs<'a> {
+            source_chain: &'a str,
+            lock_tx_hash: &'a [u8; 32],
+            source_seal: &'a [u8],
+            destination_chain: &'a str,
+            sanad_id: &'a [u8; 32],
+        }
+
+        let inputs = CrossChainReplayInputs {
+            source_chain: proof.lock_event.source_chain.as_str(),
+            lock_tx_hash: proof.lock_event.source_tx_hash.as_bytes(),
+            source_seal: &proof.lock_event.source_seal.id,
+            destination_chain: proof.lock_event.destination_chain.as_str(),
+            sanad_id: proof.lock_event.sanad_id.as_bytes(),
+        };
+
+        let cbor = to_canonical_cbor(&inputs).unwrap_or_default();
+        let id = csv_tagged_hash("csv-cross-chain-replay.v1", &cbor);
+        ReplayId { version: Self::CURRENT_VERSION, id }
+    }
 }
 
 #[cfg(test)]

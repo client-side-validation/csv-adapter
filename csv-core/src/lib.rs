@@ -135,6 +135,22 @@ pub mod replay_registry;
 pub mod sanad;
 pub mod seal_protocol;
 
+  // Adapter boundary — adapters are data providers, not verifiers
+#[allow(missing_docs)]
+pub mod adapter;
+
+// Typed finality guarantee — chain-agnostic, runtime-enforceable
+#[allow(missing_docs)]
+pub mod finality_guarantee;
+
+// Canonical Sanad Envelope — chain-agnostic, version-stable identity
+#[allow(missing_docs)]
+pub mod envelope;
+
+// Canonical event model with causality chains
+#[allow(missing_docs)]
+pub mod event;
+
 // DAG and proof types - 🔒 STABLE
 pub mod dag;
 pub mod proof;
@@ -268,11 +284,27 @@ pub use events::{
 pub use client::{ValidationClient, ValidationResult};
 pub use cross_chain::{
     CrossChainHashAlgorithm, CrossChainLockEvent, CrossChainRegistry, CrossChainRegistryEntry,
-    CrossChainTransferProof, StandardTransferVerifier,
+    CrossChainTransferProof, StandardTransferVerifier, CrossChainDomain,
 };
 pub use nullifier::{
     DoubleSpendError, OptimizedSealNullifier, SealConsumption, SealNullifier,
 };
+
+// Adapter boundary
+pub use adapter::{
+    ChainAdapter, ChainContext, InclusionVerifier, RawAnchorData,
+    RawInclusionProof, VerifiedInclusion,
+};
+pub use adapter::InclusionProofType as AdapterInclusionProofType;
+
+// Finality guarantee
+pub use finality_guarantee::{FinalityGuarantee, FinalityPolicy, FinalityPolicyRegistry};
+
+// Canonical envelope
+pub use envelope::{CanonicalSanadEnvelope, EncodingType, SignatureScheme as EnvelopeSignatureScheme, TypeId, decode_envelope};
+
+// Canonical events
+pub use event::{CanonicalEvent, EventLog, EventType, InMemoryEventLog};
 
 // ===========================================================================
 // Re-exports: Beta API (may receive additive changes)
