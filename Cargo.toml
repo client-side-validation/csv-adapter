@@ -25,9 +25,9 @@ members = [
     "csv-explorer/storage",
     "csv-explorer/indexer",
     "csv-stark",
-    "typescript-sdk/wasm",
-    "xtask",
-    "fuzz",
+    "csv-ts-sdk/wasm",
+    "csv-xtask",
+    "csv-fuzz",
 ]
 
 [workspace.package]
